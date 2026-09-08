@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#f5f7fb" />
+  <title>饭醉工具箱</title>
+  <style>
+    :root{
+      --bg:#f5f7fb;
+      --card:rgba(255,255,255,.78);
+      --card-solid:#ffffff;
+      --text:#182033;
+      --muted:#7b859c;
+      --line:rgba(24,32,51,.08);
+      --shadow:0 12px 32px rgba(45,60,90,.10);
+      --accent:#ffb547;
+      --accent2:#7c8cff;
+      --radius:24px;
+    }
+
+    [data-theme="dark"]{
+      --bg:#10131a;
+      --card:rgba(28,33,45,.84);
+      --card-solid:#1b2030;
+      --text:#f4f6fb;
+      --muted:#9da6bb;
+      --line:rgba(255,255,255,.08);
+      --shadow:0 14px 36px rgba(0,0,0,.28);
+    }
+
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{
+      margin:0;
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(124,140,255,.14), transparent 34%),
+        radial-gradient(circle at top right, rgba(255,181,71,.15), transparent 30%),
+        var(--bg);
+      color:var(--text);
+      min-height:100vh;
+      transition:background .25s,color .25s;
+    }
+
+    .page{
+      width:min(1120px,100%);
+      margin:0 auto;
+      padding:calc(22px + env(safe-area-inset-top)) 18px calc(36px + env(safe-area-inset-bottom));
+    }
+
+    .topbar{
+      display:flex;
+      justify-content:space-between;
+      gap:16px;
+      align-items:center;
+      margin-bottom:26px;
+    }
+
+    .brand h1{
+      margin:0;
+      font-size:clamp(30px,6vw,54px);
+      letter-spacing:-1.5px;
+      line-height:1.05;
+    }
+
+    .brand p{
+      margin:10px 0 0;
+      color:var(--muted);
+      font-size:14px;
+    }
+
+    .theme-btn{
+      border:1px solid var(--line);
+      background:var(--card);
+      backdrop-filter:blur(18px);
+      color:var(--text);
+      width:46px;
+      height:46px;
+      border-radius:16px;
+      box-shadow:var(--shadow);
+      cursor:pointer;
+      font-size:20px;
+      flex:0 0 auto;
+    }
+
+    .hero{
+      border:1px solid var(--line);
+      background:
+        linear-gradient(135deg, rgba(124,140,255,.18), rgba(255,181,71,.12)),
+        var(--card);
+      backdrop-filter:blur(18px);
+      border-radius:30px;
+      padding:24px;
+      box-shadow:var(--shadow);
+      margin-bottom:20px;
+    }
+
+    .hero-badge{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      background:rgba(255,255,255,.55);
+      border:1px solid var(--line);
+      padding:8px 12px;
+      border-radius:999px;
+      font-size:13px;
+      color:var(--muted);
+    }
+
+    [data-theme="dark"] .hero-badge{background:rgba(255,255,255,.05)}
+
+    .hero h2{
+      margin:18px 0 8px;
+      font-size:clamp(24px,4.4vw,38px);
+    }
+
+    .hero p{
+      margin:0;
+      color:var(--muted);
+      line-height:1.7;
+      max-width:760px;
+    }
+
+    .controls{
+      display:grid;
+      grid-template-columns:1fr;
+      gap:12px;
+      margin:18px 0 28px;
+    }
+
+    .search{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:18px;
+      padding:0 14px;
+      box-shadow:var(--shadow);
+    }
+
+    .search input{
+      width:100%;
+      border:none;
+      outline:none;
+      background:transparent;
+      color:var(--text);
+      padding:15px 0;
+      font-size:15px;
+    }
+
+    .filters{
+      display:flex;
+      gap:8px;
+      overflow:auto;
+      padding-bottom:2px;
+      scrollbar-width:none;
+    }
+    .filters::-webkit-scrollbar{display:none}
+
+    .filter-btn{
+      white-space:nowrap;
+      border:1px solid var(--line);
+      background:var(--card);
+      color:var(--muted);
+      padding:10px 14px;
+      border-radius:999px;
+      cursor:pointer;
+      font-size:14px;
+    }
+
+    .filter-btn.active{
+      background:var(--text);
+      color:var(--bg);
+      border-color:transparent;
+    }
+
+    .section-head{
+      display:flex;
+      justify-content:space-between;
+      align-items:end;
+      gap:16px;
+      margin:8px 2px 14px;
+    }
+
+    .section-head h3{
+      margin:0;
+      font-size:22px;
+    }
+
+    .section-head span{
+      color:var(--muted);
+      font-size:13px;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:14px;
+    }
+
+    .tool-card{
+      position:relative;
+      display:block;
+      text-decoration:none;
+      color:inherit;
+      min-height:170px;
+      padding:18px;
+      border-radius:var(--radius);
+      border:1px solid var(--line);
+      background:var(--card);
+      backdrop-filter:blur(18px);
+      box-shadow:var(--shadow);
+      transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+      overflow:hidden;
+    }
+
+    .tool-card:hover{transform:translateY(-3px)}
+    .tool-card:active{transform:scale(.985)}
+
+    .tool-card::after{
+      content:"";
+      position:absolute;
+      inset:auto -28px -36px auto;
+      width:110px;
+      height:110px;
+      border-radius:50%;
+      background:var(--glow, rgba(124,140,255,.13));
+      filter:blur(1px);
+    }
+
+    .icon{
+      font-size:40px;
+      line-height:1;
+      margin-bottom:20px;
+    }
+
+    .tool-card h4{
+      margin:0 0 7px;
+      font-size:18px;
+    }
+
+    .tool-card p{
+      margin:0;
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.5;
+      max-width:88%;
+    }
+
+    .arrow{
+      position:absolute;
+      right:16px;
+      top:16px;
+      width:32px;
+      height:32px;
+      border-radius:50%;
+      display:grid;
+      place-items:center;
+      background:rgba(255,255,255,.55);
+      border:1px solid var(--line);
+      color:var(--muted);
+      z-index:2;
+    }
+    [data-theme="dark"] .arrow{background:rgba(255,255,255,.06)}
+
+    .featured{
+      margin-bottom:28px;
+    }
+
+    .featured .tool-card:first-child{
+      --glow:rgba(255,125,99,.16);
+    }
+
+    .empty{
+      grid-column:1/-1;
+      text-align:center;
+      color:var(--muted);
+      padding:34px 16px;
+      border:1px dashed var(--line);
+      border-radius:22px;
+      background:var(--card);
+    }
+
+    footer{
+      text-align:center;
+      color:var(--muted);
+      font-size:12px;
+      padding-top:30px;
+    }
+
+    .tip{
+      margin-top:28px;
+      border:1px solid var(--line);
+      background:var(--card);
+      border-radius:22px;
+      padding:18px;
+      color:var(--muted);
+      line-height:1.65;
+      font-size:13px;
+    }
+
+    @media (min-width:700px){
+      .controls{
+        grid-template-columns:1.4fr 1fr;
+        align-items:center;
+      }
+      .grid{
+        grid-template-columns:repeat(3,minmax(0,1fr));
+      }
+      .tool-card{
+        min-height:185px;
+      }
+    }
+
+    @media (min-width:980px){
+      .grid{
+        grid-template-columns:repeat(4,minmax(0,1fr));
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="topbar">
+      <div class="brand">
+        <h1>饭醉工具箱 🍻</h1>
+        <p>今晚吃什么 · 随机决策 · 朋友聚会小互动</p>
+      </div>
+      <button class="theme-btn" id="themeBtn" aria-label="切换深浅色">🌙</button>
+    </header>
+
+    <section class="hero">
+      <span class="hero-badge">🎉 Friends · Food · Fun</span>
+      <h2>少纠结一点，多开心一点。</h2>
+      <p>把聚餐、分组、抽签和各种“到底选哪个”的问题，都交给随机。这个页面只负责导航，具体工具独立放在各自文件夹里，后期新增或修改都更方便。</p>
+    </section>
+
+    <section class="controls">
+      <label class="search">
+        <span>🔎</span>
+        <input id="searchInput" type="search" placeholder="搜索：吃什么、抽签、转盘、分组…" />
+      </label>
+      <div class="filters" id="filters"></div>
+    </section>
+
+    <section class="featured">
+      <div class="section-head">
+        <h3>🔥 热门推荐</h3>
+        <span>最常用的几个</span>
+      </div>
+      <div class="grid" id="featuredGrid"></div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h3>🧰 全部工具</h3>
+        <span id="countText"></span>
+      </div>
+      <div class="grid" id="toolsGrid"></div>
+    </section>
+
+    <div class="tip">
+      <strong>后期新增工具：</strong>
+      只需要在本文件底部的 <code>TOOLS</code> 数组中新增一条数据，并创建对应文件夹，例如 <code>./dice/index.html</code>。无需改页面结构。
+    </div>
+
+    <footer>© 2026 饭醉工具箱 · Made for good food and good friends.</footer>
+  </main>
+
+  <script>
+    // =========================================================
+    // 只需要维护这里：新增工具 = 新增一个对象
+    // category 可用：吃喝 / 随机 / 聚会 / 实用
+    // featured: true 会出现在“热门推荐”
+    // =========================================================
+    const TOOLS = [
+      {
+        name: "今晚吃什么",
+        desc: "吃饭选择困难症终结器",
+        icon: "🍜",
+        url: "./dinner/",
+        category: "吃喝",
+        featured: true
+      },
+      {
+        name: "随机抽签",
+        desc: "支持公平抽取与不放回",
+        icon: "🎲",
+        url: "./draw/",
+        category: "随机",
+        featured: true
+      },
+      {
+        name: "随机排序",
+        desc: "一键打乱顺序，适合排位与分工",
+        icon: "🔀",
+        url: "./shuffle/",
+        category: "随机",
+        featured: true
+      },
+      {
+        name: "真心话大冒险",
+        desc: "聚会气氛快速升温",
+        icon: "🎯",
+        url: "./truth-or-dare/",
+        category: "聚会"
+      },
+      {
+        name: "喝酒小游戏",
+        desc: "适度娱乐，快乐加倍",
+        icon: "🍻",
+        url: "./drinking-game/",
+        category: "吃喝"
+      },
+      {
+        name: "决策器",
+        desc: "选人、选事、做决定",
+        icon: "🧭",
+        url: "./decision/",
+        category: "随机"
+      },
+      {
+        name: "抛硬币",
+        desc: "正面还是反面？",
+        icon: "🪙",
+        url: "./coin/",
+        category: "随机"
+      },
+      {
+        name: "随机数",
+        desc: "指定范围，一键生成",
+        icon: "🔢",
+        url: "./random-number/",
+        category: "随机"
+      },
+      {
+        name: "分组工具",
+        desc: "快速随机分组，聚会必备",
+        icon: "👥",
+        url: "./groups/",
+        category: "聚会"
+      },
+      {
+        name: "待办清单",
+        desc: "聚会、旅行、日常事项清单",
+        icon: "📋",
+        url: "./todo/",
+        category: "实用"
+      }
+    ];
+
+    const filtersEl = document.getElementById("filters");
+    const toolsGrid = document.getElementById("toolsGrid");
+    const featuredGrid = document.getElementById("featuredGrid");
+    const searchInput = document.getElementById("searchInput");
+    const countText = document.getElementById("countText");
+    const themeBtn = document.getElementById("themeBtn");
+
+    let currentCategory = "全部";
+    let keyword = "";
+
+    const categories = ["全部", ...new Set(TOOLS.map(t => t.category))];
+
+    function toolCard(tool){
+      const colors = {
+        "吃喝":"rgba(255,181,71,.18)",
+        "随机":"rgba(124,140,255,.16)",
+        "聚会":"rgba(255,104,145,.14)",
+        "实用":"rgba(73,196,154,.15)"
+      };
+
+      return `
+        <a class="tool-card" href="${tool.url}" style="--glow:${colors[tool.category] || 'rgba(124,140,255,.13)'}">
+          <span class="arrow">→</span>
+          <div class="icon">${tool.icon}</div>
+          <h4>${tool.name}</h4>
+          <p>${tool.desc}</p>
+        </a>
+      `;
+    }
+
+    function renderFilters(){
+      filtersEl.innerHTML = categories.map(cat => `
+        <button class="filter-btn ${cat === currentCategory ? "active" : ""}" data-cat="${cat}">
+          ${cat}
+        </button>
+      `).join("");
+
+      filtersEl.querySelectorAll(".filter-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          currentCategory = btn.dataset.cat;
+          renderFilters();
+          renderTools();
+        });
+      });
+    }
+
+    function renderTools(){
+      const result = TOOLS.filter(tool => {
+        const matchCategory = currentCategory === "全部" || tool.category === currentCategory;
+        const text = `${tool.name} ${tool.desc} ${tool.category}`.toLowerCase();
+        const matchKeyword = text.includes(keyword.toLowerCase());
+        return matchCategory && matchKeyword;
+      });
+
+      countText.textContent = `${result.length} 个工具`;
+      toolsGrid.innerHTML = result.length
+        ? result.map(toolCard).join("")
+        : `<div class="empty">没有找到匹配的工具 👀</div>`;
+    }
+
+    function renderFeatured(){
+      featuredGrid.innerHTML = TOOLS
+        .filter(t => t.featured)
+        .slice(0, 4)
+        .map(toolCard)
+        .join("");
+    }
+
+    searchInput.addEventListener("input", e => {
+      keyword = e.target.value.trim();
+      renderTools();
+    });
+
+    function setTheme(theme){
+      document.documentElement.setAttribute("data-theme", theme);
+      localStorage.setItem("fan-zui-theme", theme);
+      themeBtn.textContent = theme === "dark" ? "☀️" : "🌙";
+    }
+
+    const savedTheme = localStorage.getItem("fan-zui-theme");
+    const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    setTheme(savedTheme || (systemDark ? "dark" : "light"));
+
+    themeBtn.addEventListener("click", () => {
+      const now = document.documentElement.getAttribute("data-theme");
+      setTheme(now === "dark" ? "light" : "dark");
+    });
+
+    renderFilters();
+    renderFeatured();
+    renderTools();
+  </script>
+</body>
+</html>
