@@ -1,0 +1,398 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#f6f7fb" />
+  <title>抛硬币｜工具箱</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    :root {
+      --bg: #f6f7fb;
+      --card: rgba(255, 255, 255, 0.9);
+      --text: #15171c;
+      --sub: #717680;
+      --line: rgba(0, 0, 0, 0.08);
+      --shadow: 0 18px 45px rgba(33, 39, 52, 0.12);
+      --coin1: #ffd86a;
+      --coin2: #e7a91f;
+      --coinEdge: #b97c0a;
+    }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background:
+        radial-gradient(circle at 20% 10%, rgba(255, 221, 120, .24), transparent 30%),
+        radial-gradient(circle at 90% 80%, rgba(122, 169, 255, .18), transparent 34%),
+        var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display",
+        "PingFang SC", "Microsoft YaHei", sans-serif;
+      overscroll-behavior: none;
+    }
+
+    body {
+      min-height: 100dvh;
+      display: flex;
+      justify-content: center;
+      padding:
+        max(18px, env(safe-area-inset-top))
+        16px
+        max(22px, env(safe-area-inset-bottom));
+    }
+
+    .app {
+      width: min(100%, 520px);
+      min-height: calc(100dvh - 40px);
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 44px;
+    }
+
+    .back {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 42px;
+      padding: 0 14px;
+      border-radius: 14px;
+      color: var(--text);
+      background: rgba(255,255,255,.72);
+      border: 1px solid var(--line);
+      text-decoration: none;
+      font-size: 15px;
+      font-weight: 650;
+      backdrop-filter: blur(14px);
+    }
+
+    .title-wrap h1 {
+      margin: 8px 0 4px;
+      font-size: clamp(30px, 8vw, 42px);
+      letter-spacing: -0.04em;
+      line-height: 1.05;
+    }
+
+    .title-wrap p {
+      margin: 0;
+      color: var(--sub);
+      font-size: 15px;
+    }
+
+    .card {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: var(--card);
+      border: 1px solid rgba(255,255,255,.9);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+      padding: 28px 20px 24px;
+      overflow: hidden;
+    }
+
+    .coin-stage {
+      width: 100%;
+      min-height: 285px;
+      display: grid;
+      place-items: center;
+      perspective: 900px;
+      touch-action: manipulation;
+      user-select: none;
+      cursor: pointer;
+    }
+
+    .coin {
+      position: relative;
+      width: min(48vw, 190px);
+      aspect-ratio: 1;
+      transform-style: preserve-3d;
+      transition: transform 1.15s cubic-bezier(.2,.75,.25,1);
+    }
+
+    .coin.flipping {
+      transition: transform 1.2s cubic-bezier(.18,.72,.16,1);
+    }
+
+    .face {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      backface-visibility: hidden;
+      background:
+        radial-gradient(circle at 35% 25%, #fff1a8 0 10%, transparent 26%),
+        linear-gradient(145deg, var(--coin1), var(--coin2));
+      border: 8px solid var(--coinEdge);
+      box-shadow:
+        inset 0 0 0 5px rgba(255,255,255,.22),
+        inset -12px -15px 24px rgba(120,70,0,.16),
+        0 20px 30px rgba(153,104,0,.22);
+      font-weight: 900;
+      font-size: clamp(44px, 13vw, 72px);
+      color: #7a4e00;
+      text-shadow: 0 2px 0 rgba(255,255,255,.35);
+    }
+
+    .face.back {
+      transform: rotateY(180deg);
+    }
+
+    .face::after {
+      content: "";
+      position: absolute;
+      inset: 11px;
+      border: 2px dashed rgba(121,77,0,.35);
+      border-radius: 50%;
+    }
+
+    .result {
+      min-height: 48px;
+      margin-top: 2px;
+      text-align: center;
+    }
+
+    .result strong {
+      display: block;
+      font-size: 30px;
+      letter-spacing: -0.03em;
+    }
+
+    .result span {
+      display: block;
+      margin-top: 6px;
+      color: var(--sub);
+      font-size: 14px;
+    }
+
+    .primary {
+      width: 100%;
+      min-height: 58px;
+      border: 0;
+      border-radius: 18px;
+      margin-top: 18px;
+      background: #17191f;
+      color: white;
+      font-size: 18px;
+      font-weight: 750;
+      cursor: pointer;
+      touch-action: manipulation;
+      box-shadow: 0 10px 22px rgba(20,20,25,.18);
+    }
+
+    .primary:active {
+      transform: scale(.985);
+    }
+
+    .primary:disabled {
+      opacity: .55;
+    }
+
+    .stats {
+      width: 100%;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .stat {
+      min-width: 0;
+      padding: 13px 8px;
+      text-align: center;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(248,249,252,.9);
+    }
+
+    .stat b {
+      display: block;
+      font-size: 20px;
+    }
+
+    .stat small {
+      display: block;
+      margin-top: 3px;
+      color: var(--sub);
+      font-size: 12px;
+    }
+
+    .reset {
+      margin-top: 14px;
+      border: 0;
+      background: transparent;
+      color: #7a7f89;
+      padding: 10px 16px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .hint {
+      text-align: center;
+      color: var(--sub);
+      font-size: 12px;
+      padding-bottom: 2px;
+    }
+
+    @media (max-height: 690px) {
+      .coin-stage { min-height: 220px; }
+      .coin { width: min(39vw, 155px); }
+      .card { padding-top: 18px; }
+      .title-wrap h1 { font-size: 30px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .coin { transition-duration: .35s !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <div class="topbar">
+      <a class="back" href="../" aria-label="返回工具箱">← 工具箱</a>
+    </div>
+
+    <section class="title-wrap">
+      <h1>抛硬币</h1>
+      <p>正面还是反面？交给概率。</p>
+    </section>
+
+    <section class="card">
+      <div class="coin-stage" id="coinStage" role="button" tabindex="0" aria-label="点击抛硬币">
+        <div class="coin" id="coin">
+          <div class="face front">正</div>
+          <div class="face back">反</div>
+        </div>
+      </div>
+
+      <div class="result" aria-live="polite">
+        <strong id="resultText">准备好了</strong>
+        <span id="resultSub">点击硬币或下方按钮开始</span>
+      </div>
+
+      <button class="primary" id="flipBtn">抛一次</button>
+
+      <div class="stats">
+        <div class="stat">
+          <b id="totalCount">0</b>
+          <small>总次数</small>
+        </div>
+        <div class="stat">
+          <b id="headsCount">0</b>
+          <small>正面</small>
+        </div>
+        <div class="stat">
+          <b id="tailsCount">0</b>
+          <small>反面</small>
+        </div>
+      </div>
+
+      <button class="reset" id="resetBtn">重置统计</button>
+    </section>
+
+    <div class="hint">每次抛掷正反面概率均为 50%</div>
+  </main>
+
+  <script>
+    const coin = document.getElementById('coin');
+    const coinStage = document.getElementById('coinStage');
+    const flipBtn = document.getElementById('flipBtn');
+    const resetBtn = document.getElementById('resetBtn');
+
+    const resultText = document.getElementById('resultText');
+    const resultSub = document.getElementById('resultSub');
+    const totalCount = document.getElementById('totalCount');
+    const headsCount = document.getElementById('headsCount');
+    const tailsCount = document.getElementById('tailsCount');
+
+    let total = 0;
+    let heads = 0;
+    let tails = 0;
+    let currentRotation = 0;
+    let busy = false;
+
+    function updateStats() {
+      totalCount.textContent = total;
+      headsCount.textContent = heads;
+      tailsCount.textContent = tails;
+    }
+
+    function flipCoin() {
+      if (busy) return;
+      busy = true;
+      flipBtn.disabled = true;
+
+      const isHeads = Math.random() < 0.5;
+      const extraSpins = 5 + Math.floor(Math.random() * 3);
+      const endRotation = isHeads ? 0 : 180;
+
+      currentRotation += extraSpins * 360;
+      const normalized = currentRotation % 360;
+      currentRotation += (endRotation - normalized + 360) % 360;
+
+      resultText.textContent = '抛掷中…';
+      resultSub.textContent = '硬币正在空中翻转';
+      coin.classList.add('flipping');
+      coin.style.transform =
+        `translateY(-10px) rotateX(${extraSpins * 24}deg) rotateY(${currentRotation}deg)`;
+
+      if (navigator.vibrate) navigator.vibrate(18);
+
+      setTimeout(() => {
+        total++;
+        if (isHeads) heads++;
+        else tails++;
+
+        resultText.textContent = isHeads ? '正面' : '反面';
+        resultSub.textContent = isHeads ? '这次是正面朝上' : '这次是反面朝上';
+        updateStats();
+
+        coin.style.transform =
+          `translateY(0) rotateX(0deg) rotateY(${currentRotation}deg)`;
+
+        if (navigator.vibrate) navigator.vibrate([18, 35, 18]);
+
+        setTimeout(() => {
+          busy = false;
+          flipBtn.disabled = false;
+          coin.classList.remove('flipping');
+        }, 180);
+      }, 1050);
+    }
+
+    flipBtn.addEventListener('click', flipCoin);
+    coinStage.addEventListener('click', flipCoin);
+
+    coinStage.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        flipCoin();
+      }
+    });
+
+    resetBtn.addEventListener('click', () => {
+      if (busy) return;
+      total = heads = tails = 0;
+      updateStats();
+      resultText.textContent = '已重置';
+      resultSub.textContent = '点击硬币继续';
+    });
+  </script>
+</body>
+</html>
