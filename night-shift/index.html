@@ -1,1 +1,3164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
 
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover"
+  >
+
+  <meta
+    name="robots"
+    content="noindex,nofollow,noarchive"
+  >
+
+  <meta name="theme-color" content="#10131d">
+
+  <title>夜班日历｜钊的工具箱</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    :root {
+      --bg: #10131d;
+      --bg2: #171c2a;
+      --card: rgba(255,255,255,.075);
+      --card2: rgba(255,255,255,.10);
+      --border: rgba(255,255,255,.10);
+      --text: #f6f7fb;
+      --muted: #9ca5b8;
+      --accent: #d9c7ff;
+      --accent2: #8fb7ff;
+      --danger: #ff818f;
+      --success: #89dfb0;
+      --shadow: 0 20px 50px rgba(0,0,0,.28);
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+    }
+
+    body {
+      min-height: 100dvh;
+
+      font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "SF Pro Display",
+        "PingFang SC",
+        "Microsoft YaHei",
+        sans-serif;
+
+      color: var(--text);
+
+      background:
+        radial-gradient(
+          circle at 20% 0%,
+          rgba(108,91,186,.28),
+          transparent 32%
+        ),
+        radial-gradient(
+          circle at 90% 15%,
+          rgba(68,120,190,.20),
+          transparent 28%
+        ),
+        linear-gradient(
+          180deg,
+          #171a27 0%,
+          #0d1018 100%
+        );
+
+      padding:
+        max(16px, env(safe-area-inset-top))
+        14px
+        max(28px, env(safe-area-inset-bottom));
+    }
+
+    button,
+    input,
+    textarea,
+    select {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .page {
+      width: min(100%, 720px);
+      margin: 0 auto;
+    }
+
+    /* =========================
+       顶部
+       ========================= */
+
+    .topbar {
+      min-height: 46px;
+
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+
+      gap: 12px;
+
+      margin-bottom: 18px;
+    }
+
+    .back {
+      min-height: 42px;
+
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+
+      padding: 0 14px;
+
+      color: var(--text);
+
+      text-decoration: none;
+
+      border: 1px solid var(--border);
+      border-radius: 15px;
+
+      background: rgba(255,255,255,.06);
+
+      backdrop-filter: blur(16px);
+
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .user-area {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .user-name {
+      color: #ddddea;
+      font-size: 13px;
+    }
+
+    .logout-btn {
+      min-height: 40px;
+
+      padding: 0 12px;
+
+      border: 1px solid var(--border);
+      border-radius: 13px;
+
+      background: rgba(255,255,255,.06);
+      color: var(--text);
+
+      font-size: 13px;
+    }
+
+    /* =========================
+       Login
+       ========================= */
+
+    .login-page {
+      min-height: calc(100dvh - 90px);
+
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .login-card {
+      width: 100%;
+
+      padding: 30px 20px;
+
+      border-radius: 30px;
+      border: 1px solid var(--border);
+
+      background:
+        linear-gradient(
+          145deg,
+          rgba(255,255,255,.095),
+          rgba(255,255,255,.045)
+        );
+
+      box-shadow: var(--shadow);
+
+      backdrop-filter: blur(22px);
+
+      text-align: center;
+    }
+
+    .moon {
+      font-size: 54px;
+      margin-bottom: 8px;
+    }
+
+    .login-card h1 {
+      margin: 0;
+
+      font-size: 36px;
+      letter-spacing: -.04em;
+    }
+
+    .login-card .subtitle {
+      margin: 10px 0 27px;
+
+      color: var(--muted);
+
+      line-height: 1.7;
+      font-size: 14px;
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+
+      text-align: left;
+    }
+
+    .form-group label {
+      display: block;
+
+      margin: 0 2px 7px;
+
+      color: #cfd3df;
+
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .input {
+      width: 100%;
+      min-height: 54px;
+
+      padding: 0 15px;
+
+      border: 1px solid var(--border);
+      border-radius: 16px;
+
+      outline: none;
+
+      background: rgba(255,255,255,.065);
+      color: var(--text);
+
+      font-size: 16px;
+    }
+
+    textarea.input {
+      min-height: 90px;
+      padding-top: 14px;
+      resize: vertical;
+    }
+
+    select.input {
+      appearance: none;
+    }
+
+    .input:focus {
+      border-color: rgba(192,178,255,.65);
+
+      box-shadow:
+        0 0 0 3px rgba(172,155,255,.10);
+    }
+
+    .primary-btn {
+      width: 100%;
+      min-height: 56px;
+
+      margin-top: 8px;
+
+      border: 0;
+      border-radius: 17px;
+
+      background:
+        linear-gradient(
+          135deg,
+          #ddd1ff,
+          #a8c4ff
+        );
+
+      color: #171824;
+
+      font-size: 16px;
+      font-weight: 850;
+
+      box-shadow:
+        0 12px 28px rgba(129,140,220,.20);
+    }
+
+    .primary-btn:disabled {
+      opacity: .55;
+      cursor: default;
+    }
+
+    .login-error {
+      min-height: 20px;
+
+      margin-top: 12px;
+
+      color: #ff9ca7;
+      font-size: 13px;
+
+      line-height: 1.5;
+    }
+
+    .privacy-note {
+      margin-top: 22px;
+
+      padding-top: 18px;
+
+      border-top: 1px solid var(--border);
+
+      color: #8993a7;
+
+      font-size: 11px;
+      line-height: 1.7;
+    }
+
+    /* =========================
+       App
+       ========================= */
+
+    header {
+      padding: 8px 3px 18px;
+    }
+
+    .eyebrow {
+      color: #aaa3d7;
+
+      font-size: 11px;
+      font-weight: 800;
+
+      letter-spacing: .18em;
+    }
+
+    header h1 {
+      margin: 7px 0 5px;
+
+      font-size: clamp(34px, 9vw, 52px);
+
+      letter-spacing: -.045em;
+      line-height: 1;
+    }
+
+    header p {
+      margin: 0;
+
+      color: var(--muted);
+
+      font-size: 14px;
+    }
+
+    /* =========================
+       下一次夜班
+       ========================= */
+
+    .next-card {
+      position: relative;
+
+      overflow: hidden;
+
+      padding: 22px 19px;
+
+      border: 1px solid rgba(200,186,255,.16);
+      border-radius: 28px;
+
+      background:
+        linear-gradient(
+          135deg,
+          rgba(166,144,255,.13),
+          rgba(90,149,255,.08)
+        ),
+        rgba(255,255,255,.05);
+
+      box-shadow: var(--shadow);
+
+      backdrop-filter: blur(20px);
+    }
+
+    .next-card::after {
+      content: "";
+
+      position: absolute;
+
+      width: 180px;
+      height: 180px;
+
+      top: -90px;
+      right: -65px;
+
+      border-radius: 50%;
+
+      background:
+        radial-gradient(
+          circle,
+          rgba(220,203,255,.25),
+          transparent 67%
+        );
+
+      pointer-events: none;
+    }
+
+    .next-label {
+      color: #c8baff;
+
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .next-date {
+      margin-top: 7px;
+
+      font-size: 25px;
+      font-weight: 900;
+    }
+
+    .next-type {
+      margin-top: 4px;
+
+      color: #bbc2d3;
+
+      font-size: 13px;
+    }
+
+    .countdown {
+      display: grid;
+
+      grid-template-columns:
+        repeat(4, 1fr);
+
+      gap: 8px;
+
+      margin-top: 18px;
+    }
+
+    .count-unit {
+      min-width: 0;
+
+      padding: 12px 4px;
+
+      text-align: center;
+
+      border: 1px solid var(--border);
+      border-radius: 16px;
+
+      background: rgba(255,255,255,.055);
+    }
+
+    .count-unit b {
+      display: block;
+
+      font-size: clamp(20px, 6vw, 30px);
+
+      font-variant-numeric: tabular-nums;
+    }
+
+    .count-unit span {
+      display: block;
+
+      margin-top: 3px;
+
+      color: var(--muted);
+
+      font-size: 10px;
+    }
+
+    /* =========================
+       Calendar
+       ========================= */
+
+    .calendar-card {
+      margin-top: 16px;
+
+      padding: 17px 12px;
+
+      border: 1px solid var(--border);
+      border-radius: 27px;
+
+      background: rgba(255,255,255,.052);
+
+      box-shadow: var(--shadow);
+
+      backdrop-filter: blur(18px);
+    }
+
+    .calendar-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+
+      padding: 2px 4px 15px;
+    }
+
+    .calendar-title {
+      font-size: 20px;
+      font-weight: 850;
+    }
+
+    .month-btn {
+      width: 42px;
+      height: 42px;
+
+      display: grid;
+      place-items: center;
+
+      border: 1px solid var(--border);
+      border-radius: 14px;
+
+      background: rgba(255,255,255,.055);
+      color: var(--text);
+
+      font-size: 22px;
+    }
+
+    .weekdays,
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+    }
+
+    .weekdays div {
+      padding: 7px 0 10px;
+
+      text-align: center;
+
+      color: #7f899d;
+
+      font-size: 11px;
+    }
+
+    .day {
+      position: relative;
+
+      min-height: 74px;
+
+      margin: 2px;
+
+      padding: 7px 5px;
+
+      border: 1px solid transparent;
+      border-radius: 14px;
+
+      overflow: hidden;
+    }
+
+    .day.has-shift {
+      background: rgba(255,255,255,.04);
+    }
+
+    .day.today {
+      border-color: rgba(202,188,255,.45);
+    }
+
+    .day.other-month {
+      opacity: .22;
+    }
+
+    .day-number {
+      width: 25px;
+      height: 25px;
+
+      display: grid;
+      place-items: center;
+
+      border-radius: 50%;
+
+      font-size: 12px;
+      font-weight: 750;
+    }
+
+    .today .day-number {
+      background: #e0d6ff;
+      color: #171822;
+    }
+
+    .shift-chip {
+      display: flex;
+      align-items: center;
+
+      gap: 4px;
+
+      width: 100%;
+
+      margin-top: 4px;
+
+      overflow: hidden;
+
+      font-size: 9px;
+
+      white-space: nowrap;
+    }
+
+    .shift-dot {
+      width: 6px;
+      height: 6px;
+
+      flex: 0 0 auto;
+
+      border-radius: 50%;
+    }
+
+    .shift-chip-text {
+      overflow: hidden;
+
+      text-overflow: ellipsis;
+    }
+
+    /* =========================
+       列表
+       ========================= */
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+
+      margin: 23px 3px 11px;
+    }
+
+    .section-title h2 {
+      margin: 0;
+
+      font-size: 18px;
+    }
+
+    .section-title span {
+      color: var(--muted);
+
+      font-size: 11px;
+    }
+
+    .shift-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .shift-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+
+      gap: 12px;
+
+      padding: 15px;
+
+      border: 1px solid var(--border);
+      border-radius: 20px;
+
+      background: rgba(255,255,255,.05);
+    }
+
+    .shift-left {
+      min-width: 0;
+    }
+
+    .shift-person {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+
+      font-size: 15px;
+      font-weight: 800;
+    }
+
+    .person-dot {
+      width: 9px;
+      height: 9px;
+
+      border-radius: 50%;
+    }
+
+    .shift-meta {
+      margin-top: 5px;
+
+      color: var(--muted);
+
+      font-size: 12px;
+    }
+
+    .shift-note {
+      margin-top: 6px;
+
+      color: #d0d3dd;
+
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .actions {
+      display: flex;
+      gap: 6px;
+
+      flex: 0 0 auto;
+    }
+
+    .small-btn {
+      min-height: 37px;
+
+      padding: 0 10px;
+
+      border: 1px solid var(--border);
+      border-radius: 12px;
+
+      background: rgba(255,255,255,.055);
+      color: var(--text);
+
+      font-size: 11px;
+    }
+
+    .small-btn.danger {
+      color: #ff9aa5;
+    }
+
+    .empty {
+      padding: 28px 12px;
+
+      text-align: center;
+
+      color: var(--muted);
+
+      border: 1px dashed var(--border);
+      border-radius: 20px;
+
+      font-size: 13px;
+    }
+
+    /* =========================
+       FAB
+       ========================= */
+
+    .fab-wrap {
+      position: sticky;
+
+      bottom:
+        max(
+          16px,
+          env(safe-area-inset-bottom)
+        );
+
+      margin-top: 20px;
+
+      pointer-events: none;
+    }
+
+    .fab {
+      width: 100%;
+      min-height: 58px;
+
+      border: 0;
+      border-radius: 19px;
+
+      background:
+        linear-gradient(
+          135deg,
+          #e2d7ff,
+          #a8c5ff
+        );
+
+      color: #171824;
+
+      font-size: 16px;
+      font-weight: 900;
+
+      box-shadow:
+        0 14px 32px rgba(104,123,208,.26);
+
+      pointer-events: auto;
+    }
+
+    /* =========================
+       Bottom Sheet
+       ========================= */
+
+    .overlay {
+      position: fixed;
+
+      inset: 0;
+
+      z-index: 100;
+
+      display: flex;
+      align-items: flex-end;
+
+      background: rgba(5,7,12,.66);
+
+      backdrop-filter: blur(6px);
+    }
+
+    .sheet {
+      width: min(100%,720px);
+
+      max-height: 92dvh;
+
+      margin: 0 auto;
+
+      overflow-y: auto;
+
+      padding:
+        15px
+        16px
+        max(20px,env(safe-area-inset-bottom));
+
+      border: 1px solid var(--border);
+
+      border-radius:
+        28px 28px 0 0;
+
+      background: #191d29;
+
+      box-shadow:
+        0 -20px 60px rgba(0,0,0,.36);
+    }
+
+    .sheet-handle {
+      width: 42px;
+      height: 5px;
+
+      margin: 0 auto 16px;
+
+      border-radius: 999px;
+
+      background: rgba(255,255,255,.18);
+    }
+
+    .sheet-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+
+      margin-bottom: 18px;
+    }
+
+    .sheet-head h2 {
+      margin: 0;
+
+      font-size: 21px;
+    }
+
+    .close-btn {
+      width: 38px;
+      height: 38px;
+
+      border: 0;
+      border-radius: 50%;
+
+      background: rgba(255,255,255,.08);
+      color: white;
+
+      font-size: 21px;
+    }
+
+    .warning {
+      margin: 12px 0 2px;
+
+      padding: 12px 13px;
+
+      color: #cfbfad;
+
+      border: 1px solid rgba(255,202,142,.10);
+      border-radius: 14px;
+
+      background: rgba(255,185,104,.055);
+
+      font-size: 11px;
+      line-height: 1.6;
+    }
+
+    .sheet-error {
+      min-height: 20px;
+
+      margin-top: 10px;
+
+      color: #ff9ba7;
+
+      font-size: 12px;
+    }
+
+    .secondary-btn {
+      width: 100%;
+      min-height: 50px;
+
+      margin-top: 8px;
+
+      border: 1px solid var(--border);
+      border-radius: 16px;
+
+      background: rgba(255,255,255,.055);
+      color: var(--text);
+
+      font-weight: 750;
+    }
+
+    @media (max-width: 420px) {
+      .day {
+        min-height: 67px;
+        margin: 1px;
+        padding: 6px 3px;
+      }
+
+      .shift-chip {
+        font-size: 8px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <main class="page">
+
+    <!-- =========================
+         登录页
+         ========================= -->
+
+    <section
+      id="loginPage"
+      class="login-page"
+    >
+
+      <div class="login-card">
+
+        <div class="moon">
+          🌙
+        </div>
+
+        <h1>
+          夜班日历
+        </h1>
+
+        <p class="subtitle">
+          仅限已授权成员访问<br>
+          登录后查看共享排班
+        </p>
+
+        <form id="loginForm">
+
+          <div class="form-group">
+
+            <label for="email">
+              邮箱
+            </label>
+
+            <input
+              id="email"
+              class="input"
+              type="email"
+              autocomplete="email"
+              required
+              placeholder="请输入邮箱"
+            >
+
+          </div>
+
+          <div class="form-group">
+
+            <label for="password">
+              密码
+            </label>
+
+            <input
+              id="password"
+              class="input"
+              type="password"
+              autocomplete="current-password"
+              required
+              placeholder="请输入密码"
+            >
+
+          </div>
+
+          <button
+            id="loginBtn"
+            class="primary-btn"
+            type="submit"
+          >
+            登录
+          </button>
+
+        </form>
+
+        <div
+          id="loginError"
+          class="login-error"
+          aria-live="polite"
+        ></div>
+
+        <div class="privacy-note">
+          本页面不提供公开注册。
+          排班数据仅供已授权成员查看。
+          请勿在夜班备注中填写患者信息、
+          医疗记录或其他敏感个人信息。
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- =========================
+         主应用
+         ========================= -->
+
+    <section
+      id="appPage"
+      class="hidden"
+    >
+
+      <div class="topbar">
+
+        <a
+          class="back"
+          href="../"
+        >
+          ← 工具箱
+        </a>
+
+        <div class="user-area">
+
+          <span
+            id="currentUserName"
+            class="user-name"
+          ></span>
+
+          <button
+            id="logoutBtn"
+            class="logout-btn"
+          >
+            退出
+          </button>
+
+        </div>
+
+      </div>
+
+
+      <header>
+
+        <div class="eyebrow">
+          NIGHT SHIFT
+        </div>
+
+        <h1>
+          🌙 夜班日历
+        </h1>
+
+        <p>
+          一起看看最近谁值班
+        </p>
+
+      </header>
+
+
+      <!-- 下一次夜班 -->
+
+      <section class="next-card">
+
+        <div class="next-label">
+          下一次我的夜班
+        </div>
+
+        <div
+          id="nextShiftDate"
+          class="next-date"
+        >
+          正在加载…
+        </div>
+
+        <div
+          id="nextShiftType"
+          class="next-type"
+        ></div>
+
+        <div class="countdown">
+
+          <div class="count-unit">
+            <b id="cdDays">--</b>
+            <span>天</span>
+          </div>
+
+          <div class="count-unit">
+            <b id="cdHours">--</b>
+            <span>小时</span>
+          </div>
+
+          <div class="count-unit">
+            <b id="cdMinutes">--</b>
+            <span>分钟</span>
+          </div>
+
+          <div class="count-unit">
+            <b id="cdSeconds">--</b>
+            <span>秒</span>
+          </div>
+
+        </div>
+
+      </section>
+
+
+      <!-- 月历 -->
+
+      <section class="calendar-card">
+
+        <div class="calendar-head">
+
+          <button
+            id="prevMonth"
+            class="month-btn"
+            aria-label="上个月"
+          >
+            ‹
+          </button>
+
+          <div
+            id="calendarTitle"
+            class="calendar-title"
+          ></div>
+
+          <button
+            id="nextMonth"
+            class="month-btn"
+            aria-label="下个月"
+          >
+            ›
+          </button>
+
+        </div>
+
+        <div class="weekdays">
+          <div>日</div>
+          <div>一</div>
+          <div>二</div>
+          <div>三</div>
+          <div>四</div>
+          <div>五</div>
+          <div>六</div>
+        </div>
+
+        <div
+          id="calendarGrid"
+          class="calendar-grid"
+        ></div>
+
+      </section>
+
+
+      <!-- 本月记录 -->
+
+      <div class="section-title">
+
+        <h2>
+          本月排班
+        </h2>
+
+        <span id="shiftCount"></span>
+
+      </div>
+
+      <section
+        id="shiftList"
+        class="shift-list"
+      ></section>
+
+
+      <div class="fab-wrap">
+
+        <button
+          id="addShiftBtn"
+          class="fab"
+        >
+          ＋ 添加我的夜班
+        </button>
+
+      </div>
+
+    </section>
+
+  </main>
+
+
+  <!-- =========================
+       添加 / 编辑 Bottom Sheet
+       ========================= -->
+
+  <div
+    id="sheetOverlay"
+    class="overlay hidden"
+  >
+
+    <section class="sheet">
+
+      <div class="sheet-handle"></div>
+
+      <div class="sheet-head">
+
+        <h2 id="sheetTitle">
+          添加我的夜班
+        </h2>
+
+        <button
+          id="closeSheet"
+          class="close-btn"
+          aria-label="关闭"
+        >
+          ×
+        </button>
+
+      </div>
+
+      <form id="shiftForm">
+
+        <input
+          id="editingId"
+          type="hidden"
+        >
+
+        <div class="form-group">
+
+          <label for="shiftDate">
+            日期
+          </label>
+
+          <input
+            id="shiftDate"
+            class="input"
+            type="date"
+            required
+          >
+
+        </div>
+
+        <div class="form-group">
+
+          <label for="shiftType">
+            班次
+          </label>
+
+          <select
+            id="shiftType"
+            class="input"
+            required
+          >
+
+            <option value="夜班">
+              夜班
+            </option>
+
+            <option value="小夜">
+              小夜
+            </option>
+
+            <option value="大夜">
+              大夜
+            </option>
+
+            <option value="二线">
+              二线
+            </option>
+
+            <option value="备班">
+              备班
+            </option>
+
+          </select>
+
+        </div>
+
+        <div class="form-group">
+
+          <label for="shiftNote">
+            备注（选填）
+          </label>
+
+          <textarea
+            id="shiftNote"
+            class="input"
+            maxlength="100"
+            placeholder="例如：换班、备班等"
+          ></textarea>
+
+        </div>
+
+        <div class="warning">
+          ⚠️ 请勿填写患者姓名、住院号、
+          诊断、联系方式、病历内容或其他医疗/
+          个人敏感信息。
+        </div>
+
+        <button
+          id="saveShiftBtn"
+          class="primary-btn"
+          type="submit"
+        >
+          保存
+        </button>
+
+        <button
+          id="cancelShiftBtn"
+          class="secondary-btn"
+          type="button"
+        >
+          取消
+        </button>
+
+        <div
+          id="sheetError"
+          class="sheet-error"
+          aria-live="polite"
+        ></div>
+
+      </form>
+
+    </section>
+
+  </div>
+
+
+  <!-- Supabase JS v2 -->
+  <script
+    src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"
+  ></script>
+
+
+  <script>
+
+    /* =====================================================
+       这里填写你的 Supabase 项目信息
+       ===================================================== */
+
+    const SUPABASE_URL =
+      "https://tmxpueakxibsaakdyusn.supabase.co";
+
+    const SUPABASE_PUBLISHABLE_KEY =
+      "sb_publishable_8sCgnOXk3XuRE28Qmk_ekg_9VSS4ASZ";
+
+
+    /*
+      注意：
+
+      ✅ 可以放：
+      Project URL
+      Publishable Key
+
+      ❌ 绝对不要放：
+      Secret Key
+      service_role
+      Database Password
+    */
+
+
+    const db =
+      supabase.createClient(
+        SUPABASE_URL,
+        SUPABASE_PUBLISHABLE_KEY
+      );
+
+
+    /* =====================================================
+       全局状态
+       ===================================================== */
+
+    let myMemberId = null;
+
+    let myMember = null;
+
+    let members = [];
+
+    let shifts = [];
+
+    let calendarDate =
+      new Date();
+
+    let nextShift = null;
+
+    let countdownTimer = null;
+
+
+    /* =====================================================
+       DOM
+       ===================================================== */
+
+    const loginPage =
+      document.getElementById("loginPage");
+
+    const appPage =
+      document.getElementById("appPage");
+
+    const loginForm =
+      document.getElementById("loginForm");
+
+    const loginBtn =
+      document.getElementById("loginBtn");
+
+    const loginError =
+      document.getElementById("loginError");
+
+    const currentUserName =
+      document.getElementById("currentUserName");
+
+    const logoutBtn =
+      document.getElementById("logoutBtn");
+
+    const calendarTitle =
+      document.getElementById("calendarTitle");
+
+    const calendarGrid =
+      document.getElementById("calendarGrid");
+
+    const shiftList =
+      document.getElementById("shiftList");
+
+    const shiftCount =
+      document.getElementById("shiftCount");
+
+    const sheetOverlay =
+      document.getElementById("sheetOverlay");
+
+    const shiftForm =
+      document.getElementById("shiftForm");
+
+    const editingId =
+      document.getElementById("editingId");
+
+    const shiftDate =
+      document.getElementById("shiftDate");
+
+    const shiftType =
+      document.getElementById("shiftType");
+
+    const shiftNote =
+      document.getElementById("shiftNote");
+
+    const sheetTitle =
+      document.getElementById("sheetTitle");
+
+    const sheetError =
+      document.getElementById("sheetError");
+
+    const saveShiftBtn =
+      document.getElementById("saveShiftBtn");
+
+
+    /* =====================================================
+       工具函数
+       ===================================================== */
+
+    function pad2(n) {
+      return String(n).padStart(2, "0");
+    }
+
+
+    function toYMD(date) {
+
+      return (
+        date.getFullYear()
+        + "-"
+        + pad2(date.getMonth() + 1)
+        + "-"
+        + pad2(date.getDate())
+      );
+
+    }
+
+
+    function parseLocalDate(ymd) {
+
+      const [y, m, d] =
+        ymd.split("-").map(Number);
+
+      return new Date(
+        y,
+        m - 1,
+        d,
+        0,
+        0,
+        0,
+        0
+      );
+
+    }
+
+
+    function formatChineseDate(ymd) {
+
+      const date =
+        parseLocalDate(ymd);
+
+      return new Intl.DateTimeFormat(
+        "zh-CN",
+        {
+          month: "long",
+          day: "numeric",
+          weekday: "short"
+        }
+      ).format(date);
+
+    }
+
+
+    function memberById(id) {
+
+      return members.find(
+        member => member.id === id
+      );
+
+    }
+
+
+    function showError(el, message) {
+
+      el.textContent =
+        message || "";
+
+    }
+
+
+    /* =====================================================
+       登录
+       ===================================================== */
+
+    loginForm.addEventListener(
+      "submit",
+      async event => {
+
+        event.preventDefault();
+
+        showError(
+          loginError,
+          ""
+        );
+
+        loginBtn.disabled = true;
+
+        loginBtn.textContent =
+          "正在登录…";
+
+
+        const email =
+          document
+            .getElementById("email")
+            .value
+            .trim();
+
+        const password =
+          document
+            .getElementById("password")
+            .value;
+
+
+        try {
+
+          const { error } =
+            await db.auth.signInWithPassword({
+              email,
+              password
+            });
+
+
+          if (error) {
+
+            /*
+              不明确区分：
+              - 邮箱不存在
+              - 密码错误
+
+              减少账号枚举信息。
+            */
+
+            throw new Error(
+              "邮箱或密码错误，或该账号未获授权。"
+            );
+
+          }
+
+
+          await enterApp();
+
+
+        } catch (error) {
+
+          showError(
+            loginError,
+            error.message
+          );
+
+        } finally {
+
+          loginBtn.disabled = false;
+
+          loginBtn.textContent =
+            "登录";
+
+        }
+
+      }
+    );
+
+
+    /* =====================================================
+       初始化 / 判断 session
+       ===================================================== */
+
+    async function init() {
+
+      const {
+        data: { session }
+      } =
+        await db.auth.getSession();
+
+
+      if (session) {
+
+        try {
+
+          await enterApp();
+
+        } catch (error) {
+
+          /*
+            可能登录账号存在，
+            但没有绑定到 members。
+          */
+
+          await db.auth.signOut();
+
+          showLogin();
+
+          showError(
+            loginError,
+            "该账号尚未绑定为夜班日历成员。"
+          );
+
+        }
+
+      } else {
+
+        showLogin();
+
+      }
+
+    }
+
+
+    function showLogin() {
+
+      loginPage.classList.remove(
+        "hidden"
+      );
+
+      appPage.classList.add(
+        "hidden"
+      );
+
+    }
+
+
+    function showApp() {
+
+      loginPage.classList.add(
+        "hidden"
+      );
+
+      appPage.classList.remove(
+        "hidden"
+      );
+
+    }
+
+
+    /* =====================================================
+       进入应用
+       ===================================================== */
+
+    async function enterApp() {
+
+      /*
+        通过数据库函数自动识别：
+        当前登录账号属于哪个 member。
+      */
+
+      const {
+        data: memberId,
+        error: memberIdError
+      } =
+        await db.rpc(
+          "current_member_id"
+        );
+
+
+      if (
+        memberIdError ||
+        !memberId
+      ) {
+
+        throw new Error(
+          "当前账号未绑定成员身份。"
+        );
+
+      }
+
+
+      myMemberId =
+        memberId;
+
+
+      /*
+        读取允许暴露的成员字段：
+
+        id
+        nickname
+        color
+
+        不读取 user_id。
+      */
+
+      const {
+        data: memberData,
+        error: memberError
+      } =
+        await db
+          .from("members")
+          .select(
+            "id,nickname,color"
+          );
+
+
+      if (memberError) {
+
+        throw memberError;
+
+      }
+
+
+      members =
+        memberData || [];
+
+
+      myMember =
+        members.find(
+          item =>
+            item.id === myMemberId
+        );
+
+
+      if (!myMember) {
+
+        throw new Error(
+          "未找到当前成员资料。"
+        );
+
+      }
+
+
+      currentUserName.textContent =
+        myMember.nickname;
+
+
+      showApp();
+
+
+      await Promise.all([
+        loadMonth(),
+        loadNextMyShift()
+      ]);
+
+    }
+
+
+    /* =====================================================
+       退出
+       ===================================================== */
+
+    logoutBtn.addEventListener(
+      "click",
+      async () => {
+
+        await db.auth.signOut();
+
+        myMemberId = null;
+
+        myMember = null;
+
+        members = [];
+
+        shifts = [];
+
+        if (countdownTimer) {
+
+          clearInterval(
+            countdownTimer
+          );
+
+        }
+
+        location.reload();
+
+      }
+    );
+
+
+    /* =====================================================
+       月份数据
+       ===================================================== */
+
+    async function loadMonth() {
+
+      const year =
+        calendarDate.getFullYear();
+
+      const month =
+        calendarDate.getMonth();
+
+
+      const first =
+        new Date(
+          year,
+          month,
+          1
+        );
+
+      const last =
+        new Date(
+          year,
+          month + 1,
+          0
+        );
+
+
+      const {
+        data,
+        error
+      } =
+        await db
+          .from("night_shifts")
+          .select(
+            "id,member_id,shift_date,shift_type,note"
+          )
+          .gte(
+            "shift_date",
+            toYMD(first)
+          )
+          .lte(
+            "shift_date",
+            toYMD(last)
+          )
+          .order(
+            "shift_date",
+            {
+              ascending: true
+            }
+          );
+
+
+      if (error) {
+
+        console.error(
+          "loadMonth:",
+          error
+        );
+
+        return;
+
+      }
+
+
+      shifts =
+        data || [];
+
+
+      renderCalendar();
+
+      renderShiftList();
+
+    }
+
+
+    /* =====================================================
+       月历绘制
+       ===================================================== */
+
+    function renderCalendar() {
+
+      const year =
+        calendarDate.getFullYear();
+
+      const month =
+        calendarDate.getMonth();
+
+
+      calendarTitle.textContent =
+        `${year}年${month + 1}月`;
+
+
+      /*
+        月历显示：
+        前一个月少量日期
+        +
+        当前月
+        +
+        后一个月少量日期
+      */
+
+      const firstDay =
+        new Date(
+          year,
+          month,
+          1
+        );
+
+      const startOffset =
+        firstDay.getDay();
+
+
+      const start =
+        new Date(
+          year,
+          month,
+          1 - startOffset
+        );
+
+
+      const todayYMD =
+        toYMD(
+          new Date()
+        );
+
+
+      calendarGrid.replaceChildren();
+
+
+      for (
+        let i = 0;
+        i < 42;
+        i++
+      ) {
+
+        const date =
+          new Date(start);
+
+        date.setDate(
+          start.getDate() + i
+        );
+
+
+        const ymd =
+          toYMD(date);
+
+
+        const cell =
+          document.createElement(
+            "div"
+          );
+
+        cell.className =
+          "day";
+
+
+        if (
+          date.getMonth()
+          !== month
+        ) {
+
+          cell.classList.add(
+            "other-month"
+          );
+
+        }
+
+
+        if (
+          ymd === todayYMD
+        ) {
+
+          cell.classList.add(
+            "today"
+          );
+
+        }
+
+
+        const dayShifts =
+          shifts.filter(
+            shift =>
+              shift.shift_date === ymd
+          );
+
+
+        if (
+          dayShifts.length
+        ) {
+
+          cell.classList.add(
+            "has-shift"
+          );
+
+        }
+
+
+        const number =
+          document.createElement(
+            "div"
+          );
+
+        number.className =
+          "day-number";
+
+        number.textContent =
+          date.getDate();
+
+
+        cell.appendChild(
+          number
+        );
+
+
+        dayShifts
+          .slice(0, 3)
+          .forEach(
+            shift => {
+
+              const member =
+                memberById(
+                  shift.member_id
+                );
+
+
+              const chip =
+                document.createElement(
+                  "div"
+                );
+
+              chip.className =
+                "shift-chip";
+
+
+              const dot =
+                document.createElement(
+                  "span"
+                );
+
+              dot.className =
+                "shift-dot";
+
+              dot.style.backgroundColor =
+                member?.color
+                || "#b7b7c7";
+
+
+              const text =
+                document.createElement(
+                  "span"
+                );
+
+              text.className =
+                "shift-chip-text";
+
+
+              /*
+                使用 textContent，
+                不拼 innerHTML。
+              */
+
+              text.textContent =
+                `${member?.nickname || "成员"} ${shift.shift_type}`;
+
+
+              chip.append(
+                dot,
+                text
+              );
+
+
+              cell.appendChild(
+                chip
+              );
+
+            }
+          );
+
+
+        if (
+          dayShifts.length > 3
+        ) {
+
+          const more =
+            document.createElement(
+              "div"
+            );
+
+          more.className =
+            "shift-chip";
+
+          more.textContent =
+            `+${dayShifts.length - 3}`;
+
+          cell.appendChild(
+            more
+          );
+
+        }
+
+
+        /*
+          点击当前月份日期：
+          打开添加夜班面板，
+          自动填入日期。
+        */
+
+        if (
+          date.getMonth()
+          === month
+        ) {
+
+          cell.addEventListener(
+            "click",
+            () => {
+
+              openAddSheet(
+                ymd
+              );
+
+            }
+          );
+
+        }
+
+
+        calendarGrid.appendChild(
+          cell
+        );
+
+      }
+
+    }
+
+
+    /* =====================================================
+       本月列表
+       ===================================================== */
+
+    function renderShiftList() {
+
+      shiftList.replaceChildren();
+
+
+      shiftCount.textContent =
+        `共 ${shifts.length} 条`;
+
+
+      if (!shifts.length) {
+
+        const empty =
+          document.createElement(
+            "div"
+          );
+
+        empty.className =
+          "empty";
+
+        empty.textContent =
+          "这个月还没有夜班记录";
+
+        shiftList.appendChild(
+          empty
+        );
+
+        return;
+
+      }
+
+
+      shifts.forEach(
+        shift => {
+
+          const member =
+            memberById(
+              shift.member_id
+            );
+
+
+          const item =
+            document.createElement(
+              "article"
+            );
+
+          item.className =
+            "shift-item";
+
+
+          const left =
+            document.createElement(
+              "div"
+            );
+
+          left.className =
+            "shift-left";
+
+
+          const person =
+            document.createElement(
+              "div"
+            );
+
+          person.className =
+            "shift-person";
+
+
+          const dot =
+            document.createElement(
+              "span"
+            );
+
+          dot.className =
+            "person-dot";
+
+          dot.style.backgroundColor =
+            member?.color
+            || "#aaa";
+
+
+          const personText =
+            document.createElement(
+              "span"
+            );
+
+          personText.textContent =
+            member?.nickname
+            || "成员";
+
+
+          person.append(
+            dot,
+            personText
+          );
+
+
+          const meta =
+            document.createElement(
+              "div"
+            );
+
+          meta.className =
+            "shift-meta";
+
+          meta.textContent =
+            `${formatChineseDate(shift.shift_date)} · ${shift.shift_type}`;
+
+
+          left.append(
+            person,
+            meta
+          );
+
+
+          if (
+            shift.note
+          ) {
+
+            const note =
+              document.createElement(
+                "div"
+              );
+
+            note.className =
+              "shift-note";
+
+            /*
+              安全渲染备注
+            */
+
+            note.textContent =
+              shift.note;
+
+
+            left.appendChild(
+              note
+            );
+
+          }
+
+
+          item.appendChild(
+            left
+          );
+
+
+          /*
+            只有自己的记录
+            才出现编辑和删除按钮。
+          */
+
+          if (
+            shift.member_id
+            === myMemberId
+          ) {
+
+            const actions =
+              document.createElement(
+                "div"
+              );
+
+            actions.className =
+              "actions";
+
+
+            const edit =
+              document.createElement(
+                "button"
+              );
+
+            edit.className =
+              "small-btn";
+
+            edit.textContent =
+              "编辑";
+
+            edit.addEventListener(
+              "click",
+              () => {
+
+                openEditSheet(
+                  shift
+                );
+
+              }
+            );
+
+
+            const del =
+              document.createElement(
+                "button"
+              );
+
+            del.className =
+              "small-btn danger";
+
+            del.textContent =
+              "删除";
+
+            del.addEventListener(
+              "click",
+              () => {
+
+                deleteShift(
+                  shift
+                );
+
+              }
+            );
+
+
+            actions.append(
+              edit,
+              del
+            );
+
+
+            item.appendChild(
+              actions
+            );
+
+          }
+
+
+          shiftList.appendChild(
+            item
+          );
+
+        }
+      );
+
+    }
+
+
+    /* =====================================================
+       切换月份
+       ===================================================== */
+
+    document
+      .getElementById(
+        "prevMonth"
+      )
+      .addEventListener(
+        "click",
+        async () => {
+
+          calendarDate =
+            new Date(
+              calendarDate.getFullYear(),
+              calendarDate.getMonth() - 1,
+              1
+            );
+
+          await loadMonth();
+
+        }
+      );
+
+
+    document
+      .getElementById(
+        "nextMonth"
+      )
+      .addEventListener(
+        "click",
+        async () => {
+
+          calendarDate =
+            new Date(
+              calendarDate.getFullYear(),
+              calendarDate.getMonth() + 1,
+              1
+            );
+
+          await loadMonth();
+
+        }
+      );
+
+
+    /* =====================================================
+       Bottom Sheet
+       ===================================================== */
+
+    document
+      .getElementById(
+        "addShiftBtn"
+      )
+      .addEventListener(
+        "click",
+        () => {
+
+          openAddSheet(
+            toYMD(
+              new Date()
+            )
+          );
+
+        }
+      );
+
+
+    document
+      .getElementById(
+        "closeSheet"
+      )
+      .addEventListener(
+        "click",
+        closeSheet
+      );
+
+
+    document
+      .getElementById(
+        "cancelShiftBtn"
+      )
+      .addEventListener(
+        "click",
+        closeSheet
+      );
+
+
+    sheetOverlay
+      .addEventListener(
+        "click",
+        event => {
+
+          if (
+            event.target
+            === sheetOverlay
+          ) {
+
+            closeSheet();
+
+          }
+
+        }
+      );
+
+
+    function openAddSheet(date) {
+
+      editingId.value =
+        "";
+
+      sheetTitle.textContent =
+        "添加我的夜班";
+
+      shiftDate.value =
+        date;
+
+      shiftType.value =
+        "夜班";
+
+      shiftNote.value =
+        "";
+
+      showError(
+        sheetError,
+        ""
+      );
+
+      sheetOverlay.classList.remove(
+        "hidden"
+      );
+
+    }
+
+
+    function openEditSheet(shift) {
+
+      /*
+        防止 UI 层编辑别人数据。
+        真正安全仍由 RLS 保证。
+      */
+
+      if (
+        shift.member_id
+        !== myMemberId
+      ) {
+
+        return;
+
+      }
+
+
+      editingId.value =
+        shift.id;
+
+      sheetTitle.textContent =
+        "编辑我的夜班";
+
+      shiftDate.value =
+        shift.shift_date;
+
+      shiftType.value =
+        shift.shift_type;
+
+      shiftNote.value =
+        shift.note || "";
+
+      showError(
+        sheetError,
+        ""
+      );
+
+      sheetOverlay.classList.remove(
+        "hidden"
+      );
+
+    }
+
+
+    function closeSheet() {
+
+      sheetOverlay.classList.add(
+        "hidden"
+      );
+
+    }
+
+
+    /* =====================================================
+       保存
+       ===================================================== */
+
+    shiftForm.addEventListener(
+      "submit",
+      async event => {
+
+        event.preventDefault();
+
+        showError(
+          sheetError,
+          ""
+        );
+
+
+        const date =
+          shiftDate.value;
+
+        const type =
+          shiftType.value;
+
+        const note =
+          shiftNote.value
+            .trim();
+
+
+        if (!date) {
+
+          showError(
+            sheetError,
+            "请选择日期。"
+          );
+
+          return;
+
+        }
+
+
+        if (
+          note.length > 100
+        ) {
+
+          showError(
+            sheetError,
+            "备注不能超过100字。"
+          );
+
+          return;
+
+        }
+
+
+        saveShiftBtn.disabled =
+          true;
+
+        saveShiftBtn.textContent =
+          "正在保存…";
+
+
+        try {
+
+          let result;
+
+
+          if (
+            editingId.value
+          ) {
+
+            /*
+              编辑：
+              不发送 member_id。
+
+              数据库也没有授权
+              UPDATE member_id。
+            */
+
+            result =
+              await db
+                .from(
+                  "night_shifts"
+                )
+                .update({
+                  shift_date: date,
+                  shift_type: type,
+                  note:
+                    note || null
+                })
+                .eq(
+                  "id",
+                  editingId.value
+                );
+
+
+          } else {
+
+            /*
+              添加：
+              member_id 自动使用
+              当前账号所属成员。
+            */
+
+            result =
+              await db
+                .from(
+                  "night_shifts"
+                )
+                .insert({
+                  member_id:
+                    myMemberId,
+
+                  shift_date:
+                    date,
+
+                  shift_type:
+                    type,
+
+                  note:
+                    note || null
+                });
+
+          }
+
+
+          if (
+            result.error
+          ) {
+
+            throw result.error;
+
+          }
+
+
+          closeSheet();
+
+
+          /*
+            如果保存到了另一个月，
+            自动跳到那个月。
+          */
+
+          const savedDate =
+            parseLocalDate(
+              date
+            );
+
+
+          calendarDate =
+            new Date(
+              savedDate.getFullYear(),
+              savedDate.getMonth(),
+              1
+            );
+
+
+          await Promise.all([
+            loadMonth(),
+            loadNextMyShift()
+          ]);
+
+
+        } catch (error) {
+
+          /*
+            duplicate constraint
+            或 RLS 等错误统一友好显示。
+          */
+
+          console.error(
+            "saveShift:",
+            error
+          );
+
+
+          if (
+            error.code
+            === "23505"
+          ) {
+
+            showError(
+              sheetError,
+              "这一天已经存在相同班次。"
+            );
+
+          } else {
+
+            showError(
+              sheetError,
+              "保存失败，请稍后再试。"
+            );
+
+          }
+
+        } finally {
+
+          saveShiftBtn.disabled =
+            false;
+
+          saveShiftBtn.textContent =
+            "保存";
+
+        }
+
+      }
+    );
+
+
+    /* =====================================================
+       删除
+       ===================================================== */
+
+    async function deleteShift(
+      shift
+    ) {
+
+      if (
+        shift.member_id
+        !== myMemberId
+      ) {
+
+        return;
+
+      }
+
+
+      const confirmed =
+        confirm(
+          `确定删除 ${formatChineseDate(shift.shift_date)} 的「${shift.shift_type}」吗？`
+        );
+
+
+      if (!confirmed) {
+
+        return;
+
+      }
+
+
+      const {
+        error
+      } =
+        await db
+          .from(
+            "night_shifts"
+          )
+          .delete()
+          .eq(
+            "id",
+            shift.id
+          );
+
+
+      if (error) {
+
+        alert(
+          "删除失败，请稍后再试。"
+        );
+
+        console.error(
+          error
+        );
+
+        return;
+
+      }
+
+
+      await Promise.all([
+        loadMonth(),
+        loadNextMyShift()
+      ]);
+
+    }
+
+
+    /* =====================================================
+       下一次我的夜班
+       ===================================================== */
+
+    async function loadNextMyShift() {
+
+      const today =
+        toYMD(
+          new Date()
+        );
+
+
+      const {
+        data,
+        error
+      } =
+        await db
+          .from(
+            "night_shifts"
+          )
+          .select(
+            "id,shift_date,shift_type,note"
+          )
+          .eq(
+            "member_id",
+            myMemberId
+          )
+          .gte(
+            "shift_date",
+            today
+          )
+          .order(
+            "shift_date",
+            {
+              ascending: true
+            }
+          )
+          .limit(1);
+
+
+      if (error) {
+
+        console.error(
+          error
+        );
+
+        return;
+
+      }
+
+
+      nextShift =
+        data?.[0] || null;
+
+
+      if (!nextShift) {
+
+        document
+          .getElementById(
+            "nextShiftDate"
+          )
+          .textContent =
+            "近期暂无夜班";
+
+        document
+          .getElementById(
+            "nextShiftType"
+          )
+          .textContent =
+            "可以点击下方按钮添加";
+
+
+        setCountdownEmpty();
+
+        return;
+
+      }
+
+
+      document
+        .getElementById(
+          "nextShiftDate"
+        )
+        .textContent =
+          formatChineseDate(
+            nextShift.shift_date
+          );
+
+
+      document
+        .getElementById(
+          "nextShiftType"
+        )
+        .textContent =
+          nextShift.shift_type;
+
+
+      startCountdown();
+
+    }
+
+
+    function setCountdownEmpty() {
+
+      document
+        .getElementById(
+          "cdDays"
+        )
+        .textContent =
+          "--";
+
+      document
+        .getElementById(
+          "cdHours"
+        )
+        .textContent =
+          "--";
+
+      document
+        .getElementById(
+          "cdMinutes"
+        )
+        .textContent =
+          "--";
+
+      document
+        .getElementById(
+          "cdSeconds"
+        )
+        .textContent =
+          "--";
+
+    }
+
+
+    function startCountdown() {
+
+      if (
+        countdownTimer
+      ) {
+
+        clearInterval(
+          countdownTimer
+        );
+
+      }
+
+
+      updateCountdown();
+
+
+      countdownTimer =
+        setInterval(
+          updateCountdown,
+          1000
+        );
+
+    }
+
+
+    function updateCountdown() {
+
+      if (!nextShift) {
+
+        return;
+
+      }
+
+
+      const target =
+        parseLocalDate(
+          nextShift.shift_date
+        );
+
+
+      const now =
+        new Date();
+
+
+      let diff =
+        target - now;
+
+
+      /*
+        如果就是今天，
+        显示“今天”状态。
+      */
+
+      if (
+        toYMD(target)
+        === toYMD(now)
+      ) {
+
+        document
+          .getElementById(
+            "cdDays"
+          )
+          .textContent =
+            "今";
+
+        document
+          .getElementById(
+            "cdHours"
+          )
+          .textContent =
+            "00";
+
+        document
+          .getElementById(
+            "cdMinutes"
+          )
+          .textContent =
+            "00";
+
+        document
+          .getElementById(
+            "cdSeconds"
+          )
+          .textContent =
+            "00";
+
+        return;
+
+      }
+
+
+      diff =
+        Math.max(
+          diff,
+          0
+        );
+
+
+      const days =
+        Math.floor(
+          diff / 86400000
+        );
+
+      const hours =
+        Math.floor(
+          (diff % 86400000)
+          / 3600000
+        );
+
+      const minutes =
+        Math.floor(
+          (diff % 3600000)
+          / 60000
+        );
+
+      const seconds =
+        Math.floor(
+          (diff % 60000)
+          / 1000
+        );
+
+
+      document
+        .getElementById(
+          "cdDays"
+        )
+        .textContent =
+          days;
+
+      document
+        .getElementById(
+          "cdHours"
+        )
+        .textContent =
+          pad2(hours);
+
+      document
+        .getElementById(
+          "cdMinutes"
+        )
+        .textContent =
+          pad2(minutes);
+
+      document
+        .getElementById(
+          "cdSeconds"
+        )
+        .textContent =
+          pad2(seconds);
+
+    }
+
+
+    /* =====================================================
+       Auth 状态变化
+       ===================================================== */
+
+    db.auth.onAuthStateChange(
+      event => {
+
+        if (
+          event
+          === "SIGNED_OUT"
+        ) {
+
+          showLogin();
+
+        }
+
+      }
+    );
+
+
+    /* =====================================================
+       启动
+       ===================================================== */
+
+    init();
+
+  </script>
+
+</body>
+</html>
