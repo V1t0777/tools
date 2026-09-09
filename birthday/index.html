@@ -1,0 +1,339 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#120d18" />
+  <title>生日倒计时｜钊的工具箱</title>
+  <style>
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    :root{
+      --bg:#110c17;
+      --card:rgba(255,255,255,.08);
+      --card-border:rgba(255,255,255,.12);
+      --text:#fff8f2;
+      --muted:#c8bbca;
+      --gold:#ffd98a;
+      --rose:#ff9fba;
+      --lav:#c7b7ff;
+      --shadow:0 22px 55px rgba(0,0,0,.34);
+    }
+    html,body{
+      margin:0;
+      min-height:100%;
+      color:var(--text);
+      background:
+        radial-gradient(circle at 18% 10%,rgba(255,118,164,.18),transparent 30%),
+        radial-gradient(circle at 88% 18%,rgba(151,111,255,.18),transparent 28%),
+        radial-gradient(circle at 50% 95%,rgba(255,205,116,.12),transparent 35%),
+        linear-gradient(180deg,#160f1f 0%,#0d0a12 100%);
+      font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","PingFang SC","Microsoft YaHei",sans-serif;
+    }
+    body{
+      min-height:100dvh;
+      padding:max(18px,env(safe-area-inset-top)) 14px max(26px,env(safe-area-inset-bottom));
+      overflow-x:hidden;
+    }
+    .stars,.stars:before,.stars:after{
+      position:fixed;inset:0;pointer-events:none;content:"";
+      background-image:
+        radial-gradient(circle,#fff 0 1px,transparent 1.5px),
+        radial-gradient(circle,#ffdca1 0 1px,transparent 1.5px);
+      background-size:90px 90px,130px 130px;
+      background-position:0 0,35px 55px;
+      opacity:.23;
+      z-index:0;
+    }
+    .stars:before{transform:translate(18px,28px);opacity:.15}
+    .stars:after{transform:translate(-25px,45px);opacity:.10}
+    .page{position:relative;z-index:1;width:min(100%,720px);margin:0 auto}
+    .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+    .back{
+      text-decoration:none;color:#fff;padding:11px 14px;border-radius:15px;
+      border:1px solid var(--card-border);background:rgba(255,255,255,.07);
+      backdrop-filter:blur(14px);font-size:14px;font-weight:700
+    }
+    .date-now{font-size:12px;color:var(--muted)}
+    header{text-align:center;padding:18px 6px 24px}
+    .eyebrow{font-size:13px;letter-spacing:.22em;color:var(--gold);margin-bottom:10px}
+    h1{
+      margin:0;font-size:clamp(38px,10vw,62px);line-height:1.03;
+      letter-spacing:-.04em;font-weight:900;
+      background:linear-gradient(100deg,#fff8e5,#ffd695,#ffb2c7,#d0c4ff);
+      -webkit-background-clip:text;background-clip:text;color:transparent
+    }
+    .subtitle{margin:12px auto 0;color:var(--muted);font-size:14px;line-height:1.7}
+    .next-card{
+      position:relative;overflow:hidden;padding:24px 20px;margin-bottom:18px;
+      border-radius:30px;border:1px solid rgba(255,226,161,.22);
+      background:
+        linear-gradient(145deg,rgba(255,221,151,.14),rgba(255,143,184,.09)),
+        rgba(255,255,255,.055);
+      box-shadow:var(--shadow);backdrop-filter:blur(20px)
+    }
+    .next-card:after{
+      content:"";position:absolute;width:180px;height:180px;border-radius:50%;
+      right:-60px;top:-85px;background:radial-gradient(circle,rgba(255,215,133,.24),transparent 67%)
+    }
+    .next-label{font-size:13px;color:var(--gold);font-weight:800;letter-spacing:.08em}
+    .next-name{font-size:34px;font-weight:900;margin:8px 0 3px}
+    .next-date{color:#efe4e9;font-size:14px}
+    .countdown{
+      display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:20px
+    }
+    .unit{
+      padding:14px 5px 12px;border-radius:18px;text-align:center;
+      background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09)
+    }
+    .unit b{display:block;font-size:clamp(22px,7vw,34px);font-variant-numeric:tabular-nums}
+    .unit span{display:block;margin-top:3px;color:var(--muted);font-size:11px}
+    .section-head{
+      display:flex;align-items:end;justify-content:space-between;margin:24px 2px 12px
+    }
+    .section-head h2{margin:0;font-size:20px}
+    .section-head span{font-size:12px;color:var(--muted)}
+    .cards{display:grid;gap:12px}
+    .person{
+      position:relative;overflow:hidden;padding:18px;border-radius:24px;
+      border:1px solid var(--card-border);background:var(--card);
+      box-shadow:0 13px 34px rgba(0,0,0,.18);backdrop-filter:blur(18px)
+    }
+    .person-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .identity{display:flex;align-items:center;gap:12px}
+    .avatar{
+      width:48px;height:48px;border-radius:50%;display:grid;place-items:center;
+      background:linear-gradient(145deg,rgba(255,214,139,.24),rgba(255,151,190,.18));
+      border:1px solid rgba(255,255,255,.12);font-size:24px
+    }
+    .name{font-size:20px;font-weight:850}
+    .lunar{font-size:12px;color:var(--muted);margin-top:4px}
+    .days{
+      text-align:right;white-space:nowrap
+    }
+    .days b{font-size:26px;color:var(--gold);font-variant-numeric:tabular-nums}
+    .days span{display:block;font-size:11px;color:var(--muted)}
+    .solar{
+      margin-top:14px;padding-top:13px;border-top:1px solid rgba(255,255,255,.08);
+      color:#eee2eb;font-size:13px;display:flex;justify-content:space-between;gap:12px
+    }
+    .wish{
+      margin-top:22px;padding:22px 18px;text-align:center;border-radius:26px;
+      background:linear-gradient(120deg,rgba(255,182,205,.10),rgba(188,167,255,.10));
+      border:1px solid rgba(255,255,255,.09);color:#eadfea;line-height:1.8;font-size:14px
+    }
+    .footer{text-align:center;color:#8f8494;font-size:11px;margin-top:18px;line-height:1.7}
+    .error{
+      padding:14px 16px;border-radius:16px;background:rgba(255,90,90,.12);
+      border:1px solid rgba(255,90,90,.22);color:#ffd2d2;font-size:13px;display:none
+    }
+    @media(min-width:660px){
+      .cards{grid-template-columns:repeat(3,1fr)}
+      .person-top{align-items:flex-start}
+      .solar{display:block}
+      .solar span:last-child{display:block;margin-top:5px}
+    }
+  </style>
+</head>
+<body>
+  <div class="stars"></div>
+  <main class="page">
+    <div class="topbar">
+      <a class="back" href="../">← 工具箱</a>
+      <div class="date-now" id="todayText"></div>
+    </div>
+
+    <header>
+      <div class="eyebrow">BIRTHDAY COUNTDOWN</div>
+      <h1>等一个值得庆祝的日子</h1>
+      <p class="subtitle">把重要的日子交给时间慢慢靠近。<br>农历生日会自动换算为下一次对应的公历日期。</p>
+    </header>
+
+    <div class="error" id="errorBox"></div>
+
+    <section class="next-card">
+      <div class="next-label">下一位寿星 ✦</div>
+      <div class="next-name" id="nextName">正在计算…</div>
+      <div class="next-date" id="nextDate">正在换算农历日期</div>
+
+      <div class="countdown">
+        <div class="unit"><b id="cdDays">--</b><span>天</span></div>
+        <div class="unit"><b id="cdHours">--</b><span>小时</span></div>
+        <div class="unit"><b id="cdMinutes">--</b><span>分钟</span></div>
+        <div class="unit"><b id="cdSeconds">--</b><span>秒</span></div>
+      </div>
+    </section>
+
+    <div class="section-head">
+      <h2>三个人的生日</h2>
+      <span>自动寻找下一次生日</span>
+    </div>
+
+    <section class="cards" id="cards"></section>
+
+    <div class="wish">
+      🎂 愿每一次生日，都比上一岁多一点自由、多一点快乐，<br>
+      也多一些值得记住的人和事。
+    </div>
+
+    <div class="footer">
+      日期依据浏览器内置 Chinese Lunar Calendar 自动换算<br>
+      默认按设备所在时区计算倒计时
+    </div>
+  </main>
+
+  <script>
+    const people = [
+      { name: "钊", lunarMonth: "腊月", lunarDay: 14, display: "农历十二月十四", icon: "✨" },
+      { name: "迪", lunarMonth: "七月", lunarDay: 14, display: "农历七月十四", icon: "🎈" },
+      { name: "晨", lunarMonth: "正月", lunarDay: 20, display: "农历正月二十", icon: "🌙" }
+    ];
+
+    const lunarFmt = new Intl.DateTimeFormat("zh-CN-u-ca-chinese", {
+      year: "numeric",
+      month: "long",
+      day: "numeric"
+    });
+
+    const solarFmt = new Intl.DateTimeFormat("zh-CN", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      weekday: "short"
+    });
+
+    function localMidnight(date) {
+      return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    }
+
+    function getLunarParts(date) {
+      const parts = lunarFmt.formatToParts(date);
+      const month = parts.find(p => p.type === "month")?.value || "";
+      const day = Number(parts.find(p => p.type === "day")?.value || 0);
+      return { month, day };
+    }
+
+    function findNextBirthday(person, from = new Date()) {
+      const start = localMidnight(from);
+
+      // 扫描未来 430 天，可覆盖一个完整农历年以及闰月带来的偏移。
+      for (let i = 0; i <= 430; i++) {
+        const d = new Date(start);
+        d.setDate(start.getDate() + i);
+
+        const lunar = getLunarParts(d);
+
+        // 不把“闰七月”等视为普通七月，避免闰月年份重复庆祝。
+        if (lunar.month === person.lunarMonth && lunar.day === person.lunarDay) {
+          return d;
+        }
+      }
+      return null;
+    }
+
+    function dayDiff(target) {
+      const now = localMidnight(new Date());
+      return Math.round((localMidnight(target) - now) / 86400000);
+    }
+
+    function renderCards(results) {
+      const el = document.getElementById("cards");
+      el.innerHTML = results.map(item => {
+        const days = dayDiff(item.date);
+        const dayText = days === 0 ? "今天" : `${days}`;
+        const unitText = days === 0 ? "生日快乐 🎉" : "天后";
+        return `
+          <article class="person">
+            <div class="person-top">
+              <div class="identity">
+                <div class="avatar">${item.person.icon}</div>
+                <div>
+                  <div class="name">${item.person.name}</div>
+                  <div class="lunar">${item.person.display}</div>
+                </div>
+              </div>
+              <div class="days">
+                <b>${dayText}</b>
+                <span>${unitText}</span>
+              </div>
+            </div>
+            <div class="solar">
+              <span>下一次公历生日</span>
+              <span>${solarFmt.format(item.date)}</span>
+            </div>
+          </article>`;
+      }).join("");
+    }
+
+    let nextBirthday = null;
+
+    function setup() {
+      document.getElementById("todayText").textContent =
+        new Intl.DateTimeFormat("zh-CN", { month:"long", day:"numeric", weekday:"short" }).format(new Date());
+
+      try {
+        const results = people.map(person => ({
+          person,
+          date: findNextBirthday(person)
+        }));
+
+        if (results.some(x => !x.date)) {
+          throw new Error("未能在未来 430 天内找到对应的农历日期。");
+        }
+
+        results.sort((a,b) => a.date - b.date);
+        renderCards(results);
+
+        nextBirthday = results[0];
+        document.getElementById("nextName").textContent = nextBirthday.person.name;
+        document.getElementById("nextDate").textContent =
+          `${nextBirthday.person.display} · ${solarFmt.format(nextBirthday.date)}`;
+
+        updateCountdown();
+        setInterval(updateCountdown, 1000);
+      } catch (err) {
+        const box = document.getElementById("errorBox");
+        box.style.display = "block";
+        box.textContent = "当前浏览器暂不支持农历自动换算：" + err.message;
+        document.getElementById("nextName").textContent = "暂无法计算";
+        document.getElementById("nextDate").textContent = "请使用最新版 Safari、Chrome 或 Edge";
+      }
+    }
+
+    function updateCountdown() {
+      if (!nextBirthday) return;
+
+      // 倒计时到生日当天 00:00。
+      const target = new Date(
+        nextBirthday.date.getFullYear(),
+        nextBirthday.date.getMonth(),
+        nextBirthday.date.getDate(),
+        0,0,0,0
+      );
+
+      let diff = target - new Date();
+
+      if (diff <= 0 && dayDiff(nextBirthday.date) === 0) {
+        document.getElementById("cdDays").textContent = "🎂";
+        document.getElementById("cdHours").textContent = "00";
+        document.getElementById("cdMinutes").textContent = "00";
+        document.getElementById("cdSeconds").textContent = "00";
+        return;
+      }
+
+      diff = Math.max(diff, 0);
+      const days = Math.floor(diff / 86400000);
+      const hours = Math.floor((diff % 86400000) / 3600000);
+      const minutes = Math.floor((diff % 3600000) / 60000);
+      const seconds = Math.floor((diff % 60000) / 1000);
+
+      document.getElementById("cdDays").textContent = days;
+      document.getElementById("cdHours").textContent = String(hours).padStart(2,"0");
+      document.getElementById("cdMinutes").textContent = String(minutes).padStart(2,"0");
+      document.getElementById("cdSeconds").textContent = String(seconds).padStart(2,"0");
+    }
+
+    setup();
+  </script>
+</body>
+</html>
