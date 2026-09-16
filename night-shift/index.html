@@ -33,6 +33,27 @@
     }
     .user-area{display:flex;align-items:center;gap:9px}.user-name{font-size:13px;color:#d9dce5}
     .login-page{min-height:calc(100dvh - 60px);display:grid;place-items:center}
+    .denied-page{min-height:calc(100dvh - 60px);display:grid;place-items:center}
+    .denied-card{
+      width:min(100%,520px);
+      padding:30px 20px;
+      border:1px solid var(--border);
+      border-radius:28px;
+      background:var(--card);
+      box-shadow:var(--shadow);
+      backdrop-filter:blur(20px);
+      text-align:center;
+    }
+    .denied-icon{font-size:48px;margin-bottom:10px}
+    .denied-card h2{margin:0;font-size:25px}
+    .denied-card p{margin:10px auto 0;max-width:390px;color:var(--muted);font-size:13px;line-height:1.75}
+    .denied-actions{display:grid;gap:9px;margin-top:20px}
+    .denied-actions a,.denied-actions button{
+      min-height:48px;border-radius:15px;font-weight:850;text-decoration:none;
+      display:flex;align-items:center;justify-content:center;
+    }
+    .denied-back{background:linear-gradient(135deg,#ddd3ff,#b6cdfd);color:#151522;border:0}
+    .denied-switch{border:1px solid var(--border);background:rgba(255,255,255,.05);color:var(--text)}
     .login-card,.calendar-card,.next-card{
       border:1px solid var(--border);background:var(--card);box-shadow:var(--shadow);backdrop-filter:blur(20px)
     }
@@ -148,6 +169,18 @@
       </form>
       <div id="loginError" class="login-error" aria-live="polite"></div>
       <div class="privacy-note">本页面不提供公开注册。请勿在夜班备注中填写患者信息、病历内容或其他敏感个人/医疗信息。</div>
+    </div>
+  </section>
+
+  <section id="deniedPage" class="denied-page hidden">
+    <div class="denied-card">
+      <div class="denied-icon">🔒</div>
+      <h2>暂无夜班日历访问权限</h2>
+      <p>当前账号已登录，但没有被授权访问“夜班日历”。权限由数据库独立控制。</p>
+      <div class="denied-actions">
+        <a class="denied-back" href="../">返回工具箱</a>
+        <button id="deniedLogoutBtn" class="denied-switch" type="button">切换账号</button>
+      </div>
     </div>
   </section>
 
@@ -271,13 +304,33 @@
 
   async function init(){
     const {data:{session}}=await db.auth.getSession();
-    if(session){ try{await enterApp();}catch{await db.auth.signOut();showLogin();showError($("loginError"),"该账号尚未绑定为夜班日历成员。");} }
+    if(session){ try{await enterApp();}catch{await db.auth.signOut();showLogin();showError($("loginError"),"登录状态或授权检查失败，请重新登录。");} }
     else showLogin();
   }
-  function showLogin(){$("loginPage").classList.remove("hidden");$("appPage").classList.add("hidden");}
-  function showApp(){$("loginPage").classList.add("hidden");$("appPage").classList.remove("hidden");}
+  function showLogin(){
+    $("loginPage").classList.remove("hidden");
+    $("deniedPage").classList.add("hidden");
+    $("appPage").classList.add("hidden");
+  }
+  function showApp(){
+    $("loginPage").classList.add("hidden");
+    $("deniedPage").classList.add("hidden");
+    $("appPage").classList.remove("hidden");
+  }
+  function showDenied(){
+    $("loginPage").classList.add("hidden");
+    $("appPage").classList.add("hidden");
+    $("deniedPage").classList.remove("hidden");
+  }
 
   async function enterApp(){
+    const {data:allowed,error:accessError}=await db.rpc("can_access_night_shift");
+    if(accessError) throw accessError;
+    if(allowed!==true){
+      showDenied();
+      return;
+    }
+
     const {data:memberId,error:memberIdError}=await db.rpc("current_member_id");
     if(memberIdError||!memberId) throw new Error("当前账号未绑定成员身份。");
     myMemberId=memberId;
@@ -294,6 +347,11 @@
   }
 
   $("logoutBtn").addEventListener("click",async()=>{await db.auth.signOut();location.reload();});
+  $("deniedLogoutBtn").addEventListener("click",async()=>{
+    await db.auth.signOut();
+    showLogin();
+    $("email").focus();
+  });
 
   async function loadMonth(){
     const year=calendarDate.getFullYear(),month=calendarDate.getMonth();
