@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="theme-color" content="#0e0d10">
+  <title>电子木鱼｜钊的工具箱</title>
+
+  <style>
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    :root{
+      --bg:#0e0d10;
+      --bg2:#171219;
+      --card:rgba(255,255,255,.055);
+      --card2:rgba(255,255,255,.085);
+      --border:rgba(255,255,255,.10);
+      --text:#f7f2e9;
+      --muted:#a99fa8;
+      --gold:#f0c36d;
+      --gold2:#ffdf9a;
+      --wood1:#8f4f2f;
+      --wood2:#6f351f;
+      --wood3:#4b2418;
+      --shadow:0 24px 70px rgba(0,0,0,.42);
+    }
+
+    html,body{margin:0;min-height:100%}
+    body{
+      min-height:100dvh;
+      color:var(--text);
+      font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","PingFang SC","Microsoft YaHei",sans-serif;
+      background:
+        radial-gradient(circle at 50% 23%,rgba(160,103,53,.13),transparent 24%),
+        radial-gradient(circle at 12% 8%,rgba(137,94,166,.13),transparent 28%),
+        radial-gradient(circle at 90% 18%,rgba(64,111,126,.10),transparent 25%),
+        linear-gradient(180deg,#18131b 0%,#0d0c0f 68%,#09090b 100%);
+      overflow-x:hidden;
+      padding:
+        max(14px,env(safe-area-inset-top))
+        14px
+        max(26px,env(safe-area-inset-bottom));
+      user-select:none;
+    }
+
+    button{font:inherit}
+    button:focus-visible,a:focus-visible{
+      outline:2px solid var(--gold2);
+      outline-offset:3px;
+    }
+
+    .page{width:min(100%,760px);margin:0 auto;position:relative}
+    .hidden{display:none!important}
+
+    .topbar{
+      display:flex;align-items:center;justify-content:space-between;gap:10px;
+      margin-bottom:14px;
+    }
+    .back,.icon-btn{
+      min-height:42px;border:1px solid var(--border);border-radius:15px;
+      background:rgba(255,255,255,.055);color:var(--text);
+      backdrop-filter:blur(16px);
+    }
+    .back{
+      padding:0 14px;display:inline-flex;align-items:center;text-decoration:none;
+      font-size:14px;font-weight:800;
+    }
+    .top-actions{display:flex;gap:8px}
+    .icon-btn{
+      min-width:42px;padding:0 11px;display:inline-grid;place-items:center;
+      cursor:pointer;font-size:16px;
+    }
+    .icon-btn.off{opacity:.48}
+
+    header{text-align:center;padding:8px 0 8px}
+    .eyebrow{
+      color:#c7a972;font-size:11px;font-weight:850;letter-spacing:.24em;
+    }
+    h1{
+      margin:9px 0 6px;font-size:clamp(34px,9vw,54px);
+      line-height:1;letter-spacing:-.045em;
+    }
+    .subtitle{
+      margin:0;color:var(--muted);font-size:14px;
+    }
+
+    .mode-switch{
+      display:flex;justify-content:center;margin:15px 0 8px;
+    }
+    .segmented{
+      display:flex;padding:4px;border:1px solid var(--border);border-radius:14px;
+      background:rgba(255,255,255,.04);
+    }
+    .segmented button{
+      min-height:34px;padding:0 14px;border:0;border-radius:10px;
+      background:transparent;color:var(--muted);font-weight:850;font-size:12px;
+      cursor:pointer;
+    }
+    .segmented button.active{
+      background:rgba(255,231,177,.12);color:var(--gold2);
+    }
+
+    .stats{
+      display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;
+      margin:14px 0 8px;
+    }
+    .stat{
+      border:1px solid var(--border);border-radius:17px;
+      padding:11px 8px;background:rgba(255,255,255,.04);
+      text-align:center;backdrop-filter:blur(16px);
+    }
+    .stat small{display:block;color:var(--muted);font-size:10px}
+    .stat b{display:block;margin-top:4px;font-size:19px;font-variant-numeric:tabular-nums}
+    .stat.combo b{color:var(--gold2)}
+
+    .stage{
+      position:relative;
+      min-height:500px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      perspective:950px;
+      isolation:isolate;
+      overflow:visible;
+    }
+
+    .ambient{
+      position:absolute;inset:0;pointer-events:none;overflow:hidden;border-radius:38px;
+    }
+    .particle{
+      position:absolute;width:3px;height:3px;border-radius:50%;
+      background:rgba(255,224,164,.35);
+      box-shadow:0 0 12px rgba(255,211,126,.45);
+      animation:drift var(--dur) linear infinite;
+      animation-delay:var(--delay);
+    }
+    @keyframes drift{
+      0%{transform:translate3d(0,20px,0);opacity:0}
+      20%{opacity:.75}
+      100%{transform:translate3d(var(--dx),-430px,0);opacity:0}
+    }
+
+    .mokugyo-wrap{
+      position:relative;
+      width:min(84vw,480px);
+      aspect-ratio:1/1;
+      display:grid;place-items:center;
+      transform-style:preserve-3d;
+      cursor:pointer;
+      touch-action:manipulation;
+      z-index:4;
+    }
+
+    .halo{
+      position:absolute;width:70%;height:70%;border-radius:50%;
+      background:radial-gradient(circle,rgba(255,205,117,.14),rgba(255,205,117,0) 67%);
+      filter:blur(1px);
+      transform:translateZ(-90px);
+      opacity:.72;
+    }
+
+    .ground-shadow{
+      position:absolute;
+      left:18%;right:18%;bottom:17%;
+      height:11%;
+      border-radius:50%;
+      background:radial-gradient(ellipse,rgba(0,0,0,.55),rgba(0,0,0,0) 70%);
+      filter:blur(10px);
+      transform:rotateX(68deg) translateZ(-80px);
+      transition:transform .14s ease,opacity .14s ease;
+    }
+
+    .fish{
+      position:absolute;
+      width:72%;
+      height:54%;
+      left:14%;
+      top:24%;
+      border-radius:48% 47% 44% 45% / 58% 58% 42% 42%;
+      background:
+        radial-gradient(circle at 44% 28%,rgba(255,214,154,.28),transparent 17%),
+        linear-gradient(110deg,rgba(255,255,255,.09),transparent 24%),
+        repeating-linear-gradient(12deg,rgba(255,255,255,.018) 0 2px,rgba(0,0,0,.018) 2px 5px),
+        radial-gradient(circle at 38% 30%,#a35f38 0 20%,var(--wood1) 38%,var(--wood2) 67%,var(--wood3) 100%);
+      border:1px solid rgba(255,211,153,.12);
+      box-shadow:
+        inset 0 18px 22px rgba(255,218,157,.07),
+        inset 0 -28px 38px rgba(39,15,8,.36),
+        0 35px 50px rgba(0,0,0,.38);
+      transform:rotateX(7deg) rotateY(-4deg) translateZ(28px);
+      transform-origin:50% 74%;
+      transition:transform .14s cubic-bezier(.25,.8,.2,1),filter .14s ease;
+    }
+    .fish::before{
+      content:"";
+      position:absolute;
+      width:56%;height:12%;
+      left:22%;top:42%;
+      border-radius:50%;
+      background:
+        linear-gradient(180deg,#1a0b07 0%,#32150d 58%,rgba(96,45,26,.95) 100%);
+      box-shadow:
+        inset 0 8px 10px rgba(0,0,0,.65),
+        0 2px 0 rgba(255,218,174,.05);
+      transform:rotate(-5deg);
+    }
+    .fish::after{
+      content:"";
+      position:absolute;
+      width:16%;height:13%;
+      right:13%;top:36%;
+      border-radius:50%;
+      background:rgba(20,8,5,.7);
+      box-shadow:inset 0 5px 7px rgba(0,0,0,.65);
+      transform:rotate(-18deg);
+    }
+
+    .base-ring{
+      position:absolute;
+      width:56%;height:13%;
+      left:22%;bottom:20%;
+      border-radius:50%;
+      background:linear-gradient(180deg,#7b4025,#422015);
+      box-shadow:inset 0 6px 9px rgba(255,194,129,.08),0 16px 20px rgba(0,0,0,.28);
+      transform:translateZ(4px);
+    }
+
+    .mallet{
+      position:absolute;
+      width:56%;
+      height:12%;
+      right:-4%;
+      top:22%;
+      transform-origin:82% 50%;
+      transform:rotate(-31deg) translateZ(86px);
+      transition:transform .13s cubic-bezier(.15,.82,.2,1);
+      filter:drop-shadow(0 16px 12px rgba(0,0,0,.30));
+      z-index:7;
+      pointer-events:none;
+    }
+    .mallet-stick{
+      position:absolute;left:6%;right:14%;top:37%;
+      height:28%;border-radius:999px;
+      background:linear-gradient(180deg,#b46b3c,#7a3c24 70%,#542719);
+      box-shadow:inset 0 2px 3px rgba(255,226,182,.14);
+    }
+    .mallet-head{
+      position:absolute;right:0;top:1%;
+      width:23%;height:98%;border-radius:44%;
+      background:
+        radial-gradient(circle at 36% 32%,rgba(255,222,174,.28),transparent 24%),
+        linear-gradient(135deg,#a35b34,#6b321e 67%,#422015);
+      border:1px solid rgba(255,214,154,.11);
+      box-shadow:inset 0 -7px 12px rgba(37,13,7,.28);
+    }
+
+    .mokugyo-wrap.hit .mallet{
+      transform:rotate(-8deg) translate(-11%,-3%) translateZ(75px);
+    }
+    .mokugyo-wrap.hit .fish{
+      transform:rotateX(9deg) rotateY(-3deg) scale(.965,.94) translateZ(22px);
+      filter:brightness(1.12);
+    }
+    .mokugyo-wrap.hit .ground-shadow{
+      transform:rotateX(68deg) scale(.90) translateZ(-80px);
+      opacity:.72;
+    }
+
+    .ring{
+      position:absolute;left:50%;top:51%;
+      width:24%;aspect-ratio:1;border-radius:50%;
+      border:2px solid rgba(255,210,126,.62);
+      transform:translate(-50%,-50%) scale(.45);
+      opacity:0;
+      z-index:2;pointer-events:none;
+    }
+    .ring.go{animation:ring .55s ease-out forwards}
+    @keyframes ring{
+      0%{transform:translate(-50%,-50%) scale(.45);opacity:.85}
+      100%{transform:translate(-50%,-50%) scale(3.1);opacity:0}
+    }
+
+    .float-layer{
+      position:absolute;inset:0;z-index:12;pointer-events:none;overflow:visible;
+    }
+    .float-text{
+      position:absolute;
+      left:50%;top:39%;
+      transform:translate(-50%,0) scale(.92);
+      color:var(--gold2);
+      font-weight:950;
+      font-size:clamp(20px,5vw,30px);
+      text-shadow:0 6px 18px rgba(0,0,0,.35);
+      white-space:nowrap;
+      animation:floatUp .92s ease-out forwards;
+    }
+    .float-text.rare{
+      color:#ffe49f;
+      font-size:clamp(23px,6vw,34px);
+      text-shadow:0 0 18px rgba(255,202,92,.25),0 6px 18px rgba(0,0,0,.35);
+    }
+    @keyframes floatUp{
+      0%{opacity:0;transform:translate(-50%,10px) scale(.88)}
+      15%{opacity:1}
+      100%{opacity:0;transform:translate(var(--tx),-115px) scale(1.08)}
+    }
+
+    .combo-float{
+      position:absolute;
+      top:15%;left:50%;
+      transform:translateX(-50%);
+      font-weight:950;color:#ffd98a;
+      font-size:clamp(18px,5vw,26px);
+      opacity:0;pointer-events:none;
+    }
+    .combo-float.show{animation:comboPop .8s ease-out}
+    @keyframes comboPop{
+      0%{opacity:0;transform:translateX(-50%) scale(.8)}
+      20%{opacity:1;transform:translateX(-50%) scale(1.05)}
+      100%{opacity:0;transform:translateX(-50%) translateY(-28px)}
+    }
+
+    .smoke{
+      position:absolute;
+      width:10px;height:10px;
+      left:50%;top:25%;
+      border-radius:50%;
+      background:rgba(220,220,220,.18);
+      filter:blur(2px);
+      opacity:0;
+      pointer-events:none;
+    }
+    .smoke.go{animation:smokeUp 1.3s ease-out forwards}
+    @keyframes smokeUp{
+      0%{opacity:.35;transform:translate(0,0) scale(.65)}
+      100%{opacity:0;transform:translate(var(--sx),-120px) scale(3)}
+    }
+
+    .caption{
+      text-align:center;margin-top:-22px;color:var(--muted);font-size:13px;
+    }
+    .title-badge{
+      display:inline-flex;align-items:center;gap:7px;
+      margin-top:8px;padding:8px 12px;border-radius:999px;
+      border:1px solid rgba(255,215,145,.11);
+      background:rgba(255,215,145,.055);
+      color:#ddc48f;font-size:12px;font-weight:850;
+    }
+
+    .footer-card{
+      margin-top:18px;padding:15px 16px;border:1px solid var(--border);border-radius:18px;
+      background:rgba(255,255,255,.035);color:var(--muted);
+      font-size:11px;line-height:1.65;text-align:center;
+    }
+
+    .toast{
+      position:fixed;
+      left:50%;
+      bottom:max(24px,calc(env(safe-area-inset-bottom) + 18px));
+      transform:translateX(-50%) translateY(14px);
+      z-index:100;
+      max-width:min(88vw,520px);
+      padding:11px 14px;border-radius:999px;
+      background:rgba(20,17,22,.90);color:#f6e7c7;
+      border:1px solid rgba(255,219,152,.13);
+      backdrop-filter:blur(18px);
+      box-shadow:0 16px 36px rgba(0,0,0,.28);
+      font-size:12px;font-weight:850;
+      opacity:0;pointer-events:none;
+      transition:.22s ease;
+      text-align:center;
+    }
+    .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+    .zen .stats,
+    .zen .mode-switch,
+    .zen .caption,
+    .zen .footer-card{
+      display:none;
+    }
+    .zen header .subtitle{
+      opacity:.35;
+    }
+    .zen .stage{
+      min-height:620px;
+    }
+
+    @media(max-width:520px){
+      .stage{min-height:470px}
+      .mokugyo-wrap{width:min(94vw,430px)}
+      .stats{gap:6px}
+      .stat{padding:10px 5px}
+      .stat b{font-size:17px}
+      .caption{margin-top:-18px}
+      .zen .stage{min-height:580px}
+    }
+
+    @media(prefers-reduced-motion:reduce){
+      *,*::before,*::after{
+        animation-duration:.01ms!important;
+        animation-iteration-count:1!important;
+        scroll-behavior:auto!important;
+      }
+      .mallet,.fish,.ground-shadow{transition:none!important}
+    }
+  </style>
+</head>
+
+<body>
+  <main id="page" class="page">
+    <div class="topbar">
+      <a class="back" href="../">← 工具箱</a>
+
+      <div class="top-actions">
+        <button id="soundBtn" class="icon-btn" type="button" aria-label="音效开关" title="音效开关">🔊</button>
+        <button id="vibrateBtn" class="icon-btn" type="button" aria-label="震动开关" title="震动开关">📳</button>
+      </div>
+    </div>
+
+    <header>
+      <div class="eyebrow">ELECTRONIC MOKUGYO</div>
+      <h1>电子木鱼</h1>
+      <p class="subtitle">敲一下，烦恼 -1，功德 +1</p>
+    </header>
+
+    <div class="mode-switch">
+      <div class="segmented">
+        <button id="normalModeBtn" class="active" type="button">普通模式</button>
+        <button id="zenModeBtn" type="button">禅模式</button>
+      </div>
+    </div>
+
+    <section class="stats" aria-label="功德统计">
+      <div class="stat">
+        <small>今日功德</small>
+        <b id="todayMerit">0</b>
+      </div>
+      <div class="stat">
+        <small>累计功德</small>
+        <b id="totalMerit">0</b>
+      </div>
+      <div class="stat combo">
+        <small>当前连击</small>
+        <b id="comboCount">0</b>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div id="ambient" class="ambient" aria-hidden="true"></div>
+
+      <div
+        id="mokugyo"
+        class="mokugyo-wrap"
+        role="button"
+        tabindex="0"
+        aria-label="敲电子木鱼"
+      >
+        <div class="halo"></div>
+        <div class="ground-shadow"></div>
+        <div class="base-ring"></div>
+        <div class="fish"></div>
+
+        <div class="mallet" aria-hidden="true">
+          <div class="mallet-stick"></div>
+          <div class="mallet-head"></div>
+        </div>
+
+        <div id="ring" class="ring"></div>
+        <div id="floatLayer" class="float-layer"></div>
+        <div id="comboFloat" class="combo-float"></div>
+      </div>
+    </section>
+
+    <div class="caption">
+      点击木鱼或按空格键
+      <div class="title-badge">
+        <span>当前称号</span>
+        <strong id="titleName">初入木鱼</strong>
+      </div>
+    </div>
+
+    <div class="footer-card">
+      今日最高连击：<strong id="bestCombo">0</strong><br>
+      数据仅保存在当前浏览器本地，不上传服务器。
+    </div>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <audio id="hit1" preload="auto" src="./audio/hit1.wav"></audio>
+  <audio id="hit2" preload="auto" src="./audio/hit2.wav"></audio>
+  <audio id="hit3" preload="auto" src="./audio/hit3.wav"></audio>
+
+  <script>
+    const STORAGE_KEY = "mokugyo.v1";
+
+    const state = {
+      todayMerit: 0,
+      totalMerit: 0,
+      combo: 0,
+      bestCombo: 0,
+      lastHitAt: 0,
+      sound: true,
+      vibrate: true,
+      zen: false,
+      dateKey: "",
+      recentHits: []
+    };
+
+    const els = {
+      page: document.getElementById("page"),
+      mokugyo: document.getElementById("mokugyo"),
+      ring: document.getElementById("ring"),
+      floatLayer: document.getElementById("floatLayer"),
+      comboFloat: document.getElementById("comboFloat"),
+      todayMerit: document.getElementById("todayMerit"),
+      totalMerit: document.getElementById("totalMerit"),
+      comboCount: document.getElementById("comboCount"),
+      bestCombo: document.getElementById("bestCombo"),
+      titleName: document.getElementById("titleName"),
+      soundBtn: document.getElementById("soundBtn"),
+      vibrateBtn: document.getElementById("vibrateBtn"),
+      normalModeBtn: document.getElementById("normalModeBtn"),
+      zenModeBtn: document.getElementById("zenModeBtn"),
+      toast: document.getElementById("toast"),
+      ambient: document.getElementById("ambient"),
+      audios: [
+        document.getElementById("hit1"),
+        document.getElementById("hit2"),
+        document.getElementById("hit3")
+      ]
+    };
+
+    function getDateKey() {
+      const now = new Date();
+      return [
+        now.getFullYear(),
+        String(now.getMonth()+1).padStart(2,"0"),
+        String(now.getDate()).padStart(2,"0")
+      ].join("-");
+    }
+
+    function loadState() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+
+        if (typeof saved.totalMerit === "number") state.totalMerit = saved.totalMerit;
+        if (typeof saved.todayMerit === "number") state.todayMerit = saved.todayMerit;
+        if (typeof saved.bestCombo === "number") state.bestCombo = saved.bestCombo;
+        if (typeof saved.sound === "boolean") state.sound = saved.sound;
+        if (typeof saved.vibrate === "boolean") state.vibrate = saved.vibrate;
+        if (typeof saved.zen === "boolean") state.zen = saved.zen;
+        if (typeof saved.dateKey === "string") state.dateKey = saved.dateKey;
+      } catch {}
+
+      const today = getDateKey();
+
+      if (state.dateKey !== today) {
+        state.todayMerit = 0;
+        state.bestCombo = 0;
+        state.dateKey = today;
+      }
+
+      saveState();
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          todayMerit: state.todayMerit,
+          totalMerit: state.totalMerit,
+          bestCombo: state.bestCombo,
+          sound: state.sound,
+          vibrate: state.vibrate,
+          zen: state.zen,
+          dateKey: state.dateKey
+        }));
+      } catch {}
+    }
+
+    function titleFor(total) {
+      if (total >= 10000) return "功德无量";
+      if (total >= 5000) return "木鱼大师";
+      if (total >= 1000) return "功德渐深";
+      if (total >= 500) return "心如止水";
+      if (total >= 100) return "略有功德";
+      return "初入木鱼";
+    }
+
+    function render() {
+      els.todayMerit.textContent = state.todayMerit.toLocaleString("zh-CN");
+      els.totalMerit.textContent = state.totalMerit.toLocaleString("zh-CN");
+      els.comboCount.textContent = state.combo.toLocaleString("zh-CN");
+      els.bestCombo.textContent = state.bestCombo.toLocaleString("zh-CN");
+      els.titleName.textContent = titleFor(state.totalMerit);
+
+      els.soundBtn.textContent = state.sound ? "🔊" : "🔇";
+      els.soundBtn.classList.toggle("off", !state.sound);
+      els.soundBtn.setAttribute("aria-pressed", String(state.sound));
+
+      els.vibrateBtn.textContent = state.vibrate ? "📳" : "📴";
+      els.vibrateBtn.classList.toggle("off", !state.vibrate);
+      els.vibrateBtn.setAttribute("aria-pressed", String(state.vibrate));
+
+      els.page.classList.toggle("zen", state.zen);
+      els.normalModeBtn.classList.toggle("active", !state.zen);
+      els.zenModeBtn.classList.toggle("active", state.zen);
+    }
+
+    function showToast(message, ms=1400) {
+      els.toast.textContent = message;
+      els.toast.classList.add("show");
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => {
+        els.toast.classList.remove("show");
+      }, ms);
+    }
+
+    function playHit() {
+      if (!state.sound) return;
+
+      const base = els.audios[Math.floor(Math.random() * els.audios.length)];
+      const clone = base.cloneNode(true);
+      clone.volume = 0.76;
+      clone.playbackRate = 0.96 + Math.random() * 0.08;
+
+      const playPromise = clone.play();
+      if (playPromise && typeof playPromise.catch === "function") {
+        playPromise.catch(() => {});
+      }
+    }
+
+    function vibrate() {
+      if (!state.vibrate) return;
+      if ("vibrate" in navigator) {
+        navigator.vibrate(16);
+      }
+    }
+
+    function animateHit() {
+      els.mokugyo.classList.remove("hit");
+      void els.mokugyo.offsetWidth;
+      els.mokugyo.classList.add("hit");
+
+      clearTimeout(animateHit.timer);
+      animateHit.timer = setTimeout(() => {
+        els.mokugyo.classList.remove("hit");
+      }, 145);
+
+      els.ring.classList.remove("go");
+      void els.ring.offsetWidth;
+      els.ring.classList.add("go");
+    }
+
+    function floatText(text, rare=false) {
+      const el = document.createElement("div");
+      el.className = `float-text ${rare ? "rare" : ""}`;
+      el.textContent = text;
+
+      const x = 44 + Math.random() * 12;
+      const tx = (-70 + Math.random() * 140) + "px";
+
+      el.style.left = x + "%";
+      el.style.setProperty("--tx", tx);
+
+      els.floatLayer.appendChild(el);
+      el.addEventListener("animationend", () => el.remove(), { once: true });
+    }
+
+    function showComboPop(text) {
+      els.comboFloat.textContent = text;
+      els.comboFloat.classList.remove("show");
+      void els.comboFloat.offsetWidth;
+      els.comboFloat.classList.add("show");
+    }
+
+    function emitSmoke() {
+      const s = document.createElement("div");
+      s.className = "smoke";
+      s.style.left = (44 + Math.random() * 14) + "%";
+      s.style.setProperty("--sx", (-45 + Math.random() * 90) + "px");
+      els.mokugyo.appendChild(s);
+      requestAnimationFrame(() => s.classList.add("go"));
+      s.addEventListener("animationend", () => s.remove(), { once:true });
+    }
+
+    function getReward() {
+      const r = Math.random();
+
+      if (r < 0.01) {
+        return { amount: 10, text: "✨ 功德暴击 +10", rare: true };
+      }
+      if (r < 0.04) {
+        return { amount: 1, text: "好运 +1", rare: false };
+      }
+      if (r < 0.08) {
+        return { amount: 1, text: "烦恼 -1", rare: false };
+      }
+      if (r < 0.11) {
+        return { amount: 1, text: "心静 +1", rare: false };
+      }
+
+      return { amount: 1, text: "功德 +1", rare: false };
+    }
+
+    function checkEggs() {
+      const milestones = {
+        66: "六六大顺 ✨",
+        88: "好运加倍 🍀",
+        100: "百敲成就达成",
+        520: "❤️ 今日功德有点甜",
+        666: "木鱼都快被你敲冒烟了 😂"
+      };
+
+      const message = milestones[state.todayMerit];
+      if (message) {
+        showToast(message, 1800);
+      }
+    }
+
+    function checkRapidHits(now) {
+      state.recentHits.push(now);
+      state.recentHits = state.recentHits.filter(t => now - t <= 5000);
+
+      if (state.recentHits.length >= 30) {
+        for (let i=0;i<4;i++) {
+          setTimeout(emitSmoke, i * 90);
+        }
+        showToast("木鱼都快冒烟了，功德照加 😂", 1500);
+        state.recentHits = [];
+      }
+    }
+
+    function hit() {
+      const now = performance.now();
+
+      if (now - state.lastHitAt <= 800) {
+        state.combo += 1;
+      } else {
+        state.combo = 1;
+      }
+
+      state.lastHitAt = now;
+      state.bestCombo = Math.max(state.bestCombo, state.combo);
+
+      const reward = getReward();
+
+      state.todayMerit += reward.amount;
+      state.totalMerit += reward.amount;
+
+      animateHit();
+      playHit();
+      vibrate();
+      floatText(reward.text, reward.rare);
+      checkEggs();
+      checkRapidHits(now);
+
+      if ([10,30,50,100].includes(state.combo)) {
+        showComboPop(`🔥 ${state.combo} 连击`);
+        if (state.combo === 100) {
+          showToast("百连功德 ✨", 1500);
+        }
+      }
+
+      saveState();
+      render();
+    }
+
+    function setMode(zen) {
+      state.zen = zen;
+      saveState();
+      render();
+    }
+
+    els.mokugyo.addEventListener("pointerdown", e => {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      hit();
+    });
+
+    els.mokugyo.addEventListener("keydown", e => {
+      if (e.code === "Space" || e.code === "Enter") {
+        e.preventDefault();
+        hit();
+      }
+    });
+
+    els.soundBtn.addEventListener("click", () => {
+      state.sound = !state.sound;
+      saveState();
+      render();
+      showToast(state.sound ? "音效已开启" : "音效已关闭");
+    });
+
+    els.vibrateBtn.addEventListener("click", () => {
+      state.vibrate = !state.vibrate;
+      saveState();
+      render();
+      showToast(state.vibrate ? "震动已开启" : "震动已关闭");
+    });
+
+    els.normalModeBtn.addEventListener("click", () => setMode(false));
+    els.zenModeBtn.addEventListener("click", () => setMode(true));
+
+    function createAmbientParticles() {
+      const count = 14;
+
+      for (let i=0;i<count;i++) {
+        const p = document.createElement("span");
+        p.className = "particle";
+        p.style.left = (5 + Math.random() * 90) + "%";
+        p.style.top = (60 + Math.random() * 40) + "%";
+        p.style.setProperty("--dur", (8 + Math.random() * 11) + "s");
+        p.style.setProperty("--delay", (-Math.random() * 12) + "s");
+        p.style.setProperty("--dx", (-70 + Math.random() * 140) + "px");
+        els.ambient.appendChild(p);
+      }
+    }
+
+    loadState();
+    createAmbientParticles();
+    render();
+  </script>
+  
+  <!-- Cloudflare Web Analytics -->
+  <script type='module' 
+    src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "bfd3df5c469343eb91856b7f3275def8"}'>  
+  </script>
+  <!-- End Cloudflare Web Analytics -->
+
+</body>
+</html>
