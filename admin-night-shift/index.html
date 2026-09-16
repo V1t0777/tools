@@ -1,0 +1,1532 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="theme-color" content="#0d1320">
+  <title>科室排班｜钊的工具箱</title>
+
+  <style>
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    :root{
+      --bg:#0d1320;
+      --card:rgba(255,255,255,.065);
+      --card-strong:rgba(255,255,255,.085);
+      --border:rgba(255,255,255,.105);
+      --text:#f6f7fb;
+      --muted:#9da8ba;
+      --shadow:0 18px 50px rgba(0,0,0,.28);
+      --duty:#ff8e95;
+      --primary:#c4a7ff;
+      --second:#81b7ff;
+      --follow:#72d6b0;
+      --clinic:#f7c66b;
+      --specialty1:#f2a7c6;
+      --specialty2:#7ed7e9;
+      --holiday:#ff9ca6;
+      --workday:#9ebcff;
+    }
+
+    html,body{margin:0;min-height:100%}
+    body{
+      min-height:100dvh;
+      color:var(--text);
+      font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","PingFang SC","Microsoft YaHei",sans-serif;
+      background:
+        radial-gradient(circle at 15% 0%,rgba(84,104,205,.28),transparent 30%),
+        radial-gradient(circle at 90% 10%,rgba(65,147,189,.18),transparent 28%),
+        linear-gradient(180deg,#171d2b 0%,#090e17 100%);
+      padding:max(16px,env(safe-area-inset-top)) 13px max(30px,env(safe-area-inset-bottom));
+    }
+
+    button,input,select,textarea{font:inherit}
+    button{cursor:pointer}
+    .hidden{display:none!important}
+    .page{width:min(100%,1080px);margin:0 auto}
+
+    .topbar{
+      display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:16px
+    }
+    .back,.ghost{
+      min-height:42px;padding:0 14px;border:1px solid var(--border);border-radius:14px;
+      background:rgba(255,255,255,.055);color:var(--text);text-decoration:none;
+      display:inline-flex;align-items:center;justify-content:center;font-weight:750;font-size:13px
+    }
+    .user{display:flex;align-items:center;gap:8px}
+    .who{font-size:12px;color:#d0d6e1}
+
+    .login-wrap{min-height:calc(100dvh - 60px);display:grid;place-items:center}
+    .login-card,.panel,.calendar-card,.today-card{
+      border:1px solid var(--border);
+      background:var(--card);
+      box-shadow:var(--shadow);
+      backdrop-filter:blur(20px)
+    }
+    .login-card{width:min(100%,520px);padding:30px 20px;border-radius:30px;text-align:center}
+    .login-icon{font-size:54px}
+    .login-card h1{margin:7px 0 0;font-size:36px;letter-spacing:-.04em}
+    .login-card p{margin:10px 0 25px;color:var(--muted);font-size:14px;line-height:1.7}
+
+    .field{text-align:left;margin-bottom:14px}
+    .field label{display:block;margin:0 2px 7px;font-size:13px;font-weight:750;color:#d6dbe6}
+    .input{
+      width:100%;min-height:52px;padding:0 14px;border:1px solid var(--border);border-radius:15px;
+      background:rgba(255,255,255,.06);color:var(--text);outline:none;font-size:15px
+    }
+    textarea.input{min-height:76px;padding-top:12px;resize:vertical}
+    .input:focus{border-color:rgba(183,195,255,.62);box-shadow:0 0 0 3px rgba(126,148,255,.10)}
+
+    .primary{
+      width:100%;min-height:54px;border:0;border-radius:17px;
+      background:linear-gradient(135deg,#d9ddff,#9fcaff);color:#121725;font-weight:900
+    }
+    .primary:disabled{opacity:.55}
+    .secondary{
+      width:100%;min-height:48px;margin-top:8px;border:1px solid var(--border);border-radius:15px;
+      background:rgba(255,255,255,.055);color:var(--text);font-weight:800
+    }
+    .danger-button{
+      min-height:38px;padding:0 11px;border:1px solid rgba(255,120,135,.18);border-radius:12px;
+      background:rgba(255,90,105,.08);color:#ff9da8;font-size:12px;font-weight:800
+    }
+    .small{
+      min-height:36px;padding:0 10px;border:1px solid var(--border);border-radius:11px;
+      background:rgba(255,255,255,.055);color:var(--text);font-size:11px
+    }
+    .error{min-height:20px;margin-top:11px;color:#ff9da8;font-size:12px}
+    .privacy{
+      margin-top:18px;padding-top:15px;border-top:1px solid var(--border);
+      font-size:11px;line-height:1.7;color:#8691a5
+    }
+
+    header{padding:7px 3px 17px}
+    .eyebrow{color:#abb9ff;font-size:11px;font-weight:850;letter-spacing:.16em}
+    header h1{margin:7px 0 5px;font-size:clamp(34px,8vw,52px);letter-spacing:-.045em;line-height:1}
+    header p{margin:0;color:var(--muted);font-size:14px}
+
+    .mode{
+      display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;
+      margin-bottom:14px;border:1px solid var(--border);border-radius:18px;background:rgba(255,255,255,.045)
+    }
+    .mode strong{font-size:13px}
+    .mode small{display:block;margin-top:3px;color:var(--muted)}
+    .mode-badge{
+      flex:0 0 auto;padding:5px 9px;border-radius:999px;font-size:10px;font-weight:900;
+      background:rgba(255,255,255,.08);color:#c9d0dc
+    }
+    .mode-badge.admin{background:rgba(132,177,255,.16);color:#bdd8ff}
+
+    .today-card{
+      padding:19px;border-radius:25px;
+      background:linear-gradient(135deg,rgba(113,137,255,.12),rgba(75,156,208,.07)),var(--card)
+    }
+    .today-label{font-size:11px;font-weight:850;color:#b9c6ff}
+    .today-date{margin-top:6px;font-size:22px;font-weight:900}
+    .today-groups{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+    .today-group{
+      min-width:0;padding:12px;border:1px solid var(--border);border-radius:17px;background:rgba(255,255,255,.035)
+    }
+    .today-group-title{font-size:12px;font-weight:900;margin-bottom:8px}
+    .today-row{
+      display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid rgba(255,255,255,.055)
+    }
+    .today-row:first-of-type{border-top:0}
+    .today-role{font-size:11px;color:var(--muted)}
+    .today-person{font-size:12px;font-weight:800;text-align:right}
+
+    .controls{margin:14px 0;display:grid;gap:10px}
+    .toolbar{display:flex;gap:8px;overflow:auto;padding-bottom:2px}
+    .pill{
+      flex:0 0 auto;min-height:38px;padding:0 13px;border:1px solid var(--border);border-radius:999px;
+      background:rgba(255,255,255,.045);color:var(--text);font-size:12px;font-weight:800
+    }
+    .pill.active{background:#dbe2ff;color:#111725;border-color:transparent}
+    .subtoolbar{display:flex;gap:7px;overflow:auto}
+    .subpill{
+      flex:0 0 auto;min-height:34px;padding:0 11px;border:1px solid var(--border);border-radius:999px;
+      background:rgba(255,255,255,.035);color:#c7cedb;font-size:11px;font-weight:750
+    }
+    .subpill.active{background:rgba(170,187,255,.16);color:#dfe5ff;border-color:rgba(170,187,255,.25)}
+
+    .switch-row{display:flex;gap:9px;align-items:center;justify-content:space-between}
+    .segmented{
+      display:flex;padding:4px;border:1px solid var(--border);border-radius:14px;background:rgba(255,255,255,.04)
+    }
+    .segmented button{
+      min-height:34px;padding:0 13px;border:0;border-radius:10px;background:transparent;color:var(--muted);font-weight:800;font-size:12px
+    }
+    .segmented button.active{background:rgba(255,255,255,.11);color:var(--text)}
+    .staff-filter{min-height:42px;max-width:220px}
+
+    .calendar-card{padding:16px 9px;border-radius:27px}
+    .cal-head{display:flex;justify-content:space-between;align-items:center;padding:2px 4px 13px}
+    .cal-title{font-size:20px;font-weight:900}
+    .month-btn{
+      width:42px;height:42px;border:1px solid var(--border);border-radius:14px;
+      background:rgba(255,255,255,.055);color:var(--text);font-size:22px
+    }
+    .weekdays,.grid{display:grid;grid-template-columns:repeat(7,1fr)}
+    .weekdays div{text-align:center;padding:7px 0 9px;color:#7f899d;font-size:11px}
+    .day{
+      position:relative;min-height:104px;margin:2px;padding:6px 4px;border:1px solid transparent;
+      border-radius:14px;overflow:hidden
+    }
+    .day.other{opacity:.22}
+    .day.today{border-color:rgba(190,203,255,.45)}
+    .day.has{background:rgba(255,255,255,.035)}
+    .day.holiday-day{background:rgba(255,96,110,.05)}
+    .day.workday-day{background:rgba(121,164,255,.05)}
+    .num{
+      width:25px;height:25px;display:grid;place-items:center;border-radius:50%;font-size:12px;font-weight:850
+    }
+    .today .num{background:#dfe5ff;color:#101521}
+    .holiday-badge{
+      position:absolute;top:6px;right:5px;min-width:18px;height:18px;padding:0 4px;display:grid;place-items:center;
+      border-radius:6px;font-size:9px;font-weight:900
+    }
+    .holiday-badge.holiday{background:rgba(255,90,110,.18);color:var(--holiday)}
+    .holiday-badge.workday{background:rgba(118,159,255,.18);color:var(--workday)}
+    .holiday-name{
+      margin-top:2px;font-size:7px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--holiday)
+    }
+    .workday-day .holiday-name{color:var(--workday)}
+    .chip{display:flex;align-items:center;gap:4px;margin-top:4px;min-width:0;font-size:8px;white-space:nowrap}
+    .chip-dot{width:6px;height:6px;flex:0 0 auto;border-radius:50%}
+    .chip-text{overflow:hidden;text-overflow:ellipsis}
+    .clinic-count{
+      margin-top:5px;padding:3px 5px;border-radius:7px;background:rgba(247,198,107,.09);
+      color:#f7d98d;font-size:8px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+    }
+    .legend{
+      display:flex;flex-wrap:wrap;gap:8px 12px;margin-top:10px;padding:12px 5px 0;
+      border-top:1px solid rgba(255,255,255,.06);color:var(--muted);font-size:10px
+    }
+    .legend span{display:inline-flex;align-items:center;gap:5px}
+    .legend i{width:7px;height:7px;border-radius:50%;display:inline-block}
+
+    .table-panel{border:1px solid var(--border);border-radius:22px;background:var(--card);overflow:hidden;box-shadow:var(--shadow)}
+    .table-scroll{overflow:auto;max-width:100%}
+    table{width:100%;min-width:900px;border-collapse:separate;border-spacing:0;font-size:12px}
+    th,td{padding:10px 9px;border-right:1px solid rgba(255,255,255,.07);border-bottom:1px solid rgba(255,255,255,.07);vertical-align:top}
+    th{position:sticky;top:0;z-index:2;background:#171f2f;color:#dfe5ef;font-size:11px;white-space:nowrap}
+    th:first-child,td:first-child{position:sticky;left:0;z-index:1;background:#141b29}
+    th:first-child{z-index:3}
+    td{color:#d6dce6}
+    .table-date{font-weight:850;white-space:nowrap}
+    .cell-entry{display:block;margin-bottom:4px;white-space:nowrap}
+    .cell-entry:last-child{margin-bottom:0}
+    .cell-slot{color:#9faabd;font-size:10px;margin-left:4px}
+    .table-empty{color:#626e82}
+
+    .list-head{display:flex;justify-content:space-between;align-items:end;margin:22px 3px 10px}
+    .list-head h2{margin:0;font-size:18px}
+    .list-head span{font-size:11px;color:var(--muted)}
+    .list{display:grid;gap:9px}
+    .item{
+      display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px;
+      border:1px solid var(--border);border-radius:18px;background:rgba(255,255,255,.045)
+    }
+    .item-left{min-width:0}
+    .item-title{display:flex;align-items:center;gap:8px;font-weight:850}
+    .item-meta{margin-top:5px;color:var(--muted);font-size:12px}
+    .empty{padding:26px 12px;text-align:center;border:1px dashed var(--border);border-radius:18px;color:var(--muted);font-size:13px}
+
+    .fab-wrap{position:sticky;bottom:max(16px,env(safe-area-inset-bottom));margin-top:18px;pointer-events:none}
+    .fab{pointer-events:auto;box-shadow:0 14px 32px rgba(101,130,210,.25)}
+
+    .overlay{position:fixed;inset:0;z-index:100;display:flex;align-items:flex-end;background:rgba(4,7,13,.69);backdrop-filter:blur(6px)}
+    .sheet{
+      width:min(100%,820px);max-height:94dvh;overflow:auto;margin:auto auto 0;
+      padding:14px 15px max(20px,env(safe-area-inset-bottom));
+      border:1px solid var(--border);border-radius:28px 28px 0 0;background:#181e2c
+    }
+    .handle{width:42px;height:5px;margin:0 auto 15px;border-radius:999px;background:rgba(255,255,255,.18)}
+    .sheet-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}
+    .sheet-head h2{margin:0;font-size:21px}
+    .close{width:38px;height:38px;border:0;border-radius:50%;background:rgba(255,255,255,.08);color:#fff;font-size:21px}
+
+    .detail-section{margin-top:16px}
+    .detail-section-title{font-size:13px;font-weight:900;margin:0 0 8px}
+    .day-detail{display:grid;gap:8px}
+    .detail-row{
+      display:grid;grid-template-columns:minmax(78px,120px) 1fr;gap:12px;align-items:start;
+      padding:11px 12px;border:1px solid var(--border);border-radius:14px;background:rgba(255,255,255,.04)
+    }
+    .detail-label{font-size:11px;font-weight:850;color:#aeb8c9}
+    .detail-main{font-size:13px;font-weight:850}
+    .detail-sub{margin-top:3px;color:var(--muted);font-size:11px}
+
+    .editor-title{margin:18px 0 9px;font-size:14px;font-weight:900}
+    .duty-editor{display:grid;gap:10px}
+    .duty-row{
+      display:grid;grid-template-columns:68px minmax(0,1fr);gap:9px;align-items:center
+    }
+    .duty-row label{font-size:12px;font-weight:850}
+    .editor-note{margin-top:7px}
+
+    .clinic-editor{display:grid;gap:10px}
+    .clinic-row{
+      padding:11px;border:1px solid var(--border);border-radius:16px;background:rgba(255,255,255,.035)
+    }
+    .clinic-row-grid{display:grid;grid-template-columns:1.2fr 1.1fr .8fr;gap:8px}
+    .clinic-row-actions{display:flex;justify-content:flex-end;margin-top:8px}
+    .add-clinic{
+      width:100%;min-height:44px;margin-top:9px;border:1px dashed rgba(180,194,255,.25);border-radius:14px;
+      background:rgba(140,160,255,.05);color:#cdd6ff;font-weight:850
+    }
+
+    .status{margin:8px 0 0;font-size:11px;color:var(--muted)}
+
+    @media(max-width:700px){
+      .today-groups{grid-template-columns:1fr}
+      .switch-row{align-items:stretch;flex-direction:column}
+      .staff-filter{max-width:none;width:100%}
+      .day{min-height:92px;margin:1px;padding:5px 3px}
+      .chip{font-size:7.4px}
+      .clinic-row-grid{grid-template-columns:1fr}
+      .duty-row{grid-template-columns:58px minmax(0,1fr)}
+    }
+
+    @media print{
+      body{background:#fff;color:#000;padding:0}
+      .topbar,header,.mode,.today-card,.controls,.calendar-card,.list-head,.list,.fab-wrap,.overlay{display:none!important}
+      #appPage{display:block!important}
+      #tableView{display:block!important}
+      .table-panel{box-shadow:none;border:0;background:#fff}
+      .table-scroll{overflow:visible}
+      table{min-width:0;font-size:10px;color:#000}
+      th,td{color:#000!important;border-color:#999!important;padding:5px}
+      th{position:static;background:#eee!important}
+      th:first-child,td:first-child{position:static;background:#fff!important}
+      .cell-slot{color:#444!important}
+    }
+  </style>
+</head>
+
+<body>
+<main class="page">
+
+  <section id="loginPage" class="login-wrap">
+    <div class="login-card">
+      <div class="login-icon">🗓️</div>
+      <h1>科室排班</h1>
+      <p>值班 · 门诊 · 全员排班<br>仅限已授权成员访问</p>
+
+      <form id="loginForm">
+        <div class="field">
+          <label for="email">邮箱</label>
+          <input id="email" class="input" type="email" autocomplete="email" required>
+        </div>
+        <div class="field">
+          <label for="password">密码</label>
+          <input id="password" class="input" type="password" autocomplete="current-password" required>
+        </div>
+        <button id="loginBtn" class="primary" type="submit">登录</button>
+      </form>
+
+      <div id="loginError" class="error" aria-live="polite"></div>
+
+      <div class="privacy">
+        本页面不提供公开注册。普通成员只读，管理员统一维护。
+        请勿录入患者姓名、住院号、诊断、病历或其他医疗敏感信息。
+      </div>
+    </div>
+  </section>
+
+  <section id="appPage" class="hidden">
+    <div class="topbar">
+      <a class="back" href="../">← 工具箱</a>
+      <div class="user">
+        <span id="who" class="who"></span>
+        <button id="logoutBtn" class="ghost">退出</button>
+      </div>
+    </div>
+
+    <header>
+      <div class="eyebrow">DEPARTMENT ROSTER</div>
+      <h1>科室排班</h1>
+      <p>月历 · 表格 · 值班 · 门诊</p>
+    </header>
+
+    <div class="mode">
+      <div>
+        <strong id="modeTitle">正在确认权限…</strong>
+        <small id="modeText"></small>
+      </div>
+      <div id="modeBadge" class="mode-badge">只读</div>
+    </div>
+
+    <section class="today-card">
+      <div class="today-label">今天</div>
+      <div id="todayDate" class="today-date"></div>
+      <div id="todayGroups" class="today-groups"></div>
+    </section>
+
+    <div class="controls">
+      <div class="toolbar" id="groupToolbar">
+        <button class="pill active" data-group="all">全部</button>
+        <button class="pill" data-group="duty">值班</button>
+        <button class="pill" data-group="clinic">门诊</button>
+      </div>
+
+      <div class="subtoolbar" id="subToolbar"></div>
+
+      <div class="switch-row">
+        <div class="segmented">
+          <button id="calendarModeBtn" class="active">月历</button>
+          <button id="tableModeBtn">表格</button>
+        </div>
+
+        <select id="staffFilter" class="input staff-filter">
+          <option value="">全部人员</option>
+        </select>
+      </div>
+    </div>
+
+    <section id="calendarView" class="calendar-card">
+      <div class="cal-head">
+        <button id="prev" class="month-btn" aria-label="上个月">‹</button>
+        <div id="calTitle" class="cal-title"></div>
+        <button id="next" class="month-btn" aria-label="下个月">›</button>
+      </div>
+
+      <div class="weekdays">
+        <div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div>
+      </div>
+
+      <div id="grid" class="grid"></div>
+
+      <div class="legend">
+        <span><i style="background:var(--duty)"></i>值班</span>
+        <span><i style="background:var(--primary)"></i>主班</span>
+        <span><i style="background:var(--second)"></i>二线</span>
+        <span><i style="background:var(--follow)"></i>跟值</span>
+        <span><i style="background:var(--clinic)"></i>门诊</span>
+        <span>休＝法定/调休休息</span>
+        <span>班＝调休工作日</span>
+      </div>
+    </section>
+
+    <section id="tableView" class="table-panel hidden">
+      <div class="cal-head">
+        <button id="prevTable" class="month-btn" aria-label="上个月">‹</button>
+        <div id="tableTitle" class="cal-title"></div>
+        <button id="nextTable" class="month-btn" aria-label="下个月">›</button>
+      </div>
+      <div class="table-scroll">
+        <table id="scheduleTable"></table>
+      </div>
+    </section>
+
+    <div class="list-head">
+      <h2>本月排班</h2>
+      <span id="countText"></span>
+    </div>
+    <section id="list" class="list"></section>
+
+    <div id="adminFab" class="fab-wrap hidden">
+      <button id="addBtn" class="primary fab">＋ 编辑某天排班</button>
+    </div>
+  </section>
+</main>
+
+<div id="detailOverlay" class="overlay hidden">
+  <section class="sheet">
+    <div class="handle"></div>
+    <div class="sheet-head">
+      <h2 id="detailTitle"></h2>
+      <button id="detailClose" class="close" aria-label="关闭">×</button>
+    </div>
+
+    <div id="detailHoliday" class="status"></div>
+
+    <section class="detail-section">
+      <h3 class="detail-section-title">🌙 值班安排</h3>
+      <div id="detailDuty" class="day-detail"></div>
+    </section>
+
+    <section class="detail-section">
+      <h3 class="detail-section-title">🏥 门诊安排</h3>
+      <div id="detailClinic" class="day-detail"></div>
+    </section>
+
+    <button id="editThisDay" class="primary hidden" style="margin-top:16px">编辑当天全部排班</button>
+  </section>
+</div>
+
+<div id="editOverlay" class="overlay hidden">
+  <section class="sheet">
+    <div class="handle"></div>
+    <div class="sheet-head">
+      <h2>编辑当天排班</h2>
+      <button id="editClose" class="close" aria-label="关闭">×</button>
+    </div>
+
+    <div class="field">
+      <label for="editDate">日期</label>
+      <input id="editDate" class="input" type="date" required>
+    </div>
+
+    <div class="editor-title">🌙 值班安排</div>
+    <div id="dutyEditor" class="duty-editor"></div>
+
+    <div class="editor-title">🏥 门诊安排</div>
+    <div id="clinicEditor" class="clinic-editor"></div>
+    <button id="addClinicRow" class="add-clinic" type="button">＋ 添加门诊记录</button>
+
+    <div class="privacy">
+      保存会一次性更新当天完整排班。门诊允许同一类型添加多位人员及不同时间段。
+      写权限由 Supabase RLS 强制验证。
+    </div>
+
+    <button id="saveDay" class="primary" style="margin-top:14px">保存当天全部排班</button>
+    <button id="cancelEdit" class="secondary" type="button">取消</button>
+    <div id="editError" class="error" aria-live="polite"></div>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const SUPABASE_URL = "https://tmxpueakxibsaakdyusn.supabase.co";
+  const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_8sCgnOXk3XuRE28Qmk_ekg_9VSS4ASZ";
+  const db = supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+  const $ = id => document.getElementById(id);
+  const pad = n => String(n).padStart(2,"0");
+  const toYMD = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const parseDate = s => {
+    const [y,m,d] = s.split("-").map(Number);
+    return new Date(y,m-1,d,0,0,0,0);
+  };
+  const displayDate = s =>
+    new Intl.DateTimeFormat("zh-CN",{month:"long",day:"numeric",weekday:"short"}).format(parseDate(s));
+
+  const DUTY_CODES = ["duty","primary","second","follow"];
+  const CLINIC_CODES = ["mobile_clinic","specialty_1","specialty_2"];
+  const DUTY_SHORT = {duty:"值",primary:"主",second:"二",follow:"跟"};
+  const SLOT_ORDER = {"上午":1,"下午":2,"全天":3,"夜间":4,"未标注":5};
+
+  let myMemberId = null;
+  let me = null;
+  let isAdmin = false;
+  let members = [];
+  let staff = [];
+  let types = [];
+  let assignments = [];
+  let monthCursor = new Date();
+  let selectedDate = null;
+
+  let filterGroup = "all";
+  let filterCode = "";
+  let filterStaffId = "";
+  let viewMode = "calendar";
+
+  const holidayCache = new Map();
+
+  function typeByCode(code) { return types.find(t => t.code === code); }
+  function typeById(id) { return types.find(t => t.id === id); }
+  function staffById(id) { return staff.find(s => s.id === id); }
+
+  function sortAssignments(items) {
+    return items.slice().sort((a,b) => {
+      const ta = typeById(a.duty_type_id)?.sort_order ?? 999;
+      const tb = typeById(b.duty_type_id)?.sort_order ?? 999;
+      if (ta !== tb) return ta - tb;
+      const sa = SLOT_ORDER[a.time_slot] ?? 99;
+      const sb = SLOT_ORDER[b.time_slot] ?? 99;
+      if (sa !== sb) return sa - sb;
+      return (staffById(a.staff_id)?.name || "").localeCompare(
+        staffById(b.staff_id)?.name || "",
+        "zh-CN"
+      );
+    });
+  }
+
+  async function loadHolidayYear(year) {
+    if (holidayCache.has(year)) return holidayCache.get(year);
+    try {
+      const r = await fetch(`../holidays/${year}.json`,{cache:"no-cache"});
+      if (!r.ok) throw new Error("holiday file missing");
+      const data = await r.json();
+      const days = data.days || {};
+      holidayCache.set(year,days);
+      return days;
+    } catch {
+      holidayCache.set(year,{});
+      return {};
+    }
+  }
+
+  async function holidayFor(ymd) {
+    const days = await loadHolidayYear(Number(ymd.slice(0,4)));
+    return days[ymd] || null;
+  }
+
+  function filteredAssignments(items) {
+    return items.filter(item => {
+      const type = typeById(item.duty_type_id);
+      if (!type) return false;
+
+      if (filterStaffId && item.staff_id !== filterStaffId) return false;
+      if (filterCode && type.code !== filterCode) return false;
+
+      if (!filterCode) {
+        if (filterGroup === "duty" && type.group_name !== "值班") return false;
+        if (filterGroup === "clinic" && type.group_name !== "门诊") return false;
+      }
+
+      return true;
+    });
+  }
+
+  function createEmpty(text) {
+    const el = document.createElement("div");
+    el.className = "empty";
+    el.textContent = text;
+    return el;
+  }
+
+  function showLogin() {
+    $("loginPage").classList.remove("hidden");
+    $("appPage").classList.add("hidden");
+  }
+
+  function showApp() {
+    $("loginPage").classList.add("hidden");
+    $("appPage").classList.remove("hidden");
+  }
+
+  $("loginForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    $("loginError").textContent = "";
+    $("loginBtn").disabled = true;
+    $("loginBtn").textContent = "正在登录…";
+
+    try {
+      const {error} = await db.auth.signInWithPassword({
+        email:$("email").value.trim(),
+        password:$("password").value
+      });
+
+      if (error) throw new Error("邮箱或密码错误，或账号未获授权。");
+      await enterApp();
+    } catch (err) {
+      $("loginError").textContent = err.message || "登录失败。";
+    } finally {
+      $("loginBtn").disabled = false;
+      $("loginBtn").textContent = "登录";
+    }
+  });
+
+  async function init() {
+    const {data:{session}} = await db.auth.getSession();
+
+    if (!session) {
+      showLogin();
+      return;
+    }
+
+    try {
+      await enterApp();
+    } catch (err) {
+      console.error(err);
+      await db.auth.signOut();
+      showLogin();
+      $("loginError").textContent = "当前账号未完成科室排班系统授权。";
+    }
+  }
+
+  async function enterApp() {
+    const {data:id,error:idError} = await db.rpc("current_member_id");
+    if (idError || !id) throw new Error("账号未绑定成员身份。");
+    myMemberId = id;
+
+    const [memberRes,adminRes,staffRes,typeRes] = await Promise.all([
+      db.from("members").select("id,nickname,color"),
+      db.rpc("is_admin"),
+      db.from("staff").select("id,name,color,active").eq("active",true).order("name"),
+      db.from("duty_types").select("id,code,label,group_name,color,sort_order,active").eq("active",true).order("sort_order")
+    ]);
+
+    if (memberRes.error) throw memberRes.error;
+    if (adminRes.error) throw adminRes.error;
+    if (staffRes.error) throw staffRes.error;
+    if (typeRes.error) throw typeRes.error;
+
+    members = memberRes.data || [];
+    me = members.find(x => x.id === myMemberId);
+    if (!me) throw new Error("未找到成员资料。");
+
+    isAdmin = adminRes.data === true;
+    staff = staffRes.data || [];
+    types = typeRes.data || [];
+
+    $("who").textContent = me.nickname;
+    $("modeTitle").textContent = isAdmin ? "管理员模式" : "只读模式";
+    $("modeText").textContent = isAdmin
+      ? "可以维护值班与门诊的全部排班"
+      : "可以查看全员排班，不能修改";
+    $("modeBadge").textContent = isAdmin ? "管理员" : "只读";
+    $("modeBadge").className = `mode-badge ${isAdmin ? "admin" : ""}`;
+    $("adminFab").classList.toggle("hidden",!isAdmin);
+
+    populateStaffFilter();
+    renderSubToolbar();
+    showApp();
+
+    await Promise.all([
+      loadMonth(),
+      loadToday()
+    ]);
+  }
+
+  function populateStaffFilter() {
+    const sel = $("staffFilter");
+    sel.replaceChildren();
+
+    const all = document.createElement("option");
+    all.value = "";
+    all.textContent = "全部人员";
+    sel.appendChild(all);
+
+    for (const person of staff) {
+      const option = document.createElement("option");
+      option.value = person.id;
+      option.textContent = person.name;
+      sel.appendChild(option);
+    }
+  }
+
+  $("logoutBtn").addEventListener("click", async () => {
+    await db.auth.signOut();
+    location.reload();
+  });
+
+  async function loadMonth() {
+    const y = monthCursor.getFullYear();
+    const m = monthCursor.getMonth();
+    const first = new Date(y,m,1);
+    const last = new Date(y,m+1,0);
+
+    await loadHolidayYear(y);
+
+    const {data,error} = await db
+      .from("schedule_assignments")
+      .select("id,work_date,duty_type_id,staff_id,time_slot,note")
+      .gte("work_date",toYMD(first))
+      .lte("work_date",toYMD(last))
+      .order("work_date",{ascending:true});
+
+    if (error) {
+      console.error(error);
+      assignments = [];
+    } else {
+      assignments = data || [];
+    }
+
+    await renderAll();
+  }
+
+  async function renderAll() {
+    if (viewMode === "calendar") {
+      await renderCalendar();
+    } else {
+      renderTable();
+    }
+    renderList();
+  }
+
+  async function loadToday() {
+    const now = new Date();
+    $("todayDate").textContent =
+      new Intl.DateTimeFormat("zh-CN",{
+        year:"numeric",month:"long",day:"numeric",weekday:"long"
+      }).format(now);
+
+    const ds = toYMD(now);
+
+    const {data,error} = await db
+      .from("schedule_assignments")
+      .select("id,work_date,duty_type_id,staff_id,time_slot,note")
+      .eq("work_date",ds);
+
+    const holder = $("todayGroups");
+    holder.replaceChildren();
+
+    if (error) {
+      holder.appendChild(createEmpty("今天排班加载失败"));
+      return;
+    }
+
+    const items = sortAssignments(data || []);
+    const duty = items.filter(x => typeById(x.duty_type_id)?.group_name === "值班");
+    const clinic = items.filter(x => typeById(x.duty_type_id)?.group_name === "门诊");
+
+    holder.appendChild(createTodayGroup("🌙 值班安排", duty));
+    holder.appendChild(createTodayGroup("🏥 门诊安排", clinic));
+  }
+
+  function createTodayGroup(title,items) {
+    const box = document.createElement("div");
+    box.className = "today-group";
+
+    const h = document.createElement("div");
+    h.className = "today-group-title";
+    h.textContent = title;
+    box.appendChild(h);
+
+    if (!items.length) {
+      const p = document.createElement("div");
+      p.className = "status";
+      p.textContent = "暂无安排";
+      box.appendChild(p);
+      return box;
+    }
+
+    for (const item of items) {
+      const type = typeById(item.duty_type_id);
+      const person = staffById(item.staff_id);
+
+      const row = document.createElement("div");
+      row.className = "today-row";
+
+      const role = document.createElement("div");
+      role.className = "today-role";
+      role.textContent = type?.label || "排班";
+
+      const name = document.createElement("div");
+      name.className = "today-person";
+      name.textContent =
+        type?.group_name === "门诊"
+          ? `${person?.name || "成员"} · ${item.time_slot || "未标注"}`
+          : (person?.name || "成员");
+
+      row.append(role,name);
+      box.appendChild(row);
+    }
+
+    return box;
+  }
+
+  function renderSubToolbar() {
+    const holder = $("subToolbar");
+    holder.replaceChildren();
+
+    const defs = filterGroup === "duty"
+      ? DUTY_CODES
+      : filterGroup === "clinic"
+        ? CLINIC_CODES
+        : [];
+
+    if (!defs.length) {
+      filterCode = "";
+      holder.classList.add("hidden");
+      return;
+    }
+
+    holder.classList.remove("hidden");
+
+    const allBtn = document.createElement("button");
+    allBtn.className = `subpill ${filterCode === "" ? "active" : ""}`;
+    allBtn.textContent = filterGroup === "duty" ? "全部值班" : "全部门诊";
+    allBtn.addEventListener("click",() => {
+      filterCode = "";
+      renderSubToolbar();
+      renderAll();
+    });
+    holder.appendChild(allBtn);
+
+    for (const code of defs) {
+      const type = typeByCode(code);
+      if (!type) continue;
+
+      const btn = document.createElement("button");
+      btn.className = `subpill ${filterCode === code ? "active" : ""}`;
+      btn.textContent = type.label;
+      btn.addEventListener("click",() => {
+        filterCode = code;
+        renderSubToolbar();
+        renderAll();
+      });
+      holder.appendChild(btn);
+    }
+  }
+
+  document.querySelectorAll("#groupToolbar .pill").forEach(btn => {
+    btn.addEventListener("click",() => {
+      document.querySelectorAll("#groupToolbar .pill").forEach(x => x.classList.remove("active"));
+      btn.classList.add("active");
+
+      filterGroup = btn.dataset.group;
+      filterCode = "";
+      renderSubToolbar();
+      renderAll();
+    });
+  });
+
+  $("staffFilter").addEventListener("change",() => {
+    filterStaffId = $("staffFilter").value;
+    renderAll();
+  });
+
+  function setViewMode(mode) {
+    viewMode = mode;
+    $("calendarModeBtn").classList.toggle("active",mode === "calendar");
+    $("tableModeBtn").classList.toggle("active",mode === "table");
+    $("calendarView").classList.toggle("hidden",mode !== "calendar");
+    $("tableView").classList.toggle("hidden",mode !== "table");
+
+    if (mode === "calendar") renderCalendar();
+    else renderTable();
+  }
+
+  $("calendarModeBtn").addEventListener("click",() => setViewMode("calendar"));
+  $("tableModeBtn").addEventListener("click",() => setViewMode("table"));
+
+  async function renderCalendar() {
+    const y = monthCursor.getFullYear();
+    const m = monthCursor.getMonth();
+    $("calTitle").textContent = `${y}年${m+1}月`;
+
+    const first = new Date(y,m,1);
+    const start = new Date(y,m,1-first.getDay());
+    const today = toYMD(new Date());
+    const grid = $("grid");
+    grid.replaceChildren();
+
+    for (let i=0;i<42;i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate()+i);
+      const ds = toYMD(d);
+
+      const cell = document.createElement("div");
+      cell.className = "day";
+
+      if (d.getMonth() !== m) cell.classList.add("other");
+      if (ds === today) cell.classList.add("today");
+
+      const holiday = await holidayFor(ds);
+      if (holiday) {
+        cell.classList.add(
+          holiday.type === "holiday" ? "holiday-day" : "workday-day"
+        );
+      }
+
+      const number = document.createElement("div");
+      number.className = "num";
+      number.textContent = d.getDate();
+      cell.appendChild(number);
+
+      if (holiday) {
+        const badge = document.createElement("span");
+        badge.className = `holiday-badge ${holiday.type === "holiday" ? "holiday" : "workday"}`;
+        badge.textContent = holiday.type === "holiday" ? "休" : "班";
+        cell.appendChild(badge);
+
+        const name = document.createElement("div");
+        name.className = "holiday-name";
+        name.textContent = holiday.name;
+        cell.appendChild(name);
+      }
+
+      const allDay = sortAssignments(
+        assignments.filter(x => x.work_date === ds)
+      );
+      const shown = filteredAssignments(allDay);
+
+      if (shown.length) cell.classList.add("has");
+
+      if (filterGroup === "all" && !filterCode) {
+        const dutyItems = shown.filter(x => typeById(x.duty_type_id)?.group_name === "值班");
+        const clinicItems = shown.filter(x => typeById(x.duty_type_id)?.group_name === "门诊");
+
+        for (const item of dutyItems.slice(0,4)) {
+          cell.appendChild(createCalendarChip(item));
+        }
+
+        if (clinicItems.length) {
+          const clinicCount = document.createElement("div");
+          clinicCount.className = "clinic-count";
+          clinicCount.textContent = `🏥 门诊 ${clinicItems.length}项`;
+          cell.appendChild(clinicCount);
+        }
+      } else {
+        for (const item of shown.slice(0,5)) {
+          cell.appendChild(createCalendarChip(item));
+        }
+      }
+
+      if (d.getMonth() === m) {
+        cell.addEventListener("click",() => openDetail(ds));
+      }
+
+      grid.appendChild(cell);
+    }
+  }
+
+  function createCalendarChip(item) {
+    const type = typeById(item.duty_type_id);
+    const person = staffById(item.staff_id);
+
+    const chip = document.createElement("div");
+    chip.className = "chip";
+
+    const dot = document.createElement("span");
+    dot.className = "chip-dot";
+    dot.style.backgroundColor = type?.color || "#aaa";
+
+    const text = document.createElement("span");
+    text.className = "chip-text";
+
+    if (type?.group_name === "值班") {
+      text.textContent = `${DUTY_SHORT[type.code] || type.label} ${person?.name || "成员"}`;
+    } else {
+      text.textContent = `${type?.label || "门诊"} ${person?.name || "成员"}`;
+    }
+
+    chip.append(dot,text);
+    return chip;
+  }
+
+  function currentTableCodes() {
+    if (filterCode) return [filterCode];
+    if (filterGroup === "duty") return DUTY_CODES;
+    if (filterGroup === "clinic") return CLINIC_CODES;
+    return [...DUTY_CODES,...CLINIC_CODES];
+  }
+
+  function renderTable() {
+    const y = monthCursor.getFullYear();
+    const m = monthCursor.getMonth();
+    $("tableTitle").textContent = `${y}年${m+1}月`;
+
+    const table = $("scheduleTable");
+    table.replaceChildren();
+
+    const codes = currentTableCodes();
+
+    const thead = document.createElement("thead");
+    const trh = document.createElement("tr");
+
+    for (const title of ["日期","星期",...codes.map(code => typeByCode(code)?.label || code)]) {
+      const th = document.createElement("th");
+      th.textContent = title;
+      trh.appendChild(th);
+    }
+
+    thead.appendChild(trh);
+    table.appendChild(thead);
+
+    const tbody = document.createElement("tbody");
+    const lastDay = new Date(y,m+1,0).getDate();
+
+    for (let day=1;day<=lastDay;day++) {
+      const date = new Date(y,m,day);
+      const ds = toYMD(date);
+      const row = document.createElement("tr");
+
+      const dateCell = document.createElement("td");
+      dateCell.className = "table-date";
+      dateCell.textContent = `${m+1}/${day}`;
+      dateCell.addEventListener("click",() => openDetail(ds));
+      row.appendChild(dateCell);
+
+      const weekCell = document.createElement("td");
+      weekCell.textContent = ["日","一","二","三","四","五","六"][date.getDay()];
+      row.appendChild(weekCell);
+
+      for (const code of codes) {
+        const type = typeByCode(code);
+        const cell = document.createElement("td");
+
+        let items = assignments.filter(
+          x => x.work_date === ds && x.duty_type_id === type?.id
+        );
+
+        if (filterStaffId) {
+          items = items.filter(x => x.staff_id === filterStaffId);
+        }
+
+        items = sortAssignments(items);
+
+        if (!items.length) {
+          const dash = document.createElement("span");
+          dash.className = "table-empty";
+          dash.textContent = "—";
+          cell.appendChild(dash);
+        } else {
+          for (const item of items) {
+            const person = staffById(item.staff_id);
+            const line = document.createElement("span");
+            line.className = "cell-entry";
+
+            const main = document.createElement("span");
+            main.textContent = person?.name || "成员";
+            line.appendChild(main);
+
+            if (type?.group_name === "门诊" && item.time_slot && item.time_slot !== "未标注") {
+              const slot = document.createElement("span");
+              slot.className = "cell-slot";
+              slot.textContent = `(${item.time_slot})`;
+              line.appendChild(slot);
+            }
+
+            cell.appendChild(line);
+          }
+        }
+
+        row.appendChild(cell);
+      }
+
+      tbody.appendChild(row);
+    }
+
+    table.appendChild(tbody);
+  }
+
+  function renderList() {
+    const list = $("list");
+    list.replaceChildren();
+
+    const data = sortAssignments(filteredAssignments(assignments));
+    $("countText").textContent = `共 ${data.length} 条`;
+
+    if (!data.length) {
+      list.appendChild(createEmpty("这个月暂无符合条件的排班"));
+      return;
+    }
+
+    for (const item of data) {
+      const type = typeById(item.duty_type_id);
+      const person = staffById(item.staff_id);
+
+      const article = document.createElement("article");
+      article.className = "item";
+
+      const left = document.createElement("div");
+      left.className = "item-left";
+
+      const title = document.createElement("div");
+      title.className = "item-title";
+
+      const dot = document.createElement("span");
+      dot.className = "chip-dot";
+      dot.style.backgroundColor = type?.color || "#aaa";
+
+      const text = document.createElement("span");
+      text.textContent = `${type?.label || "排班"} · ${person?.name || "成员"}`;
+
+      title.append(dot,text);
+
+      const meta = document.createElement("div");
+      meta.className = "item-meta";
+      meta.textContent =
+        type?.group_name === "门诊"
+          ? `${displayDate(item.work_date)} · ${item.time_slot || "未标注"}`
+          : displayDate(item.work_date);
+
+      left.append(title,meta);
+      article.appendChild(left);
+
+      const view = document.createElement("button");
+      view.className = "small";
+      view.textContent = "查看";
+      view.addEventListener("click",() => openDetail(item.work_date));
+
+      article.appendChild(view);
+      list.appendChild(article);
+    }
+  }
+
+  async function changeMonth(delta) {
+    monthCursor = new Date(
+      monthCursor.getFullYear(),
+      monthCursor.getMonth()+delta,
+      1
+    );
+    await loadMonth();
+  }
+
+  $("prev").addEventListener("click",() => changeMonth(-1));
+  $("next").addEventListener("click",() => changeMonth(1));
+  $("prevTable").addEventListener("click",() => changeMonth(-1));
+  $("nextTable").addEventListener("click",() => changeMonth(1));
+
+  async function openDetail(ds) {
+    selectedDate = ds;
+    $("detailTitle").textContent = displayDate(ds);
+
+    const holiday = await holidayFor(ds);
+    $("detailHoliday").textContent = holiday
+      ? `${holiday.type === "holiday" ? "休" : "班"} · ${holiday.name}`
+      : "";
+
+    const dayItems = sortAssignments(
+      assignments.filter(x => x.work_date === ds)
+    );
+
+    const duty = dayItems.filter(x => typeById(x.duty_type_id)?.group_name === "值班");
+    const clinic = dayItems.filter(x => typeById(x.duty_type_id)?.group_name === "门诊");
+
+    renderDetailRows($("detailDuty"),duty,"当天暂无值班安排");
+    renderDetailRows($("detailClinic"),clinic,"当天暂无门诊安排");
+
+    $("editThisDay").classList.toggle("hidden",!isAdmin);
+    $("detailOverlay").classList.remove("hidden");
+  }
+
+  function renderDetailRows(holder,items,emptyText) {
+    holder.replaceChildren();
+
+    if (!items.length) {
+      holder.appendChild(createEmpty(emptyText));
+      return;
+    }
+
+    for (const item of items) {
+      const type = typeById(item.duty_type_id);
+      const person = staffById(item.staff_id);
+
+      const row = document.createElement("div");
+      row.className = "detail-row";
+
+      const label = document.createElement("div");
+      label.className = "detail-label";
+      label.textContent = type?.label || "排班";
+
+      const right = document.createElement("div");
+
+      const main = document.createElement("div");
+      main.className = "detail-main";
+      main.textContent = person?.name || "成员";
+      right.appendChild(main);
+
+      const subParts = [];
+      if (type?.group_name === "门诊" && item.time_slot && item.time_slot !== "未标注") {
+        subParts.push(item.time_slot);
+      }
+      if (item.note) subParts.push(item.note);
+
+      if (subParts.length) {
+        const sub = document.createElement("div");
+        sub.className = "detail-sub";
+        sub.textContent = subParts.join(" · ");
+        right.appendChild(sub);
+      }
+
+      row.append(label,right);
+      holder.appendChild(row);
+    }
+  }
+
+  function closeDetail() {
+    $("detailOverlay").classList.add("hidden");
+  }
+
+  $("detailClose").addEventListener("click",closeDetail);
+  $("detailOverlay").addEventListener("click",e => {
+    if (e.target === $("detailOverlay")) closeDetail();
+  });
+
+  $("addBtn").addEventListener("click",() => {
+    if (!isAdmin) return;
+    openEditor(toYMD(new Date()));
+  });
+
+  $("editThisDay").addEventListener("click",() => {
+    if (!isAdmin || !selectedDate) return;
+    closeDetail();
+    openEditor(selectedDate);
+  });
+
+  function createStaffSelect(selectedId="") {
+    const select = document.createElement("select");
+    select.className = "input";
+
+    const blank = document.createElement("option");
+    blank.value = "";
+    blank.textContent = "— 不安排 —";
+    select.appendChild(blank);
+
+    for (const person of staff) {
+      const option = document.createElement("option");
+      option.value = person.id;
+      option.textContent = person.name;
+      if (person.id === selectedId) option.selected = true;
+      select.appendChild(option);
+    }
+
+    return select;
+  }
+
+  function renderDutyEditor(dayItems) {
+    const holder = $("dutyEditor");
+    holder.replaceChildren();
+
+    for (const code of DUTY_CODES) {
+      const type = typeByCode(code);
+      if (!type) continue;
+
+      const current = dayItems.find(x => x.duty_type_id === type.id);
+
+      const row = document.createElement("div");
+      row.className = "duty-row";
+      row.dataset.code = code;
+
+      const label = document.createElement("label");
+      label.textContent = type.label;
+
+      const fieldWrap = document.createElement("div");
+      const select = createStaffSelect(current?.staff_id || "");
+      select.dataset.roleSelect = "1";
+
+      const note = document.createElement("input");
+      note.className = "input editor-note";
+      note.type = "text";
+      note.maxLength = 100;
+      note.placeholder = "备注（选填）";
+      note.value = current?.note || "";
+      note.dataset.roleNote = "1";
+
+      fieldWrap.append(select,note);
+      row.append(label,fieldWrap);
+      holder.appendChild(row);
+    }
+  }
+
+  function createClinicRow(item=null) {
+    const row = document.createElement("div");
+    row.className = "clinic-row";
+
+    const grid = document.createElement("div");
+    grid.className = "clinic-row-grid";
+
+    const typeSelect = document.createElement("select");
+    typeSelect.className = "input";
+    typeSelect.dataset.clinicType = "1";
+
+    for (const code of CLINIC_CODES) {
+      const type = typeByCode(code);
+      if (!type) continue;
+
+      const option = document.createElement("option");
+      option.value = type.id;
+      option.textContent = type.label;
+      if (item?.duty_type_id === type.id) option.selected = true;
+      typeSelect.appendChild(option);
+    }
+
+    const staffSelect = createStaffSelect(item?.staff_id || "");
+    staffSelect.dataset.clinicStaff = "1";
+
+    const slotSelect = document.createElement("select");
+    slotSelect.className = "input";
+    slotSelect.dataset.clinicSlot = "1";
+
+    for (const slot of ["上午","下午","全天"]) {
+      const option = document.createElement("option");
+      option.value = slot;
+      option.textContent = slot;
+      if ((item?.time_slot || "全天") === slot) option.selected = true;
+      slotSelect.appendChild(option);
+    }
+
+    grid.append(typeSelect,staffSelect,slotSelect);
+
+    const note = document.createElement("input");
+    note.className = "input editor-note";
+    note.type = "text";
+    note.maxLength = 100;
+    note.placeholder = "门诊备注（选填）";
+    note.value = item?.note || "";
+    note.dataset.clinicNote = "1";
+
+    const actions = document.createElement("div");
+    actions.className = "clinic-row-actions";
+
+    const remove = document.createElement("button");
+    remove.className = "danger-button";
+    remove.type = "button";
+    remove.textContent = "删除此条";
+    remove.addEventListener("click",() => row.remove());
+
+    actions.appendChild(remove);
+    row.append(grid,note,actions);
+
+    return row;
+  }
+
+  function renderClinicEditor(dayItems) {
+    const holder = $("clinicEditor");
+    holder.replaceChildren();
+
+    const clinicItems = dayItems.filter(
+      x => typeById(x.duty_type_id)?.group_name === "门诊"
+    );
+
+    for (const item of clinicItems) {
+      holder.appendChild(createClinicRow(item));
+    }
+  }
+
+  function openEditor(ds) {
+    $("editDate").value = ds;
+    $("editError").textContent = "";
+
+    const dayItems = sortAssignments(
+      assignments.filter(x => x.work_date === ds)
+    );
+
+    renderDutyEditor(dayItems);
+    renderClinicEditor(dayItems);
+
+    $("editOverlay").classList.remove("hidden");
+  }
+
+  function closeEditor() {
+    $("editOverlay").classList.add("hidden");
+  }
+
+  $("editClose").addEventListener("click",closeEditor);
+  $("cancelEdit").addEventListener("click",closeEditor);
+  $("editOverlay").addEventListener("click",e => {
+    if (e.target === $("editOverlay")) closeEditor();
+  });
+
+  $("addClinicRow").addEventListener("click",() => {
+    $("clinicEditor").appendChild(createClinicRow());
+  });
+
+  $("editDate").addEventListener("change",() => {
+    const ds = $("editDate").value;
+    if (!ds) return;
+
+    const d = parseDate(ds);
+
+    if (
+      d.getFullYear() === monthCursor.getFullYear() &&
+      d.getMonth() === monthCursor.getMonth()
+    ) {
+      const items = sortAssignments(assignments.filter(x => x.work_date === ds));
+      renderDutyEditor(items);
+      renderClinicEditor(items);
+    } else {
+      renderDutyEditor([]);
+      renderClinicEditor([]);
+    }
+  });
+
+  function collectEditorItems() {
+    const items = [];
+
+    document.querySelectorAll("#dutyEditor .duty-row").forEach(row => {
+      const code = row.dataset.code;
+      const type = typeByCode(code);
+      const select = row.querySelector("[data-role-select]");
+      const note = row.querySelector("[data-role-note]");
+
+      if (!type || !select?.value) return;
+
+      items.push({
+        duty_type_id:type.id,
+        staff_id:select.value,
+        time_slot:"未标注",
+        note:(note?.value || "").trim()
+      });
+    });
+
+    document.querySelectorAll("#clinicEditor .clinic-row").forEach(row => {
+      const typeId = row.querySelector("[data-clinic-type]")?.value;
+      const staffId = row.querySelector("[data-clinic-staff]")?.value;
+      const slot = row.querySelector("[data-clinic-slot]")?.value;
+      const note = row.querySelector("[data-clinic-note]")?.value.trim() || "";
+
+      if (!typeId || !staffId || !slot) return;
+
+      items.push({
+        duty_type_id:Number(typeId),
+        staff_id:staffId,
+        time_slot:slot,
+        note
+      });
+    });
+
+    return items;
+  }
+
+  $("saveDay").addEventListener("click",async () => {
+    if (!isAdmin) {
+      $("editError").textContent = "当前账号没有管理权限。";
+      return;
+    }
+
+    const ds = $("editDate").value;
+    if (!ds) {
+      $("editError").textContent = "请选择日期。";
+      return;
+    }
+
+    const items = collectEditorItems();
+
+    const duplicateKeys = new Set();
+    for (const item of items) {
+      const key = `${item.duty_type_id}|${item.staff_id}|${item.time_slot}`;
+      if (duplicateKeys.has(key)) {
+        $("editError").textContent = "存在完全重复的排班记录，请删除重复项。";
+        return;
+      }
+      duplicateKeys.add(key);
+
+      if ((item.note || "").length > 100) {
+        $("editError").textContent = "备注不能超过100字。";
+        return;
+      }
+    }
+
+    $("saveDay").disabled = true;
+    $("saveDay").textContent = "正在保存…";
+    $("editError").textContent = "";
+
+    try {
+      const {error} = await db.rpc("replace_day_schedule",{
+        p_date:ds,
+        p_items:items
+      });
+
+      if (error) throw error;
+
+      closeEditor();
+
+      const d = parseDate(ds);
+      monthCursor = new Date(d.getFullYear(),d.getMonth(),1);
+
+      await Promise.all([
+        loadMonth(),
+        loadToday()
+      ]);
+    } catch (err) {
+      console.error(err);
+      $("editError").textContent =
+        "保存失败。请检查管理员权限、人员选择或网络连接。";
+    } finally {
+      $("saveDay").disabled = false;
+      $("saveDay").textContent = "保存当天全部排班";
+    }
+  });
+
+  db.auth.onAuthStateChange(event => {
+    if (event === "SIGNED_OUT") showLogin();
+  });
+
+  init();
+</script>
+
+  <!-- Cloudflare Web Analytics -->
+  <script type='module' 
+    src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "bfd3df5c469343eb91856b7f3275def8"}'>  
+  </script>
+  <!-- End Cloudflare Web Analytics -->
+
+</body>
+</html>
