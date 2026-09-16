@@ -15,6 +15,20 @@
       --shadow:0 14px 36px rgba(49,66,108,.12);
       --radius:24px;
       --accent:#ffb84d;
+
+      /* 页面背景区域的次级文字，会随明暗主题变化 */
+      --page-muted:#586176;
+      --page-soft:#6f7890;
+      --section-meta:#8a93a6;
+
+      /*
+        浅色功能卡片专用文字。
+        热门推荐 / 顶部横幅 / 寄语即使在深色模式下仍保持浅色背景，
+        因此这里不要继承全局 --text / --muted。
+      */
+      --light-surface-text:#243047;
+      --light-surface-muted:#667188;
+      --light-surface-arrow:#35415a;
     }
     *{box-sizing:border-box}
     html{scroll-behavior:smooth}
@@ -46,7 +60,7 @@
       font-size:19px; cursor:pointer; backdrop-filter:blur(18px);
     }
     header{text-align:center;padding:8px 0 22px}
-    .eyebrow{font-size:14px;color:#6f7890;margin-bottom:8px}
+    .eyebrow{font-size:14px;color:var(--page-soft);margin-bottom:8px}
     h1{
       margin:0;
       font-size:clamp(38px,8vw,72px);
@@ -60,7 +74,7 @@
       margin:8px auto 10px;
       transform:rotate(-2deg);
     }
-    .subtitle{margin:0;color:#586176;font-size:15px}
+    .subtitle{margin:0;color:var(--page-muted);font-size:15px}
     .search-wrap{
       position:relative;
       margin:4px auto 18px;
@@ -69,8 +83,14 @@
     .search{
       width:100%; border:1px solid rgba(255,255,255,.9); outline:none;
       border-radius:999px; padding:17px 22px 17px 50px;
-      font-size:16px; background:rgba(255,255,255,.76);
+      font-size:16px; background:rgba(255,255,255,.82);
+      color:#243047;
       box-shadow:var(--shadow); backdrop-filter:blur(20px);
+    }
+    .search::placeholder{color:#7d8798;opacity:1}
+    .search:focus{
+      border-color:rgba(116,139,190,.35);
+      box-shadow:0 0 0 3px rgba(116,139,190,.10),var(--shadow);
     }
     .search-icon{position:absolute;left:19px;top:50%;transform:translateY(-50%);font-size:20px}
     .hero{
@@ -83,8 +103,8 @@
       overflow:hidden;
       margin-bottom:26px;
     }
-    .hero h2{margin:0 0 8px;font-size:24px}
-    .hero p{margin:0;color:#5f677a;line-height:1.65}
+    .hero h2{margin:0 0 8px;font-size:24px;color:var(--light-surface-text)}
+    .hero p{margin:0;color:var(--light-surface-muted);line-height:1.65}
     .hero-emoji{font-size:58px;filter:drop-shadow(0 8px 12px rgba(0,0,0,.12))}
     .section{margin-top:24px}
     .section-head{
@@ -92,7 +112,7 @@
       margin:0 2px 14px;
     }
     .section-head h3{margin:0;font-size:22px}
-    .section-head span{color:#8a93a6;font-size:14px}
+    .section-head span{color:var(--section-meta);font-size:14px}
     .featured-grid,.tool-grid{
       display:grid;
       gap:14px;
@@ -109,7 +129,7 @@
       border:1px solid var(--card-border);
       box-shadow:var(--shadow);
       backdrop-filter:blur(18px);
-      transition:.18s ease;
+      transition:transform .18s ease,background .22s ease,color .22s ease,border-color .22s ease;
       overflow:hidden;
     }
     .tool-card:hover{transform:translateY(-3px)}
@@ -117,6 +137,31 @@
     .tool-card.featured:nth-child(1){background:linear-gradient(145deg,#fff2ef,#ffe8e3)}
     .tool-card.featured:nth-child(2){background:linear-gradient(145deg,#eef1ff,#e7ecff)}
     .tool-card.featured:nth-child(3){background:linear-gradient(145deg,#e9fbf4,#dcf8ec)}
+    /*
+      热门推荐始终是浅色卡片，所以使用独立深色文字，
+      不再继承深色模式的全局浅色文字。
+    */
+    .tool-card.featured{
+      color:var(--light-surface-text);
+    }
+    .tool-card.featured .tool-title{
+      color:var(--light-surface-text);
+      text-shadow:none;
+    }
+    .tool-card.featured .tool-desc{
+      color:var(--light-surface-muted);
+    }
+    .tool-card.featured .arrow{
+      background:rgba(255,255,255,.88);
+      color:var(--light-surface-arrow);
+      border:1px solid rgba(54,68,94,.06);
+      box-shadow:0 5px 14px rgba(56,69,94,.09);
+    }
+    .tool-card.featured:hover .arrow{
+      background:#fff;
+      transform:translateX(1px);
+    }
+
     .tool-icon{font-size:48px;margin-bottom:20px}
     .tool-title{font-size:20px;font-weight:800;margin-bottom:8px}
     .tool-desc{font-size:14px;line-height:1.5;color:var(--muted)}
@@ -131,7 +176,7 @@
       border:2px dashed rgba(121,133,160,.28);
       background:rgba(255,255,255,.34);
       display:flex;align-items:center;justify-content:center;flex-direction:column;
-      color:#9099ab;
+      color:var(--section-meta);
     }
     .quote{
       margin-top:26px;
@@ -139,6 +184,7 @@
       padding:25px 24px;
       background:linear-gradient(120deg,rgba(245,239,255,.9),rgba(233,242,255,.88));
       box-shadow:var(--shadow);
+      color:var(--light-surface-text);
       font-size:18px;line-height:1.8;text-align:center;
     }
     footer{
@@ -237,6 +283,7 @@
       { title:"生日倒计时", desc:"农历生日 · 自动换算 · 仪式感倒计时", icon:"🎂", href:"./birthday/", featured:true },
       { title:"夜班日历", desc:"共享排班 · 查看夜班 · 值班倒计时", icon:"🌙", href:"./night-shift/", featured:true },
       { title:"科室排班", desc:"值班 · 门诊 · 全员排班", icon:"🗓️", href:"./admin-night-shift/" },
+      { title:"电子木鱼", desc:"敲一下 · 烦恼-1 · 功德+1", icon:"🪵", href:"./mokugyo/" },
       { title:"喝酒小游戏", desc:"适度娱乐 · 快乐加倍", icon:"🍻", href:"./drinking-game/" }
     ];
 
@@ -285,6 +332,9 @@
       document.documentElement.style.setProperty("--card-border", dark ? "rgba(255,255,255,.08)" : "rgba(255,255,255,.72)");
       document.documentElement.style.setProperty("--text", dark ? "#f2f5fb" : "#182033");
       document.documentElement.style.setProperty("--muted", dark ? "#aeb6c7" : "#7d879d");
+      document.documentElement.style.setProperty("--page-muted", dark ? "#c4ccda" : "#586176");
+      document.documentElement.style.setProperty("--page-soft", dark ? "#aeb8cb" : "#6f7890");
+      document.documentElement.style.setProperty("--section-meta", dark ? "#aeb8cb" : "#8a93a6");
       document.body.style.background = dark
         ? "radial-gradient(circle at 15% 0%, rgba(58,91,135,.35), transparent 30%), radial-gradient(circle at 90% 8%, rgba(108,74,54,.25), transparent 28%), linear-gradient(180deg,#171c26 0%,#10141c 100%)"
         : "radial-gradient(circle at 15% 0%, rgba(169,208,255,.42), transparent 30%), radial-gradient(circle at 90% 8%, rgba(255,207,165,.32), transparent 28%), linear-gradient(180deg,#f8fbff 0%,#f2f5fa 100%)";
@@ -292,12 +342,13 @@
 
     render();
   </script>
+<!-- Cloudflare Web Analytics -->
+<script
+  type="module"
+  src="https://static.cloudflareinsights.com/beacon.min.js"
+  data-cf-beacon='{"token":"bfd3df5c469343eb91856b7f3275def8"}'>
+</script>
+<!-- End Cloudflare Web Analytics -->
 
-  <!-- Cloudflare Web Analytics -->
-  <script type='module' 
-    src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "bfd3df5c469343eb91856b7f3275def8"}'>  
-  </script>
-  <!-- End Cloudflare Web Analytics -->
-   
 </body>
 </html>
