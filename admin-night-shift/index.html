@@ -57,6 +57,27 @@
     .who{font-size:12px;color:#d0d6e1}
 
     .login-wrap{min-height:calc(100dvh - 60px);display:grid;place-items:center}
+    .denied-wrap{min-height:calc(100dvh - 60px);display:grid;place-items:center}
+    .denied-card{
+      width:min(100%,540px);
+      padding:32px 22px;
+      border:1px solid var(--border);
+      border-radius:30px;
+      background:var(--card);
+      box-shadow:var(--shadow);
+      backdrop-filter:blur(20px);
+      text-align:center;
+    }
+    .denied-card .lock{font-size:50px;margin-bottom:9px}
+    .denied-card h2{margin:0;font-size:26px}
+    .denied-card p{margin:10px auto 0;max-width:410px;color:var(--muted);font-size:13px;line-height:1.75}
+    .denied-actions{display:grid;gap:9px;margin-top:21px}
+    .denied-actions a,.denied-actions button{
+      min-height:49px;border-radius:15px;font-weight:850;text-decoration:none;
+      display:flex;align-items:center;justify-content:center
+    }
+    .denied-back{border:0;background:linear-gradient(135deg,#dfe4ff,#acd1ff);color:#111725}
+    .denied-switch{border:1px solid var(--border);background:rgba(255,255,255,.055);color:var(--text)}
     .login-card,.panel,.calendar-card,.today-card{
       border:1px solid var(--border);
       background:var(--card);
@@ -391,6 +412,18 @@
     </div>
   </section>
 
+  <section id="deniedPage" class="denied-wrap hidden">
+    <div class="denied-card">
+      <div class="lock">🔒</div>
+      <h2>暂无科室排班访问权限</h2>
+      <p>当前账号已登录，但没有被授权访问“科室排班”。排班数据受到 Supabase RLS 数据库权限保护。</p>
+      <div class="denied-actions">
+        <a class="denied-back" href="../">返回工具箱</a>
+        <button id="deniedLogoutBtn" class="denied-switch" type="button">切换账号</button>
+      </div>
+    </div>
+  </section>
+
   <section id="appPage" class="hidden">
     <div class="topbar">
       <a class="back" href="../">← 工具箱</a>
@@ -646,12 +679,20 @@
 
   function showLogin() {
     $("loginPage").classList.remove("hidden");
+    $("deniedPage").classList.add("hidden");
     $("appPage").classList.add("hidden");
   }
 
   function showApp() {
     $("loginPage").classList.add("hidden");
+    $("deniedPage").classList.add("hidden");
     $("appPage").classList.remove("hidden");
+  }
+
+  function showDenied() {
+    $("loginPage").classList.add("hidden");
+    $("appPage").classList.add("hidden");
+    $("deniedPage").classList.remove("hidden");
   }
 
   $("loginForm").addEventListener("submit", async e => {
@@ -690,11 +731,21 @@
       console.error(err);
       await db.auth.signOut();
       showLogin();
-      $("loginError").textContent = "当前账号未完成科室排班系统授权。";
+      $("loginError").textContent = "登录状态或授权检查失败，请重新登录。";
     }
   }
 
   async function enterApp() {
+    const {data:allowed,error:accessError} =
+      await db.rpc("can_access_department_roster");
+
+    if (accessError) throw accessError;
+
+    if (allowed !== true) {
+      showDenied();
+      return;
+    }
+
     const {data:id,error:idError} = await db.rpc("current_member_id");
     if (idError || !id) throw new Error("账号未绑定成员身份。");
     myMemberId = id;
@@ -758,6 +809,12 @@
   $("logoutBtn").addEventListener("click", async () => {
     await db.auth.signOut();
     location.reload();
+  });
+
+  $("deniedLogoutBtn").addEventListener("click", async () => {
+    await db.auth.signOut();
+    showLogin();
+    $("email").focus();
   });
 
   async function loadMonth() {
