@@ -406,6 +406,121 @@
       font-size:11px;line-height:1.65;text-align:center;
     }
 
+    .record-tools{
+      display:flex;
+      justify-content:center;
+      margin-top:10px;
+    }
+    .record-manage-btn{
+      min-height:34px;
+      padding:0 12px;
+      border:1px solid rgba(255,255,255,.07);
+      border-radius:999px;
+      background:rgba(255,255,255,.025);
+      color:rgba(220,212,202,.48);
+      font-size:10px;
+      font-weight:800;
+      letter-spacing:.02em;
+      transition:
+        color .22s ease,
+        background .22s ease,
+        border-color .22s ease,
+        transform .22s ease;
+    }
+    .record-manage-btn:hover,
+    .record-manage-btn:focus-visible{
+      color:#ddd2c2;
+      background:rgba(255,255,255,.045);
+      border-color:rgba(255,255,255,.11);
+      transform:translateY(-1px);
+    }
+
+    .clear-overlay{
+      position:fixed;
+      inset:0;
+      z-index:120;
+      display:flex;
+      align-items:flex-end;
+      background:rgba(5,5,7,.68);
+      backdrop-filter:blur(7px);
+    }
+    .clear-sheet{
+      width:min(100%,620px);
+      margin:0 auto;
+      padding:14px 15px max(22px,env(safe-area-inset-bottom));
+      border:1px solid var(--border);
+      border-radius:28px 28px 0 0;
+      background:#19171b;
+      box-shadow:0 -18px 60px rgba(0,0,0,.35);
+    }
+    .clear-handle{
+      width:42px;
+      height:5px;
+      margin:0 auto 16px;
+      border-radius:999px;
+      background:rgba(255,255,255,.16);
+    }
+    .clear-sheet h2{
+      margin:0;
+      font-size:21px;
+      letter-spacing:-.02em;
+    }
+    .clear-sheet p{
+      margin:8px 0 0;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.7;
+    }
+    .clear-warning{
+      margin-top:14px;
+      padding:11px 12px;
+      border:1px solid rgba(255,151,151,.10);
+      border-radius:14px;
+      background:rgba(255,110,110,.045);
+      color:#d9bbb7;
+      font-size:11px;
+      line-height:1.65;
+    }
+    .hold-clear{
+      position:relative;
+      width:100%;
+      min-height:54px;
+      margin-top:15px;
+      overflow:hidden;
+      border:1px solid rgba(255,148,148,.15);
+      border-radius:17px;
+      background:rgba(255,83,83,.055);
+      color:#e8c2bf;
+      font-weight:900;
+      cursor:pointer;
+      touch-action:none;
+    }
+    .hold-clear .progress{
+      position:absolute;
+      inset:0 auto 0 0;
+      width:0;
+      background:linear-gradient(90deg,rgba(255,109,109,.10),rgba(255,139,107,.18));
+      pointer-events:none;
+    }
+    .hold-clear .label{
+      position:relative;
+      z-index:1;
+    }
+    .hold-clear.holding{
+      border-color:rgba(255,150,140,.26);
+      color:#ffe0da;
+    }
+    .clear-cancel{
+      width:100%;
+      min-height:48px;
+      margin-top:8px;
+      border:1px solid var(--border);
+      border-radius:15px;
+      background:rgba(255,255,255,.04);
+      color:var(--text);
+      font-weight:850;
+    }
+
     .toast{
       position:fixed;
       left:50%;
@@ -590,7 +705,33 @@
       今日最高连击：<strong id="bestCombo">0</strong><br>
       数据仅保存在当前浏览器本地，不上传服务器。
     </div>
+
+    <div class="record-tools">
+      <button id="recordManageBtn" class="record-manage-btn" type="button">
+        管理本地记录
+      </button>
+    </div>
   </main>
+
+  <div id="clearOverlay" class="clear-overlay hidden" aria-hidden="true">
+    <section class="clear-sheet" role="dialog" aria-modal="true" aria-labelledby="clearTitle">
+      <div class="clear-handle"></div>
+      <h2 id="clearTitle">清空功德记录</h2>
+      <p>只会清空当前浏览器中的功德统计，不会影响音效、触感或禅模式设置。</p>
+
+      <div class="clear-warning">
+        将清空：今日功德、累计功德、当前连击、今日最高连击。<br>
+        此操作无法恢复。
+      </div>
+
+      <button id="holdClearBtn" class="hold-clear" type="button">
+        <span id="holdProgress" class="progress"></span>
+        <span id="holdLabel" class="label">按住 1.2 秒确认清空</span>
+      </button>
+
+      <button id="clearCancelBtn" class="clear-cancel" type="button">取消</button>
+    </section>
+  </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 <script>
@@ -631,6 +772,12 @@
       comboCount: document.getElementById("comboCount"),
       bestCombo: document.getElementById("bestCombo"),
       titleName: document.getElementById("titleName"),
+      recordManageBtn: document.getElementById("recordManageBtn"),
+      clearOverlay: document.getElementById("clearOverlay"),
+      holdClearBtn: document.getElementById("holdClearBtn"),
+      holdProgress: document.getElementById("holdProgress"),
+      holdLabel: document.getElementById("holdLabel"),
+      clearCancelBtn: document.getElementById("clearCancelBtn"),
       soundBtn: document.getElementById("soundBtn"),
       vibrateBtn: document.getElementById("vibrateBtn"),
       hapticStatus: document.getElementById("hapticStatus"),
@@ -1042,6 +1189,126 @@
       saveState();
       render();
     }
+
+    // ----------------------------
+    // 功德记录安全清空
+    // ----------------------------
+    const CLEAR_HOLD_MS = 1200;
+    let clearHoldStartedAt = 0;
+    let clearHoldRaf = 0;
+    let clearHoldActive = false;
+
+    function openClearSheet() {
+      resetClearHold();
+      els.clearOverlay.classList.remove("hidden");
+      els.clearOverlay.setAttribute("aria-hidden","false");
+    }
+
+    function closeClearSheet() {
+      resetClearHold();
+      els.clearOverlay.classList.add("hidden");
+      els.clearOverlay.setAttribute("aria-hidden","true");
+    }
+
+    function resetClearHold() {
+      clearHoldActive = false;
+      clearHoldStartedAt = 0;
+      cancelAnimationFrame(clearHoldRaf);
+      clearHoldRaf = 0;
+      els.holdClearBtn.classList.remove("holding");
+      els.holdProgress.style.width = "0%";
+      els.holdLabel.textContent = "按住 1.2 秒确认清空";
+    }
+
+    function clearMeritRecords() {
+      // 只重置统计数据；保留 sound / vibrate / zen / dateKey 等用户设置。
+      state.todayMerit = 0;
+      state.totalMerit = 0;
+      state.combo = 0;
+      state.bestCombo = 0;
+      state.lastHitAt = 0;
+      state.recentHits = [];
+
+      saveState();
+      render();
+      closeClearSheet();
+
+      showToast("功德记录已清空",1300);
+    }
+
+    function updateClearHoldProgress(now) {
+      if (!clearHoldActive) return;
+
+      const elapsed = now - clearHoldStartedAt;
+      const ratio = Math.min(1,elapsed / CLEAR_HOLD_MS);
+      els.holdProgress.style.width = (ratio * 100).toFixed(1) + "%";
+
+      const left = Math.max(0,(CLEAR_HOLD_MS - elapsed) / 1000);
+      els.holdLabel.textContent =
+        ratio >= 1
+          ? "正在清空…"
+          : `继续按住 ${left.toFixed(1)} 秒`;
+
+      if (ratio >= 1) {
+        clearHoldActive = false;
+        clearMeritRecords();
+        return;
+      }
+
+      clearHoldRaf = requestAnimationFrame(updateClearHoldProgress);
+    }
+
+    function beginClearHold(e) {
+      if (e) e.preventDefault();
+      if (clearHoldActive) return;
+
+      clearHoldActive = true;
+      clearHoldStartedAt = performance.now();
+      els.holdClearBtn.classList.add("holding");
+      els.holdLabel.textContent = "继续按住…";
+      clearHoldRaf = requestAnimationFrame(updateClearHoldProgress);
+
+      try {
+        if (e?.pointerId != null) {
+          els.holdClearBtn.setPointerCapture(e.pointerId);
+        }
+      } catch {}
+    }
+
+    function cancelClearHold() {
+      if (!clearHoldActive) return;
+
+      const elapsed = performance.now() - clearHoldStartedAt;
+      resetClearHold();
+
+      if (elapsed > 150) {
+        showToast("已取消清空",800);
+      }
+    }
+
+    els.recordManageBtn.addEventListener("click",openClearSheet);
+    els.clearCancelBtn.addEventListener("click",closeClearSheet);
+
+    els.clearOverlay.addEventListener("click",e => {
+      if (e.target === els.clearOverlay) closeClearSheet();
+    });
+
+    els.holdClearBtn.addEventListener("pointerdown",beginClearHold);
+    els.holdClearBtn.addEventListener("pointerup",cancelClearHold);
+    els.holdClearBtn.addEventListener("pointercancel",cancelClearHold);
+    els.holdClearBtn.addEventListener("lostpointercapture",cancelClearHold);
+
+    // 键盘同样需要持续按住 Enter / Space，避免单击误清空。
+    els.holdClearBtn.addEventListener("keydown",e => {
+      if ((e.code === "Space" || e.code === "Enter") && !e.repeat) {
+        beginClearHold(e);
+      }
+    });
+    els.holdClearBtn.addEventListener("keyup",e => {
+      if (e.code === "Space" || e.code === "Enter") {
+        cancelClearHold();
+      }
+    });
 
     els.mokugyo.addEventListener("pointerdown", e => {
       if (e.pointerType === "mouse" && e.button !== 0) return;
