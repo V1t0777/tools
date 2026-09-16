@@ -266,6 +266,59 @@
       opacity:.72;
     }
 
+    /*
+      不支持 Vibration API 的设备（尤其 iPhone / iOS Safari）使用拟触觉反馈：
+      通过极轻微舞台位移 + 更短促的木鱼压缩/阴影变化，与低延迟音效同步。
+    */
+    .stage.pseudo-haptic{
+      animation:pseudoStageTap .085s ease-out;
+    }
+
+    .mokugyo-wrap.pseudo-haptic .fish{
+      transform:rotateX(10deg) rotateY(-3deg) scale(.955,.925) translateZ(20px);
+      filter:brightness(1.16);
+    }
+
+    .mokugyo-wrap.pseudo-haptic .ground-shadow{
+      transform:rotateX(68deg) scale(.84,.78) translateZ(-80px);
+      opacity:.66;
+    }
+
+    .mokugyo-wrap.pseudo-haptic .mallet{
+      transform:rotate(-6deg) translate(-12%,-4%) translateZ(74px);
+    }
+
+    @keyframes pseudoStageTap{
+      0%{transform:translate3d(0,0,0)}
+      35%{transform:translate3d(0,1.4px,0)}
+      70%{transform:translate3d(.7px,-.7px,0)}
+      100%{transform:translate3d(0,0,0)}
+    }
+
+    .haptic-status{
+      min-height:42px;
+      padding:0 12px;
+      border:1px solid var(--border);
+      border-radius:15px;
+      background:rgba(255,255,255,.035);
+      color:rgba(235,225,207,.62);
+      display:inline-flex;
+      align-items:center;
+      gap:7px;
+      font-size:11px;
+      font-weight:800;
+      white-space:nowrap;
+    }
+
+    .haptic-status .dot{
+      width:6px;
+      height:6px;
+      border-radius:50%;
+      background:#d7bd86;
+      box-shadow:0 0 10px rgba(215,189,134,.25);
+      flex:0 0 auto;
+    }
+
     .ring{
       position:absolute;left:50%;top:51%;
       width:24%;aspect-ratio:1;border-radius:50%;
@@ -458,6 +511,10 @@
       <div class="top-actions">
         <button id="soundBtn" class="icon-btn" type="button" aria-label="音效开关" title="音效开关">🔊</button>
         <button id="vibrateBtn" class="icon-btn" type="button" aria-label="震动开关" title="震动开关">📳</button>
+        <div id="hapticStatus" class="haptic-status hidden" aria-label="触感反馈状态">
+          <span class="dot"></span>
+          <span>触感：视觉模拟</span>
+        </div>
       </div>
     </div>
 
@@ -489,7 +546,7 @@
       </div>
     </section>
 
-    <section class="stage">
+    <section id="stage" class="stage">
       <div id="ambient" class="ambient" aria-hidden="true"></div>
 
       <div
@@ -539,6 +596,16 @@
 <script>
     const STORAGE_KEY = "mokugyo.v1";
 
+    const vibrationSupported =
+      typeof navigator !== "undefined" &&
+      typeof navigator.vibrate === "function";
+
+    const isiOS =
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+    const usePseudoHaptics = !vibrationSupported || isiOS;
+
     const state = {
       todayMerit: 0,
       totalMerit: 0,
@@ -554,6 +621,7 @@
 
     const els = {
       page: document.getElementById("page"),
+      stage: document.getElementById("stage"),
       mokugyo: document.getElementById("mokugyo"),
       ring: document.getElementById("ring"),
       floatLayer: document.getElementById("floatLayer"),
@@ -565,6 +633,7 @@
       titleName: document.getElementById("titleName"),
       soundBtn: document.getElementById("soundBtn"),
       vibrateBtn: document.getElementById("vibrateBtn"),
+      hapticStatus: document.getElementById("hapticStatus"),
       normalModeBtn: document.getElementById("normalModeBtn"),
       zenModeBtn: document.getElementById("zenModeBtn"),
       zenReturnBtn: document.getElementById("zenReturnBtn"),
@@ -639,9 +708,16 @@
       els.soundBtn.classList.toggle("off", !state.sound);
       els.soundBtn.setAttribute("aria-pressed", String(state.sound));
 
-      els.vibrateBtn.textContent = state.vibrate ? "📳" : "📴";
-      els.vibrateBtn.classList.toggle("off", !state.vibrate);
-      els.vibrateBtn.setAttribute("aria-pressed", String(state.vibrate));
+      if (usePseudoHaptics) {
+        els.vibrateBtn.classList.add("hidden");
+        els.hapticStatus.classList.remove("hidden");
+      } else {
+        els.vibrateBtn.classList.remove("hidden");
+        els.hapticStatus.classList.add("hidden");
+        els.vibrateBtn.textContent = state.vibrate ? "📳" : "📴";
+        els.vibrateBtn.classList.toggle("off", !state.vibrate);
+        els.vibrateBtn.setAttribute("aria-pressed", String(state.vibrate));
+      }
 
       els.page.classList.toggle("zen", state.zen);
       els.normalModeBtn.classList.toggle("active", !state.zen);
@@ -801,11 +877,33 @@
       }
     }
 
-    function vibrate() {
-      if (!state.vibrate) return;
-      if ("vibrate" in navigator) {
-        navigator.vibrate(16);
+    function pseudoHapticTap() {
+      // 视觉模拟仅在设备没有可靠 Vibration API 时使用。
+      els.stage.classList.remove("pseudo-haptic");
+      els.mokugyo.classList.remove("pseudo-haptic");
+
+      void els.stage.offsetWidth;
+      els.stage.classList.add("pseudo-haptic");
+      els.mokugyo.classList.add("pseudo-haptic");
+
+      clearTimeout(pseudoHapticTap.timer);
+      pseudoHapticTap.timer = setTimeout(() => {
+        els.stage.classList.remove("pseudo-haptic");
+        els.mokugyo.classList.remove("pseudo-haptic");
+      }, 92);
+    }
+
+    function hapticFeedback() {
+      if (usePseudoHaptics) {
+        pseudoHapticTap();
+        return;
       }
+
+      if (!state.vibrate) return;
+
+      try {
+        navigator.vibrate(16);
+      } catch {}
     }
 
     function animateHit() {
@@ -906,7 +1004,7 @@
       // 声音放在事件处理最前面，尽可能缩短“触摸→发声”的体感延迟。
       playHitLowLatency();
       animateHit();
-      vibrate();
+      hapticFeedback();
 
       const now = performance.now();
 
@@ -965,6 +1063,8 @@
     });
 
     els.vibrateBtn.addEventListener("click", () => {
+      if (usePseudoHaptics) return;
+
       state.vibrate = !state.vibrate;
       saveState();
       render();
