@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -177,23 +176,30 @@
     </div>
 
     <div class="footer">
-      日期依据浏览器内置 Chinese Lunar Calendar 自动换算<br>
+      农历换算由 lunar-javascript 完成，不依赖浏览器原生农历支持<br>
       默认按设备所在时区计算倒计时
     </div>
   </main>
 
   <script>
     const people = [
-      { name: "钊", lunarMonth: "腊月", lunarDay: 14, display: "农历十二月十四", icon: "✨" },
-      { name: "迪", lunarMonth: "七月", lunarDay: 14, display: "农历七月十四", icon: "🎈" },
-      { name: "晨", lunarMonth: "正月", lunarDay: 20, display: "农历正月二十", icon: "🌙" }
+      { name: "钊", lunarMonth: 12, lunarDay: 14, isLeapMonth: false, display: "农历十二月十四", icon: "✨" },
+      { name: "迪", lunarMonth: 7,  lunarDay: 14, isLeapMonth: false, display: "农历七月十四",   icon: "🎈" },
+      { name: "晨", lunarMonth: 1,  lunarDay: 20, isLeapMonth: false, display: "农历正月二十",   icon: "🌙" }
     ];
 
-    const lunarFmt = new Intl.DateTimeFormat("zh-CN-u-ca-chinese", {
-      year: "numeric",
-      month: "long",
-      day: "numeric"
-    });
+    /*
+      加载策略：
+      1. 优先读取同目录 ./lunar.js —— 正式部署时最推荐；
+      2. 如果本地文件不存在，再依次尝试备用 CDN。
+      这样 Safari / 微信内置浏览器不再依赖 Intl 的中国农历支持。
+    */
+    const LUNAR_SOURCES = [
+      "./lunar.js",
+      "https://cdn.bootcdn.net/ajax/libs/lunar-javascript/1.7.7/lunar.min.js",
+      "https://cdnjs.cloudflare.com/ajax/libs/lunar-javascript/1.7.7/lunar.min.js",
+      "https://cdn.jsdelivr.net/npm/lunar-javascript@1.7.7/lunar.min.js"
+    ];
 
     const solarFmt = new Intl.DateTimeFormat("zh-CN", {
       year: "numeric",
@@ -206,28 +212,88 @@
       return new Date(date.getFullYear(), date.getMonth(), date.getDate());
     }
 
+    function loadScript(src) {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = src;
+        script.async = true;
+        script.onload = () => resolve(src);
+        script.onerror = () => {
+          script.remove();
+          reject(new Error(`加载失败：${src}`));
+        };
+        document.head.appendChild(script);
+      });
+    }
+
+    async function ensureLunarLibrary() {
+      if (typeof Solar !== "undefined" && typeof Lunar !== "undefined") {
+        return;
+      }
+
+      for (const src of LUNAR_SOURCES) {
+        try {
+          await loadScript(src);
+
+          if (typeof Solar !== "undefined" && typeof Lunar !== "undefined") {
+            return;
+          }
+        } catch (err) {
+          console.warn(err.message);
+        }
+      }
+
+      throw new Error(
+        "农历组件加载失败。请确认 birthday/lunar.js 已上传，或网络可以访问备用 CDN。"
+      );
+    }
+
+    /*
+      这里故意使用“公历 -> 农历”逐日匹配，
+      而不是直接 Lunar.fromYmd(...).getSolar()。
+
+      好处：
+      - 不依赖 Safari / WebKit 的 Intl Chinese Calendar；
+      - 使用 lunar-javascript 自己的公历转农历算法；
+      - 未来 430 天最多约 1293 次转换（三个人），性能开销很小；
+      - 可明确排除闰月，避免普通生日在闰月年份重复匹配。
+    */
     function getLunarParts(date) {
-      const parts = lunarFmt.formatToParts(date);
-      const month = parts.find(p => p.type === "month")?.value || "";
-      const day = Number(parts.find(p => p.type === "day")?.value || 0);
-      return { month, day };
+      const solar = Solar.fromYmd(
+        date.getFullYear(),
+        date.getMonth() + 1,
+        date.getDate()
+      );
+
+      const lunar = solar.getLunar();
+      const rawMonth = Number(lunar.getMonth());
+
+      return {
+        month: Math.abs(rawMonth),
+        day: Number(lunar.getDay()),
+        isLeapMonth: rawMonth < 0
+      };
     }
 
     function findNextBirthday(person, from = new Date()) {
       const start = localMidnight(from);
 
-      // 扫描未来 430 天，可覆盖一个完整农历年以及闰月带来的偏移。
+      // 一个农历年不会超过约 385 天；430 天提供充足余量。
       for (let i = 0; i <= 430; i++) {
         const d = new Date(start);
         d.setDate(start.getDate() + i);
 
         const lunar = getLunarParts(d);
 
-        // 不把“闰七月”等视为普通七月，避免闰月年份重复庆祝。
-        if (lunar.month === person.lunarMonth && lunar.day === person.lunarDay) {
+        if (
+          lunar.month === person.lunarMonth &&
+          lunar.day === person.lunarDay &&
+          lunar.isLeapMonth === person.isLeapMonth
+        ) {
           return d;
         }
       }
+
       return null;
     }
 
@@ -238,10 +304,12 @@
 
     function renderCards(results) {
       const el = document.getElementById("cards");
+
       el.innerHTML = results.map(item => {
         const days = dayDiff(item.date);
         const dayText = days === 0 ? "今天" : `${days}`;
         const unitText = days === 0 ? "生日快乐 🎉" : "天后";
+
         return `
           <article class="person">
             <div class="person-top">
@@ -266,49 +334,68 @@
     }
 
     let nextBirthday = null;
+    let countdownTimer = null;
 
-    function setup() {
+    async function setup() {
       document.getElementById("todayText").textContent =
-        new Intl.DateTimeFormat("zh-CN", { month:"long", day:"numeric", weekday:"short" }).format(new Date());
+        new Intl.DateTimeFormat("zh-CN", {
+          month: "long",
+          day: "numeric",
+          weekday: "short"
+        }).format(new Date());
 
       try {
+        await ensureLunarLibrary();
+
         const results = people.map(person => ({
           person,
           date: findNextBirthday(person)
         }));
 
         if (results.some(x => !x.date)) {
-          throw new Error("未能在未来 430 天内找到对应的农历日期。");
+          throw new Error("未能在未来 430 天内找到对应的农历生日。");
         }
 
-        results.sort((a,b) => a.date - b.date);
+        results.sort((a, b) => a.date - b.date);
         renderCards(results);
 
         nextBirthday = results[0];
-        document.getElementById("nextName").textContent = nextBirthday.person.name;
+
+        document.getElementById("nextName").textContent =
+          nextBirthday.person.name;
+
         document.getElementById("nextDate").textContent =
           `${nextBirthday.person.display} · ${solarFmt.format(nextBirthday.date)}`;
 
         updateCountdown();
-        setInterval(updateCountdown, 1000);
+
+        if (countdownTimer) {
+          clearInterval(countdownTimer);
+        }
+
+        countdownTimer = setInterval(updateCountdown, 1000);
+
       } catch (err) {
+        console.error(err);
+
         const box = document.getElementById("errorBox");
         box.style.display = "block";
-        box.textContent = "当前浏览器暂不支持农历自动换算：" + err.message;
+        box.textContent = err.message;
+
         document.getElementById("nextName").textContent = "暂无法计算";
-        document.getElementById("nextDate").textContent = "请使用最新版 Safari、Chrome 或 Edge";
+        document.getElementById("nextDate").textContent =
+          "请检查 lunar.js 文件或网络连接";
       }
     }
 
     function updateCountdown() {
       if (!nextBirthday) return;
 
-      // 倒计时到生日当天 00:00。
       const target = new Date(
         nextBirthday.date.getFullYear(),
         nextBirthday.date.getMonth(),
         nextBirthday.date.getDate(),
-        0,0,0,0
+        0, 0, 0, 0
       );
 
       let diff = target - new Date();
@@ -322,20 +409,21 @@
       }
 
       diff = Math.max(diff, 0);
+
       const days = Math.floor(diff / 86400000);
       const hours = Math.floor((diff % 86400000) / 3600000);
       const minutes = Math.floor((diff % 3600000) / 60000);
       const seconds = Math.floor((diff % 60000) / 1000);
 
       document.getElementById("cdDays").textContent = days;
-      document.getElementById("cdHours").textContent = String(hours).padStart(2,"0");
-      document.getElementById("cdMinutes").textContent = String(minutes).padStart(2,"0");
-      document.getElementById("cdSeconds").textContent = String(seconds).padStart(2,"0");
+      document.getElementById("cdHours").textContent = String(hours).padStart(2, "0");
+      document.getElementById("cdMinutes").textContent = String(minutes).padStart(2, "0");
+      document.getElementById("cdSeconds").textContent = String(seconds).padStart(2, "0");
     }
 
     setup();
   </script>
-
+  
   <!-- Cloudflare Web Analytics -->
   <script type='module' 
     src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "bfd3df5c469343eb91856b7f3275def8"}'>  
