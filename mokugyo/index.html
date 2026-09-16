@@ -385,6 +385,50 @@
       min-height:620px;
     }
 
+    .zen-return-wrap{
+      display:none;
+      justify-content:center;
+      margin-top:-30px;
+      position:relative;
+      z-index:20;
+      pointer-events:none;
+    }
+    .zen .zen-return-wrap{
+      display:flex;
+    }
+    .zen-return{
+      pointer-events:auto;
+      min-height:40px;
+      padding:0 14px;
+      border:1px solid rgba(255,224,170,.10);
+      border-radius:999px;
+      background:rgba(255,255,255,.025);
+      color:rgba(239,224,197,.55);
+      backdrop-filter:blur(12px);
+      font-size:11px;
+      font-weight:800;
+      letter-spacing:.03em;
+      transition:
+        color .25s ease,
+        background .25s ease,
+        border-color .25s ease,
+        opacity .25s ease,
+        transform .25s ease;
+      opacity:.62;
+    }
+    .zen-return:hover,
+    .zen-return:focus-visible{
+      color:#f4e5c9;
+      background:rgba(255,232,188,.065);
+      border-color:rgba(255,224,170,.18);
+      opacity:1;
+      transform:translateY(-1px);
+    }
+    .zen-return .moon{
+      margin-right:6px;
+      opacity:.82;
+    }
+
     @media(max-width:520px){
       .stage{min-height:470px}
       .mokugyo-wrap{width:min(94vw,430px)}
@@ -471,6 +515,12 @@
       </div>
     </section>
 
+    <div class="zen-return-wrap">
+      <button id="zenReturnBtn" class="zen-return" type="button" aria-label="返回普通模式">
+        <span class="moon">☾</span>返回普通模式
+      </button>
+    </div>
+
     <div class="caption">
       点击木鱼或按空格键
       <div class="title-badge">
@@ -486,12 +536,7 @@
   </main>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-
-  <audio id="hit1" preload="auto" src="./audio/hit1.wav"></audio>
-  <audio id="hit2" preload="auto" src="./audio/hit2.wav"></audio>
-  <audio id="hit3" preload="auto" src="./audio/hit3.wav"></audio>
-
-  <script>
+<script>
     const STORAGE_KEY = "mokugyo.v1";
 
     const state = {
@@ -522,13 +567,9 @@
       vibrateBtn: document.getElementById("vibrateBtn"),
       normalModeBtn: document.getElementById("normalModeBtn"),
       zenModeBtn: document.getElementById("zenModeBtn"),
+      zenReturnBtn: document.getElementById("zenReturnBtn"),
       toast: document.getElementById("toast"),
-      ambient: document.getElementById("ambient"),
-      audios: [
-        document.getElementById("hit1"),
-        document.getElementById("hit2"),
-        document.getElementById("hit3")
-      ]
+      ambient: document.getElementById("ambient")
     };
 
     function getDateKey() {
@@ -616,17 +657,147 @@
       }, ms);
     }
 
-    function playHit() {
+    // ----------------------------
+    // 低延迟音频引擎
+    // ----------------------------
+    const HIT_URLS = [
+      "./audio/hit1.wav",
+      "./audio/hit2.wav",
+      "./audio/hit3.wav"
+    ];
+
+    let audioCtx = null;
+    let masterGain = null;
+    let hitBuffers = [];
+    let audioPreloadPromise = null;
+
+    function ensureAudioContext() {
+      if (audioCtx) return audioCtx;
+
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return null;
+
+      try {
+        audioCtx = new AudioCtx({
+          latencyHint:"interactive",
+          sampleRate:44100
+        });
+      } catch {
+        try {
+          audioCtx = new AudioCtx({ latencyHint:"interactive" });
+        } catch {
+          audioCtx = new AudioCtx();
+        }
+      }
+
+      masterGain = audioCtx.createGain();
+      masterGain.gain.value = 0.78;
+      masterGain.connect(audioCtx.destination);
+
+      return audioCtx;
+    }
+
+    async function decodeAudio(ctx, arrayBuffer) {
+      // 兼容旧版 Safari 的 decodeAudioData callback 行为。
+      try {
+        return await ctx.decodeAudioData(arrayBuffer.slice(0));
+      } catch {
+        return await new Promise((resolve,reject) => {
+          ctx.decodeAudioData(arrayBuffer.slice(0),resolve,reject);
+        });
+      }
+    }
+
+    async function preloadHitSounds() {
+      if (audioPreloadPromise) return audioPreloadPromise;
+
+      audioPreloadPromise = (async () => {
+        const ctx = ensureAudioContext();
+        if (!ctx) return;
+
+        const loaded = await Promise.all(
+          HIT_URLS.map(async url => {
+            const response = await fetch(url,{cache:"force-cache"});
+            if (!response.ok) throw new Error("音频加载失败");
+            const bytes = await response.arrayBuffer();
+            return await decodeAudio(ctx,bytes);
+          })
+        );
+
+        hitBuffers = loaded.filter(Boolean);
+      })().catch(err => {
+        console.warn("木鱼音效预加载失败，将使用合成木质音作为备用。",err);
+        hitBuffers = [];
+      });
+
+      return audioPreloadPromise;
+    }
+
+    function playSynthWood(ctx) {
+      // 音频仍未解码完成时的低延迟备用音，保证第一次敲击也有即时反馈。
+      if (!ctx || !masterGain) return;
+
+      const now = ctx.currentTime;
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc1.type = "sine";
+      osc2.type = "triangle";
+      osc1.frequency.setValueAtTime(520 + Math.random()*24,now);
+      osc2.frequency.setValueAtTime(835 + Math.random()*35,now);
+
+      gain.gain.setValueAtTime(0.17,now);
+      gain.gain.exponentialRampToValueAtTime(0.0001,now + 0.12);
+
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(masterGain);
+
+      osc1.start(now);
+      osc2.start(now);
+      osc1.stop(now + 0.13);
+      osc2.stop(now + 0.10);
+    }
+
+    function startHitBuffer() {
       if (!state.sound) return;
 
-      const base = els.audios[Math.floor(Math.random() * els.audios.length)];
-      const clone = base.cloneNode(true);
-      clone.volume = 0.76;
-      clone.playbackRate = 0.96 + Math.random() * 0.08;
+      const ctx = ensureAudioContext();
+      if (!ctx || !masterGain) return;
 
-      const playPromise = clone.play();
-      if (playPromise && typeof playPromise.catch === "function") {
-        playPromise.catch(() => {});
+      if (!hitBuffers.length) {
+        playSynthWood(ctx);
+        return;
+      }
+
+      const source = ctx.createBufferSource();
+      const gain = ctx.createGain();
+
+      source.buffer = hitBuffers[Math.floor(Math.random()*hitBuffers.length)];
+      source.playbackRate.value = 0.97 + Math.random()*0.06;
+      gain.gain.value = 0.94;
+
+      source.connect(gain);
+      gain.connect(masterGain);
+
+      // currentTime 立即调度；AudioBufferSourceNode 可天然重叠，适合高速连击。
+      source.start(ctx.currentTime);
+    }
+
+    function playHitLowLatency() {
+      if (!state.sound) return;
+
+      const ctx = ensureAudioContext();
+      if (!ctx) return;
+
+      if (ctx.state === "suspended") {
+        // iOS/Safari 首次用户手势时解锁；之后所有敲击均直接播放。
+        ctx.resume()
+          .then(() => startHitBuffer())
+          .catch(() => {});
+      } else {
+        startHitBuffer();
       }
     }
 
@@ -732,6 +903,11 @@
     }
 
     function hit() {
+      // 声音放在事件处理最前面，尽可能缩短“触摸→发声”的体感延迟。
+      playHitLowLatency();
+      animateHit();
+      vibrate();
+
       const now = performance.now();
 
       if (now - state.lastHitAt <= 800) {
@@ -748,9 +924,6 @@
       state.todayMerit += reward.amount;
       state.totalMerit += reward.amount;
 
-      animateHit();
-      playHit();
-      vibrate();
       floatText(reward.text, reward.rare);
       checkEggs();
       checkRapidHits(now);
@@ -800,6 +973,10 @@
 
     els.normalModeBtn.addEventListener("click", () => setMode(false));
     els.zenModeBtn.addEventListener("click", () => setMode(true));
+    els.zenReturnBtn.addEventListener("click", () => {
+      setMode(false);
+      showToast("已回到普通模式",900);
+    });
 
     function createAmbientParticles() {
       const count = 14;
@@ -819,11 +996,16 @@
     loadState();
     createAmbientParticles();
     render();
+
+    // 页面打开即开始 fetch + decode，用户真正敲击时通常已在内存中。
+    // AudioContext 即使在 iOS 初始为 suspended，也可以预先解码资源。
+    preloadHitSounds();
   </script>
-  
   <!-- Cloudflare Web Analytics -->
-  <script type='module' 
-    src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "bfd3df5c469343eb91856b7f3275def8"}'>  
+  <script
+    type="module"
+    src="https://static.cloudflareinsights.com/beacon.min.js"
+    data-cf-beacon='{"token":"bfd3df5c469343eb91856b7f3275def8"}'>
   </script>
   <!-- End Cloudflare Web Analytics -->
 
