@@ -101,6 +101,36 @@
     .close-btn{width:38px;height:38px;border:0;border-radius:50%;background:rgba(255,255,255,.08);color:#fff;font-size:21px}
     .warning{margin:12px 0 2px;padding:12px 13px;border:1px solid rgba(255,202,142,.10);border-radius:14px;background:rgba(255,185,104,.055);color:#cfbfad;font-size:11px;line-height:1.6}
     .secondary-btn{width:100%;min-height:50px;margin-top:8px;border:1px solid var(--border);border-radius:16px;background:rgba(255,255,255,.055);color:var(--text);font-weight:750}
+    .fixed-shift{
+      width:100%;
+      min-height:54px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding:0 15px;
+      border:1px solid rgba(193,179,255,.26);
+      border-radius:16px;
+      background:linear-gradient(135deg,rgba(189,173,255,.12),rgba(126,164,255,.08));
+      color:#f5f7fb;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.035);
+    }
+    .fixed-shift-main{
+      display:flex;
+      align-items:center;
+      gap:9px;
+      font-size:15px;
+      font-weight:850;
+    }
+    .fixed-shift-badge{
+      padding:5px 9px;
+      border-radius:999px;
+      background:rgba(216,201,255,.14);
+      color:#e8deff;
+      font-size:11px;
+      font-weight:850;
+    }
+
     @media(max-width:420px){.day{min-height:76px;margin:1px;padding:6px 3px}.shift-chip{font-size:8px}.holiday-name{font-size:7px}}
   </style>
 </head>
@@ -110,7 +140,7 @@
     <div class="login-card">
       <div class="moon">🌙</div>
       <h1>夜班日历</h1>
-      <p class="subtitle">仅限已授权成员访问<br>登录后查看共享排班</p>
+      <p class="subtitle">仅限已授权成员访问<br>登录后查看共享夜班</p>
       <form id="loginForm">
         <div class="form-group"><label for="email">邮箱</label><input id="email" class="input" type="email" autocomplete="email" required placeholder="请输入邮箱"></div>
         <div class="form-group"><label for="password">密码</label><input id="password" class="input" type="password" autocomplete="current-password" required placeholder="请输入密码"></div>
@@ -130,7 +160,7 @@
     <header>
       <div class="eyebrow">NIGHT SHIFT</div>
       <h1>🌙 夜班日历</h1>
-      <p>共享排班 · 节假日 · 调休一目了然</p>
+      <p>仅记录夜班 · 节假日 · 调休一目了然</p>
     </header>
 
     <section class="next-card">
@@ -175,10 +205,11 @@
       <input id="editingId" type="hidden">
       <div class="form-group"><label for="shiftDate">日期</label><input id="shiftDate" class="input" type="date" required></div>
       <div class="form-group">
-        <label for="shiftType">班次</label>
-        <select id="shiftType" class="input" required>
-          <option value="夜班">夜班</option><option value="小夜">小夜</option><option value="大夜">大夜</option><option value="二线">二线</option><option value="备班">备班</option>
-        </select>
+        <label>班次</label>
+        <div class="fixed-shift" aria-label="班次固定为夜班">
+          <div class="fixed-shift-main"><span>🌙</span><span>夜班</span></div>
+          <span class="fixed-shift-badge">固定班次</span>
+        </div>
       </div>
       <div class="form-group"><label for="shiftNote">备注（选填）</label><textarea id="shiftNote" class="input" maxlength="100" placeholder="例如：换班、备班等"></textarea></div>
       <div class="warning">⚠️ 请勿填写患者姓名、住院号、诊断、联系方式、病历内容或其他医疗/个人敏感信息。</div>
@@ -270,6 +301,7 @@
     const first=new Date(year,month,1),last=new Date(year,month+1,0);
     const {data,error}=await db.from("night_shifts")
       .select("id,member_id,shift_date,shift_type,note")
+      .eq("shift_type","夜班")
       .gte("shift_date",toYMD(first)).lte("shift_date",toYMD(last))
       .order("shift_date",{ascending:true});
     if(error){console.error(error);return;}
@@ -370,17 +402,17 @@
   $("sheetOverlay").addEventListener("click",e=>{if(e.target===$("sheetOverlay"))closeSheet();});
 
   function openAddSheet(date){
-    $("editingId").value="";$("sheetTitle").textContent="添加我的夜班";$("shiftDate").value=date;$("shiftType").value="夜班";$("shiftNote").value="";showError($("sheetError"),"");$("sheetOverlay").classList.remove("hidden");
+    $("editingId").value="";$("sheetTitle").textContent="添加我的夜班";$("shiftDate").value=date;$("shiftNote").value="";showError($("sheetError"),"");$("sheetOverlay").classList.remove("hidden");
   }
   function openEditSheet(shift){
     if(shift.member_id!==myMemberId)return;
-    $("editingId").value=shift.id;$("sheetTitle").textContent="编辑我的夜班";$("shiftDate").value=shift.shift_date;$("shiftType").value=shift.shift_type;$("shiftNote").value=shift.note||"";showError($("sheetError"),"");$("sheetOverlay").classList.remove("hidden");
+    $("editingId").value=shift.id;$("sheetTitle").textContent="编辑我的夜班";$("shiftDate").value=shift.shift_date;$("shiftNote").value=shift.note||"";showError($("sheetError"),"");$("sheetOverlay").classList.remove("hidden");
   }
   function closeSheet(){$("sheetOverlay").classList.add("hidden");}
 
   $("shiftForm").addEventListener("submit",async e=>{
     e.preventDefault();showError($("sheetError"),"");
-    const date=$("shiftDate").value,type=$("shiftType").value,note=$("shiftNote").value.trim();
+    const date=$("shiftDate").value,type="夜班",note=$("shiftNote").value.trim();
     if(!date){showError($("sheetError"),"请选择日期。");return;}
     if(note.length>100){showError($("sheetError"),"备注不能超过100字。");return;}
     $("saveShiftBtn").disabled=true;$("saveShiftBtn").textContent="正在保存…";
@@ -411,7 +443,7 @@
 
   async function loadNextMyShift(){
     const today=toYMD(new Date());
-    const {data,error}=await db.from("night_shifts").select("id,shift_date,shift_type,note").eq("member_id",myMemberId).gte("shift_date",today).order("shift_date",{ascending:true}).limit(1);
+    const {data,error}=await db.from("night_shifts").select("id,shift_date,shift_type,note").eq("member_id",myMemberId).eq("shift_type","夜班").gte("shift_date",today).order("shift_date",{ascending:true}).limit(1);
     if(error){console.error(error);return;}
     nextShift=data?.[0]||null;
     const holidayEl=$("nextHoliday");holidayEl.textContent="";holidayEl.className="next-holiday";
@@ -444,11 +476,13 @@
   db.auth.onAuthStateChange(event=>{if(event==="SIGNED_OUT")showLogin();});
   init();
 </script>
-
 <!-- Cloudflare Web Analytics -->
-<script type='module' 
-    src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "bfd3df5c469343eb91856b7f3275def8"}'>  
+<script
+  type="module"
+  src="https://static.cloudflareinsights.com/beacon.min.js"
+  data-cf-beacon='{"token":"bfd3df5c469343eb91856b7f3275def8"}'>
 </script>
 <!-- End Cloudflare Web Analytics -->
+
 </body>
 </html>
