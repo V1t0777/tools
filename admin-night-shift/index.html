@@ -77,6 +77,63 @@
     textarea.input{min-height:76px;padding-top:12px;resize:vertical}
     .input:focus{border-color:rgba(183,195,255,.62);box-shadow:0 0 0 3px rgba(126,148,255,.10)}
 
+    /*
+      Windows / Chrome / Edge 原生 select 修复：
+      页面本身为深色主题，但 Windows 的下拉弹层通常是白底。
+      option 若继承浅色文字，就会出现“白底浅字”。
+    */
+    select.input{
+      color-scheme:light;
+      background-color:#20283a;
+      color:#f6f7fb;
+      border-color:rgba(255,255,255,.14);
+      cursor:pointer;
+    }
+
+    select.input option,
+    select.input optgroup{
+      background-color:#ffffff !important;
+      color:#111827 !important;
+    }
+
+    select.input option:checked{
+      background:#2563eb linear-gradient(0deg,#2563eb,#2563eb) !important;
+      color:#ffffff !important;
+    }
+
+    select.input option:disabled{
+      color:#6b7280 !important;
+    }
+
+    select.input:hover{
+      border-color:rgba(190,203,255,.42);
+      background-color:#252f44;
+    }
+
+    select.input:focus,
+    select.input:focus-visible{
+      outline:none;
+      border-color:#9fb5ff;
+      box-shadow:0 0 0 3px rgba(120,149,255,.18);
+    }
+
+    button:focus-visible,
+    a:focus-visible,
+    input:focus-visible,
+    textarea:focus-visible{
+      outline:2px solid #9fb5ff;
+      outline-offset:2px;
+    }
+
+    @media (forced-colors: active){
+      select.input,
+      select.input option,
+      select.input optgroup{
+        forced-color-adjust:auto;
+      }
+    }
+
+
     .primary{
       width:100%;min-height:54px;border:0;border-radius:17px;
       background:linear-gradient(135deg,#d9ddff,#9fcaff);color:#121725;font-weight:900
@@ -378,8 +435,8 @@
           <button id="tableModeBtn">表格</button>
         </div>
 
-        <select id="staffFilter" class="input staff-filter">
-          <option value="">全部人员</option>
+        <select id="staffFilter" class="input staff-filter" aria-label="筛选人员" title="筛选人员">
+          <option value="">全部人员（可筛选）</option>
         </select>
       </div>
     </div>
@@ -1243,6 +1300,8 @@
   function createStaffSelect(selectedId="") {
     const select = document.createElement("select");
     select.className = "input";
+    select.title = "选择人员";
+    select.setAttribute("aria-label","选择人员");
 
     const blank = document.createElement("option");
     blank.value = "";
@@ -1304,6 +1363,8 @@
 
     const typeSelect = document.createElement("select");
     typeSelect.className = "input";
+    typeSelect.title = "门诊类型";
+    typeSelect.setAttribute("aria-label","门诊类型");
     typeSelect.dataset.clinicType = "1";
 
     for (const code of CLINIC_CODES) {
@@ -1322,6 +1383,8 @@
 
     const slotSelect = document.createElement("select");
     slotSelect.className = "input";
+    slotSelect.title = "时间段";
+    slotSelect.setAttribute("aria-label","时间段");
     slotSelect.dataset.clinicSlot = "1";
 
     for (const slot of ["上午","下午","全天"]) {
@@ -1522,11 +1585,11 @@
   init();
 </script>
 
-  <!-- Cloudflare Web Analytics -->
+<!-- Cloudflare Web Analytics -->
   <script type='module' 
     src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "bfd3df5c469343eb91856b7f3275def8"}'>  
   </script>
   <!-- End Cloudflare Web Analytics -->
-
+   
 </body>
 </html>
