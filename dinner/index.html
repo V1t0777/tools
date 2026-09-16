@@ -1,316 +1,1087 @@
-
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
-  <meta name="theme-color" content="#f7f3ed" />
-  <title>今晚吃什么</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="theme-color" content="#11131a">
+  <title>今晚吃什么｜钊的工具箱</title>
+
   <style>
-    :root{
-      --bg1:#fffaf4;
-      --bg2:#f3f6fb;
-      --text:#202533;
-      --muted:#7c8495;
-      --card:rgba(255,255,255,.78);
-      --shadow:0 18px 50px rgba(51,61,87,.14);
-    }
     *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-    html,body{margin:0;min-height:100%;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","PingFang SC","Microsoft YaHei",sans-serif}
+    :root{
+      --bg:#11131a;
+      --bg2:#181b25;
+      --card:rgba(255,255,255,.065);
+      --card2:rgba(255,255,255,.095);
+      --border:rgba(255,255,255,.10);
+      --text:#f7f8fc;
+      --muted:#a8b0c2;
+      --accent:#ffb85c;
+      --accent2:#ff7f66;
+      --good:#89e1b3;
+      --danger:#ff98a3;
+      --shadow:0 22px 60px rgba(0,0,0,.30);
+    }
+
+    html,body{margin:0;min-height:100%}
     body{
       min-height:100dvh;
       color:var(--text);
+      font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","PingFang SC","Microsoft YaHei",sans-serif;
       background:
-        radial-gradient(circle at 10% 0%, rgba(255,196,144,.28), transparent 30%),
-        radial-gradient(circle at 95% 5%, rgba(163,195,255,.25), transparent 28%),
-        linear-gradient(180deg,var(--bg1),var(--bg2));
-      overflow-x:hidden;
+        radial-gradient(circle at 15% 0%,rgba(255,143,90,.16),transparent 30%),
+        radial-gradient(circle at 90% 12%,rgba(114,128,255,.17),transparent 28%),
+        linear-gradient(180deg,#191c26 0%,#0d0f15 100%);
+      padding:max(14px,env(safe-area-inset-top)) 14px max(28px,env(safe-area-inset-bottom));
     }
-    .app{
-      width:min(720px,100%);
-      min-height:100dvh;
-      margin:0 auto;
-      padding:calc(14px + env(safe-area-inset-top)) 16px calc(22px + env(safe-area-inset-bottom));
-      display:flex;
-      flex-direction:column;
+
+    button,input{font:inherit}
+    button{cursor:pointer}
+    .hidden{display:none!important}
+    .page{width:min(100%,760px);margin:0 auto}
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:16px}
+    .back,.icon-btn{
+      min-height:42px;border:1px solid var(--border);border-radius:14px;background:rgba(255,255,255,.055);
+      color:var(--text);backdrop-filter:blur(16px)
     }
-    .topbar{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:12px;
+    .back{display:inline-flex;align-items:center;padding:0 14px;text-decoration:none;font-size:14px;font-weight:800}
+    .top-actions{display:flex;gap:8px}
+    .icon-btn{min-width:42px;padding:0 11px}
+    .icon-btn.off{opacity:.48}
+
+    header{padding:7px 2px 16px;text-align:center}
+    .eyebrow{color:#ffba72;font-size:11px;font-weight:900;letter-spacing:.18em}
+    h1{margin:7px 0 5px;font-size:clamp(36px,9vw,54px);letter-spacing:-.05em;line-height:1}
+    header p{margin:0;color:var(--muted);font-size:14px}
+
+    .panel{
+      border:1px solid var(--border);
+      border-radius:26px;
+      background:var(--card);
+      box-shadow:var(--shadow);
+      backdrop-filter:blur(20px);
     }
-    .back{
-      display:inline-flex;
-      align-items:center;
-      gap:7px;
-      color:var(--text);
-      text-decoration:none;
-      font-weight:700;
-      background:rgba(255,255,255,.74);
-      border:1px solid rgba(255,255,255,.9);
-      box-shadow:0 8px 24px rgba(50,60,80,.10);
-      border-radius:16px;
-      padding:11px 14px;
-      backdrop-filter:blur(16px);
+
+    .hero{
+      padding:18px;
+      background:
+        linear-gradient(135deg,rgba(255,151,92,.11),rgba(132,121,255,.08)),
+        var(--card);
     }
-    .tiny{font-size:13px;color:var(--muted)}
-    header{
-      text-align:center;
-      padding:24px 0 12px;
+
+    .mode-row{
+      display:flex;justify-content:space-between;align-items:center;gap:12px;
+      margin-bottom:14px;
     }
-    h1{
-      margin:0;
-      font-size:clamp(34px,9vw,54px);
-      font-weight:900;
-      letter-spacing:.02em;
+    .mode-row strong{font-size:13px}
+    .mode-row span{display:block;margin-top:3px;color:var(--muted);font-size:11px}
+
+    .segmented{
+      display:flex;padding:4px;border:1px solid var(--border);border-radius:14px;background:rgba(255,255,255,.035)
     }
-    .sub{
-      margin:9px 0 0;
-      color:var(--muted);
-      font-size:15px;
+    .segmented button{
+      min-height:34px;padding:0 12px;border:0;border-radius:10px;background:transparent;color:var(--muted);
+      font-size:12px;font-weight:850
     }
-    .stage{
-      flex:1;
-      display:flex;
-      flex-direction:column;
-      justify-content:center;
-      align-items:center;
-      padding:8px 0 18px;
+    .segmented button.active{background:rgba(255,255,255,.12);color:#fff}
+
+    .candidate-summary{
+      padding:13px 14px;border:1px solid var(--border);border-radius:16px;background:rgba(255,255,255,.035)
     }
-    .wheel-wrap{
+    .candidate-summary-head{display:flex;justify-content:space-between;gap:10px;align-items:center}
+    .candidate-summary-head strong{font-size:13px}
+    .candidate-summary-head button{
+      min-height:34px;padding:0 11px;border:1px solid var(--border);border-radius:11px;background:rgba(255,255,255,.05);
+      color:var(--text);font-size:11px;font-weight:800
+    }
+    .candidate-tags{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+    .tag{
+      display:inline-flex;align-items:center;min-height:29px;padding:0 10px;border-radius:999px;
+      background:rgba(255,255,255,.07);color:#dde2ed;font-size:11px
+    }
+
+    .machine{
       position:relative;
-      width:min(82vw,430px);
-      aspect-ratio:1;
+      min-height:285px;
       display:grid;
       place-items:center;
+      margin:18px 0 6px;
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,.06);
+      border-radius:25px;
+      background:
+        radial-gradient(circle at 50% 46%,rgba(255,179,92,.10),transparent 35%),
+        rgba(0,0,0,.10);
     }
-    .pointer{
-      position:absolute;
-      z-index:5;
-      top:-7px;
-      left:50%;
-      transform:translateX(-50%);
-      width:0;height:0;
-      border-left:16px solid transparent;
-      border-right:16px solid transparent;
-      border-top:30px solid #222a3a;
-      filter:drop-shadow(0 5px 8px rgba(0,0,0,.20));
+    .machine::before,.machine::after{
+      content:"";position:absolute;left:8%;right:8%;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.14),transparent)
     }
-    canvas{
-      width:100%;
-      height:100%;
-      border-radius:50%;
-      filter:drop-shadow(0 18px 30px rgba(49,58,80,.20));
-      transform:rotate(0deg);
-      will-change:transform;
+    .machine::before{top:34%}
+    .machine::after{bottom:34%}
+
+    .reel{
+      width:82%;
+      min-height:146px;
+      display:grid;
+      place-items:center;
+      text-align:center;
+      border-radius:25px;
+      background:linear-gradient(145deg,rgba(255,255,255,.105),rgba(255,255,255,.045));
+      border:1px solid rgba(255,255,255,.11);
+      box-shadow:0 22px 45px rgba(0,0,0,.20);
+      transform:translateZ(0);
     }
-    .spin-btn{
-      position:absolute;
-      z-index:4;
-      width:108px;
-      height:108px;
-      border-radius:50%;
-      border:8px solid rgba(255,255,255,.9);
-      background:linear-gradient(180deg,#222b3e,#151b29);
-      color:white;
-      font-size:22px;
-      font-weight:900;
-      box-shadow:0 12px 30px rgba(18,25,38,.25);
-      cursor:pointer;
-      touch-action:manipulation;
+    .reel-icon{font-size:45px}
+    .reel-name{margin-top:8px;font-size:clamp(30px,8vw,48px);font-weight:950;letter-spacing:-.04em}
+    .reel-sub{margin-top:5px;color:var(--muted);font-size:12px}
+    .reel.rolling{animation:reelPulse .18s ease-in-out infinite alternate}
+    @keyframes reelPulse{from{transform:scale(.985);filter:brightness(.97)}to{transform:scale(1.02);filter:brightness(1.07)}}
+
+    .primary{
+      width:100%;min-height:56px;border:0;border-radius:18px;
+      background:linear-gradient(135deg,#ffd38a,#ff9b6d);color:#201611;font-weight:950;font-size:16px;
+      box-shadow:0 14px 34px rgba(255,142,92,.18)
     }
-    .spin-btn:active{transform:scale(.96)}
-    .spin-btn:disabled{opacity:.75}
+    .primary:disabled{opacity:.45;cursor:default}
+    .secondary{
+      width:100%;min-height:50px;margin-top:8px;border:1px solid var(--border);border-radius:16px;
+      background:rgba(255,255,255,.055);color:var(--text);font-weight:850
+    }
+
+    .hint{text-align:center;margin-top:9px;color:var(--muted);font-size:11px;line-height:1.6}
+
+    .finalists{
+      margin-top:16px;padding:18px;
+    }
+    .section-kicker{font-size:11px;color:#ffbd77;font-weight:900;letter-spacing:.12em}
+    .section-title{margin:6px 0 4px;font-size:22px;font-weight:950}
+    .section-desc{color:var(--muted);font-size:12px}
+
+    .final-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:15px 0}
+    .final-card{
+      min-width:0;padding:15px 8px;border:1px solid var(--border);border-radius:18px;background:rgba(255,255,255,.045);
+      text-align:center;transition:.2s ease
+    }
+    .final-card.active{
+      transform:translateY(-4px) scale(1.03);
+      border-color:rgba(255,197,118,.40);
+      background:rgba(255,188,105,.10);
+      box-shadow:0 12px 30px rgba(0,0,0,.20)
+    }
+    .final-emoji{font-size:28px}
+    .final-name{margin-top:7px;font-size:14px;font-weight:900;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
     .result-card{
-      margin-top:22px;
-      width:min(92vw,430px);
-      min-height:92px;
-      padding:16px 20px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      flex-direction:column;
-      background:var(--card);
-      border:1px solid rgba(255,255,255,.92);
-      border-radius:24px;
-      box-shadow:var(--shadow);
-      backdrop-filter:blur(18px);
-      text-align:center;
+      margin-top:16px;padding:20px;text-align:center;
+      background:
+        radial-gradient(circle at 50% 20%,rgba(255,191,100,.10),transparent 28%),
+        var(--card);
     }
-    .result-label{font-size:13px;color:var(--muted);margin-bottom:5px}
-    .result{
-      font-size:30px;
-      font-weight:900;
-      min-height:39px;
+    .result-label{font-size:11px;letter-spacing:.13em;color:#ffbd77;font-weight:900}
+    .result-emoji{font-size:54px;margin-top:8px}
+    .result-name{font-size:clamp(34px,9vw,52px);font-weight:950;letter-spacing:-.045em;margin-top:5px}
+    .result-copy{margin-top:7px;color:var(--muted);font-size:13px}
+
+    .result-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:16px}
+    .action-btn{
+      min-height:50px;border:1px solid var(--border);border-radius:15px;background:rgba(255,255,255,.055);
+      color:var(--text);font-weight:850
     }
-    .hint{
-      margin-top:10px;
-      color:var(--muted);
-      font-size:13px;
-      text-align:center;
-      line-height:1.55;
+    .action-btn.confirm{background:rgba(128,226,178,.11);color:#b9f2d3;border-color:rgba(128,226,178,.16)}
+    .action-btn.regret{color:#ffd59a}
+    .locked{
+      margin-top:12px;padding:10px 12px;border-radius:13px;background:rgba(255,255,255,.045);color:#c8cedb;font-size:12px;font-weight:800
     }
-    @media (max-height:700px){
-      header{padding:14px 0 5px}
-      .wheel-wrap{width:min(67vh,78vw)}
-      .result-card{margin-top:12px;min-height:76px}
-      .result{font-size:26px}
+
+    .jaw-meter{
+      margin-top:13px;padding:11px 12px;border:1px solid rgba(255,255,255,.07);border-radius:14px;background:rgba(255,255,255,.03);
+      text-align:left
+    }
+    .jaw-head{display:flex;justify-content:space-between;gap:10px;font-size:11px;color:var(--muted)}
+    .jaw-bar{height:7px;border-radius:999px;background:rgba(255,255,255,.07);overflow:hidden;margin-top:8px}
+    .jaw-fill{height:100%;width:0;background:linear-gradient(90deg,#ffce7f,#ff7f6d);border-radius:999px;transition:.28s ease}
+    .jaw-message{margin-top:8px;font-size:12px;color:#f7d6a5;font-weight:800;min-height:18px}
+
+    .history{
+      margin-top:16px;padding:17px;
+    }
+    .history-head{display:flex;justify-content:space-between;gap:12px;align-items:center}
+    .history-head h2{margin:0;font-size:18px}
+    .history-head button{
+      min-height:34px;padding:0 10px;border:1px solid var(--border);border-radius:11px;background:rgba(255,255,255,.045);
+      color:var(--muted);font-size:11px
+    }
+    .history-list{display:grid;gap:8px;margin-top:12px}
+    .history-row{
+      display:flex;justify-content:space-between;gap:12px;padding:10px 11px;border-radius:13px;background:rgba(255,255,255,.035);
+      font-size:12px
+    }
+    .history-row span:last-child{color:var(--muted)}
+    .empty{padding:18px 12px;text-align:center;color:var(--muted);font-size:12px;border:1px dashed var(--border);border-radius:14px}
+
+    .toast{
+      position:fixed;left:50%;bottom:max(24px,calc(env(safe-area-inset-bottom) + 18px));
+      transform:translateX(-50%) translateY(12px);z-index:200;
+      max-width:min(90vw,520px);padding:11px 14px;border-radius:999px;
+      background:rgba(17,19,26,.92);color:#ffe4be;border:1px solid rgba(255,197,118,.12);
+      box-shadow:0 16px 40px rgba(0,0,0,.30);backdrop-filter:blur(18px);
+      opacity:0;pointer-events:none;transition:.22s ease;text-align:center;font-size:12px;font-weight:850
+    }
+    .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+    .overlay{
+      position:fixed;inset:0;z-index:150;background:rgba(5,7,11,.72);backdrop-filter:blur(7px);
+      display:flex;align-items:flex-end
+    }
+    .sheet{
+      width:min(100%,760px);max-height:92dvh;overflow:auto;margin:0 auto;
+      border:1px solid var(--border);border-radius:28px 28px 0 0;background:#191c26;
+      padding:14px 15px max(20px,env(safe-area-inset-bottom))
+    }
+    .handle{width:42px;height:5px;margin:0 auto 15px;border-radius:999px;background:rgba(255,255,255,.18)}
+    .sheet-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+    .sheet-head h2{margin:0;font-size:21px}
+    .close{
+      width:38px;height:38px;border:0;border-radius:50%;background:rgba(255,255,255,.08);color:#fff;font-size:21px
+    }
+
+    .candidate-list{display:grid;gap:8px}
+    .candidate-row{
+      display:grid;grid-template-columns:auto 1fr auto;gap:9px;align-items:center;
+      padding:10px;border:1px solid var(--border);border-radius:15px;background:rgba(255,255,255,.035)
+    }
+    .candidate-row input[type="checkbox"]{width:20px;height:20px;accent-color:#ff9f68}
+    .candidate-name{font-size:14px;font-weight:850}
+    .delete-btn{
+      min-height:34px;padding:0 10px;border:1px solid rgba(255,120,135,.16);border-radius:11px;
+      background:rgba(255,90,105,.07);color:#ff9ea8;font-size:11px
+    }
+
+    .add-row{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:12px}
+    .text-input{
+      width:100%;min-height:46px;padding:0 13px;border:1px solid var(--border);border-radius:14px;
+      background:rgba(255,255,255,.055);color:var(--text);outline:none
+    }
+    .add-btn{
+      min-height:46px;padding:0 14px;border:0;border-radius:14px;background:#ffd18a;color:#231710;font-weight:900
+    }
+
+    @media(max-width:540px){
+      .mode-row{align-items:stretch;flex-direction:column}
+      .segmented{width:100%}
+      .segmented button{flex:1}
+      .machine{min-height:260px}
+      .reel{width:90%}
+      .result-actions{grid-template-columns:1fr}
+      .final-card{padding:13px 5px}
+    }
+
+    @media(prefers-reduced-motion:reduce){
+      *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}
     }
   </style>
 </head>
+
 <body>
-  <main class="app">
+  <main class="page">
     <div class="topbar">
-      <a class="back" href="../" aria-label="返回工具箱">← 返回工具箱</a>
-      <div class="tiny">三选一 · 等概率</div>
+      <a class="back" href="../">← 工具箱</a>
+      <div class="top-actions">
+        <button id="soundBtn" class="icon-btn" type="button" title="音效开关" aria-label="音效开关">🔊</button>
+        <button id="manageBtn" class="icon-btn" type="button" title="管理候选" aria-label="管理候选">⚙️</button>
+      </div>
     </div>
 
     <header>
+      <div class="eyebrow">DINNER DECISION</div>
       <h1>今晚吃什么</h1>
-      <p class="sub">烧烤 · 火锅 · 炒菜，每项概率均为 1/3</p>
+      <p>别纠结了，让命运替你拍板。</p>
     </header>
 
-    <section class="stage">
-      <div class="wheel-wrap">
-        <div class="pointer"></div>
-        <canvas id="wheel" width="900" height="900" aria-label="今晚吃什么转盘"></canvas>
-        <button id="spinBtn" class="spin-btn">开转</button>
+    <section class="panel hero">
+      <div class="mode-row">
+        <div>
+          <strong>随机模式</strong>
+          <span id="modeDesc">每个候选完全等概率</span>
+        </div>
+
+        <div class="segmented">
+          <button id="fairBtn" class="active" type="button">公平随机</button>
+          <button id="smartBtn" type="button">智能随机</button>
+        </div>
       </div>
 
-      <div class="result-card">
-        <div class="result-label">今晚就吃</div>
-        <div id="result" class="result">点击转盘开始</div>
+      <div class="candidate-summary">
+        <div class="candidate-summary-head">
+          <strong id="candidateCount">当前候选 0 项</strong>
+          <button id="manageBtn2" type="button">管理候选</button>
+        </div>
+        <div id="candidateTags" class="candidate-tags"></div>
       </div>
 
-      <div class="hint">每次先等概率随机选中一项，再让转盘旋转到对应区域；动画不会改变抽取概率。</div>
+      <div class="machine">
+        <div id="reel" class="reel">
+          <div>
+            <div id="reelIcon" class="reel-icon">🍽️</div>
+            <div id="reelName" class="reel-name">准备开饭</div>
+            <div id="reelSub" class="reel-sub">先抽出今晚的三位决赛选手</div>
+          </div>
+        </div>
+      </div>
+
+      <button id="drawThreeBtn" class="primary" type="button">抽出三位决赛选手</button>
+      <div class="hint">至少启用 3 个候选。智能随机会降低最近吃过选项的概率。</div>
+    </section>
+
+    <section id="finalistsPanel" class="panel finalists hidden">
+      <div class="section-kicker">FINAL THREE</div>
+      <div class="section-title">三选一决赛</div>
+      <div class="section-desc">都走到决赛了，今晚总得选一个。</div>
+
+      <div id="finalGrid" class="final-grid"></div>
+
+      <button id="startFinalBtn" class="primary" type="button">开始决赛</button>
+      <button id="replaceThreeBtn" class="secondary" type="button">这三个都不想吃，换一批</button>
+    </section>
+
+    <section id="resultPanel" class="panel result-card hidden">
+      <div class="result-label">TONIGHT'S CHOICE</div>
+      <div id="resultEmoji" class="result-emoji">🍲</div>
+      <div id="resultName" class="result-name">火锅</div>
+      <div id="resultCopy" class="result-copy">今晚就它了。</div>
+
+      <div class="result-actions">
+        <button id="confirmBtn" class="action-btn confirm" type="button">就它了 ✓</button>
+        <button id="regretBtn" class="action-btn regret" type="button">我不服，反悔一次</button>
+      </div>
+
+      <div id="lockedText" class="locked hidden">这次不许反悔了 😏</div>
+
+      <div class="jaw-meter">
+        <div class="jaw-head">
+          <span>嘴硬检测</span>
+          <span id="jawCount">0 次否决</span>
+        </div>
+        <div class="jaw-bar">
+          <div id="jawFill" class="jaw-fill"></div>
+        </div>
+        <div id="jawMessage" class="jaw-message"></div>
+      </div>
+    </section>
+
+    <section class="panel history">
+      <div class="history-head">
+        <h2>最近吃过</h2>
+        <button id="clearHistoryBtn" type="button">清空历史</button>
+      </div>
+      <div id="historyList" class="history-list"></div>
     </section>
   </main>
 
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <div id="managerOverlay" class="overlay hidden">
+    <section class="sheet">
+      <div class="handle"></div>
+      <div class="sheet-head">
+        <h2>管理候选</h2>
+        <button id="closeManagerBtn" class="close" type="button" aria-label="关闭">×</button>
+      </div>
+
+      <div id="candidateList" class="candidate-list"></div>
+
+      <div class="add-row">
+        <input id="newCandidateInput" class="text-input" type="text" maxlength="12" placeholder="新增候选，例如：椰子鸡">
+        <button id="addCandidateBtn" class="add-btn" type="button">添加</button>
+      </div>
+    </section>
+  </div>
+
   <script>
-    const options = [
-      { name: "烧烤", emoji: "🍢", color: "#ffb36a" },
-      { name: "火锅", emoji: "🍲", color: "#ff7f72" },
-      { name: "炒菜", emoji: "🥘", color: "#85d39b" }
+    const STORAGE_KEY = "dinnerDecision.v2";
+
+    const DEFAULT_CANDIDATES = [
+      { id:"bbq", name:"烧烤", emoji:"🍖", enabled:true },
+      { id:"hotpot", name:"火锅", emoji:"🍲", enabled:true },
+      { id:"stirfry", name:"炒菜", emoji:"🥘", enabled:true },
+      { id:"cantonese", name:"粤菜", emoji:"🥢", enabled:true },
+      { id:"japanese", name:"日料", emoji:"🍣", enabled:true },
+      { id:"korean", name:"韩餐", emoji:"🍱", enabled:true },
+      { id:"crayfish", name:"小龙虾", emoji:"🦞", enabled:true },
+      { id:"noodles", name:"面馆", emoji:"🍜", enabled:true }
     ];
 
-    const canvas = document.getElementById("wheel");
-    const ctx = canvas.getContext("2d");
-    const btn = document.getElementById("spinBtn");
-    const resultEl = document.getElementById("result");
+    const state = {
+      mode:"fair",
+      sound:true,
+      candidates:[],
+      history:[],
+      finalists:[],
+      result:null,
+      rejectCount:0,
+      regretUsed:false,
+      sessionResultLocked:false
+    };
 
-    const TWO_PI = Math.PI * 2;
-    const slice = TWO_PI / options.length;
-    let currentRotation = 0;
-    let spinning = false;
+    const els = {
+      fairBtn:document.getElementById("fairBtn"),
+      smartBtn:document.getElementById("smartBtn"),
+      modeDesc:document.getElementById("modeDesc"),
+      candidateCount:document.getElementById("candidateCount"),
+      candidateTags:document.getElementById("candidateTags"),
+      drawThreeBtn:document.getElementById("drawThreeBtn"),
+      reel:document.getElementById("reel"),
+      reelIcon:document.getElementById("reelIcon"),
+      reelName:document.getElementById("reelName"),
+      reelSub:document.getElementById("reelSub"),
+      finalistsPanel:document.getElementById("finalistsPanel"),
+      finalGrid:document.getElementById("finalGrid"),
+      startFinalBtn:document.getElementById("startFinalBtn"),
+      replaceThreeBtn:document.getElementById("replaceThreeBtn"),
+      resultPanel:document.getElementById("resultPanel"),
+      resultEmoji:document.getElementById("resultEmoji"),
+      resultName:document.getElementById("resultName"),
+      resultCopy:document.getElementById("resultCopy"),
+      confirmBtn:document.getElementById("confirmBtn"),
+      regretBtn:document.getElementById("regretBtn"),
+      lockedText:document.getElementById("lockedText"),
+      jawCount:document.getElementById("jawCount"),
+      jawFill:document.getElementById("jawFill"),
+      jawMessage:document.getElementById("jawMessage"),
+      historyList:document.getElementById("historyList"),
+      clearHistoryBtn:document.getElementById("clearHistoryBtn"),
+      managerOverlay:document.getElementById("managerOverlay"),
+      candidateList:document.getElementById("candidateList"),
+      newCandidateInput:document.getElementById("newCandidateInput"),
+      addCandidateBtn:document.getElementById("addCandidateBtn"),
+      manageBtn:document.getElementById("manageBtn"),
+      manageBtn2:document.getElementById("manageBtn2"),
+      closeManagerBtn:document.getElementById("closeManagerBtn"),
+      soundBtn:document.getElementById("soundBtn"),
+      toast:document.getElementById("toast")
+    };
 
-    function drawWheel(){
-      const c = canvas.width / 2;
-      const r = c - 18;
-      ctx.clearRect(0,0,canvas.width,canvas.height);
-
-      // 外圈
-      ctx.beginPath();
-      ctx.arc(c,c,r+8,0,TWO_PI);
-      ctx.fillStyle = "#ffffff";
-      ctx.fill();
-
-      options.forEach((opt,i)=>{
-        // 让第一个扇区以正上方为中心，方便指针定位
-        const centerAngle = -Math.PI/2 + i * slice;
-        const start = centerAngle - slice/2;
-        const end = centerAngle + slice/2;
-
-        ctx.beginPath();
-        ctx.moveTo(c,c);
-        ctx.arc(c,c,r,start,end);
-        ctx.closePath();
-        ctx.fillStyle = opt.color;
-        ctx.fill();
-
-        ctx.save();
-        ctx.translate(c,c);
-        ctx.rotate(centerAngle);
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-
-        ctx.font = "700 46px -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif";
-        ctx.fillStyle = "#1f2533";
-        ctx.fillText(opt.name, r*0.62, -4);
-
-        ctx.font = "58px Apple Color Emoji, Segoe UI Emoji";
-        ctx.fillText(opt.emoji, r*0.62, 58);
-        ctx.restore();
-      });
-
-      // 分割线
-      ctx.strokeStyle = "rgba(255,255,255,.86)";
-      ctx.lineWidth = 10;
-      options.forEach((_,i)=>{
-        const a = -Math.PI/2 - slice/2 + i*slice;
-        ctx.beginPath();
-        ctx.moveTo(c,c);
-        ctx.lineTo(c+Math.cos(a)*r, c+Math.sin(a)*r);
-        ctx.stroke();
-      });
-
-      // 中心装饰
-      ctx.beginPath();
-      ctx.arc(c,c,103,0,TWO_PI);
-      ctx.fillStyle = "rgba(255,255,255,.96)";
-      ctx.fill();
+    function cloneDefaults() {
+      return DEFAULT_CANDIDATES.map(x => ({...x}));
     }
 
-    function cryptoRandomIndex(max){
-      if (window.crypto && crypto.getRandomValues){
-        const limit = Math.floor(0x100000000 / max) * max;
-        const buf = new Uint32Array(1);
-        do {
-          crypto.getRandomValues(buf);
-        } while (buf[0] >= limit);
-        return buf[0] % max;
+    function loadState() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+
+        if (saved.mode === "fair" || saved.mode === "smart") state.mode = saved.mode;
+        if (typeof saved.sound === "boolean") state.sound = saved.sound;
+        if (Array.isArray(saved.candidates) && saved.candidates.length) {
+          state.candidates = saved.candidates
+            .filter(x => x && typeof x.name === "string")
+            .map(x => ({
+              id:String(x.id || cryptoSafeId()),
+              name:String(x.name).slice(0,12),
+              emoji:String(x.emoji || "🍽️"),
+              enabled:x.enabled !== false
+            }));
+        } else {
+          state.candidates = cloneDefaults();
+        }
+
+        if (Array.isArray(saved.history)) {
+          state.history = saved.history.slice(0,30);
+        }
+      } catch {
+        state.candidates = cloneDefaults();
       }
-      return Math.floor(Math.random() * max);
+
+      if (!state.candidates.length) state.candidates = cloneDefaults();
+      saveState();
     }
 
-    function spin(){
-      if(spinning) return;
-      spinning = true;
-      btn.disabled = true;
-      resultEl.textContent = "正在决定…";
-
-      const winner = cryptoRandomIndex(options.length);
-
-      // 指针固定正上方。要让 winner 的扇区中心转到正上方，
-      // 需要将画布转过 -winner * 120°（再加若干整圈）。
-      const baseTurns = 5 + Math.floor(Math.random()*3);
-      const targetNormalized = ((-winner * 120) % 360 + 360) % 360;
-      const currentNormalized = ((currentRotation % 360) + 360) % 360;
-      let delta = targetNormalized - currentNormalized;
-      if(delta < 0) delta += 360;
-      const target = currentRotation + baseTurns*360 + delta;
-
-      canvas.style.transition = "transform 4.6s cubic-bezier(.12,.72,.16,1)";
-      canvas.style.transform = `rotate(${target}deg)`;
-      currentRotation = target;
-
-      setTimeout(()=>{
-        resultEl.textContent = `${options[winner].emoji} ${options[winner].name}`;
-        if (navigator.vibrate) navigator.vibrate([35,45,35]);
-        btn.disabled = false;
-        spinning = false;
-      }, 4650);
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          mode:state.mode,
+          sound:state.sound,
+          candidates:state.candidates,
+          history:state.history.slice(0,30)
+        }));
+      } catch {}
     }
 
-    btn.addEventListener("click", spin, {passive:true});
-    drawWheel();
+    function cryptoSafeId() {
+      if (crypto && typeof crypto.randomUUID === "function") {
+        return crypto.randomUUID();
+      }
+      return "c_" + Date.now().toString(36) + Math.random().toString(36).slice(2);
+    }
+
+    function enabledCandidates() {
+      return state.candidates.filter(x => x.enabled);
+    }
+
+    function showToast(message, ms=1600) {
+      els.toast.textContent = message;
+      els.toast.classList.add("show");
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => {
+        els.toast.classList.remove("show");
+      }, ms);
+    }
+
+    function vibrate(ms=18) {
+      if ("vibrate" in navigator) navigator.vibrate(ms);
+    }
+
+    function tone(freq=520, duration=.07, volume=.05) {
+      if (!state.sound) return;
+
+      try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return;
+
+        const ctx = tone.ctx || (tone.ctx = new Ctx());
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = "sine";
+        osc.frequency.value = freq;
+
+        gain.gain.setValueAtTime(volume, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(.0001, ctx.currentTime + duration);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + duration);
+      } catch {}
+    }
+
+    function tickTone(step=0) {
+      tone(420 + step * 22, .045, .025);
+    }
+
+    function successTone() {
+      tone(620,.08,.045);
+      setTimeout(() => tone(810,.11,.035),70);
+    }
+
+    function historyPenalty(candidateId) {
+      if (state.mode !== "smart") return 1;
+
+      let factor = 1;
+      const recent = state.history.slice(0,6);
+
+      recent.forEach((item,index) => {
+        if (item.id !== candidateId) return;
+
+        if (index === 0) factor *= .30;
+        else if (index <= 2) factor *= .55;
+        else factor *= .75;
+      });
+
+      return Math.max(.12,factor);
+    }
+
+    function weightedPick(items) {
+      if (!items.length) return null;
+      if (state.mode === "fair") {
+        return items[Math.floor(Math.random() * items.length)];
+      }
+
+      const weights = items.map(x => historyPenalty(x.id));
+      const total = weights.reduce((a,b) => a+b,0);
+
+      let r = Math.random() * total;
+
+      for (let i=0;i<items.length;i++) {
+        r -= weights[i];
+        if (r <= 0) return items[i];
+      }
+
+      return items[items.length-1];
+    }
+
+    function pickWithoutReplacement(items,count) {
+      const pool = items.slice();
+      const result = [];
+
+      while (pool.length && result.length < count) {
+        const picked = weightedPick(pool);
+        if (!picked) break;
+
+        result.push(picked);
+        const idx = pool.findIndex(x => x.id === picked.id);
+        if (idx >= 0) pool.splice(idx,1);
+      }
+
+      return result;
+    }
+
+    function renderMode() {
+      els.fairBtn.classList.toggle("active",state.mode === "fair");
+      els.smartBtn.classList.toggle("active",state.mode === "smart");
+
+      els.modeDesc.textContent =
+        state.mode === "fair"
+          ? "每个候选完全等概率"
+          : "最近吃过的候选会自动降低概率";
+    }
+
+    function renderCandidatesSummary() {
+      const enabled = enabledCandidates();
+
+      els.candidateCount.textContent = `当前候选 ${enabled.length} 项`;
+      els.drawThreeBtn.disabled = enabled.length < 3;
+
+      els.candidateTags.replaceChildren();
+
+      enabled.slice(0,10).forEach(item => {
+        const tag = document.createElement("span");
+        tag.className = "tag";
+        tag.textContent = `${item.emoji} ${item.name}`;
+        els.candidateTags.appendChild(tag);
+      });
+
+      if (enabled.length > 10) {
+        const tag = document.createElement("span");
+        tag.className = "tag";
+        tag.textContent = `+${enabled.length - 10}`;
+        els.candidateTags.appendChild(tag);
+      }
+    }
+
+    function renderHistory() {
+      els.historyList.replaceChildren();
+
+      if (!state.history.length) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = "还没有历史记录";
+        els.historyList.appendChild(empty);
+        return;
+      }
+
+      state.history.slice(0,8).forEach(item => {
+        const row = document.createElement("div");
+        row.className = "history-row";
+
+        const left = document.createElement("span");
+        left.textContent = `${item.emoji || "🍽️"} ${item.name}`;
+
+        const right = document.createElement("span");
+        const date = new Date(item.at);
+        right.textContent = new Intl.DateTimeFormat("zh-CN",{
+          month:"numeric",
+          day:"numeric"
+        }).format(date);
+
+        row.append(left,right);
+        els.historyList.appendChild(row);
+      });
+    }
+
+    function animateReel(items, duration=1450) {
+      return new Promise(resolve => {
+        const source = items.length ? items : enabledCandidates();
+        if (!source.length) return resolve(null);
+
+        els.reel.classList.add("rolling");
+
+        let elapsed = 0;
+        let index = 0;
+        let delay = 65;
+
+        function step() {
+          const item = source[index % source.length];
+          els.reelIcon.textContent = item.emoji;
+          els.reelName.textContent = item.name;
+          els.reelSub.textContent = "命运正在替你筛选……";
+
+          tickTone(index % 6);
+
+          index++;
+          elapsed += delay;
+
+          if (elapsed >= duration) {
+            els.reel.classList.remove("rolling");
+            resolve(item);
+            return;
+          }
+
+          delay = Math.min(180, delay * 1.08);
+          setTimeout(step,delay);
+        }
+
+        step();
+      });
+    }
+
+    async function drawThree(isReplacement=false) {
+      const enabled = enabledCandidates();
+
+      if (enabled.length < 3) {
+        showToast("至少启用 3 个候选");
+        return;
+      }
+
+      els.drawThreeBtn.disabled = true;
+      els.replaceThreeBtn.disabled = true;
+
+      if (isReplacement) {
+        registerReject("换一批");
+      } else {
+        state.rejectCount = 0;
+        state.regretUsed = false;
+        state.sessionResultLocked = false;
+        renderJaw();
+      }
+
+      const previewPool = enabled.slice();
+
+      await animateReel(previewPool,1300);
+
+      state.finalists = pickWithoutReplacement(enabled,3);
+      state.result = null;
+
+      renderFinalists();
+
+      els.reelIcon.textContent = "🏁";
+      els.reelName.textContent = "三位选手已就位";
+      els.reelSub.textContent = "进入三选一决赛";
+
+      els.finalistsPanel.classList.remove("hidden");
+      els.resultPanel.classList.add("hidden");
+
+      els.drawThreeBtn.disabled = false;
+      els.replaceThreeBtn.disabled = false;
+
+      els.finalistsPanel.scrollIntoView({behavior:"smooth",block:"center"});
+      vibrate(24);
+    }
+
+    function renderFinalists(activeId="") {
+      els.finalGrid.replaceChildren();
+
+      state.finalists.forEach(item => {
+        const card = document.createElement("div");
+        card.className = `final-card ${item.id === activeId ? "active" : ""}`;
+        card.dataset.id = item.id;
+
+        const emoji = document.createElement("div");
+        emoji.className = "final-emoji";
+        emoji.textContent = item.emoji;
+
+        const name = document.createElement("div");
+        name.className = "final-name";
+        name.textContent = item.name;
+
+        card.append(emoji,name);
+        els.finalGrid.appendChild(card);
+      });
+    }
+
+    async function runFinal(isRegret=false) {
+      if (state.finalists.length !== 3) return;
+
+      els.startFinalBtn.disabled = true;
+      els.replaceThreeBtn.disabled = true;
+
+      let elapsed = 0;
+      let delay = 80;
+      let idx = 0;
+
+      await new Promise(resolve => {
+        function step() {
+          const item = state.finalists[idx % 3];
+          renderFinalists(item.id);
+          tickTone(idx % 5);
+
+          idx++;
+          elapsed += delay;
+
+          if (elapsed >= 1700) {
+            resolve();
+            return;
+          }
+
+          delay = Math.min(210,delay * 1.10);
+          setTimeout(step,delay);
+        }
+
+        step();
+      });
+
+      let pool = state.finalists.slice();
+
+      if (isRegret && state.result) {
+        pool = pool.filter(x => x.id !== state.result.id);
+        if (!pool.length) pool = state.finalists.slice();
+      }
+
+      const selected = weightedPick(pool);
+      state.result = selected;
+
+      renderFinalists(selected.id);
+      renderResult();
+
+      els.startFinalBtn.disabled = false;
+      els.replaceThreeBtn.disabled = false;
+
+      successTone();
+      vibrate(35);
+      els.resultPanel.scrollIntoView({behavior:"smooth",block:"center"});
+    }
+
+    function renderResult() {
+      if (!state.result) return;
+
+      els.resultEmoji.textContent = state.result.emoji;
+      els.resultName.textContent = state.result.name;
+
+      if (state.regretUsed) {
+        els.resultCopy.textContent = "命运已经给了第二次答案。";
+        els.regretBtn.classList.add("hidden");
+        els.lockedText.classList.remove("hidden");
+      } else {
+        els.resultCopy.textContent = "今晚就它了。";
+        els.regretBtn.classList.remove("hidden");
+        els.lockedText.classList.add("hidden");
+      }
+
+      els.resultPanel.classList.remove("hidden");
+      renderJaw();
+    }
+
+    function registerReject(reason="否决") {
+      state.rejectCount += 1;
+
+      const messages = [
+        "看来你还有一点自己的想法。",
+        "又不要？命运开始怀疑自己了。",
+        "你不是不知道吃什么，你只是在等我说出你想吃的那个 😂",
+        "建议你直接说出心里那个答案 😏",
+        "嘴硬指数已经拉满。"
+      ];
+
+      renderJaw();
+
+      const idx = Math.min(state.rejectCount - 1,messages.length - 1);
+      showToast(messages[idx],1800);
+    }
+
+    function renderJaw() {
+      els.jawCount.textContent = `${state.rejectCount} 次否决`;
+      const percent = Math.min(100,state.rejectCount * 34);
+      els.jawFill.style.width = percent + "%";
+
+      if (state.rejectCount === 0) {
+        els.jawMessage.textContent = "目前看起来还挺随和。";
+      } else if (state.rejectCount === 1) {
+        els.jawMessage.textContent = "开始有点挑了。";
+      } else if (state.rejectCount === 2) {
+        els.jawMessage.textContent = "命运已经感受到压力。";
+      } else {
+        els.jawMessage.textContent =
+          "你不是不知道吃什么，你只是在等我说出你想吃的那个 😂";
+      }
+    }
+
+    function confirmResult() {
+      if (!state.result) return;
+
+      state.history.unshift({
+        id:state.result.id,
+        name:state.result.name,
+        emoji:state.result.emoji,
+        at:new Date().toISOString()
+      });
+
+      state.history = state.history.slice(0,30);
+      saveState();
+      renderHistory();
+
+      showToast(`今晚就吃「${state.result.name}」！`);
+      successTone();
+      vibrate(42);
+
+      els.confirmBtn.disabled = true;
+      setTimeout(() => {
+        els.confirmBtn.disabled = false;
+      },700);
+    }
+
+    async function regretOnce() {
+      if (!state.result) return;
+
+      if (state.regretUsed) {
+        showToast("这次不许反悔了 😏");
+        return;
+      }
+
+      registerReject("反悔");
+      state.regretUsed = true;
+
+      await runFinal(true);
+
+      els.lockedText.textContent = "这次不许反悔了 😏";
+      els.lockedText.classList.remove("hidden");
+      els.regretBtn.classList.add("hidden");
+    }
+
+    function renderManager() {
+      els.candidateList.replaceChildren();
+
+      state.candidates.forEach(item => {
+        const row = document.createElement("div");
+        row.className = "candidate-row";
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.checked = item.enabled;
+        checkbox.setAttribute("aria-label",`启用 ${item.name}`);
+
+        checkbox.addEventListener("change",() => {
+          const enabledCount = enabledCandidates().length;
+
+          if (!checkbox.checked && enabledCount <= 3 && item.enabled) {
+            checkbox.checked = true;
+            showToast("至少保留 3 个启用候选");
+            return;
+          }
+
+          item.enabled = checkbox.checked;
+          saveState();
+          renderCandidatesSummary();
+        });
+
+        const name = document.createElement("div");
+        name.className = "candidate-name";
+        name.textContent = `${item.emoji} ${item.name}`;
+
+        const del = document.createElement("button");
+        del.className = "delete-btn";
+        del.type = "button";
+        del.textContent = "删除";
+
+        del.addEventListener("click",() => {
+          if (state.candidates.length <= 3) {
+            showToast("至少保留 3 个候选");
+            return;
+          }
+
+          state.candidates = state.candidates.filter(x => x.id !== item.id);
+          saveState();
+          renderManager();
+          renderCandidatesSummary();
+        });
+
+        row.append(checkbox,name,del);
+        els.candidateList.appendChild(row);
+      });
+    }
+
+    function openManager() {
+      renderManager();
+      els.managerOverlay.classList.remove("hidden");
+    }
+
+    function closeManager() {
+      els.managerOverlay.classList.add("hidden");
+    }
+
+    function addCandidate() {
+      const name = els.newCandidateInput.value.trim();
+
+      if (!name) {
+        showToast("请输入候选名称");
+        return;
+      }
+
+      if (state.candidates.some(x => x.name === name)) {
+        showToast("这个候选已经存在");
+        return;
+      }
+
+      state.candidates.push({
+        id:cryptoSafeId(),
+        name:name.slice(0,12),
+        emoji:"🍽️",
+        enabled:true
+      });
+
+      els.newCandidateInput.value = "";
+      saveState();
+      renderManager();
+      renderCandidatesSummary();
+      showToast(`已添加「${name.slice(0,12)}」`);
+    }
+
+    els.fairBtn.addEventListener("click",() => {
+      state.mode = "fair";
+      saveState();
+      renderMode();
+    });
+
+    els.smartBtn.addEventListener("click",() => {
+      state.mode = "smart";
+      saveState();
+      renderMode();
+    });
+
+    els.drawThreeBtn.addEventListener("click",() => drawThree(false));
+    els.replaceThreeBtn.addEventListener("click",() => drawThree(true));
+    els.startFinalBtn.addEventListener("click",() => runFinal(false));
+    els.confirmBtn.addEventListener("click",confirmResult);
+    els.regretBtn.addEventListener("click",regretOnce);
+
+    els.clearHistoryBtn.addEventListener("click",() => {
+      if (!state.history.length) return;
+
+      if (confirm("确定清空最近吃过记录吗？")) {
+        state.history = [];
+        saveState();
+        renderHistory();
+        showToast("历史记录已清空");
+      }
+    });
+
+    els.manageBtn.addEventListener("click",openManager);
+    els.manageBtn2.addEventListener("click",openManager);
+    els.closeManagerBtn.addEventListener("click",closeManager);
+
+    els.managerOverlay.addEventListener("click",e => {
+      if (e.target === els.managerOverlay) closeManager();
+    });
+
+    els.addCandidateBtn.addEventListener("click",addCandidate);
+
+    els.newCandidateInput.addEventListener("keydown",e => {
+      if (e.key === "Enter") addCandidate();
+    });
+
+    els.soundBtn.addEventListener("click",() => {
+      state.sound = !state.sound;
+      els.soundBtn.textContent = state.sound ? "🔊" : "🔇";
+      els.soundBtn.classList.toggle("off",!state.sound);
+      saveState();
+      showToast(state.sound ? "音效已开启" : "音效已关闭");
+    });
+
+    loadState();
+    els.soundBtn.textContent = state.sound ? "🔊" : "🔇";
+    els.soundBtn.classList.toggle("off",!state.sound);
+
+    renderMode();
+    renderCandidatesSummary();
+    renderHistory();
+    renderJaw();
   </script>
 
   <!-- Cloudflare Web Analytics -->
-  <script type='module' 
-    src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "bfd3df5c469343eb91856b7f3275def8"}'>  
+  <script
+    type="module"
+    src="https://static.cloudflareinsights.com/beacon.min.js"
+    data-cf-beacon='{"token":"bfd3df5c469343eb91856b7f3275def8"}'>
   </script>
   <!-- End Cloudflare Web Analytics -->
-  
 </body>
 </html>
