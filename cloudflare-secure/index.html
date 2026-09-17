@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="theme-color" content="#0f1420">
+  <title>工具箱安全镜像</title>
+  <style>
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    :root{--bg:#0f1420;--card:#171e2d;--border:rgba(255,255,255,.09);--text:#f3f6fb;--muted:#96a1b5;--accent:#d8cdff}
+    html,body{margin:0;min-height:100%}
+    body{min-height:100dvh;padding:max(20px,env(safe-area-inset-top)) 16px max(28px,env(safe-area-inset-bottom));background:radial-gradient(circle at 20% 0%,rgba(109,88,190,.25),transparent 34%),linear-gradient(180deg,#161c2a,#0c1019);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","PingFang SC","Microsoft YaHei",sans-serif}
+    main{width:min(100%,680px);margin:auto}
+    .eyebrow{margin-top:12px;color:#aaa0d8;font-size:11px;font-weight:850;letter-spacing:.16em}
+    h1{margin:8px 0 8px;font-size:clamp(34px,9vw,50px);letter-spacing:-.04em}
+    .lead{margin:0;color:var(--muted);font-size:14px;line-height:1.75}
+    .notice{margin:20px 0;padding:14px 15px;border:1px solid rgba(205,192,255,.16);border-radius:18px;background:rgba(198,184,255,.07);font-size:12px;line-height:1.7;color:#c9c3d8}
+    .grid{display:grid;gap:12px;margin-top:16px}
+    .card{display:flex;align-items:center;gap:14px;min-height:86px;padding:16px;border:1px solid var(--border);border-radius:22px;background:rgba(255,255,255,.045);color:var(--text);text-decoration:none;box-shadow:0 16px 40px rgba(0,0,0,.18)}
+    .icon{width:48px;height:48px;display:grid;place-items:center;border-radius:16px;background:rgba(255,255,255,.06);font-size:25px;flex:0 0 auto}
+    .card strong{display:block;font-size:17px}.card span{display:block;margin-top:4px;color:var(--muted);font-size:12px;line-height:1.55}
+    .back{display:flex;justify-content:center;align-items:center;min-height:48px;margin-top:18px;border:1px solid var(--border);border-radius:16px;color:#cfd5e1;text-decoration:none;background:rgba(255,255,255,.035);font-size:13px;font-weight:800}
+    footer{margin-top:18px;text-align:center;color:#657187;font-size:10px;line-height:1.6}
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">SECURE MIRROR · BETA</div>
+  <h1>工具箱安全镜像</h1>
+  <p class="lead">这是与 GitHub Pages 并行运行的测试入口。账号、权限和数据仍由同一个 Supabase 项目保护；此镜像用于测试独立站点访问速度和安全响应头。</p>
+
+  <div class="notice">首次在这个镜像登录时需要重新输入账号密码，这是正常现象：浏览器会把不同站点的登录存储彼此隔离。原 GitHub Pages 暂时保持不变，可随时作为回退入口。</div>
+
+  <section class="grid" aria-label="需登录工具">
+    <a class="card" href="./dinner/">
+      <div class="icon">🍽️</div><div><strong>今晚吃什么</strong><span>共享候选、筛选与最近历史；也可不登录单机使用。</span></div>
+    </a>
+    <a class="card" href="./night-shift/">
+      <div class="icon">🌙</div><div><strong>夜班日历</strong><span>仅限已授权成员访问。</span></div>
+    </a>
+    <a class="card" href="./admin-night-shift/">
+      <div class="icon">🗓️</div><div><strong>科室排班</strong><span>按现有 viewer / admin 权限访问。</span></div>
+    </a>
+  </section>
+
+  <a class="back" href="https://v1t0777.github.io/tools/">← 返回 GitHub Pages 主站</a>
+  <footer>测试阶段不切换主站，不删除 GitHub Pages，也不迁移 Supabase 数据。</footer>
+</main>
+<!-- Cloudflare Web Analytics -->
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"bfd3df5c469343eb91856b7f3275def8"}'></script>
+<!-- End Cloudflare Web Analytics -->
+</body>
+</html>
