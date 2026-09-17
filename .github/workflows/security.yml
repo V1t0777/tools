@@ -1,0 +1,37 @@
+name: Repository security checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static-site-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Build Cloudflare Pages mirror
+        shell: bash
+        run: bash cloudflare-secure/build.sh
+
+      - name: Scan repository and validate deployment output
+        shell: bash
+        run: python3 scripts/security_check.py . --dist dist-secure
+
+      - name: Verify shell syntax
+        shell: bash
+        run: bash -n cloudflare-secure/build.sh
