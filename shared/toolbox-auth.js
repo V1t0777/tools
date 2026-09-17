@@ -183,6 +183,18 @@
   bc?.addEventListener('message',e=>{
     if(e.data?.source===tabId)return;session=readStored();const event=session?'SIGNED_IN':'SIGNED_OUT';listeners.forEach(fn=>{try{fn(event,session)}catch{}});
   });
+
+  async function foregroundProbe(){
+    if(global.document?.hidden||!current())return;
+    try{await probe(true)}catch(err){
+      if(!['SESSION_REVOKED','AUTH_REQUIRED'].includes(err?.code))console.warn('toolbox session probe failed',err);
+    }
+  }
+  const probeTimer=global.setInterval?.(foregroundProbe,PROBE_MS);
+  global.addEventListener?.('focus',foregroundProbe);
+  global.document?.addEventListener?.('visibilitychange',()=>{if(!global.document.hidden)foregroundProbe()});
+  global.addEventListener?.('pagehide',()=>{if(probeTimer)global.clearInterval?.(probeTimer)},{once:true});
+
   session=readStored();
   global.ToolboxAuth={url:URL,key:KEY,storeKey:STORE,createClient,signIn,signOut,refresh,getSession:ensure,peekSession:current,rest,rpc,probe,authMessage,lockRemaining,ToolboxAuthError};
 })(window);
