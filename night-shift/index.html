@@ -253,12 +253,9 @@
   </section>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../shared/toolbox-auth.js?v=20260917-4"></script>
 <script>
-  const SUPABASE_URL = "https://tmxpueakxibsaakdyusn.supabase.co";
-  const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_8sCgnOXk3XuRE28Qmk_ekg_9VSS4ASZ";
-
-  const db = supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+  const db = ToolboxAuth.createClient();
 
   let myMemberId=null,myMember=null,members=[],shifts=[],calendarDate=new Date(),nextShift=null,countdownTimer=null;
   const holidayCache = new Map();
@@ -296,9 +293,9 @@
     e.preventDefault(); showError($("loginError"),""); $("loginBtn").disabled=true; $("loginBtn").textContent="正在登录…";
     try{
       const {error}=await db.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});
-      if(error) throw new Error("邮箱或密码错误，或该账号未获授权。");
+      if(error) throw error;
       await enterApp();
-    }catch(err){ showError($("loginError"),err.message); }
+    }catch(err){ showError($("loginError"),ToolboxAuth.authMessage(err)); }
     finally{$("loginBtn").disabled=false;$("loginBtn").textContent="登录";}
   });
 

@@ -576,11 +576,9 @@
   </section>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../shared/toolbox-auth.js?v=20260917-4"></script>
 <script>
-  const SUPABASE_URL = "https://tmxpueakxibsaakdyusn.supabase.co";
-  const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_8sCgnOXk3XuRE28Qmk_ekg_9VSS4ASZ";
-  const db = supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+  const db = ToolboxAuth.createClient();
 
   const $ = id => document.getElementById(id);
   const pad = n => String(n).padStart(2,"0");
@@ -707,10 +705,10 @@
         password:$("password").value
       });
 
-      if (error) throw new Error("邮箱或密码错误，或账号未获授权。");
+      if (error) throw error;
       await enterApp();
     } catch (err) {
-      $("loginError").textContent = err.message || "登录失败。";
+      $("loginError").textContent = ToolboxAuth.authMessage(err);
     } finally {
       $("loginBtn").disabled = false;
       $("loginBtn").textContent = "登录";
