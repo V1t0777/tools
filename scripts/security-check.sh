@@ -5,14 +5,14 @@ fail=0
 
 echo "== Secret-like content scan =="
 patterns=(
-  'service[_-]?role'
   'postgres(ql)?://[^[:space:]]+:[^@[:space:]]+@'
   '-----BEGIN ([A-Z0-9 ]+ )?PRIVATE KEY-----'
   'github_pat_[A-Za-z0-9_]{20,}'
   'gh[pousr]_[A-Za-z0-9_]{20,}'
   'sk-[A-Za-z0-9_-]{20,}'
   'xox[baprs]-[A-Za-z0-9-]{10,}'
-  'SUPABASE_(SERVICE_ROLE|DB_PASSWORD|DATABASE_PASSWORD|SECRET)'
+  'sb_secret_[A-Za-z0-9_-]{20,}'
+  'eyJ[A-Za-z0-9_-]{20,}\\.eyJ[A-Za-z0-9_-]{20,}\\.[A-Za-z0-9_-]{20,}'
 )
 
 scan_pathspec=(
