@@ -1,0 +1,26 @@
+# Local/private environment files
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# Database/export artifacts
+*.dump
+*.backup
+*.sql.gz
+
+# Local Supabase / CLI state
+.supabase/
+supabase/.temp/
+
+# Generated output
+dist-secure/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
