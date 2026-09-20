@@ -11,7 +11,7 @@ mkdir -p "$OUT"/{dinner,night-shift,admin-night-shift,beads,shared,holidays}
 cp dinner/index.html dinner/app.js dinner/style.css "$OUT/dinner/"
 cp night-shift/index.html "$OUT/night-shift/"
 cp admin-night-shift/index.html "$OUT/admin-night-shift/"
-cp beads/index.html beads/app.js beads/style.css "$OUT/beads/"
+cp beads/index.html beads/app.js beads/style.css beads/mard-palette.js "$OUT/beads/"
 cp shared/toolbox-auth.js "$OUT/shared/"
 cp holidays/*.json "$OUT/holidays/"
 
