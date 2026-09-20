@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#f6f3ff" />
   <meta name="robots" content="noindex,nofollow,noarchive" />
   <title>拼豆计算器｜钊的工具箱</title>
-  <link rel="stylesheet" href="./style.css?v=20260920-1" />
+  <link rel="stylesheet" href="./style.css?v=20260920-2" />
 </head>
 <body>
   <main class="app">
@@ -77,8 +77,10 @@
           </label>
           <label>识别模式
             <select id="matchMode">
-              <option value="cluster" selected>自动聚类（无需色卡）</option>
-              <option value="palette">自定义色卡（推荐映射实际色号）</option>
+              <option value="mard221" selected>MARD 标准 221 色（推荐）</option>
+              <option value="mard291">MARD 完整 291 色</option>
+              <option value="cluster">自动聚类（仅统计颜色）</option>
+              <option value="palette">自定义色卡</option>
             </select>
           </label>
         </div>
@@ -101,11 +103,34 @@
       <section class="card palette-card" id="paletteCard">
         <div class="section-head compact">
           <div>
-            <h2>2. 色卡设置</h2>
-            <p>有实际品牌色号时，使用色卡模式可直接统计到真实色号。</p>
+            <h2>2. MARD 电子色卡</h2>
+            <p>内置 2026 修订版 291 色数据；标准识别默认只用 A–H 与 M 共 221 色，避免特殊材质误匹配。</p>
           </div>
+          <a class="source-link" href="https://www.pixel-beads.com/zh/mard-bead-color-chart" target="_blank" rel="noopener noreferrer">色卡来源 ↗</a>
         </div>
-        <div class="palette-settings">
+
+        <div class="mard-summary">
+          <div><b id="mardTotal">291</b><span>完整色号</span></div>
+          <div><b>221</b><span>标准系列</span></div>
+          <div><b>70</b><span>扩展系列</span></div>
+          <div><b>15</b><span>系列</span></div>
+        </div>
+
+        <div class="mard-tools">
+          <select id="mardRange">
+            <option value="221" selected>标准 221 色 · A–H + M</option>
+            <option value="291">完整 291 色 · 含特殊系列</option>
+          </select>
+          <select id="mardSeries"><option value="all">全部系列</option></select>
+          <input id="mardSearch" type="search" placeholder="搜索 A12 / FE9F72" />
+        </div>
+        <div class="mard-note" id="mardNote">标准 221 色用于普通实色匹配；P/Q/R/T/Y/ZG 属于特殊材质，单一 HEX 不能完整表达实物效果。</div>
+        <div class="mard-grid" id="mardGrid" aria-label="MARD 电子色卡"></div>
+        <div class="mard-foot"><span id="mardCount">显示 221 / 291 色</span><span>HEX 为屏幕参考值，实物受光线、批次和材质影响。</span></div>
+
+        <details class="custom-palette">
+          <summary>自定义色卡 / 其他品牌</summary>
+          <div class="palette-settings">
           <label>色卡名称
             <input id="paletteName" value="我的色卡" maxlength="80" />
           </label>
@@ -116,11 +141,12 @@
             <input id="clusterTolerance" type="number" min="0.5" max="30" step="0.5" value="5" />
           </label>
         </div>
-        <textarea id="paletteText" spellcheck="false" placeholder="每行：色号,#RRGGBB,名称&#10;例如：A01,#FFFFFF,白色&#10;A02,#111111,黑色"></textarea>
-        <div class="tool-row">
-          <button class="btn secondary" id="savePaletteBtn" type="button">保存本机色卡</button>
-          <span class="mini" id="paletteStatus">当前未载入自定义色卡</span>
-        </div>
+          <textarea id="paletteText" spellcheck="false" placeholder="每行：色号,#RRGGBB,名称&#10;例如：X01,#FFFFFF,白色&#10;X02,#111111,黑色"></textarea>
+          <div class="tool-row">
+            <button class="btn secondary" id="savePaletteBtn" type="button">保存本机色卡</button>
+            <span class="mini" id="paletteStatus">当前未载入自定义色卡</span>
+          </div>
+        </details>
       </section>
 
       <section class="card preview-card">
@@ -245,7 +271,8 @@
           <li><strong>优先使用标准图纸：</strong>每格颜色应尽可能均匀，避免透视拍照、强反光和大面积文字水印。</li>
           <li><strong>先校准网格：</strong>行列数必须正确，网格线应与预览完全重合；不确定时优先手动填写。</li>
           <li><strong>中心区域采样：</strong>默认只读取格子中央 55%，降低网格线和压缩边缘污染。</li>
-          <li><strong>真实色号请导入色卡：</strong>自动聚类适合精确“数量统计”，但 C01/C02 不是跨项目稳定的品牌色号。</li>
+          <li><strong>MARD 默认使用 221 标准色：</strong>完整 291 色还包含珠光、温变、果冻、透明、夜光与光变系列；这些特殊效果无法由单一 HEX 完整表达。</li>
+          <li><strong>其他品牌可导入自定义色卡：</strong>自动聚类适合精确“数量统计”，但 C01/C02 不是跨项目稳定的品牌色号。</li>
           <li><strong>检查待确认格：</strong>系统同时看 ΔE00 和格内颜色离散程度；低置信度格建议人工点选修正。</li>
           <li><strong>数学自检：</strong>所有颜色格 + 空白格必须严格等于 行 × 列，防止漏格和重复统计。</li>
         </ol>
@@ -255,7 +282,8 @@
   </main>
 
   <script src="../shared/toolbox-auth.js?v=20260917-4"></script>
-  <script src="./app.js?v=20260920-1"></script>
+  <script src="./mard-palette.js?v=20260920-2"></script>
+  <script src="./app.js?v=20260920-2"></script>
   <!-- Cloudflare Web Analytics -->
   <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"bfd3df5c469343eb91856b7f3275def8"}'></script>
   <!-- End Cloudflare Web Analytics -->
