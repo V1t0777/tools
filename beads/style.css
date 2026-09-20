@@ -31,3 +31,19 @@ textarea{width:100%;min-height:108px;padding:11px;line-height:1.55;resize:vertic
 .empty-note{text-align:center;color:#aaa1af;font-size:11px;padding:22px}.hidden{display:none!important}
 @media(max-width:760px){.hero-icon{font-size:45px}.login-form{display:grid;grid-template-columns:1fr 1fr}.login-form .btn{grid-column:1/3}.settings-grid{grid-template-columns:1fr 1fr}.palette-settings{grid-template-columns:1fr 1fr}.palette-settings label:first-child{grid-column:1/3}.inventory-form{grid-template-columns:1fr 1fr}.inventory-form .btn{grid-column:1/3}.save-project{grid-template-columns:1fr}.project-list{grid-template-columns:1fr}.cell-editor{grid-template-columns:1fr}.cell-editor .btn{width:100%}}
 @media(max-width:480px){body{padding-left:10px;padding-right:10px}.card{padding:14px;border-radius:20px}.hero{padding-left:2px;padding-right:2px}.hero p{font-size:11px}.tabs{gap:4px}.tab{font-size:11px}.crop-grid{grid-template-columns:1fr 1fr}.audit-grid div{padding:9px 4px}.audit-grid b{font-size:18px}.section-head{align-items:flex-start}.tool-row .btn{flex:1}.quality-badge{font-size:9px}}
+
+.source-link{display:inline-flex;align-items:center;min-height:34px;padding:0 10px;border-radius:11px;border:1px solid rgba(118,86,232,.14);background:#f5f1ff;color:#6548c6;text-decoration:none;font-size:10px;font-weight:850;white-space:nowrap}
+.mard-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
+.mard-summary div{border:1px solid var(--line);border-radius:14px;background:#faf9fc;padding:10px;text-align:center}
+.mard-summary b{display:block;font-size:19px}.mard-summary span{display:block;margin-top:3px;color:var(--muted);font-size:9px;font-weight:750}
+.mard-tools{display:grid;grid-template-columns:1.3fr 1fr 1.2fr;gap:8px}
+.mard-note{margin:9px 0;padding:10px 11px;border-radius:13px;background:#fff8e9;color:#826026;border:1px solid rgba(183,123,21,.10);font-size:10px;line-height:1.6}
+.mard-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:7px;max-height:380px;overflow:auto;padding:2px}
+.mard-color-card{display:flex;align-items:center;gap:7px;min-width:0;border:1px solid var(--line);border-radius:12px;background:#fff;padding:7px;cursor:pointer;transition:transform .12s ease,border-color .12s ease}
+.mard-color-card:active{transform:scale(.98)}.mard-color-card:hover{border-color:rgba(118,86,232,.28)}
+.mard-swatch{width:28px;height:28px;flex:0 0 28px;border-radius:9px;border:1px solid rgba(0,0,0,.10);box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
+.mard-color-info{min-width:0;display:block}.mard-color-info b{display:block;font-size:10px;line-height:1.15}.mard-color-info small{display:block;color:var(--muted);font-size:8px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mard-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px;color:var(--muted);font-size:9px;line-height:1.45}
+.custom-palette{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}.custom-palette summary{cursor:pointer;color:#655c70;font-size:11px;font-weight:850;margin-bottom:9px}.custom-palette[open] summary{color:#5e43bf}
+@media(max-width:760px){.mard-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.mard-tools{grid-template-columns:1fr 1fr}.mard-tools input{grid-column:1/3}}
+@media(max-width:480px){.mard-summary{grid-template-columns:repeat(2,1fr)}.mard-grid{grid-template-columns:repeat(3,minmax(0,1fr));max-height:340px}.mard-foot{align-items:flex-start;flex-direction:column;gap:4px}.source-link{font-size:9px}}
