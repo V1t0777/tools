@@ -38,7 +38,9 @@
     autoGrid:$('autoGridBtn'), previewGrid:$('previewGridBtn'), analyze:$('analyzeBtn'),
     imageStatus:$('imageStatus'), canvasEmpty:$('canvasEmpty'), paletteCard:$('paletteCard'),
     paletteName:$('paletteName'), delta:$('deltaThreshold'), tolerance:$('clusterTolerance'), paletteText:$('paletteText'),
-    paletteStatus:$('paletteStatus'), resultBody:$('resultBody'), autoBlank:$('autoBlank'),
+    paletteStatus:$('paletteStatus'), mardRange:$('mardRange'), mardSeries:$('mardSeries'), mardSearch:$('mardSearch'),
+    mardGrid:$('mardGrid'), mardCount:$('mardCount'), mardNote:$('mardNote'),
+    resultBody:$('resultBody'), autoBlank:$('autoBlank'),
     auditCells:$('auditCells'), auditBeads:$('auditBeads'), auditBlank:$('auditBlank'), auditLow:$('auditLow'),
     integrity:$('integrity'), quality:$('qualityBadge'), resultSub:$('resultSub'),
     cellEditor:$('cellEditor'), cellLabel:$('cellLabel'), cellConfidence:$('cellConfidence'), cellSelect:$('cellColorSelect'),
@@ -186,6 +188,77 @@
     return Math.sqrt(a*a+b*b+c*c+Rt*b*c);
   }
 
+  function getMardPalette(mode='mard221'){
+    const source=globalThis.MARDPalette?.colors||[];
+    const full=mode==='mard291';
+    return source
+      .filter(x=>full||x.standard)
+      .map(x=>{
+        const rgb=hexToRgb(x.hex);
+        return {
+          key:x.code,
+          code:x.code,
+          name:'MARD '+x.code+(x.special?.name?' · '+x.special.name:''),
+          hex:x.hex.toUpperCase(),
+          rgb,
+          lab:rgbToLab(rgb),
+          series:x.series,
+          special:x.special||null
+        };
+      });
+  }
+
+  function initMardPalette(){
+    if(!globalThis.MARDPalette){
+      els.mardNote.textContent='MARD 色卡数据未加载。';
+      return;
+    }
+    els.mardSeries.textContent='';
+    const all=create('option');all.value='all';all.textContent='全部系列';els.mardSeries.append(all);
+    for(const s of MARDPalette.seriesOrder){
+      const op=create('option');op.value=s;
+      const count=MARDPalette.colors.filter(x=>x.series===s).length;
+      op.textContent=s+' 系列 · '+count+' 色';
+      els.mardSeries.append(op);
+    }
+    renderMardPalette();
+  }
+
+  function renderMardPalette(){
+    if(!globalThis.MARDPalette) return;
+    const full=els.mardRange.value==='291';
+    const series=els.mardSeries.value||'all';
+    const needle=els.mardSearch.value.trim().toUpperCase().replace('#','');
+    let rows=MARDPalette.colors.filter(x=>full||x.standard);
+    if(series!=='all') rows=rows.filter(x=>x.series===series);
+    if(needle) rows=rows.filter(x=>x.code.includes(needle)||x.hex.replace('#','').includes(needle));
+    els.mardGrid.textContent='';
+    for(const item of rows){
+      const card=create('div','mard-color-card');
+      card.title=item.special?.note||item.hex;
+      const sw=create('span','mard-swatch');sw.style.background=item.hex;
+      const info=create('span','mard-color-info');
+      info.append(create('b','',item.code),create('small','',item.hex+(item.special?.name?' · '+item.special.name:'')));
+      card.append(sw,info);
+      card.addEventListener('click',()=>{
+        els.invPalette.value=full?'MARD 291 (2026)':'MARD 221 (2026)';
+        els.invCode.value=item.code;
+        els.invName.value='MARD '+item.code+(item.special?.name?' · '+item.special.name:'');
+        els.invHex.value=item.hex;
+        els.invQty.value=inventoryMap.get(escKey(els.invPalette.value,item.code))?.quantity||0;
+        setStatus(els.imageStatus,'已选择 '+item.code+' '+item.hex+'；如需维护库存，可进入“库存”页。');
+      });
+      els.mardGrid.append(card);
+    }
+    const base=full?MARDPalette.totalCount:MARDPalette.standardCount;
+    els.mardCount.textContent='显示 '+rows.length+' / '+base+' 色';
+    if(full){
+      els.mardNote.textContent='完整 291 色包含 P/Q/R/T/Y/ZG 特殊系列。识别时会标记这些匹配为“待确认”，因为特殊材质效果不能由单一 HEX 完整表达。';
+    }else{
+      els.mardNote.textContent='标准 221 色覆盖 A–H 与 M，适合普通实色图纸，也是默认识别范围。';
+    }
+  }
+
   function parsePalette(){
     const lines=els.paletteText.value.split(/\r?\n/);
     const out=[],seen=new Set();
@@ -213,9 +286,17 @@
     const n=parsePalette().length;els.paletteStatus.textContent=n?('已载入 '+n+' 个颜色'):'当前未载入自定义色卡';
   }
   $('savePaletteBtn').addEventListener('click',savePaletteLocal);
+  els.mardRange.addEventListener('change',()=>{
+    els.mode.value=els.mardRange.value==='291'?'mard291':'mard221';
+    renderMardPalette();
+  });
+  els.mardSeries.addEventListener('change',renderMardPalette);
+  els.mardSearch.addEventListener('input',renderMardPalette);
   els.mode.addEventListener('change',()=>{
     els.paletteCard.classList.toggle('palette-required',els.mode.value==='palette');
-    if(els.mode.value==='palette' && !parsePalette().length) setStatus(els.imageStatus,'色卡模式需要先填写“色号,#RRGGBB,名称”。','error');
+    if(els.mode.value==='mard221'){els.mardRange.value='221';renderMardPalette();}
+    if(els.mode.value==='mard291'){els.mardRange.value='291';renderMardPalette();}
+    if(els.mode.value==='palette' && !parsePalette().length) setStatus(els.imageStatus,'自定义色卡模式需要先填写“色号,#RRGGBB,名称”。','error');
   });
 
   // ---------- Image / grid ----------
@@ -377,7 +458,10 @@
     let palette=[];
     if(mode==='palette'){
       palette=parsePalette();
-      if(!palette.length){setStatus(els.imageStatus,'色卡模式下没有有效色卡。格式：色号,#RRGGBB,名称。','error');return;}
+      if(!palette.length){setStatus(els.imageStatus,'自定义色卡模式下没有有效色卡。格式：色号,#RRGGBB,名称。','error');return;}
+    }else if(mode==='mard221'||mode==='mard291'){
+      palette=getMardPalette(mode);
+      if(!palette.length){setStatus(els.imageStatus,'MARD 电子色卡没有正确加载，请刷新页面后重试。','error');return;}
     }
 
     els.analyze.disabled=true;els.analyze.textContent='分析中…';
@@ -393,17 +477,26 @@
       }
 
       colorCatalog=new Map();
-      if(mode==='palette'){
+      if(mode!=='cluster'){
         const threshold=clamp(Number(els.delta.value)||8,1,30);
+        const exact=new Map(palette.map(p=>[p.hex.toUpperCase(),p]));
         for(const c of raw){
           if(c.alpha<40){c.key='__transparent__';c.low=false;continue;}
-          let best=null,bestD=Infinity,second=Infinity;
-          for(const p of palette){
-            const d=dE00(c.lab,p.lab);
-            if(d<bestD){second=bestD;bestD=d;best=p;} else if(d<second) second=d;
+          let best=exact.get(c.hex.toUpperCase())||null,bestD=best?0:Infinity,second=Infinity;
+          if(!best){
+            for(const p of palette){
+              const d=dE00(c.lab,p.lab);
+              if(d<bestD){second=bestD;bestD=d;best=p;} else if(d<second) second=d;
+            }
+          }else{
+            for(const p of palette){
+              if(p.key===best.key) continue;
+              const d=dE00(c.lab,p.lab);
+              if(d<second) second=d;
+            }
           }
           c.key=best.key;c.delta=bestD;
-          c.low=bestD>threshold || c.std>24 || (second-bestD<1.0 && bestD>2);
+          c.low=bestD>threshold || c.std>24 || (second-bestD<1.0 && bestD>2) || !!best.special;
         }
         for(const p of palette) colorCatalog.set(p.key,{...p});
       }else{
@@ -436,7 +529,8 @@
 
       colorCatalog.set('__transparent__',{key:'__transparent__',code:'透明',name:'透明 / 空白',hex:'#FFFFFF',rgb:[255,255,255],lab:rgbToLab([255,255,255])});
       cells=raw;
-      analysisMeta={cols,rows,mode,ratio,crop:currentCrop(),paletteName:mode==='palette'?(els.paletteName.value.trim()||'我的色卡'):'自动聚类',tolerance:Number(els.tolerance.value)||5,deltaThreshold:Number(els.delta.value)||8};
+      const paletteName=mode==='mard221'?'MARD 221 (2026)':mode==='mard291'?'MARD 291 (2026)':mode==='palette'?(els.paletteName.value.trim()||'我的色卡'):'自动聚类';
+      analysisMeta={cols,rows,mode,ratio,crop:currentCrop(),paletteName,tolerance:Number(els.tolerance.value)||5,deltaThreshold:Number(els.delta.value)||8};
 
       blankKeys=new Set();
       if(cells.some(c=>c.key==='__transparent__')) blankKeys.add('__transparent__');
@@ -514,7 +608,12 @@
     const rate=beads?low/beads:0;
     els.quality.className='quality-badge '+(rate<=.01?'good':rate<=.05?'warn':'bad');
     els.quality.textContent=rate<=.01?'识别质量高':rate<=.05?'建议复核':'需要校准';
-    els.resultSub.textContent='共 '+resultItems.length+' 种颜色；待确认 '+low+' 格。'+(analysisMeta?.mode==='cluster'?' 自动色号仅在本次图纸内稳定。':'');
+    const modeNote=analysisMeta?.mode==='cluster'
+      ? ' 自动色号仅在本次图纸内稳定。'
+      : analysisMeta?.mode==='mard291'
+        ? ' 特殊材质系列会额外标记为待确认。'
+        : '';
+    els.resultSub.textContent='共 '+resultItems.length+' 种颜色；待确认 '+low+' 格。'+modeNote;
   }
 
   els.autoBlank.addEventListener('change',()=>{
@@ -665,6 +764,7 @@
 
   // ---------- init ----------
   loadPaletteLocal();
+  initMardPalette();
   refreshAuthUI().finally(startPolling);
   window.addEventListener('pagehide',()=>clearInterval(inventoryPoll),{once:true});
 })();
