@@ -3,13 +3,15 @@ set -euo pipefail
 
 OUT="dist-secure"
 rm -rf "$OUT"
-mkdir -p "$OUT"/{dinner,night-shift,admin-night-shift,shared,holidays}
+mkdir -p "$OUT"/{dinner,night-shift,admin-night-shift,beads,shared,holidays}
 
-# Only publish pages that require a Supabase login plus their direct dependencies.
-# Public/no-auth tools intentionally stay on GitHub Pages and are not copied here.
+# Publish tools that use the shared Supabase login plus their direct dependencies.
+# Beads also supports a local-only mode, but its online inventory/project features live on this origin
+# so the existing unified toolbox login can be reused safely.
 cp dinner/index.html dinner/app.js dinner/style.css "$OUT/dinner/"
 cp night-shift/index.html "$OUT/night-shift/"
 cp admin-night-shift/index.html "$OUT/admin-night-shift/"
+cp beads/index.html beads/app.js beads/style.css "$OUT/beads/"
 cp shared/toolbox-auth.js "$OUT/shared/"
 cp holidays/*.json "$OUT/holidays/"
 
