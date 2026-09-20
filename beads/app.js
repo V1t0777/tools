@@ -1,0 +1,670 @@
+(() => {
+  'use strict';
+
+  const db = ToolboxAuth.createClient();
+  const $ = id => document.getElementById(id);
+  const q = v => encodeURIComponent(String(v));
+  const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
+  const median = arr => {
+    if(!arr.length) return 0;
+    const a=arr.slice().sort((x,y)=>x-y), m=Math.floor(a.length/2);
+    return a.length%2?a[m]:(a[m-1]+a[m])/2;
+  };
+  const escKey = (palette,code) => String(palette||'').trim()+'::'+String(code||'').trim().toUpperCase();
+
+  let session = null;
+  let group = null;
+  let groupRole = null;
+  let inventoryRows = [];
+  let inventoryMap = new Map();
+  let inventoryPoll = null;
+
+  let imageBitmap = null;
+  let workCanvas = document.createElement('canvas');
+  let workCtx = workCanvas.getContext('2d',{willReadFrequently:true});
+  let cells = [];
+  let colorCatalog = new Map();
+  let resultItems = [];
+  let blankKeys = new Set();
+  let highlightKey = null;
+  let selectedCellIndex = -1;
+  let analysisMeta = null;
+
+  const preview = $('previewCanvas');
+  const pctx = preview.getContext('2d');
+  const els = {
+    file:$('fileInput'), cols:$('gridCols'), rows:$('gridRows'), ratio:$('sampleRatio'),
+    mode:$('matchMode'), cropL:$('cropLeft'), cropT:$('cropTop'), cropR:$('cropRight'), cropB:$('cropBottom'),
+    autoGrid:$('autoGridBtn'), previewGrid:$('previewGridBtn'), analyze:$('analyzeBtn'),
+    imageStatus:$('imageStatus'), canvasEmpty:$('canvasEmpty'), paletteCard:$('paletteCard'),
+    paletteName:$('paletteName'), delta:$('deltaThreshold'), tolerance:$('clusterTolerance'), paletteText:$('paletteText'),
+    paletteStatus:$('paletteStatus'), resultBody:$('resultBody'), autoBlank:$('autoBlank'),
+    auditCells:$('auditCells'), auditBeads:$('auditBeads'), auditBlank:$('auditBlank'), auditLow:$('auditLow'),
+    integrity:$('integrity'), quality:$('qualityBadge'), resultSub:$('resultSub'),
+    cellEditor:$('cellEditor'), cellLabel:$('cellLabel'), cellConfidence:$('cellConfidence'), cellSelect:$('cellColorSelect'),
+    projectTitle:$('projectTitle'), projectScope:$('projectScope'), projectStatus:$('projectStatus'),
+    invScope:$('inventoryScope'), invIdentity:$('inventoryIdentity'), invBody:$('inventoryBody'),
+    invPalette:$('invPalette'), invCode:$('invCode'), invName:$('invName'), invHex:$('invHex'), invQty:$('invQty'),
+    invStatus:$('inventoryStatus'), eventList:$('eventList'), projectList:$('projectList')
+  };
+
+  function setStatus(el,msg,type=''){
+    el.textContent=msg||'';
+    el.classList.toggle('error',type==='error');
+  }
+  function create(tag,cls,text){
+    const el=document.createElement(tag);
+    if(cls) el.className=cls;
+    if(text!==undefined) el.textContent=text;
+    return el;
+  }
+  function btn(text,cls='micro'){
+    const b=create('button',cls,text); b.type='button'; return b;
+  }
+  function formatTime(v){
+    try{return new Intl.DateTimeFormat('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date(v));}
+    catch{return String(v||'');}
+  }
+
+  // ---------- Auth / cloud ----------
+  async function refreshAuthUI(){
+    const {data}=await db.auth.getSession();
+    session=data?.session||null;
+    if(!session){
+      group=null;groupRole=null;
+      $('loginForm').classList.remove('hidden');
+      $('loggedActions').classList.add('hidden');
+      $('loginTitle').textContent='本地识别可直接使用';
+      $('loginDesc').textContent='登录后可同步个人库存、饭醉拼豆库和项目记录。';
+      $('cloudState').innerHTML='<span class="dot local"></span><span>本地模式</span>';
+      els.invIdentity.textContent='未登录';
+      inventoryRows=[];inventoryMap.clear();
+      renderInventory();renderResults();
+      return;
+    }
+    $('loginForm').classList.add('hidden');
+    $('loggedActions').classList.remove('hidden');
+    $('loggedUser').textContent=session.user?.email||'已登录';
+    $('loginTitle').textContent='云端同步已启用';
+    $('loginDesc').textContent='个人库存仅自己可见；共享库存按组权限开放。';
+    $('cloudState').innerHTML='<span class="dot online"></span><span>云端已连接</span>';
+    await loadGroup();
+    await loadInventory();
+  }
+
+  async function loadGroup(){
+    group=null;groupRole=null;
+    if(!session) return;
+    try{
+      const rows=await ToolboxAuth.rest('bead_group_members?select=group_id,display_name,role&user_id=eq.'+q(session.user.id)+'&limit=1');
+      if(rows?.length){
+        groupRole=rows[0].role;
+        const groups=await ToolboxAuth.rest('bead_groups?select=id,name&id=eq.'+q(rows[0].group_id)+'&limit=1');
+        if(groups?.length) group=groups[0];
+      }
+      els.invIdentity.textContent=group ? ('共享组：'+group.name+' · '+groupRole) : '仅个人库存';
+      els.projectScope.querySelector('option[value="group"]').disabled=!group;
+      els.invScope.querySelector('option[value="group"]').disabled=!group;
+      if(!group && els.invScope.value==='group') els.invScope.value='personal';
+    }catch(err){
+      console.warn(err);
+      els.invIdentity.textContent='共享组加载失败';
+    }
+  }
+
+  $('loginForm').addEventListener('submit',async e=>{
+    e.preventDefault();$('loginError').textContent='';
+    const email=$('loginEmail').value.trim(),password=$('loginPassword').value;
+    const {error}=await db.auth.signInWithPassword({email,password});
+    if(error){$('loginError').textContent=ToolboxAuth.authMessage(error);return;}
+    $('loginPassword').value='';
+    await refreshAuthUI();
+  });
+  $('logoutBtn').addEventListener('click',async()=>{await db.auth.signOut();await refreshAuthUI();});
+  db.auth.onAuthStateChange(()=>setTimeout(refreshAuthUI,0));
+
+  // ---------- Tabs ----------
+  document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===t));
+    document.querySelectorAll('.tab-panel').forEach(x=>x.classList.toggle('active',x.id==='tab-'+t.dataset.tab));
+    if(t.dataset.tab==='inventory' && session) loadInventory();
+    if(t.dataset.tab==='projects' && session) loadProjects();
+  }));
+  function switchTab(name){
+    const t=document.querySelector('.tab[data-tab="'+name+'"]'); if(t) t.click();
+  }
+
+  // ---------- Color science ----------
+  function hexToRgb(hex){
+    const h=String(hex).replace('#','');
+    if(!/^[0-9a-fA-F]{6}$/.test(h)) return null;
+    return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];
+  }
+  function rgbToHex(r,g,b){
+    const h=v=>clamp(Math.round(v),0,255).toString(16).padStart(2,'0').toUpperCase();
+    return '#'+h(r)+h(g)+h(b);
+  }
+  function rgbToLab(rgb){
+    let [r,g,b]=rgb.map(v=>v/255);
+    r=r<=.04045?r/12.92:Math.pow((r+.055)/1.055,2.4);
+    g=g<=.04045?g/12.92:Math.pow((g+.055)/1.055,2.4);
+    b=b<=.04045?b/12.92:Math.pow((b+.055)/1.055,2.4);
+    let x=(r*.4124564+g*.3575761+b*.1804375)/.95047;
+    let y=(r*.2126729+g*.7151522+b*.0721750)/1;
+    let z=(r*.0193339+g*.1191920+b*.9503041)/1.08883;
+    const f=t=>t>.008856?Math.cbrt(t):(7.787*t+16/116);
+    x=f(x);y=f(y);z=f(z);
+    return [116*y-16,500*(x-y),200*(y-z)];
+  }
+  function dE00(lab1,lab2){
+    const [L1,a1,b1]=lab1,[L2,a2,b2]=lab2;
+    const C1=Math.hypot(a1,b1),C2=Math.hypot(a2,b2),Cbar=(C1+C2)/2;
+    const G=.5*(1-Math.sqrt(Math.pow(Cbar,7)/(Math.pow(Cbar,7)+Math.pow(25,7))));
+    const ap1=(1+G)*a1,ap2=(1+G)*a2;
+    const Cp1=Math.hypot(ap1,b1),Cp2=Math.hypot(ap2,b2);
+    const hp=(a,b)=>{let h=Math.atan2(b,a)*180/Math.PI;return h<0?h+360:h};
+    const h1=hp(ap1,b1),h2=hp(ap2,b2);
+    const dLp=L2-L1,dCp=Cp2-Cp1;
+    let dh=h2-h1;
+    if(Cp1*Cp2===0) dh=0;
+    else if(dh>180) dh-=360;
+    else if(dh<-180) dh+=360;
+    const dHp=2*Math.sqrt(Cp1*Cp2)*Math.sin((dh*Math.PI/180)/2);
+    const Lbar=(L1+L2)/2,Cpbar=(Cp1+Cp2)/2;
+    let hbar;
+    if(Cp1*Cp2===0) hbar=h1+h2;
+    else if(Math.abs(h1-h2)<=180) hbar=(h1+h2)/2;
+    else hbar=(h1+h2<360)?(h1+h2+360)/2:(h1+h2-360)/2;
+    const rad=x=>x*Math.PI/180;
+    const T=1-.17*Math.cos(rad(hbar-30))+.24*Math.cos(rad(2*hbar))+.32*Math.cos(rad(3*hbar+6))-.20*Math.cos(rad(4*hbar-63));
+    const dTheta=30*Math.exp(-Math.pow((hbar-275)/25,2));
+    const Rc=2*Math.sqrt(Math.pow(Cpbar,7)/(Math.pow(Cpbar,7)+Math.pow(25,7)));
+    const Sl=1+(.015*Math.pow(Lbar-50,2))/Math.sqrt(20+Math.pow(Lbar-50,2));
+    const Sc=1+.045*Cpbar,Sh=1+.015*Cpbar*T;
+    const Rt=-Math.sin(rad(2*dTheta))*Rc;
+    const a=dLp/Sl,b=dCp/Sc,c=dHp/Sh;
+    return Math.sqrt(a*a+b*b+c*c+Rt*b*c);
+  }
+
+  function parsePalette(){
+    const lines=els.paletteText.value.split(/\r?\n/);
+    const out=[],seen=new Set();
+    for(const raw of lines){
+      const line=raw.trim();if(!line) continue;
+      const parts=line.split(',').map(s=>s.trim());
+      if(parts.length<2) continue;
+      const code=parts[0].toUpperCase(),hex=parts[1].toUpperCase(),name=parts.slice(2).join(',')||code;
+      const rgb=hexToRgb(hex);
+      if(!code||!rgb||seen.has(code)) continue;
+      seen.add(code);out.push({key:code,code,name,hex:rgbToHex(...rgb),rgb,lab:rgbToLab(rgb)});
+    }
+    return out;
+  }
+  function savePaletteLocal(){
+    const parsed=parsePalette();
+    try{localStorage.setItem('beadPalette.v1',JSON.stringify({name:els.paletteName.value.trim()||'我的色卡',text:els.paletteText.value}));}catch{}
+    els.paletteStatus.textContent=parsed.length ? ('已保存 '+parsed.length+' 个颜色') : '未识别到有效色卡行';
+  }
+  function loadPaletteLocal(){
+    try{
+      const v=JSON.parse(localStorage.getItem('beadPalette.v1')||'null');
+      if(v){els.paletteName.value=v.name||'我的色卡';els.paletteText.value=v.text||'';}
+    }catch{}
+    const n=parsePalette().length;els.paletteStatus.textContent=n?('已载入 '+n+' 个颜色'):'当前未载入自定义色卡';
+  }
+  $('savePaletteBtn').addEventListener('click',savePaletteLocal);
+  els.mode.addEventListener('change',()=>{
+    els.paletteCard.classList.toggle('palette-required',els.mode.value==='palette');
+    if(els.mode.value==='palette' && !parsePalette().length) setStatus(els.imageStatus,'色卡模式需要先填写“色号,#RRGGBB,名称”。','error');
+  });
+
+  // ---------- Image / grid ----------
+  function currentCrop(){
+    return {
+      l:clamp(Number(els.cropL.value)||0,0,45)/100,
+      t:clamp(Number(els.cropT.value)||0,0,45)/100,
+      r:clamp(Number(els.cropR.value)||0,0,45)/100,
+      b:clamp(Number(els.cropB.value)||0,0,45)/100
+    };
+  }
+  function prepareWorkCanvas(){
+    if(!imageBitmap) return false;
+    const c=currentCrop();
+    const sx=imageBitmap.width*c.l, sy=imageBitmap.height*c.t;
+    const sw=imageBitmap.width*(1-c.l-c.r), sh=imageBitmap.height*(1-c.t-c.b);
+    if(sw<10||sh<10) return false;
+    const maxDim=1000, scale=Math.min(1,maxDim/Math.max(sw,sh));
+    workCanvas.width=Math.max(1,Math.round(sw*scale));
+    workCanvas.height=Math.max(1,Math.round(sh*scale));
+    workCtx.clearRect(0,0,workCanvas.width,workCanvas.height);
+    workCtx.drawImage(imageBitmap,sx,sy,sw,sh,0,0,workCanvas.width,workCanvas.height);
+    return true;
+  }
+
+  els.file.addEventListener('change',async()=>{
+    const file=els.file.files?.[0]; if(!file) return;
+    try{
+      imageBitmap?.close?.();
+      imageBitmap=await createImageBitmap(file);
+      cells=[];colorCatalog.clear();resultItems=[];blankKeys.clear();highlightKey=null;selectedCellIndex=-1;
+      prepareWorkCanvas();renderPreview(true);renderResults();
+      els.canvasEmpty.classList.add('hidden');
+      setStatus(els.imageStatus,'已载入 '+imageBitmap.width+'×'+imageBitmap.height+' 图像。请先确认网格行列数与裁切范围。');
+    }catch(err){setStatus(els.imageStatus,'无法读取这张图片：'+err.message,'error');}
+  });
+
+  [els.cols,els.rows,els.cropL,els.cropT,els.cropR,els.cropB].forEach(el=>el.addEventListener('change',()=>{
+    if(imageBitmap){prepareWorkCanvas();renderPreview(true);}
+  }));
+  $('previewGridBtn').addEventListener('click',()=>{if(prepareWorkCanvas())renderPreview(true);});
+
+  function renderPreview(showGrid=true){
+    if(!imageBitmap || !workCanvas.width){
+      pctx.clearRect(0,0,preview.width,preview.height);return;
+    }
+    preview.width=workCanvas.width;preview.height=workCanvas.height;
+    pctx.drawImage(workCanvas,0,0);
+    const cols=clamp(parseInt(els.cols.value)||1,1,300),rows=clamp(parseInt(els.rows.value)||1,1,300);
+    const cw=preview.width/cols,ch=preview.height/rows;
+
+    if(cells.length){
+      for(let i=0;i<cells.length;i++){
+        const c=cells[i],x=c.col*cw,y=c.row*ch;
+        if(highlightKey && c.key!==highlightKey){
+          pctx.fillStyle='rgba(20,18,24,.58)';pctx.fillRect(x,y,cw,ch);
+        }else if(c.low){
+          pctx.fillStyle='rgba(255,176,40,.13)';pctx.fillRect(x,y,cw,ch);
+        }
+      }
+      if(selectedCellIndex>=0 && cells[selectedCellIndex]){
+        const c=cells[selectedCellIndex];
+        pctx.strokeStyle='#ff3459';pctx.lineWidth=Math.max(2,preview.width/450);
+        pctx.strokeRect(c.col*cw+1,c.row*ch+1,cw-2,ch-2);
+      }
+    }
+
+    if(showGrid){
+      pctx.beginPath();
+      pctx.strokeStyle='rgba(116,55,245,.45)';
+      pctx.lineWidth=Math.max(.6,preview.width/1300);
+      for(let i=1;i<cols;i++){const x=i*cw;pctx.moveTo(x,0);pctx.lineTo(x,preview.height);}
+      for(let i=1;i<rows;i++){const y=i*ch;pctx.moveTo(0,y);pctx.lineTo(preview.width,y);}
+      pctx.stroke();
+    }
+  }
+
+  function grayAt(data,w,x,y){
+    const i=(y*w+x)*4;
+    return .2126*data[i]+.7152*data[i+1]+.0722*data[i+2];
+  }
+  function projection(axis,img,w,h){
+    const len=axis==='x'?w:h,out=new Array(len).fill(0),step=3;
+    if(axis==='x'){
+      for(let x=1;x<w;x++) for(let y=0;y<h;y+=step) out[x]+=Math.abs(grayAt(img,w,x,y)-grayAt(img,w,x-1,y));
+    }else{
+      for(let y=1;y<h;y++) for(let x=0;x<w;x+=step) out[y]+=Math.abs(grayAt(img,w,x,y)-grayAt(img,w,x,y-1));
+    }
+    return out;
+  }
+  function inferSpacing(proj){
+    const vals=proj.slice(2,-2).slice().sort((a,b)=>a-b);
+    if(vals.length<10) return null;
+    const threshold=vals[Math.floor(vals.length*.88)];
+    const raw=[];
+    for(let i=2;i<proj.length-2;i++){
+      if(proj[i]>=threshold && proj[i]>=proj[i-1] && proj[i]>=proj[i+1]) raw.push(i);
+    }
+    const peaks=[];
+    for(const p of raw){
+      if(!peaks.length||p-peaks[peaks.length-1]>2) peaks.push(p);
+      else if(proj[p]>proj[peaks[peaks.length-1]]) peaks[peaks.length-1]=p;
+    }
+    const diffs=[];
+    for(let i=1;i<peaks.length;i++){const d=peaks[i]-peaks[i-1];if(d>=4&&d<=180)diffs.push(d);}
+    if(diffs.length<3) return null;
+    const hist=new Map();
+    for(const d of diffs){
+      const k=Math.round(d);
+      for(let z=k-1;z<=k+1;z++) hist.set(z,(hist.get(z)||0)+1);
+    }
+    let best=null,bestN=0;
+    hist.forEach((n,k)=>{if(n>bestN){bestN=n;best=k;}});
+    if(!best||bestN<3) return null;
+    return {spacing:best,confidence:bestN/diffs.length,peaks:peaks.length};
+  }
+  $('autoGridBtn').addEventListener('click',()=>{
+    if(!prepareWorkCanvas()){setStatus(els.imageStatus,'请先上传图纸。','error');return;}
+    const img=workCtx.getImageData(0,0,workCanvas.width,workCanvas.height).data;
+    const vx=inferSpacing(projection('x',img,workCanvas.width,workCanvas.height));
+    const vy=inferSpacing(projection('y',img,workCanvas.width,workCanvas.height));
+    if(!vx||!vy){
+      setStatus(els.imageStatus,'自动估算没有找到稳定的周期网格。请手动填写列数和行数；手动校准通常更可靠。','error');return;
+    }
+    const cols=clamp(Math.round(workCanvas.width/vx.spacing),1,300);
+    const rows=clamp(Math.round(workCanvas.height/vy.spacing),1,300);
+    els.cols.value=cols;els.rows.value=rows;renderPreview(true);
+    const conf=Math.round(((vx.confidence+vy.confidence)/2)*100);
+    setStatus(els.imageStatus,'自动估算：'+cols+' 列 × '+rows+' 行（周期一致性约 '+conf+'%）。请务必肉眼确认网格线对齐后再分析。');
+  });
+
+  function sampleCell(data,w,h,x0,y0,x1,y1,ratio){
+    const cx=(x0+x1)/2,cy=(y0+y1)/2;
+    const sw=(x1-x0)*ratio,sh=(y1-y0)*ratio;
+    const left=clamp(Math.floor(cx-sw/2),0,w-1),right=clamp(Math.ceil(cx+sw/2),0,w-1);
+    const top=clamp(Math.floor(cy-sh/2),0,h-1),bottom=clamp(Math.ceil(cy+sh/2),0,h-1);
+    const nx=Math.min(9,Math.max(3,right-left+1)),ny=Math.min(9,Math.max(3,bottom-top+1));
+    const rs=[],gs=[],bs=[],as=[],lumas=[];
+    for(let iy=0;iy<ny;iy++){
+      const y=Math.round(top+(bottom-top)*(ny===1?0:iy/(ny-1)));
+      for(let ix=0;ix<nx;ix++){
+        const x=Math.round(left+(right-left)*(nx===1?0:ix/(nx-1)));
+        const p=(y*w+x)*4,r=data[p],g=data[p+1],b=data[p+2],a=data[p+3];
+        rs.push(r);gs.push(g);bs.push(b);as.push(a);lumas.push(.2126*r+.7152*g+.0722*b);
+      }
+    }
+    const r=median(rs),g=median(gs),b=median(bs),a=median(as),lm=lumas.reduce((s,v)=>s+v,0)/lumas.length;
+    const variance=lumas.reduce((s,v)=>s+(v-lm)*(v-lm),0)/lumas.length;
+    return {rgb:[r,g,b],hex:rgbToHex(r,g,b),lab:rgbToLab([r,g,b]),alpha:a,std:Math.sqrt(variance)};
+  }
+
+  async function analyze(){
+    if(!imageBitmap){setStatus(els.imageStatus,'请先上传图纸。','error');return;}
+    if(!prepareWorkCanvas()){setStatus(els.imageStatus,'当前裁切范围无效。','error');return;}
+    const cols=clamp(parseInt(els.cols.value)||0,1,300),rows=clamp(parseInt(els.rows.value)||0,1,300);
+    const total=cols*rows;
+    if(total>60000){setStatus(els.imageStatus,'当前网格超过 60,000 格。请确认行列数是否填写正确。','error');return;}
+    const ratio=Number(els.ratio.value)||.55,mode=els.mode.value;
+    let palette=[];
+    if(mode==='palette'){
+      palette=parsePalette();
+      if(!palette.length){setStatus(els.imageStatus,'色卡模式下没有有效色卡。格式：色号,#RRGGBB,名称。','error');return;}
+    }
+
+    els.analyze.disabled=true;els.analyze.textContent='分析中…';
+    await new Promise(r=>requestAnimationFrame(r));
+    try{
+      const img=workCtx.getImageData(0,0,workCanvas.width,workCanvas.height).data;
+      const raw=[],cw=workCanvas.width/cols,ch=workCanvas.height/rows;
+      for(let row=0;row<rows;row++){
+        for(let col=0;col<cols;col++){
+          const s=sampleCell(img,workCanvas.width,workCanvas.height,col*cw,row*ch,(col+1)*cw,(row+1)*ch,ratio);
+          raw.push({row,col,...s,key:null,delta:null,low:false});
+        }
+      }
+
+      colorCatalog=new Map();
+      if(mode==='palette'){
+        const threshold=clamp(Number(els.delta.value)||8,1,30);
+        for(const c of raw){
+          if(c.alpha<40){c.key='__transparent__';c.low=false;continue;}
+          let best=null,bestD=Infinity,second=Infinity;
+          for(const p of palette){
+            const d=dE00(c.lab,p.lab);
+            if(d<bestD){second=bestD;bestD=d;best=p;} else if(d<second) second=d;
+          }
+          c.key=best.key;c.delta=bestD;
+          c.low=bestD>threshold || c.std>24 || (second-bestD<1.0 && bestD>2);
+        }
+        for(const p of palette) colorCatalog.set(p.key,{...p});
+      }else{
+        const tol=clamp(Number(els.tolerance.value)||5,.5,30);
+        const clusters=[];
+        let seq=0;
+        for(const c of raw){
+          if(c.alpha<40){c.key='__transparent__';c.low=false;continue;}
+          let best=null,bestD=Infinity;
+          for(const cl of clusters){const d=dE00(c.lab,cl.lab);if(d<bestD){bestD=d;best=cl;}}
+          if(!best || bestD>tol){
+            best={tmp:'T'+(++seq),n:0,sum:[0,0,0],lab:c.lab};
+            clusters.push(best);bestD=0;
+          }
+          best.n++;best.sum[0]+=c.rgb[0];best.sum[1]+=c.rgb[1];best.sum[2]+=c.rgb[2];
+          best.rgb=best.sum.map(v=>v/best.n);best.lab=rgbToLab(best.rgb);
+          c.key=best.tmp;c.delta=bestD;c.low=c.std>24;
+        }
+        const counts=new Map();
+        raw.forEach(c=>counts.set(c.key,(counts.get(c.key)||0)+1));
+        clusters.sort((a,b)=>(counts.get(b.tmp)||0)-(counts.get(a.tmp)||0));
+        const remap=new Map();
+        clusters.forEach((cl,i)=>{
+          const code='C'+String(i+1).padStart(2,'0'),hex=rgbToHex(...cl.rgb);
+          remap.set(cl.tmp,code);
+          colorCatalog.set(code,{key:code,code,name:'自动颜色 '+String(i+1).padStart(2,'0'),hex,rgb:cl.rgb,lab:cl.lab});
+        });
+        raw.forEach(c=>{if(c.key!=='__transparent__')c.key=remap.get(c.key);});
+      }
+
+      colorCatalog.set('__transparent__',{key:'__transparent__',code:'透明',name:'透明 / 空白',hex:'#FFFFFF',rgb:[255,255,255],lab:rgbToLab([255,255,255])});
+      cells=raw;
+      analysisMeta={cols,rows,mode,ratio,crop:currentCrop(),paletteName:mode==='palette'?(els.paletteName.value.trim()||'我的色卡'):'自动聚类',tolerance:Number(els.tolerance.value)||5,deltaThreshold:Number(els.delta.value)||8};
+
+      blankKeys=new Set();
+      if(cells.some(c=>c.key==='__transparent__')) blankKeys.add('__transparent__');
+      aggregate();
+      if(els.autoBlank.checked){
+        const top=resultItems.filter(x=>x.key!=='__transparent__').sort((a,b)=>b.qty-a.qty)[0];
+        if(top) blankKeys.add(top.key);
+        aggregate();
+      }
+      highlightKey=null;selectedCellIndex=-1;els.cellEditor.classList.add('hidden');
+      renderPreview(true);renderResults();
+      setStatus(els.imageStatus,'分析完成。请重点检查网格对齐、待确认格和自动空白颜色；必要时点击格子人工修正。');
+    }catch(err){
+      console.error(err);setStatus(els.imageStatus,'分析失败：'+err.message,'error');
+    }finally{
+      els.analyze.disabled=false;els.analyze.textContent='开始精确分析';
+    }
+  }
+  els.analyze.addEventListener('click',analyze);
+
+  function aggregate(){
+    const map=new Map();
+    for(const c of cells){
+      const meta=colorCatalog.get(c.key)||{key:c.key,code:c.key,name:c.key,hex:c.hex||'#999999'};
+      if(!map.has(c.key)) map.set(c.key,{...meta,qty:0,low:0,deltaSum:0,deltaN:0});
+      const x=map.get(c.key);x.qty++;if(c.low)x.low++;
+      if(Number.isFinite(c.delta)){x.deltaSum+=c.delta;x.deltaN++;}
+    }
+    resultItems=[...map.values()].map(x=>({...x,avgDelta:x.deltaN?x.deltaSum/x.deltaN:null,isBlank:blankKeys.has(x.key)}))
+      .sort((a,b)=>b.qty-a.qty);
+  }
+
+  function renderResults(){
+    aggregateIfPossible();
+    els.resultBody.textContent='';
+    if(!resultItems.length){
+      const tr=create('tr');const td=create('td','empty-row','暂无分析结果');td.colSpan=7;tr.append(td);els.resultBody.append(tr);
+      updateAudit();return;
+    }
+    const paletteName=analysisMeta?.paletteName||'自动聚类';
+    for(const item of resultItems){
+      const tr=create('tr'); if(item.key===highlightKey) tr.style.background='#f5f1ff';
+      const c1=create('td');const sw=create('span','swatch');sw.style.background=item.hex;c1.append(sw,document.createTextNode(item.name||item.code));tr.append(c1);
+      const c2=create('td');const codeBtn=btn(item.code,'code-btn');codeBtn.addEventListener('click',()=>{highlightKey=item.key;renderPreview(true);renderResults();});c2.append(codeBtn);tr.append(c2);
+      tr.append(create('td','',item.qty.toLocaleString()));
+      const conf=item.low?('待确认 '+item.low):(item.avgDelta!=null?('ΔE '+item.avgDelta.toFixed(1)):'稳定');
+      tr.append(create('td',item.low?'low':'',conf));
+      let inv=0,missing=0;
+      if(!item.isBlank){
+        inv=inventoryMap.get(escKey(paletteName,item.code))?.quantity||0;
+        missing=Math.max(0,item.qty-inv);
+      }
+      tr.append(create('td','',item.isBlank?'—':inv.toLocaleString()));
+      tr.append(create('td',missing?'missing':'enough',item.isBlank?'—':(missing?missing.toLocaleString():'足够')));
+      const act=create('td');const wrap=create('div','row-actions');
+      const hb=btn('高亮');hb.addEventListener('click',()=>{highlightKey=item.key;renderPreview(true);renderResults();});
+      const bb=btn(item.isBlank?'恢复豆子':'设为空白');
+      bb.addEventListener('click',()=>{els.autoBlank.checked=false;if(blankKeys.has(item.key))blankKeys.delete(item.key);else blankKeys.add(item.key);aggregate();renderPreview(true);renderResults();});
+      const ib=btn('填入库存');ib.disabled=item.isBlank;ib.addEventListener('click',()=>prefillInventory(item));
+      wrap.append(hb,bb,ib);act.append(wrap);tr.append(act);
+      if(item.isBlank) tr.style.opacity='.58';
+      els.resultBody.append(tr);
+    }
+    updateAudit();
+  }
+  function aggregateIfPossible(){if(cells.length)aggregate();}
+  function updateAudit(){
+    const total=cells.length||0;
+    const blanks=cells.reduce((n,c)=>n+(blankKeys.has(c.key)?1:0),0);
+    const beads=total-blanks,low=cells.reduce((n,c)=>n+(c.low&&!blankKeys.has(c.key)?1:0),0);
+    els.auditCells.textContent=total.toLocaleString();els.auditBeads.textContent=beads.toLocaleString();els.auditBlank.textContent=blanks.toLocaleString();els.auditLow.textContent=low.toLocaleString();
+    if(!total){els.integrity.textContent='数学自检：等待分析';els.quality.textContent='等待分析';els.quality.className='quality-badge';return;}
+    const expected=(analysisMeta?.cols||0)*(analysisMeta?.rows||0),ok=total===expected && beads+blanks===expected;
+    els.integrity.textContent='数学自检：'+(ok?'通过':'异常')+' · '+beads+' 豆子 + '+blanks+' 空白 = '+expected+' 格';
+    const rate=beads?low/beads:0;
+    els.quality.className='quality-badge '+(rate<=.01?'good':rate<=.05?'warn':'bad');
+    els.quality.textContent=rate<=.01?'识别质量高':rate<=.05?'建议复核':'需要校准';
+    els.resultSub.textContent='共 '+resultItems.length+' 种颜色；待确认 '+low+' 格。'+(analysisMeta?.mode==='cluster'?' 自动色号仅在本次图纸内稳定。':'');
+  }
+
+  els.autoBlank.addEventListener('change',()=>{
+    if(!cells.length)return;
+    blankKeys=new Set(cells.some(c=>c.key==='__transparent__')?['__transparent__']:[]);
+    if(els.autoBlank.checked){
+      aggregate();const top=resultItems.filter(x=>x.key!=='__transparent__').sort((a,b)=>b.qty-a.qty)[0];if(top)blankKeys.add(top.key);
+    }
+    aggregate();renderPreview(true);renderResults();
+  });
+  $('clearHighlightBtn').addEventListener('click',()=>{highlightKey=null;renderPreview(true);renderResults();});
+
+  preview.addEventListener('click',e=>{
+    if(!cells.length||!analysisMeta)return;
+    const rect=preview.getBoundingClientRect();
+    const x=(e.clientX-rect.left)/rect.width*preview.width,y=(e.clientY-rect.top)/rect.height*preview.height;
+    const col=clamp(Math.floor(x/(preview.width/analysisMeta.cols)),0,analysisMeta.cols-1);
+    const row=clamp(Math.floor(y/(preview.height/analysisMeta.rows)),0,analysisMeta.rows-1);
+    selectedCellIndex=row*analysisMeta.cols+col;
+    const c=cells[selectedCellIndex];if(!c)return;
+    els.cellLabel.textContent='第 '+(row+1)+' 行 · 第 '+(col+1)+' 列';
+    els.cellConfidence.textContent='当前 '+(colorCatalog.get(c.key)?.code||c.key)+(c.delta!=null?' · ΔE '+c.delta.toFixed(2):'')+(c.low?' · 待确认':'');
+    els.cellSelect.textContent='';
+    for(const item of resultItems){
+      const op=create('option');op.value=item.key;op.textContent=item.code+' · '+item.name;op.selected=item.key===c.key;els.cellSelect.append(op);
+    }
+    els.cellEditor.classList.remove('hidden');renderPreview(true);
+  });
+  $('applyCellBtn').addEventListener('click',()=>{
+    const c=cells[selectedCellIndex];if(!c)return;
+    c.key=els.cellSelect.value;c.low=false;c.delta=0;
+    aggregate();renderPreview(true);renderResults();
+    els.cellConfidence.textContent='已人工确认并修正';
+  });
+
+  // ---------- Inventory ----------
+  async function loadInventory(){
+    if(!session){inventoryRows=[];inventoryMap.clear();renderInventory();renderResults();return;}
+    const scope=els.invScope.value;
+    if(scope==='group'&&!group){setStatus(els.invStatus,'当前账号没有共享库存权限。','error');return;}
+    try{
+      const filter=scope==='group'
+        ? 'group_id=eq.'+q(group.id)+'&owner_user_id=is.null'
+        : 'owner_user_id=eq.'+q(session.user.id)+'&group_id=is.null';
+      inventoryRows=await ToolboxAuth.rest('bead_inventory?select=id,palette_name,color_code,color_name,color_hex,quantity,updated_at&'+filter+'&order=palette_name.asc,color_code.asc');
+      inventoryMap=new Map(inventoryRows.map(r=>[escKey(r.palette_name,r.color_code),r]));
+      renderInventory();renderResults();await loadEvents();
+      setStatus(els.invStatus,'已同步 '+inventoryRows.length+' 个色号 · '+formatTime(new Date()));
+    }catch(err){setStatus(els.invStatus,'库存同步失败：'+err.message,'error');}
+  }
+  els.invScope.addEventListener('change',loadInventory);
+  $('refreshInventoryBtn').addEventListener('click',loadInventory);
+
+  function renderInventory(){
+    els.invBody.textContent='';
+    if(!session){const tr=create('tr');const td=create('td','empty-row','登录后加载库存');td.colSpan=6;tr.append(td);els.invBody.append(tr);return;}
+    if(!inventoryRows.length){const tr=create('tr');const td=create('td','empty-row','当前库存为空，可在上方添加');td.colSpan=6;tr.append(td);els.invBody.append(tr);return;}
+    for(const r of inventoryRows){
+      const tr=create('tr');
+      const c1=create('td');const sw=create('span','swatch');sw.style.background=r.color_hex;c1.append(sw);tr.append(c1);
+      tr.append(create('td','',r.palette_name),create('td','',r.color_code),create('td','',r.color_name||'—'),create('td','',Number(r.quantity).toLocaleString()));
+      const a=create('td');const e=btn('编辑');e.addEventListener('click',()=>{els.invPalette.value=r.palette_name;els.invCode.value=r.color_code;els.invName.value=r.color_name||'';els.invHex.value=r.color_hex;els.invQty.value=r.quantity;window.scrollTo({top:0,behavior:'smooth'});});a.append(e);tr.append(a);
+      els.invBody.append(tr);
+    }
+  }
+
+  $('inventoryForm').addEventListener('submit',async e=>{
+    e.preventDefault();
+    if(!session){setStatus(els.invStatus,'请先登录。','error');return;}
+    const scope=els.invScope.value;if(scope==='group'&&!group){setStatus(els.invStatus,'没有共享组权限。','error');return;}
+    const payload={
+      p_scope:scope,p_group_id:scope==='group'?group.id:null,
+      p_palette_name:els.invPalette.value.trim(),p_color_code:els.invCode.value.trim().toUpperCase(),
+      p_color_name:els.invName.value.trim(),p_color_hex:els.invHex.value.toUpperCase(),
+      p_quantity:Math.max(0,parseInt(els.invQty.value)||0),p_reason:'manual'
+    };
+    if(!payload.p_palette_name||!payload.p_color_code){setStatus(els.invStatus,'请填写色卡和色号。','error');return;}
+    const {error}=await db.rpc('bead_set_inventory',payload);
+    if(error){setStatus(els.invStatus,'保存失败：'+error.message,'error');return;}
+    await loadInventory();setStatus(els.invStatus,'库存已保存并同步。');
+  });
+
+  function prefillInventory(item){
+    if(!analysisMeta)return;
+    els.invPalette.value=analysisMeta.paletteName;els.invCode.value=item.code;els.invName.value=item.name||'';els.invHex.value=item.hex;els.invQty.value=inventoryMap.get(escKey(analysisMeta.paletteName,item.code))?.quantity||0;
+    switchTab('inventory');
+  }
+
+  async function loadEvents(){
+    if(!session){els.eventList.innerHTML='<div class="empty-note">暂无记录</div>';return;}
+    try{
+      const scope=els.invScope.value;
+      const filter=scope==='group'&&group?'group_id=eq.'+q(group.id):'owner_user_id=eq.'+q(session.user.id);
+      const rows=await ToolboxAuth.rest('bead_inventory_events?select=id,palette_name,color_code,delta,resulting_quantity,reason,created_at&'+filter+'&order=created_at.desc&limit=12');
+      els.eventList.textContent='';
+      if(!rows.length){els.eventList.append(create('div','empty-note','暂无记录'));return;}
+      for(const r of rows){
+        const line=create('div','event');const left=create('div');left.append(create('strong','',r.palette_name+' · '+r.color_code),create('span','', ' · '+formatTime(r.created_at)+' · '+r.reason));
+        const d=create('b',r.delta>=0?'plus':'minus',(r.delta>=0?'+':'')+r.delta+' → '+r.resulting_quantity);line.append(left,d);els.eventList.append(line);
+      }
+    }catch(err){console.warn(err);}
+  }
+
+  // ---------- Projects ----------
+  $('saveProjectBtn').addEventListener('click',async()=>{
+    if(!session){setStatus(els.projectStatus,'请先登录后再保存云端项目。','error');return;}
+    if(!cells.length||!analysisMeta){setStatus(els.projectStatus,'请先完成图纸分析。','error');return;}
+    const title=els.projectTitle.value.trim();if(!title){setStatus(els.projectStatus,'请填写项目名称。','error');return;}
+    const scope=els.projectScope.value;if(scope==='group'&&!group){setStatus(els.projectStatus,'当前账号没有共享项目权限。','error');return;}
+    aggregate();
+    const items=resultItems.filter(x=>!blankKeys.has(x.key)).map(x=>({code:x.code,name:x.name,hex:x.hex,quantity:x.qty,low_confidence:x.low,avg_delta:x.avgDelta==null?null:Number(x.avgDelta.toFixed(3))}));
+    const blank=cells.reduce((n,c)=>n+(blankKeys.has(c.key)?1:0),0),low=cells.reduce((n,c)=>n+(c.low&&!blankKeys.has(c.key)?1:0),0);
+    const body={
+      owner_user_id:session.user.id,group_id:scope==='group'?group.id:null,title,
+      palette_name:analysisMeta.paletteName,source_mode:'grid',grid_width:analysisMeta.cols,grid_height:analysisMeta.rows,
+      total_cells:cells.length,blank_cells:blank,total_beads:cells.length-blank,low_confidence_cells:low,items,
+      analysis_settings:{sample_ratio:analysisMeta.ratio,crop:analysisMeta.crop,match_mode:analysisMeta.mode,cluster_tolerance:analysisMeta.tolerance,delta_threshold:analysisMeta.deltaThreshold}
+    };
+    try{
+      await ToolboxAuth.rest('bead_projects',{method:'POST',body,prefer:'return=minimal'});
+      setStatus(els.projectStatus,'项目已保存到云端。');loadProjects();
+    }catch(err){setStatus(els.projectStatus,'保存项目失败：'+err.message,'error');}
+  });
+
+  async function loadProjects(){
+    if(!session){els.projectList.textContent='';els.projectList.append(create('div','empty-note','登录后可查看项目'));return;}
+    try{
+      const rows=await ToolboxAuth.rest('bead_projects?select=id,title,group_id,palette_name,grid_width,grid_height,total_beads,blank_cells,low_confidence_cells,created_at,items&order=created_at.desc&limit=30');
+      els.projectList.textContent='';
+      if(!rows.length){els.projectList.append(create('div','empty-note','暂无云端项目'));return;}
+      for(const r of rows){
+        const card=create('article','project-item');card.append(create('h3','',r.title));
+        card.append(create('p','',r.grid_width+'×'+r.grid_height+' · '+r.total_beads.toLocaleString()+' 颗 · '+r.palette_name+' · '+formatTime(r.created_at)));
+        const tags=create('div','project-tags');tags.append(create('span','',r.group_id?'共享':'个人'),create('span','',(Array.isArray(r.items)?r.items.length:0)+' 色'),create('span','',r.low_confidence_cells+' 待确认'));
+        card.append(tags);els.projectList.append(card);
+      }
+    }catch(err){els.projectList.textContent='';els.projectList.append(create('div','empty-note','项目加载失败：'+err.message));}
+  }
+  $('refreshProjectsBtn').addEventListener('click',loadProjects);
+
+  // Periodic shared-state refresh without third-party realtime dependency.
+  function startPolling(){
+    clearInterval(inventoryPoll);
+    inventoryPoll=setInterval(()=>{
+      if(session && !document.hidden && document.querySelector('.tab[data-tab="inventory"]').classList.contains('active')) loadInventory();
+    },8000);
+  }
+
+  // ---------- init ----------
+  loadPaletteLocal();
+  refreshAuthUI().finally(startPolling);
+  window.addEventListener('pagehide',()=>clearInterval(inventoryPoll),{once:true});
+})();
