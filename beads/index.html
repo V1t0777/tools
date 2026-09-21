@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#f6f3ff" />
   <meta name="robots" content="noindex,nofollow,noarchive" />
   <title>拼豆计算器｜钊的工具箱</title>
-  <link rel="stylesheet" href="./style.css?v=20260920-2" />
+  <link rel="stylesheet" href="./style.css?v=20260921-1" />
 </head>
 <body>
   <main class="app">
@@ -90,6 +90,31 @@
           <label>上裁切 %<input id="cropTop" type="number" min="0" max="45" step="0.1" value="0" /></label>
           <label>右裁切 %<input id="cropRight" type="number" min="0" max="45" step="0.1" value="0" /></label>
           <label>下裁切 %<input id="cropBottom" type="number" min="0" max="45" step="0.1" value="0" /></label>
+        </div>
+
+        <div class="mini26-box">
+          <div class="mini26-title">
+            <div><b>2.6 mm Mini 拼豆优化</b><span>按 2.6 mm 名义间距计算成品尺寸，并针对高密度图纸减少缩放混色。</span></div>
+            <span class="mini26-badge">2.6 mm</span>
+          </div>
+          <div class="mini26-grid">
+            <label>豆子 / 孔距 mm
+              <input id="beadPitch" type="number" min="2" max="4" step="0.05" value="2.6" inputmode="decimal" />
+            </label>
+            <label>源色合并 ΔE00
+              <input id="sourceMergeTolerance" type="number" min="0.5" max="8" step="0.1" value="2.4" inputmode="decimal" />
+            </label>
+            <label>目标宽度 cm（可选）
+              <input id="targetWidthCm" type="number" min="0" max="100" step="0.1" inputmode="decimal" placeholder="例如 10" />
+            </label>
+            <label>目标高度 cm（可选）
+              <input id="targetHeightCm" type="number" min="0" max="100" step="0.1" inputmode="decimal" placeholder="例如 10" />
+            </label>
+          </div>
+          <div class="mini26-actions">
+            <button class="btn secondary" id="sizeToGridBtn" type="button">按 2.6 mm 换算格数</button>
+            <span id="physicalSizeInfo">当前 38 × 38 格 ≈ 9.88 × 9.88 cm</span>
+          </div>
         </div>
 
         <div class="tool-row">
@@ -186,7 +211,7 @@
         </div>
         <div class="integrity" id="integrity">数学自检：等待分析</div>
 
-        <label class="blank-auto"><input id="autoBlank" type="checkbox" checked /> 自动把最常见颜色视为空白（可在表格中修改）</label>
+        <label class="blank-auto"><input id="autoBlank" type="checkbox" checked /> 智能空白：仅当同色占据大部分边缘且覆盖至少 3 个角时自动视为空白</label>
 
         <div class="table-wrap">
           <table>
@@ -270,7 +295,9 @@
         <ol>
           <li><strong>优先使用标准图纸：</strong>每格颜色应尽可能均匀，避免透视拍照、强反光和大面积文字水印。</li>
           <li><strong>先校准网格：</strong>行列数必须正确，网格线应与预览完全重合；不确定时优先手动填写。</li>
-          <li><strong>中心区域采样：</strong>默认只读取格子中央 55%，降低网格线和压缩边缘污染。</li>
+          <li><strong>2.6 mm Mini 优化：</strong>系统按 2.6 mm 名义间距计算物理尺寸，高密度图纸优先保留足够的每格像素并关闭缩放平滑，减少相邻色混合。</li>
+          <li><strong>先聚类、后映射色号：</strong>同一图纸中因压缩产生的近似颜色会先按 ΔE00 合并，再统一匹配 MARD，避免一种颜色被拆成多个色号。</li>
+          <li><strong>中心区域采样：</strong>默认读取格子中央 55%，并使用真实采样像素的代表色而不是人为组合 RGB，降低网格线和压缩边缘污染。</li>
           <li><strong>MARD 默认使用 221 标准色：</strong>完整 291 色还包含珠光、温变、果冻、透明、夜光与光变系列；这些特殊效果无法由单一 HEX 完整表达。</li>
           <li><strong>其他品牌可导入自定义色卡：</strong>自动聚类适合精确“数量统计”，但 C01/C02 不是跨项目稳定的品牌色号。</li>
           <li><strong>检查待确认格：</strong>系统同时看 ΔE00 和格内颜色离散程度；低置信度格建议人工点选修正。</li>
@@ -282,8 +309,8 @@
   </main>
 
   <script src="../shared/toolbox-auth.js?v=20260917-4"></script>
-  <script src="./mard-palette.js?v=20260920-2"></script>
-  <script src="./app.js?v=20260920-2"></script>
+  <script src="./mard-palette.js?v=20260921-1"></script>
+  <script src="./app.js?v=20260921-1"></script>
   <!-- Cloudflare Web Analytics -->
   <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"bfd3df5c469343eb91856b7f3275def8"}'></script>
   <!-- End Cloudflare Web Analytics -->
