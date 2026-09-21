@@ -641,18 +641,27 @@
   }
   function prepareWorkCanvas(){
     if(!imageBitmap) return false;
-    const c=currentCrop();
-    const sx=imageBitmap.width*c.l, sy=imageBitmap.height*c.t;
-    const sw=imageBitmap.width*(1-c.l-c.r), sh=imageBitmap.height*(1-c.t-c.b);
-    if(sw<10||sh<10) return false;
     const cols=clamp(parseInt(els.cols.value)||38,1,300),rows=clamp(parseInt(els.rows.value)||38,1,300);
     const desired=Math.max(cols,rows)*12;
-    const maxDim=Math.min(1800,Math.max(1000,desired)),scale=Math.min(1,maxDim/Math.max(sw,sh));
+    const maxDim=Math.min(1800,Math.max(1000,desired));
+    let baseCanvas=null;
+    if(perspectiveEnabled){
+      baseCanvas=perspectiveRectify(maxDim);
+      if(!baseCanvas)return false;
+    }else{
+      const raw=rawSourceCanvas(maxDim);
+      baseCanvas=raw.canvas;
+    }
+    const cr=currentCrop();
+    const sx=baseCanvas.width*cr.l,sy=baseCanvas.height*cr.t;
+    const sw=baseCanvas.width*(1-cr.l-cr.r),sh=baseCanvas.height*(1-cr.t-cr.b);
+    if(sw<10||sh<10)return false;
+    const scale=Math.min(1,maxDim/Math.max(sw,sh));
     workCanvas.width=Math.max(1,Math.round(sw*scale));
     workCanvas.height=Math.max(1,Math.round(sh*scale));
     workCtx.clearRect(0,0,workCanvas.width,workCanvas.height);
     workCtx.imageSmoothingEnabled=false;
-    workCtx.drawImage(imageBitmap,sx,sy,sw,sh,0,0,workCanvas.width,workCanvas.height);
+    workCtx.drawImage(baseCanvas,sx,sy,sw,sh,0,0,workCanvas.width,workCanvas.height);
     return true;
   }
 
@@ -664,7 +673,9 @@
       cells=[];colorCatalog.clear();resultItems=[];blankKeys.clear();highlightKey=null;selectedCellIndex=-1;
       prepareWorkCanvas();renderPreview(true);renderResults();
       els.canvasEmpty.classList.add('hidden');
-      setStatus(els.imageStatus,'已载入 '+imageBitmap.width+'×'+imageBitmap.height+' 图像。请先确认网格行列数与裁切范围。');
+      perspectiveEnabled=false;els.perspectiveMode.value='off';perspectiveCorners=[{x:.03,y:.03},{x:.97,y:.03},{x:.97,y:.97},{x:.03,y:.97}];
+      phaseOffset={x:0,y:0,score:null};els.phaseStatus.textContent='相位：等待分析';
+      setStatus(els.imageStatus,'已载入 '+imageBitmap.width+'×'+imageBitmap.height+' 图像。请先确认网格行列数；拍照图建议设置四角透视校正。');
     }catch(err){setStatus(els.imageStatus,'无法读取这张图片：'+err.message,'error');}
   });
 
