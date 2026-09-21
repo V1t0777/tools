@@ -1066,6 +1066,60 @@
   });
   $('clearHighlightBtn').addEventListener('click',()=>{highlightKey=null;renderPreview(true);renderResults();});
 
+  // ---------- Built-in synthetic regression benchmark ----------
+  function benchmarkPalette(){
+    const src=(globalThis.MARDPalette?.colors||[]).filter(x=>x.standard);
+    return src.map(x=>{const rgb=hexToRgb(x.hex);return {key:x.code,code:x.code,name:'MARD '+x.code,hex:x.hex,rgb,lab:rgbToLab(rgb)};});
+  }
+  function seededRandom(seed){
+    let s=seed>>>0;
+    return ()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296;};
+  }
+  function runBenchmarkCase(noise=0,seed=1){
+    const palette=benchmarkPalette(),byCode=new Map(palette.map(x=>[x.code,x]));
+    const codes=['A4','A7','B5','B20','C8','C10','D5','E6','F5','G7','H2','H7'];
+    const valid=codes.map(x=>byCode.get(x)).filter(Boolean);
+    if(valid.length<8)return null;
+    const cols=24,rows=18,rng=seededRandom(seed),raw=[];
+    for(let row=0;row<rows;row++){
+      for(let col=0;col<cols;col++){
+        const p=valid[(Math.floor(col/4)+Math.floor(row/3)*3)%valid.length];
+        const rgb=p.rgb.map(v=>clamp(Math.round(v+(rng()-.5)*2*noise),0,255));
+        raw.push({row,col,rgb,hex:rgbToHex(...rgb),lab:rgbToLab(rgb),alpha:255,std:noise*.35,key:null,expected:p.code});
+      }
+    }
+    let clusters=clusterSourceCells(raw,2.4);
+    clusters=spatialRefineClusters(raw,clusters,cols,rows,2.4);
+    for(const cl of clusters){
+      const best=rankPalette(cl.lab,palette,1)[0];
+      for(const cell of cl.cells)cell.predicted=best?.code||'';
+    }
+    const correct=raw.filter(x=>x.predicted===x.expected).length;
+    const predictedColors=new Set(raw.map(x=>x.predicted)).size;
+    const expectedColors=new Set(raw.map(x=>x.expected)).size;
+    return {accuracy:correct/raw.length,cells:raw.length,predictedColors,expectedColors,raw,cols,rows};
+  }
+  function renderBenchmarkPattern(result){
+    const old=benchmarkBox.querySelector?.('.benchmark-canvas'); if(old)old.remove();
+    if(!result)return;
+    const cv=document.createElement('canvas');cv.className='benchmark-canvas';cv.width=240;cv.height=180;
+    const ctx=cv.getContext('2d'),cw=cv.width/result.cols,ch=cv.height/result.rows;
+    for(const cell of result.raw){ctx.fillStyle=cell.hex;ctx.fillRect(cell.col*cw,cell.row*ch,Math.ceil(cw),Math.ceil(ch));}
+    els.benchmarkResult.parentElement.append(cv);
+  }
+  els.runBenchmark.addEventListener('click',()=>{
+    const cases=[
+      {name:'标准图',r:runBenchmarkCase(0,11)},
+      {name:'轻度压缩噪声',r:runBenchmarkCase(3,22)},
+      {name:'较强颜色扰动',r:runBenchmarkCase(6,33)}
+    ].filter(x=>x.r);
+    if(!cases.length){els.benchmarkResult.textContent='色卡未加载，无法运行';return;}
+    const mean=cases.reduce((s,x)=>s+x.r.accuracy,0)/cases.length;
+    benchmarkState={mean,cases};
+    els.benchmarkResult.textContent=cases.map(x=>x.name+' '+(x.r.accuracy*100).toFixed(1)+'%').join(' · ')+' · 平均 '+(mean*100).toFixed(1)+'%';
+    renderBenchmarkPattern(cases[1]?.r||cases[0].r);
+  });
+
   preview.addEventListener('click',e=>{
     if(!cells.length||!analysisMeta)return;
     const rect=preview.getBoundingClientRect();
