@@ -4,7 +4,7 @@
   const COLORS = ['#111827','#ef4444','#f59e0b','#22c55e','#3b82f6','#8b5cf6','#ec4899','#ffffff'];
   const $ = id => document.getElementById(id);
   const screens = ['authScreen','homeScreen','roomScreen','gameScreen','finishScreen'];
-  let session=null, me=null, state=null, channel=null, realtime=null, pollTimer=null, clockTimer=null;
+  let session=null, me=null, state=null, stateGeneration=0, channel=null, realtime=null, pollTimer=null, clockTimer=null;
   let currentRoundId=null, strokes=[], activeStroke=null, sendPoints=[], sendTimer=null, selectedColor=COLORS[0], brushSize=7, erasing=false;
   let canvas=$('canvas'), ctx=canvas.getContext('2d'), logical={w:1,h:1}, busy=false, transitionBusy=false, presenceMembers=new Set();
 
@@ -63,9 +63,9 @@
     if(code.length!==6){if(!silent)toast('请输入 6 位房间码');return;}
     try{const data=await api('join_room',{code});await enterRoom(data.state);}catch(err){toast(err.message);if(silent)setURL('');}
   }
-  async function enterRoom(next){ state=next;setURL(state.room.code);$('shareBtn').classList.remove('hidden');await connectRealtime();renderState();clearInterval(pollTimer);pollTimer=setInterval(refreshState,2200);clearInterval(clockTimer);clockTimer=setInterval(tick,250); }
-  async function mutate(action,payload={}){if(busy)return;busy=true;try{const data=await api(action,{room_id:state.room.id,...payload});if(data.state){state=data.state;renderState();sendEvent('state_changed',{at:Date.now()});}return data;}finally{busy=false;}}
-  async function refreshState(){if(!state||transitionBusy)return;transitionBusy=true;try{const data=await api('state',{room_id:state.room.id});state=data.state;renderState();}catch(err){if(/不在房间|房间不存在/.test(err.message)){leaveRealtime();show('homeScreen');setURL('');}else console.warn(err);}finally{transitionBusy=false;}}
+  async function enterRoom(next){ stateGeneration++;state=next;setURL(state.room.code);$('shareBtn').classList.remove('hidden');await connectRealtime();renderState();clearInterval(pollTimer);pollTimer=setInterval(refreshState,2200);clearInterval(clockTimer);clockTimer=setInterval(tick,250); }
+  async function mutate(action,payload={}){if(busy)return;busy=true;const generation=++stateGeneration;try{const data=await api(action,{room_id:state.room.id,...payload});if(data.state&&generation===stateGeneration){state=data.state;renderState();sendEvent('state_changed',{at:Date.now()});}return data;}finally{busy=false;}}
+  async function refreshState(){if(!state||busy||transitionBusy)return;const generation=stateGeneration;transitionBusy=true;try{const data=await api('state',{room_id:state.room.id});if(generation!==stateGeneration)return;state=data.state;renderState();}catch(err){if(/不在房间|房间不存在/.test(err.message)){leaveRealtime();show('homeScreen');setURL('');}else console.warn(err);}finally{transitionBusy=false;}}
 
   async function connectRealtime(){
     leaveRealtime(false);
@@ -125,7 +125,7 @@
     else if(state.room.status==='summary')remaining=Math.max(0,Math.ceil((new Date(state.room.summary_until).getTime()-Date.now())/1000));
     $('timer').textContent=remaining;$('timer').classList.toggle('urgent',remaining<=10);$('timer').classList.toggle('critical',remaining<=5);
     if(state.room.status==='playing'){
-      if(remaining<=30&&state.round){$('hintBar').textContent=`范围提示：${state.round.hint}`;$('hintBar').classList.add('revealed');}
+      if(remaining<=30&&state.round?.hint){$('hintBar').textContent=`范围提示：${state.round.hint}`;$('hintBar').classList.add('revealed');}
       else{$('hintBar').textContent='范围提示将在剩余 30 秒时出现';$('hintBar').classList.remove('revealed');}
       if(remaining<=0&&!transitionBusy)mutate('finish_round').catch(()=>{});
     }else if(state.room.status==='summary'){
