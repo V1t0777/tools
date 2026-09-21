@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0c1220">
+  <title>小游戏｜钊的工具箱</title>
+  <style>
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    :root{--bg:#090e18;--card:#121a2a;--line:rgba(255,255,255,.09);--text:#f7f9ff;--muted:#98a5bd;--violet:#8f7cff;--cyan:#55d8ff}
+    html,body{margin:0;min-height:100%;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","PingFang SC","Microsoft YaHei",sans-serif;color:var(--text);background:var(--bg)}
+    body{min-height:100dvh;background:radial-gradient(circle at 14% 0,rgba(90,115,255,.2),transparent 34%),radial-gradient(circle at 95% 18%,rgba(63,224,255,.11),transparent 28%),linear-gradient(180deg,#10182a,#080c14);padding:max(18px,env(safe-area-inset-top)) 16px max(28px,env(safe-area-inset-bottom))}
+    .page{width:min(920px,100%);margin:auto}.top{display:flex;align-items:center;justify-content:space-between}.back{color:var(--text);text-decoration:none;border:1px solid var(--line);border-radius:14px;padding:11px 14px;background:rgba(255,255,255,.05);font-weight:800;font-size:13px}
+    header{padding:42px 2px 26px}.eyebrow{color:#8fe6ff;font-weight:850;font-size:13px;letter-spacing:.12em}h1{font-size:clamp(42px,10vw,72px);margin:9px 0 12px;letter-spacing:-.06em;line-height:.96}.lead{margin:0;color:var(--muted);line-height:1.75;max-width:560px}
+    .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}.card{position:relative;min-height:270px;border:1px solid var(--line);border-radius:28px;padding:24px;color:inherit;text-decoration:none;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.25);transition:.18s transform}
+    .card:active{transform:scale(.985)}.snake{background:linear-gradient(145deg,#10291d,#0c1812)}.draw{background:linear-gradient(145deg,#211b42,#111a38)}.glow{position:absolute;width:180px;height:180px;border-radius:50%;right:-60px;top:-65px;filter:blur(4px);opacity:.25}.snake .glow{background:#63f69a}.draw .glow{background:#8372ff}
+    .icon{font-size:58px;filter:drop-shadow(0 10px 15px rgba(0,0,0,.22))}.badge{position:absolute;right:19px;top:19px;border-radius:999px;padding:7px 10px;background:rgba(255,255,255,.08);font-size:11px;font-weight:850;color:#d6dded}.title{font-size:28px;font-weight:950;margin-top:auto}.desc{color:#aeb8ca;font-size:14px;line-height:1.6;margin-top:7px}.meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:16px}.meta span{border:1px solid var(--line);border-radius:999px;padding:6px 9px;color:#bcc6d8;font-size:10px;font-weight:800}.arrow{position:absolute;right:22px;bottom:22px;width:42px;height:42px;display:grid;place-items:center;border-radius:50%;background:rgba(255,255,255,.09);font-size:24px}
+    .note{margin:20px 2px 0;color:#708099;font-size:12px;line-height:1.7}
+    @media(max-width:650px){header{padding-top:34px}.grid{grid-template-columns:1fr}.card{min-height:230px}}
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="top"><a class="back" href="../">← 返回工具箱</a><span aria-hidden="true">🎮</span></div>
+    <header><div class="eyebrow">GAME LOUNGE</div><h1>小游戏</h1><p class="lead">一个人随手玩，或和熟悉的朋友开一局。首版联机功能只向工具箱现有成员开放。</p></header>
+    <section class="grid" aria-label="小游戏列表">
+      <a class="card snake" href="../snake/">
+        <i class="glow"></i><span class="badge">单人 · 直接玩</span><div class="icon">🐍</div>
+        <div class="title">贪吃蛇</div><div class="desc">滑动操控，休闲、经典与极速三种模式。</div>
+        <div class="meta"><span>金苹果</span><span>本地最高分</span><span>手机适配</span></div><div class="arrow">›</div>
+      </a>
+      <a class="card draw" href="../pictionary/">
+        <i class="glow"></i><span class="badge">好友实时联机</span><div class="icon">🎨</div>
+        <div class="title">你画我猜</div><div class="desc">60 秒一轮，实时画笔、猜词计分与 30 秒范围提示。</div>
+        <div class="meta"><span>2–8 人</span><span>好友房</span><span>需登录</span></div><div class="arrow">›</div>
+      </a>
+    </section>
+    <p class="note">陌生人匹配与公开房间暂未开放，将在后续版本单独增加。</p>
+  </main>
+  <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"bfd3df5c469343eb91856b7f3275def8"}'></script>
+</body>
+</html>

@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#101225">
+  <meta name="referrer" content="no-referrer">
+  <title>你画我猜｜钊的工具箱</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <a class="back" href="../games/">← 小游戏</a>
+      <div class="brand"><span>🎨</span><strong>你画我猜</strong></div>
+      <button class="ghost hidden" id="shareBtn">邀请</button>
+    </header>
+
+    <section class="screen active" id="authScreen">
+      <div class="hero-card">
+        <div class="hero-icon">🖍️</div><h1>画给朋友猜</h1>
+        <p>好友房实时联机。当前版本仅限工具箱已有成员进入。</p>
+      </div>
+      <form class="panel form" id="loginForm">
+        <h2>登录工具箱</h2>
+        <label>邮箱<input id="emailInput" type="email" autocomplete="username" required placeholder="你的登录邮箱"></label>
+        <label>密码<input id="passwordInput" type="password" autocomplete="current-password" required placeholder="••••••••"></label>
+        <button class="primary" type="submit">登录</button><p class="error" id="loginError"></p>
+      </form>
+    </section>
+
+    <section class="screen" id="homeScreen">
+      <div class="welcome"><div><small>欢迎回来</small><h1 id="welcomeName">好友</h1></div><button class="ghost" id="signOutBtn">退出</button></div>
+      <div class="action-grid">
+        <button class="action-card create" id="createBtn"><span>✨</span><b>创建好友房</b><small>生成房间码与邀请链接</small></button>
+        <form class="action-card join" id="joinForm"><span>🔑</span><b>输入房间码</b><input id="roomCodeInput" maxlength="6" autocomplete="off" placeholder="例如 7K3M8P"><button type="submit">加入房间</button></form>
+      </div>
+      <p class="privacy">🔒 非成员即使拿到链接也无法加入。</p>
+    </section>
+
+    <section class="screen" id="roomScreen">
+      <div class="room-head"><div><small>好友房</small><h1 id="roomCode">------</h1></div><span class="status-pill" id="connectionStatus">连接中</span></div>
+      <div class="panel players-panel"><div class="section-title"><b>房间成员</b><span id="playerCount">0 / 8</span></div><div class="players" id="players"></div></div>
+      <div class="panel lobby-actions" id="lobbyActions">
+        <p id="lobbyHint">准备好后，等待房主开始。</p>
+        <button class="secondary" id="readyBtn">我准备好了</button>
+        <button class="primary hidden" id="startBtn">开始游戏</button>
+      </div>
+      <div class="panel rules"><b>本局规则</b><p>每人画 2 次 · 每轮 60 秒 · 30 秒时解锁范围提示 · 越早猜中得分越高</p></div>
+    </section>
+
+    <section class="screen" id="gameScreen">
+      <div class="game-head"><div><small id="roundLabel">第 1 轮</small><strong id="drawerLabel">准备中</strong></div><div class="timer" id="timer">60</div></div>
+      <div class="word-box" id="wordBox"><span id="wordLabel">等待画手选词</span></div>
+      <div class="hint-bar" id="hintBar" aria-live="polite">范围提示将在剩余 30 秒时出现</div>
+      <section class="canvas-shell" id="canvasShell"><canvas id="canvas"></canvas><div class="canvas-cover" id="canvasCover"><div id="coverText">等待本轮开始</div></div></section>
+      <div class="tools hidden" id="drawTools">
+        <div class="colors" id="colors"></div>
+        <div class="brushes"><button data-size="3">细</button><button data-size="7" class="active">中</button><button data-size="14">粗</button><button id="eraserBtn">橡皮</button></div>
+        <div class="edit-tools"><button id="undoBtn">↶ 撤销</button><button class="hold-clear" id="clearBtn">长按清空</button></div>
+      </div>
+      <div class="guess-panel" id="guessPanel">
+        <div class="feed" id="guessFeed"></div>
+        <form class="guess-form" id="guessForm"><input id="guessInput" maxlength="40" placeholder="输入你的答案…" autocomplete="off"><button>发送</button></form>
+      </div>
+      <div class="score-strip" id="scoreStrip"></div>
+    </section>
+
+    <section class="screen" id="finishScreen">
+      <div class="finish-hero"><div>🏆</div><h1>本局结束</h1><p>饭醉团伙 · 本局战报</p></div>
+      <div class="panel ranking" id="ranking"></div>
+      <button class="primary" id="againBtn">再来一局</button><a class="secondary link" href="../games/">返回小游戏</a>
+    </section>
+  </main>
+
+  <div class="modal hidden" id="wordModal"><div class="modal-card"><small>你是本轮画手</small><h2>请选择题目</h2><p>其他玩家不会看到正确答案</p><div id="wordOptions"></div></div></div>
+  <div class="toast" id="toast" role="status"></div>
+
+  <script src="../shared/toolbox-auth.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/dist/umd/supabase.min.js"></script>
+  <script src="./app.js"></script>
+  <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"bfd3df5c469343eb91856b7f3275def8"}'></script>
+</body>
+</html>
