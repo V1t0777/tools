@@ -367,6 +367,217 @@
   [els.cols,els.rows,els.beadPitch].forEach(el=>el.addEventListener('input',updatePhysicalInfo));
   els.sizeToGrid.addEventListener('click',applyTargetSize);
 
+  // ---------- Precision geometry ----------
+  function solveLinear(A,b){
+    const n=b.length,M=A.map((row,i)=>row.slice().concat(b[i]));
+    for(let col=0;col<n;col++){
+      let pivot=col;
+      for(let r=col+1;r<n;r++) if(Math.abs(M[r][col])>Math.abs(M[pivot][col])) pivot=r;
+      if(Math.abs(M[pivot][col])<1e-10) return null;
+      [M[col],M[pivot]]=[M[pivot],M[col]];
+      const div=M[col][col];
+      for(let j=col;j<=n;j++) M[col][j]/=div;
+      for(let r=0;r<n;r++){
+        if(r===col) continue;
+        const factor=M[r][col];
+        if(!factor) continue;
+        for(let j=col;j<=n;j++) M[r][j]-=factor*M[col][j];
+      }
+    }
+    return M.map(row=>row[n]);
+  }
+
+  function homographyDestToSrc(dst,src){
+    const A=[],b=[];
+    for(let i=0;i<4;i++){
+      const x=dst[i].x,y=dst[i].y,u=src[i].x,v=src[i].y;
+      A.push([x,y,1,0,0,0,-u*x,-u*y]); b.push(u);
+      A.push([0,0,0,x,y,1,-v*x,-v*y]); b.push(v);
+    }
+    const h=solveLinear(A,b);
+    return h ? [...h,1] : null;
+  }
+
+  function applyH(H,x,y){
+    const d=H[6]*x+H[7]*y+H[8];
+    return {x:(H[0]*x+H[1]*y+H[2])/d,y:(H[3]*x+H[4]*y+H[5])/d};
+  }
+
+  function rawSourceCanvas(maxDim=1800){
+    const s=document.createElement('canvas');
+    const scale=Math.min(1,maxDim/Math.max(imageBitmap.width,imageBitmap.height));
+    s.width=Math.max(1,Math.round(imageBitmap.width*scale));
+    s.height=Math.max(1,Math.round(imageBitmap.height*scale));
+    const x=s.getContext('2d',{willReadFrequently:true});
+    x.imageSmoothingEnabled=false;
+    x.drawImage(imageBitmap,0,0,s.width,s.height);
+    return {canvas:s,scale};
+  }
+
+  function perspectiveRectify(maxDim=1800){
+    if(!imageBitmap||!perspectiveEnabled) return null;
+    const raw=rawSourceCanvas(maxDim);
+    const pts=perspectiveCorners.map(p=>({x:p.x*(raw.canvas.width-1),y:p.y*(raw.canvas.height-1)}));
+    const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+    let ow=Math.max(64,Math.round((dist(pts[0],pts[1])+dist(pts[3],pts[2]))/2));
+    let oh=Math.max(64,Math.round((dist(pts[0],pts[3])+dist(pts[1],pts[2]))/2));
+    const scale=Math.min(1,maxDim/Math.max(ow,oh));ow=Math.max(64,Math.round(ow*scale));oh=Math.max(64,Math.round(oh*scale));
+    const dst=[{x:0,y:0},{x:ow-1,y:0},{x:ow-1,y:oh-1},{x:0,y:oh-1}];
+    const H=homographyDestToSrc(dst,pts); if(!H) return null;
+    const srcCtx=raw.canvas.getContext('2d',{willReadFrequently:true});
+    const src=srcCtx.getImageData(0,0,raw.canvas.width,raw.canvas.height);
+    const out=document.createElement('canvas');out.width=ow;out.height=oh;
+    const ox=out.getContext('2d',{willReadFrequently:true});
+    const od=ox.createImageData(ow,oh),sd=src.data,dd=od.data,sw=raw.canvas.width,sh=raw.canvas.height;
+    for(let y=0;y<oh;y++){
+      for(let x=0;x<ow;x++){
+        const p=applyH(H,x,y);
+        const sx=clamp(Math.round(p.x),0,sw-1),sy=clamp(Math.round(p.y),0,sh-1);
+        const si=(sy*sw+sx)*4,di=(y*ow+x)*4;
+        dd[di]=sd[si];dd[di+1]=sd[si+1];dd[di+2]=sd[si+2];dd[di+3]=sd[si+3];
+      }
+    }
+    ox.putImageData(od,0,0);
+    return out;
+  }
+
+  function renderPerspectiveEditor(){
+    if(!imageBitmap)return;
+    const cv=els.perspectiveCanvas,ctx=cv.getContext('2d');
+    const maxW=900,maxH=650,scale=Math.min(maxW/imageBitmap.width,maxH/imageBitmap.height,1);
+    cv.width=Math.max(240,Math.round(imageBitmap.width*scale));cv.height=Math.max(180,Math.round(imageBitmap.height*scale));
+    ctx.clearRect(0,0,cv.width,cv.height);ctx.imageSmoothingEnabled=false;ctx.drawImage(imageBitmap,0,0,cv.width,cv.height);
+    ctx.strokeStyle='rgba(139,102,255,.95)';ctx.lineWidth=Math.max(2,cv.width/350);ctx.beginPath();
+    perspectiveCorners.forEach((p,i)=>{const x=p.x*cv.width,y=p.y*cv.height;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);});ctx.closePath();ctx.stroke();
+    perspectiveCorners.forEach((p,i)=>{
+      const x=p.x*cv.width,y=p.y*cv.height;
+      ctx.fillStyle='#7656e8';ctx.beginPath();ctx.arc(x,y,Math.max(10,cv.width/55),0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#fff';ctx.font='bold '+Math.max(12,cv.width/48)+'px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(String(i+1),x,y);
+    });
+  }
+
+  let dragCorner=-1;
+  els.perspectiveCanvas.addEventListener('pointerdown',e=>{
+    const r=els.perspectiveCanvas.getBoundingClientRect();
+    const x=(e.clientX-r.left)/r.width,y=(e.clientY-r.top)/r.height;
+    let best=Infinity,idx=-1;
+    perspectiveCorners.forEach((p,i)=>{const d=Math.hypot(x-p.x,y-p.y);if(d<best){best=d;idx=i;}});
+    if(best<.12){dragCorner=idx;els.perspectiveCanvas.setPointerCapture?.(e.pointerId);}
+  });
+  els.perspectiveCanvas.addEventListener('pointermove',e=>{
+    if(dragCorner<0)return;
+    const r=els.perspectiveCanvas.getBoundingClientRect();
+    perspectiveCorners[dragCorner]={x:clamp((e.clientX-r.left)/r.width,0,1),y:clamp((e.clientY-r.top)/r.height,0,1)};
+    renderPerspectiveEditor();
+  });
+  const stopDrag=()=>{dragCorner=-1;};
+  els.perspectiveCanvas.addEventListener('pointerup',stopDrag);els.perspectiveCanvas.addEventListener('pointercancel',stopDrag);
+
+  els.openPerspective.addEventListener('click',()=>{
+    if(!imageBitmap){setStatus(els.imageStatus,'请先上传图纸，再设置四角。','error');return;}
+    perspectiveBackup=perspectiveCorners.map(p=>({...p}));
+    els.perspectiveEditor.classList.remove('hidden');renderPerspectiveEditor();
+  });
+  els.resetPerspective.addEventListener('click',()=>{
+    perspectiveCorners=[{x:.03,y:.03},{x:.97,y:.03},{x:.97,y:.97},{x:.03,y:.97}];
+    perspectiveEnabled=false;els.perspectiveMode.value='off';els.perspectiveEditor.classList.add('hidden');
+    if(imageBitmap){prepareWorkCanvas();renderPreview(true);}
+  });
+  els.applyPerspective.addEventListener('click',()=>{
+    perspectiveEnabled=true;els.perspectiveMode.value='manual';els.perspectiveEditor.classList.add('hidden');
+    prepareWorkCanvas();renderPreview(true);setStatus(els.imageStatus,'四角透视校正已应用。请继续确认网格是否对齐。');
+  });
+  els.cancelPerspective.addEventListener('click',()=>{
+    if(perspectiveBackup)perspectiveCorners=perspectiveBackup.map(p=>({...p}));
+    els.perspectiveEditor.classList.add('hidden');
+  });
+  els.perspectiveMode.addEventListener('change',()=>{
+    if(els.perspectiveMode.value==='off'){perspectiveEnabled=false;if(imageBitmap){prepareWorkCanvas();renderPreview(true);}}
+    else if(imageBitmap){els.openPerspective.click();}
+  });
+
+  function fastVariance(data,w,h,cx,cy,rx,ry){
+    const vals=[];
+    for(let yy=-1;yy<=1;yy++)for(let xx=-1;xx<=1;xx++){
+      const x=clamp(Math.round(cx+xx*rx),0,w-1),y=clamp(Math.round(cy+yy*ry),0,h-1);
+      vals.push(grayAt(data,w,x,y));
+    }
+    const m=vals.reduce((a,b)=>a+b,0)/vals.length;
+    return vals.reduce((s,v)=>s+(v-m)*(v-m),0)/vals.length;
+  }
+
+  function findGridPhase(data,w,h,cols,rows){
+    if(els.phaseMode.value!=='auto')return{x:0,y:0,score:null};
+    const cw=w/cols,ch=h/rows,steps=[-.32,-.24,-.16,-.08,0,.08,.16,.24,.32];
+    let best={x:0,y:0,score:Infinity};
+    const rowStep=Math.max(1,Math.floor(rows/12)),colStep=Math.max(1,Math.floor(cols/12));
+    for(const oy of steps)for(const ox of steps){
+      let score=0,n=0;
+      for(let r=0;r<rows;r+=rowStep)for(let col=0;col<cols;col+=colStep){
+        const cx=(col+.5+ox)*cw,cy=(r+.5+oy)*ch;
+        score+=fastVariance(data,w,h,cx,cy,Math.max(1,cw*.12),Math.max(1,ch*.12));n++;
+      }
+      score/=Math.max(1,n);
+      if(score<best.score)best={x:ox,y:oy,score};
+    }
+    return best;
+  }
+
+  function rebuildClustersFromCells(raw){
+    const map=new Map();
+    for(const cell of raw){
+      if(cell.alpha<40||cell.sourceCluster==null)continue;
+      let cl=map.get(cell.sourceCluster);
+      if(!cl){cl={id:cell.sourceCluster,count:0,sum:[0,0,0],cells:[]};map.set(cell.sourceCluster,cl);}
+      cl.count++;cl.sum[0]+=cell.rgb[0];cl.sum[1]+=cell.rgb[1];cl.sum[2]+=cell.rgb[2];cl.cells.push(cell);
+    }
+    return [...map.values()].map(cl=>{cl.rgb=cl.sum.map(v=>v/cl.count);cl.lab=rgbToLab(cl.rgb);cl.hex=rgbToHex(...cl.rgb);return cl;}).sort((a,b)=>b.count-a.count);
+  }
+
+  function mergeClusterInto(from,to){
+    for(const cell of from.cells)cell.sourceCluster=to.id;
+  }
+
+  function spatialRefineClusters(raw,clusters,cols,rows,tolerance){
+    const byId=new Map(clusters.map(x=>[x.id,x])),total=raw.length;
+    const tiny=Math.max(2,Math.round(total*.004));
+    for(const cl of clusters.slice().sort((a,b)=>a.count-b.count)){
+      if(cl.count>tiny)continue;
+      const votes=new Map();
+      for(const cell of cl.cells){
+        const idx=cell.row*cols+cell.col;
+        const neighbors=[idx-cols,idx+cols,idx-1,idx+1];
+        for(const ni of neighbors){
+          const n=raw[ni];if(!n)continue;
+          if(Math.abs(n.row-cell.row)+Math.abs(n.col-cell.col)!==1)continue;
+          if(n.sourceCluster!=null&&n.sourceCluster!==cl.id)votes.set(n.sourceCluster,(votes.get(n.sourceCluster)||0)+1);
+        }
+      }
+      const targets=[...votes.entries()].sort((a,b)=>b[1]-a[1]);
+      if(!targets.length)continue;
+      const target=byId.get(targets[0][0]);if(!target)continue;
+      if(dE00(cl.lab,target.lab)<=tolerance*1.55)mergeClusterInto(cl,target);
+    }
+    return rebuildClustersFromCells(raw);
+  }
+
+  function constrainClusterCount(raw,clusters,expected){
+    expected=clamp(parseInt(expected)||0,0,100);
+    if(!expected||clusters.length<=expected)return clusters;
+    let list=clusters;
+    while(list.length>expected){
+      let best=null,bestD=Infinity;
+      for(let i=0;i<list.length;i++)for(let j=i+1;j<list.length;j++){
+        const d=dE00(list[i].lab,list[j].lab);
+        if(d<bestD){bestD=d;best=[list[i],list[j]];}
+      }
+      if(!best||bestD>7.5)break;
+      const [a,b]=best;a.count>=b.count?mergeClusterInto(b,a):mergeClusterInto(a,b);
+      list=rebuildClustersFromCells(raw);
+    }
+    return list;
+  }
+
   function clusterSourceCells(raw,tolerance){
     const exact=new Map();
     for(const cell of raw){
