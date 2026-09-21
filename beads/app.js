@@ -203,11 +203,29 @@
     return Math.sqrt(a*a+b*b+c*c+Rt*b*c);
   }
 
+  function parseProjectPaletteCodes(){
+    return new Set(
+      String(els.projectPaletteCodes?.value||'')
+        .toUpperCase()
+        .split(/[\s,，;；]+/)
+        .map(x=>x.trim())
+        .filter(Boolean)
+    );
+  }
+  function updateProjectPaletteStatus(){
+    const codes=parseProjectPaletteCodes();
+    const enabled=!!els.limitPalette?.checked;
+    els.projectPaletteStatus.textContent=enabled
+      ? (codes.size ? ('限定 '+codes.size+' 个 MARD 色号') : '已启用限定，但尚未填写色号')
+      : '未限制：在当前 MARD 色库中匹配';
+  }
   function getMardPalette(mode='mard221'){
     const source=globalThis.MARDPalette?.colors||[];
     const full=mode==='mard291';
+    const limited=!!els.limitPalette?.checked;
+    const allowed=parseProjectPaletteCodes();
     return source
-      .filter(x=>full||x.standard)
+      .filter(x=>(full||x.standard) && (!limited || !allowed.size || allowed.has(x.code.toUpperCase())))
       .map(x=>{
         const rgb=hexToRgb(x.hex);
         return {
@@ -307,6 +325,22 @@
   });
   els.mardSeries.addEventListener('change',renderMardPalette);
   els.mardSearch.addEventListener('input',renderMardPalette);
+  els.limitPalette.addEventListener('change',updateProjectPaletteStatus);
+  els.projectPaletteCodes.addEventListener('input',updateProjectPaletteStatus);
+  els.paletteFromInventory.addEventListener('click',()=>{
+    const codes=[...new Set(inventoryRows
+      .filter(r=>Number(r.quantity)>0 && /^MARD\b/i.test(String(r.palette_name||'')))
+      .map(r=>String(r.color_code||'').toUpperCase())
+      .filter(Boolean))].sort();
+    if(!codes.length){
+      setStatus(els.imageStatus,'当前库存里没有可用于限定的 MARD 有货色号。','error');
+      return;
+    }
+    els.projectPaletteCodes.value=codes.join(',');
+    els.limitPalette.checked=true;
+    updateProjectPaletteStatus();
+    setStatus(els.imageStatus,'已从当前库存生成项目限定色板，共 '+codes.length+' 个色号。');
+  });
   els.mode.addEventListener('change',()=>{
     els.paletteCard.classList.toggle('palette-required',els.mode.value==='palette');
     if(els.mode.value==='mard221'){els.mardRange.value='221';renderMardPalette();}
@@ -861,6 +895,7 @@
   // ---------- init ----------
   loadPaletteLocal();
   initMardPalette();
+  updateProjectPaletteStatus();
   updatePhysicalInfo();
   refreshAuthUI().finally(startPolling);
   window.addEventListener('pagehide',()=>clearInterval(inventoryPoll),{once:true});
