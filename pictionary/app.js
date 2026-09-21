@@ -8,6 +8,7 @@
   let currentRoundId=null, strokes=[], activeStroke=null, sendPoints=[], sendTimer=null, selectedColor=COLORS[0], brushSize=7, erasing=false;
   let canvas=$('canvas'), ctx=canvas.getContext('2d'), logical={w:1,h:1}, busy=false, transitionBusy=false, presenceMembers=new Set();
   let realtimeStatus='CLOSED', reconnectTimer=null, snapshotTimer=null, snapshotAssemblies=new Map();
+  let canvasSyncTimer=null, serverSaveTimer=null, canvasFetchBusy=false, canvasSaveBusy=false, canvasSaveQueued=false, lastCanvasVersion=0;
 
   function show(id){ screens.forEach(x => $(x).classList.toggle('active',x===id)); }
   function toast(message){ const el=$('toast'); el.textContent=message; el.classList.add('show'); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),2300); }
@@ -64,7 +65,13 @@
     if(code.length!==6){if(!silent)toast('请输入 6 位房间码');return;}
     try{const data=await api('join_room',{code});await enterRoom(data.state);}catch(err){toast(err.message);if(silent)setURL('');}
   }
-  async function enterRoom(next){ stateGeneration++;state=next;setURL(state.room.code);$('shareBtn').classList.remove('hidden');await connectRealtime();renderState();clearInterval(pollTimer);pollTimer=setInterval(refreshState,1600);clearInterval(clockTimer);clockTimer=setInterval(tick,250); }
+  async function enterRoom(next){
+    stateGeneration++;state=next;setURL(state.room.code);$('shareBtn').classList.remove('hidden');
+    await connectRealtime();renderState();
+    clearInterval(pollTimer);pollTimer=setInterval(refreshState,1600);
+    clearInterval(clockTimer);clockTimer=setInterval(tick,250);
+    clearInterval(canvasSyncTimer);canvasSyncTimer=setInterval(pullCanvasFallback,500);
+  }
   async function mutate(action,payload={}){if(busy)return;busy=true;const generation=++stateGeneration;try{const data=await api(action,{room_id:state.room.id,...payload});if(data.state&&generation===stateGeneration){state=data.state;renderState();sendEvent('state_changed',{at:Date.now()});}return data;}finally{busy=false;}}
   async function refreshState(){if(!state||busy||transitionBusy)return;const generation=stateGeneration;transitionBusy=true;try{const data=await api('state',{room_id:state.room.id});if(generation!==stateGeneration)return;state=data.state;renderState();}catch(err){if(/不在房间|房间不存在/.test(err.message)){leaveRealtime();show('homeScreen');setURL('');}else console.warn(err);}finally{transitionBusy=false;}}
 
@@ -107,7 +114,10 @@
   function leaveRealtime(stopTimers=true){
     clearTimeout(reconnectTimer);reconnectTimer=null;clearInterval(snapshotTimer);snapshotTimer=null;
     if(channel&&realtime)realtime.removeChannel(channel);channel=realtime=null;realtimeStatus='CLOSED';presenceMembers.clear();
-    if(stopTimers){clearInterval(pollTimer);clearInterval(clockTimer);pollTimer=clockTimer=null;}
+    if(stopTimers){
+      clearInterval(pollTimer);clearInterval(clockTimer);clearInterval(canvasSyncTimer);clearTimeout(serverSaveTimer);
+      pollTimer=clockTimer=canvasSyncTimer=serverSaveTimer=null;
+    }
   }
   function sendEvent(event,payload){
     if(!channel||realtimeStatus!=='SUBSCRIBED')return Promise.resolve('not_connected');
@@ -167,9 +177,9 @@
 
   function resizeCanvas(){const rect=canvas.getBoundingClientRect();if(!rect.width)return;const dpr=Math.min(2,window.devicePixelRatio||1);logical={w:rect.width,h:rect.height};canvas.width=Math.round(rect.width*dpr);canvas.height=Math.round(rect.height*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);ctx.lineCap='round';ctx.lineJoin='round';redraw();}
   function point(e){const r=canvas.getBoundingClientRect();return [Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)),Math.max(0,Math.min(1,(e.clientY-r.top)/r.height))];}
-  function pointerDown(e){if(!isDrawer()||state.room.status!=='playing')return;e.preventDefault();canvas.setPointerCapture(e.pointerId);const p=point(e);activeStroke={id:crypto.randomUUID?.()||`${Date.now()}-${Math.random()}`,color:erasing?'#ffffff':selectedColor,size:brushSize,points:[p]};sendPoints=[p];drawDot(activeStroke,p);flushStroke(false);}
-  function pointerMove(e){if(!activeStroke)return;e.preventDefault();const p=point(e),last=activeStroke.points.at(-1);if(Math.hypot((p[0]-last[0])*logical.w,(p[1]-last[1])*logical.h)<1.5)return;activeStroke.points.push(p);sendPoints.push(p);drawSegment(activeStroke,last,p);scheduleSend();}
-  function pointerUp(e){if(!activeStroke)return;e.preventDefault();flushStroke(true);strokes.push(activeStroke);activeStroke=null;sendPoints=[];saveCanvas();}
+  function pointerDown(e){if(!isDrawer()||state.room.status!=='playing')return;e.preventDefault();canvas.setPointerCapture(e.pointerId);const p=point(e);activeStroke={id:crypto.randomUUID?.()||`${Date.now()}-${Math.random()}`,color:erasing?'#ffffff':selectedColor,size:brushSize,points:[p]};sendPoints=[p];drawDot(activeStroke,p);flushStroke(false);scheduleServerCanvasSave();}
+  function pointerMove(e){if(!activeStroke)return;e.preventDefault();const p=point(e),last=activeStroke.points.at(-1);if(Math.hypot((p[0]-last[0])*logical.w,(p[1]-last[1])*logical.h)<1.5)return;activeStroke.points.push(p);sendPoints.push(p);drawSegment(activeStroke,last,p);scheduleSend();scheduleServerCanvasSave();}
+  function pointerUp(e){if(!activeStroke)return;e.preventDefault();flushStroke(true);strokes.push(activeStroke);activeStroke=null;sendPoints=[];saveCanvas();persistCanvasFallback();}
   function scheduleSend(){if(sendTimer)return;sendTimer=setTimeout(()=>flushStroke(false),45);}
   function flushStroke(done){
     clearTimeout(sendTimer);sendTimer=null;if(!activeStroke)return;
@@ -198,20 +208,20 @@
   function drawDot(s,p){ctx.fillStyle=s.color;ctx.beginPath();ctx.arc(p[0]*logical.w,p[1]*logical.h,s.size/2,0,Math.PI*2);ctx.fill();}
   function drawSegment(s,a,b){ctx.strokeStyle=s.color;ctx.lineWidth=s.size;ctx.beginPath();ctx.moveTo(a[0]*logical.w,a[1]*logical.h);ctx.lineTo(b[0]*logical.w,b[1]*logical.h);ctx.stroke();}
   function redraw(){if(!logical.w)return;ctx.clearRect(0,0,logical.w,logical.h);ctx.fillStyle='#fff';ctx.fillRect(0,0,logical.w,logical.h);for(const s of strokes){if(s.points.length===1)drawDot(s,s.points[0]);for(let i=1;i<s.points.length;i++)drawSegment(s,s.points[i-1],s.points[i]);}if(activeStroke){if(activeStroke.points.length===1)drawDot(activeStroke,activeStroke.points[0]);for(let i=1;i<activeStroke.points.length;i++)drawSegment(activeStroke,activeStroke.points[i-1],activeStroke.points[i]);}}
-  function undoStroke(){if(!isDrawer()||!strokes.length)return;const s=strokes.pop();redraw();saveCanvas();sendEvent('undo',{round_id:currentRoundId,id:s.id});sendSnapshot();}
+  function undoStroke(){if(!isDrawer()||!strokes.length)return;const s=strokes.pop();redraw();saveCanvas();sendEvent('undo',{round_id:currentRoundId,id:s.id});sendSnapshot();persistCanvasFallback();}
   function bindHoldClear(){
     let t=null;const b=$('clearBtn');
     const cancel=()=>{clearTimeout(t);t=null;b.classList.remove('holding');};
-    b.addEventListener('pointerdown',e=>{if(!isDrawer())return;e.preventDefault();b.classList.add('holding');t=setTimeout(()=>{strokes=[];activeStroke=null;sendPoints=[];redraw();saveCanvas();sendEvent('clear',{round_id:currentRoundId,sent_at:Date.now()});toast('画布已清空');cancel();},480);});
+    b.addEventListener('pointerdown',e=>{if(!isDrawer())return;e.preventDefault();b.classList.add('holding');t=setTimeout(()=>{strokes=[];activeStroke=null;sendPoints=[];redraw();saveCanvas();sendEvent('clear',{round_id:currentRoundId,sent_at:Date.now()});persistCanvasFallback();toast('画布已清空');cancel();},480);});
     ['pointerup','pointercancel','pointerleave'].forEach(x=>b.addEventListener(x,cancel));
   }
   function storageKey(){return currentRoundId?`pictionary.canvas.${currentRoundId}`:'';}
   function saveCanvas(){try{if(storageKey())sessionStorage.setItem(storageKey(),JSON.stringify(strokes));}catch{}}
   function switchRound(id){
-    currentRoundId=id;strokes=[];activeStroke=null;sendPoints=[];snapshotAssemblies.clear();
+    currentRoundId=id;strokes=[];activeStroke=null;sendPoints=[];snapshotAssemblies.clear();lastCanvasVersion=0;
     if(id&&isDrawer()){try{strokes=JSON.parse(sessionStorage.getItem(storageKey())||'[]');}catch{strokes=[];}}
     redraw();
-    if(id&&!isDrawer())setTimeout(()=>sendEvent('sync_request',{member_id:me.id,round_id:id}),120);
+    if(id&&!isDrawer()){setTimeout(()=>sendEvent('sync_request',{member_id:me.id,round_id:id}),120);setTimeout(pullCanvasFallback,180);}
   }
   function sendSnapshot(){
     if(!currentRoundId||!isDrawer())return;
@@ -229,6 +239,44 @@
     if(entry.chunks.size<entry.total)return;
     const merged=[];for(let i=0;i<entry.total;i++)merged.push(...(entry.chunks.get(i)||[]));
     strokes=merged;activeStroke=null;snapshotAssemblies.clear();redraw();
+  }
+
+  function canvasPayload(){
+    const all=activeStroke?[...strokes,activeStroke]:strokes;
+    return all.map(s=>({id:s.id,color:s.color,size:s.size,points:s.points}));
+  }
+  function scheduleServerCanvasSave(){
+    if(serverSaveTimer||!isDrawer()||state?.room?.status!=='playing'||!currentRoundId)return;
+    serverSaveTimer=setTimeout(()=>{serverSaveTimer=null;persistCanvasFallback();},420);
+  }
+  async function persistCanvasFallback(){
+    clearTimeout(serverSaveTimer);serverSaveTimer=null;
+    if(!isDrawer()||state?.room?.status!=='playing'||!currentRoundId)return;
+    if(canvasSaveBusy){canvasSaveQueued=true;return;}
+    canvasSaveBusy=true;
+    const roundId=currentRoundId,roomId=state.room.id,payload=canvasPayload();
+    try{
+      const data=await api('save_canvas',{room_id:roomId,round_id:roundId,strokes:payload});
+      if(roundId===currentRoundId)lastCanvasVersion=Math.max(lastCanvasVersion,Number(data?.version)||0);
+    }catch(err){console.warn('canvas fallback save failed',err);}
+    finally{
+      canvasSaveBusy=false;
+      if(canvasSaveQueued){canvasSaveQueued=false;scheduleServerCanvasSave();}
+    }
+  }
+  async function pullCanvasFallback(){
+    if(canvasFetchBusy||!state||!currentRoundId||isDrawer()||state.room.status!=='playing')return;
+    canvasFetchBusy=true;
+    const roundId=currentRoundId,roomId=state.room.id;
+    try{
+      const data=await api('canvas',{room_id:roomId,round_id:roundId});
+      if(roundId!==currentRoundId)return;
+      const version=Number(data?.version)||0;
+      if(version>lastCanvasVersion&&Array.isArray(data?.strokes)){
+        lastCanvasVersion=version;strokes=data.strokes;activeStroke=null;redraw();
+      }
+    }catch(err){console.warn('canvas fallback fetch failed',err);}
+    finally{canvasFetchBusy=false;}
   }
 
   boot();
