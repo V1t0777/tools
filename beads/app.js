@@ -771,7 +771,9 @@
     if(cells.length){
       for(let i=0;i<cells.length;i++){
         const c=cells[i],x=c.col*cw,y=c.row*ch;
-        if(highlightKey && c.key!==highlightKey){
+        if(isCellBlank(c)){
+          pctx.fillStyle='rgba(255,255,255,.26)';pctx.fillRect(x,y,cw,ch);
+        }else if(highlightKey && c.key!==highlightKey){
           pctx.fillStyle='rgba(20,18,24,.58)';pctx.fillRect(x,y,cw,ch);
         }else if(c.low){
           pctx.fillStyle='rgba(255,176,40,.13)';pctx.fillRect(x,y,cw,ch);
@@ -788,8 +790,9 @@
       pctx.beginPath();
       pctx.strokeStyle='rgba(116,55,245,.45)';
       pctx.lineWidth=Math.max(.6,preview.width/1300);
-      for(let i=1;i<cols;i++){const x=i*cw;pctx.moveTo(x,0);pctx.lineTo(x,preview.height);}
-      for(let i=1;i<rows;i++){const y=i*ch;pctx.moveTo(0,y);pctx.lineTo(preview.width,y);}
+      const px=(analysisMeta?.phaseX??phaseOffset.x??0)*cw,py=(analysisMeta?.phaseY??phaseOffset.y??0)*ch;
+      for(let i=1;i<cols;i++){const x=i*cw+px;pctx.moveTo(x,0);pctx.lineTo(x,preview.height);}
+      for(let i=1;i<rows;i++){const y=i*ch+py;pctx.moveTo(0,y);pctx.lineTo(preview.width,y);}
       pctx.stroke();
     }
   }
@@ -982,12 +985,14 @@
   function aggregate(){
     const map=new Map();
     for(const c of cells){
+      if(isCellBlank(c))continue;
       const meta=colorCatalog.get(c.key)||{key:c.key,code:c.key,name:c.key,hex:c.hex||'#999999'};
-      if(!map.has(c.key)) map.set(c.key,{...meta,qty:0,low:0,deltaSum:0,deltaN:0});
-      const x=map.get(c.key);x.qty++;if(c.low)x.low++;
+      if(!map.has(c.key)) map.set(c.key,{...meta,qty:0,low:0,ambiguous:0,deltaSum:0,deltaN:0,candidateRanks:meta.candidateRanks||c.candidates||null});
+      const x=map.get(c.key);x.qty++;if(c.low)x.low++;if(c.ambiguous)x.ambiguous++;
       if(Number.isFinite(c.delta)){x.deltaSum+=c.delta;x.deltaN++;}
+      if(!x.candidateRanks&&c.candidates)x.candidateRanks=c.candidates;
     }
-    resultItems=[...map.values()].map(x=>({...x,avgDelta:x.deltaN?x.deltaSum/x.deltaN:null,isBlank:blankKeys.has(x.key)}))
+    resultItems=[...map.values()].map(x=>({...x,avgDelta:x.deltaN?x.deltaSum/x.deltaN:null,isBlank:false}))
       .sort((a,b)=>b.qty-a.qty);
   }
 
@@ -995,40 +1000,43 @@
     aggregateIfPossible();
     els.resultBody.textContent='';
     if(!resultItems.length){
-      const tr=create('tr');const td=create('td','empty-row','暂无分析结果');td.colSpan=7;tr.append(td);els.resultBody.append(tr);
-      updateAudit();return;
+      const tr=create('tr');const td=create('td','empty-row','暂无豆子颜色结果');td.colSpan=7;tr.append(td);els.resultBody.append(tr);
+      updateAudit();updateDiagnostics();return;
     }
     const paletteName=analysisMeta?.paletteName||'自动聚类';
     for(const item of resultItems){
       const tr=create('tr'); if(item.key===highlightKey) tr.style.background='#f5f1ff';
-      const c1=create('td');const sw=create('span','swatch');sw.style.background=item.hex;c1.append(sw,document.createTextNode(item.name||item.code));tr.append(c1);
+      const c1=create('td');const sw=create('span','swatch');sw.style.background=item.hex;c1.append(sw,document.createTextNode(item.name||item.code));
+      if(item.unknown)c1.append(create('span','unknown-tag','未知')); else if(item.ambiguous)c1.append(create('span','ambiguous-tag','歧义'));
+      tr.append(c1);
       const c2=create('td');const codeBtn=btn(item.code,'code-btn');codeBtn.addEventListener('click',()=>{highlightKey=item.key;renderPreview(true);renderResults();});c2.append(codeBtn);tr.append(c2);
       tr.append(create('td','',item.qty.toLocaleString()));
-      const conf=item.low?('待确认 '+item.low):(item.avgDelta!=null?('ΔE '+item.avgDelta.toFixed(1)):'稳定');
-      tr.append(create('td',item.low?'low':'',conf));
-      let inv=0,missing=0;
-      if(!item.isBlank){
-        inv=inventoryMap.get(escKey(paletteName,item.code))?.quantity||0;
-        missing=Math.max(0,item.qty-inv);
+      const confTd=create('td',item.low?'low':'');
+      const main=item.low?('待确认 '+item.low):(item.avgDelta!=null?('ΔE '+item.avgDelta.toFixed(1)):'稳定');
+      confTd.append(document.createTextNode(main));
+      if(item.candidateRanks?.length){
+        const txt=item.candidateRanks.map((x,i)=>(i+1)+'. '+x.code+' '+x.delta.toFixed(1)).join(' · ');
+        confTd.append(create('span','candidate-line',txt));
       }
-      tr.append(create('td','',item.isBlank?'—':inv.toLocaleString()));
-      tr.append(create('td',missing?'missing':'enough',item.isBlank?'—':(missing?missing.toLocaleString():'足够')));
+      tr.append(confTd);
+      let inv=inventoryMap.get(escKey(paletteName,item.code))?.quantity||0;
+      const missing=Math.max(0,item.qty-inv);
+      tr.append(create('td','',inv.toLocaleString()));
+      tr.append(create('td',missing?'missing':'enough',missing?missing.toLocaleString():'足够'));
       const act=create('td');const wrap=create('div','row-actions');
       const hb=btn('高亮');hb.addEventListener('click',()=>{highlightKey=item.key;renderPreview(true);renderResults();});
-      const bb=btn(item.isBlank?'恢复豆子':'设为空白');
-      bb.addEventListener('click',()=>{els.autoBlank.checked=false;if(blankKeys.has(item.key))blankKeys.delete(item.key);else blankKeys.add(item.key);aggregate();renderPreview(true);renderResults();});
-      const ib=btn('填入库存');ib.disabled=item.isBlank;ib.addEventListener('click',()=>prefillInventory(item));
+      const bb=btn('整色设空白');bb.addEventListener('click',()=>{els.autoBlank.checked=false;if(blankKeys.has(item.key))blankKeys.delete(item.key);else blankKeys.add(item.key);aggregate();renderPreview(true);renderResults();updateDiagnostics();});
+      const ib=btn('填入库存');ib.addEventListener('click',()=>prefillInventory(item));
       wrap.append(hb,bb,ib);act.append(wrap);tr.append(act);
-      if(item.isBlank) tr.style.opacity='.58';
       els.resultBody.append(tr);
     }
-    updateAudit();
+    updateAudit();updateDiagnostics();
   }
   function aggregateIfPossible(){if(cells.length)aggregate();}
   function updateAudit(){
     const total=cells.length||0;
-    const blanks=cells.reduce((n,c)=>n+(blankKeys.has(c.key)?1:0),0);
-    const beads=total-blanks,low=cells.reduce((n,c)=>n+(c.low&&!blankKeys.has(c.key)?1:0),0);
+    const blanks=cells.reduce((n,c)=>n+(isCellBlank(c)?1:0),0);
+    const beads=total-blanks,low=cells.reduce((n,c)=>n+(c.low&&!isCellBlank(c)?1:0),0);
     els.auditCells.textContent=total.toLocaleString();els.auditBeads.textContent=beads.toLocaleString();els.auditBlank.textContent=blanks.toLocaleString();els.auditLow.textContent=low.toLocaleString();
     if(!total){els.integrity.textContent='数学自检：等待分析';els.quality.textContent='等待分析';els.quality.className='quality-badge';return;}
     const expected=(analysisMeta?.cols||0)*(analysisMeta?.rows||0),ok=total===expected && beads+blanks===expected;
@@ -1036,7 +1044,7 @@
     const rate=beads?low/beads:0;
     els.quality.className='quality-badge '+(rate<=.01?'good':rate<=.05?'warn':'bad');
     els.quality.textContent=rate<=.01?'识别质量高':rate<=.05?'建议复核':'需要校准';
-    const mappedColors=resultItems.filter(x=>!x.isBlank).length;
+    const mappedColors=resultItems.length;
     const modeNote=analysisMeta?.mode==='cluster'
       ? ' 自动色号仅在本次图纸内稳定。'
       : analysisMeta?.mode==='mard291'
@@ -1049,12 +1057,12 @@
 
   els.autoBlank.addEventListener('change',()=>{
     if(!cells.length)return;
-    blankKeys=new Set(cells.some(c=>c.key==='__transparent__')?['__transparent__']:[]);
+    blankKeys=new Set(['__transparent__']);cells.forEach(c=>{c.autoBlank=c.key==='__transparent__';});
     if(els.autoBlank.checked&&analysisMeta){
-      const borderBlank=findBorderBlankKey(cells,analysisMeta.cols,analysisMeta.rows);
-      if(borderBlank)blankKeys.add(borderBlank);
-    }
-    aggregate();renderPreview(true);renderResults();
+      const bg=detectConnectedBackground(cells,analysisMeta.cols,analysisMeta.rows,analysisMeta.backgroundTolerance||4);
+      analysisMeta.backgroundCount=bg.count;
+    }else if(analysisMeta) analysisMeta.backgroundCount=0;
+    aggregate();renderPreview(true);renderResults();updateDiagnostics();
   });
   $('clearHighlightBtn').addEventListener('click',()=>{highlightKey=null;renderPreview(true);renderResults();});
 
