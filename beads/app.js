@@ -29,6 +29,11 @@
   let highlightKey = null;
   let selectedCellIndex = -1;
   let analysisMeta = null;
+  let perspectiveEnabled = false;
+  let perspectiveCorners = [{x:.03,y:.03},{x:.97,y:.03},{x:.97,y:.97},{x:.03,y:.97}];
+  let perspectiveBackup = null;
+  let phaseOffset = {x:0,y:0,score:null};
+  let benchmarkState = null;
 
   const preview = $('previewCanvas');
   const pctx = preview.getContext('2d');
@@ -42,7 +47,15 @@
     mardGrid:$('mardGrid'), mardCount:$('mardCount'), mardNote:$('mardNote'),
     beadPitch:$('beadPitch'), sourceMerge:$('sourceMergeTolerance'), targetW:$('targetWidthCm'), targetH:$('targetHeightCm'),
     physicalInfo:$('physicalSizeInfo'), sizeToGrid:$('sizeToGridBtn'),
+    phaseMode:$('phaseMode'), backgroundTol:$('backgroundTolerance'), expectedColors:$('expectedColors'),
+    perspectiveMode:$('perspectiveMode'), openPerspective:$('openPerspectiveBtn'), resetPerspective:$('resetPerspectiveBtn'),
+    perspectiveEditor:$('perspectiveEditor'), perspectiveCanvas:$('perspectiveCanvas'), applyPerspective:$('applyPerspectiveBtn'), cancelPerspective:$('cancelPerspectiveBtn'),
+    phaseStatus:$('phaseStatus'),
+    limitPalette:$('limitPaletteEnabled'), projectPaletteCodes:$('projectPaletteCodes'), projectPaletteStatus:$('projectPaletteStatus'), paletteFromInventory:$('paletteFromInventoryBtn'),
     resultBody:$('resultBody'), autoBlank:$('autoBlank'),
+    diagGeometry:$('diagGeometry'), diagPerspective:$('diagPerspective'), diagSource:$('diagSource'), diagBackground:$('diagBackground'),
+    diagAmbiguous:$('diagAmbiguous'), diagUnknown:$('diagUnknown'), diagnosticList:$('diagnosticList'),
+    runBenchmark:$('runBenchmarkBtn'), benchmarkResult:$('benchmarkResult'),
     auditCells:$('auditCells'), auditBeads:$('auditBeads'), auditBlank:$('auditBlank'), auditLow:$('auditLow'),
     integrity:$('integrity'), quality:$('qualityBadge'), resultSub:$('resultSub'),
     cellEditor:$('cellEditor'), cellLabel:$('cellLabel'), cellConfidence:$('cellConfidence'), cellSelect:$('cellColorSelect'),
