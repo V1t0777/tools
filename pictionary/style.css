@@ -22,3 +22,7 @@ button,input{font:inherit}button{cursor:pointer}.app{width:min(100%,760px);margi
 @keyframes pictionaryHoldFill{to{width:100%}}
 .option:disabled{opacity:.58;cursor:wait}
 @media(prefers-reduced-motion:reduce){.hold-clear.holding::before{animation-duration:.01ms}}
+
+/* Low-latency guess feedback */
+.feed .pending{opacity:.72}
+.feed .pending-dot{color:var(--muted);letter-spacing:.08em}
