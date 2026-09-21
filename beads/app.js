@@ -897,7 +897,7 @@
       if(!palette.length){setStatus(els.imageStatus,'MARD 候选色卡为空，请检查项目限定色板。','error');return;}
     }
 
-    els.analyze.disabled=true;els.analyze.textContent='分析中…';
+    els.analyze.disabled=true;els.analyze.textContent='分析中…';document.body.classList.add('analysis-busy');
     await new Promise(r=>requestAnimationFrame(r));
     try{
       const img=workCtx.getImageData(0,0,workCanvas.width,workCanvas.height).data;
@@ -977,7 +977,7 @@
     }catch(err){
       console.error(err);setStatus(els.imageStatus,'分析失败：'+err.message,'error');
     }finally{
-      els.analyze.disabled=false;els.analyze.textContent='开始精确分析';
+      els.analyze.disabled=false;els.analyze.textContent='开始精确分析';document.body.classList.remove('analysis-busy');
     }
   }
   els.analyze.addEventListener('click',analyze);

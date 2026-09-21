@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#07110d" />
   <title>贪吃蛇｜钊的工具箱</title>
+  <link rel="stylesheet" href="../shared/toolbox-ui.css" />
+  <link rel="stylesheet" href="../shared/toolbox-motion.css" />
   <style>
     *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
     :root{
@@ -19,29 +21,31 @@
         radial-gradient(circle at 20% 0%,rgba(54,255,137,.10),transparent 34%),
         radial-gradient(circle at 100% 45%,rgba(54,162,255,.08),transparent 32%),
         linear-gradient(180deg,#0a1711 0%,#050b08 100%);
-      padding:max(12px,env(safe-area-inset-top)) 14px max(16px,env(safe-area-inset-bottom));
+      padding:max(12px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));
     }
     button{font:inherit}
     .app{width:min(100%,560px);margin:0 auto;display:flex;flex-direction:column;gap:11px}
     .topbar{display:flex;align-items:center;justify-content:space-between;min-height:42px}
     .back,.icon-btn{
-      min-height:40px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.045);
+      min-height:44px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.045);
       color:var(--text);text-decoration:none;display:inline-flex;align-items:center;justify-content:center;
       padding:0 13px;font-weight:800;font-size:13px;touch-action:manipulation
     }
-    .icon-btn{min-width:40px;padding:0;cursor:pointer}
+    .icon-btn{min-width:44px;padding:0;cursor:pointer}
     .title-row{display:flex;align-items:end;justify-content:space-between;gap:12px}
     h1{margin:0;font-size:clamp(31px,8vw,45px);line-height:1;letter-spacing:-.045em}
     .sub{margin:5px 0 0;color:var(--muted);font-size:12px}
     .mode-tabs{display:flex;gap:6px;padding:4px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.035)}
     .mode-tabs button{
-      min-height:33px;padding:0 10px;border:0;border-radius:10px;background:transparent;color:var(--muted);
+      min-height:44px;padding:0 10px;border:0;border-radius:10px;background:transparent;color:var(--muted);
       font-size:11px;font-weight:850;white-space:nowrap;touch-action:manipulation
     }
     .mode-tabs button.active{background:rgba(103,245,154,.14);color:#bfffd5}
     .hud{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
     .stat{border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.04);padding:9px 8px;text-align:center}
-    .stat b{display:block;font-size:20px;line-height:1.05}
+    .stat b{display:block;font-size:20px;line-height:1.05;transform-origin:center}
+    .stat.score-pop b{animation:scorePop 100ms var(--ease-spring,cubic-bezier(.22,1,.36,1))}
+    .stat.gold-flash{border-color:rgba(255,215,94,.48);background:rgba(255,215,94,.11);box-shadow:0 0 0 3px rgba(255,215,94,.06)}
     .stat span{display:block;margin-top:3px;color:var(--muted);font-size:10px;font-weight:750}
     .board-shell{
       position:relative;width:100%;aspect-ratio:1;border-radius:26px;padding:8px;
@@ -51,9 +55,12 @@
     canvas{display:block;width:100%;height:100%;border-radius:19px;background:#08120d}
     .overlay{
       position:absolute;inset:8px;border-radius:19px;display:flex;flex-direction:column;align-items:center;justify-content:center;
-      text-align:center;padding:24px;background:rgba(4,10,7,.72);backdrop-filter:blur(7px);z-index:2
+      text-align:center;padding:24px;background:rgba(4,10,7,.72);backdrop-filter:blur(7px);z-index:2;
+      opacity:1;visibility:visible;transform:scale(1);transition:opacity 180ms ease,transform 180ms var(--ease-spring,cubic-bezier(.22,1,.36,1)),visibility 180ms
     }
-    .overlay.hidden{display:none}
+    .overlay.hidden{opacity:0;visibility:hidden;pointer-events:none;transform:scale(.985)}
+    .gold-burst{position:absolute;z-index:1;width:28px;height:28px;border:2px solid rgba(255,215,94,.9);border-radius:50%;pointer-events:none;opacity:0;transform:translate(-50%,-50%) scale(.35)}
+    .gold-burst.play{animation:goldRing 360ms ease-out}
     .overlay .emoji{font-size:46px;line-height:1}
     .overlay h2{margin:12px 0 5px;font-size:27px}
     .overlay p{margin:0 0 18px;color:#a7bcae;font-size:13px;line-height:1.65;max-width:310px}
@@ -85,11 +92,14 @@
       color:#dfffea;font-size:23px;font-weight:950;touch-action:none;user-select:none
     }
     .up{grid-area:up}.left{grid-area:left}.down{grid-area:down}.right{grid-area:right}
+    :where(a,button):focus-visible{outline:3px solid rgba(103,245,154,.58);outline-offset:3px}
     .hint{text-align:center;color:#6f887a;font-size:10px;line-height:1.55}
     .gold-note{color:#dac46d}
+    @keyframes scorePop{50%{transform:translateY(-2px) scale(1.14)}}
+    @keyframes goldRing{0%{opacity:.95;transform:translate(-50%,-50%) scale(.35)}100%{opacity:0;transform:translate(-50%,-50%) scale(2.25)}}
     @media (max-height:720px) and (orientation:portrait){
       body{padding-top:max(7px,env(safe-area-inset-top));padding-bottom:max(8px,env(safe-area-inset-bottom))}
-      .app{gap:7px}.topbar{min-height:34px}.back,.icon-btn{min-height:34px}
+      .app{gap:7px}.topbar{min-height:44px}
       h1{font-size:29px}.sub{display:none}.stat{padding:6px}.stat b{font-size:17px}
       .board-shell{width:min(100%,52dvh);align-self:center}
       .dpad{grid-template-columns:repeat(3,48px);grid-template-rows:repeat(2,44px)}
@@ -103,7 +113,7 @@
       .controls{grid-column:2;grid-row:4;align-self:end}.hint{display:none}
       h1{font-size:30px}
     }
-    @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+    @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}.overlay{transition:none!important}.stat.score-pop b,.gold-burst.play{animation:none!important}}
   </style>
 </head>
 <body>
@@ -133,6 +143,7 @@
 
     <section class="board-shell" id="boardShell" aria-label="贪吃蛇游戏区域">
       <canvas id="gameCanvas"></canvas>
+      <span class="gold-burst" id="goldBurst" aria-hidden="true"></span>
       <div class="overlay" id="overlay">
         <div class="emoji" id="overlayEmoji">🐍</div>
         <h2 id="overlayTitle">准备出发</h2>
@@ -182,6 +193,8 @@
   const scoreEl = document.getElementById('score');
   const bestEl = document.getElementById('best');
   const levelEl = document.getElementById('level');
+  const scoreStat = scoreEl.closest('.stat');
+  const goldBurst = document.getElementById('goldBurst');
   const modeTabs = document.getElementById('modeTabs');
 
   const MODES = {
@@ -206,6 +219,7 @@
   let audioCtx = null;
   let logicalSize = 320;
   let flash = 0;
+  let gameOverTimer = null;
 
   const bestKey = () => 'zhaoSnakeBest.v1.' + mode;
 
@@ -244,6 +258,7 @@
 
   function resetGame(){
     clearTimeout(timer);
+    clearTimeout(gameOverTimer);
     snake = [{x:10,y:10},{x:9,y:10},{x:8,y:10},{x:7,y:10}];
     dir = {x:1,y:0};
     dirQueue = [];
@@ -301,10 +316,24 @@
 
     const ate = food && head.x===food.x && head.y===food.y;
     if(ate){
+      const ateX = head.x;
+      const ateY = head.y;
       const gain = food.gold ? 3 : 1;
       score += gain;
       if(food.gold) extraGrowth += 2;
       scoreEl.textContent = String(score);
+      scoreStat.classList.remove('score-pop','gold-flash');
+      void scoreStat.offsetWidth;
+      scoreStat.classList.add('score-pop');
+      if(food.gold){
+        scoreStat.classList.add('gold-flash');
+        goldBurst.style.left = `${((ateX+.5)/GRID)*100}%`;
+        goldBurst.style.top = `${((ateY+.5)/GRID)*100}%`;
+        goldBurst.classList.remove('play');
+        void goldBurst.offsetWidth;
+        goldBurst.classList.add('play');
+        setTimeout(()=>scoreStat.classList.remove('gold-flash'),360);
+      }
       level = 1 + Math.floor(score/5);
       levelEl.textContent = String(level);
       flash = food.gold ? 2 : 1;
@@ -373,17 +402,20 @@
   }
 
   function gameOver(){
-    state = 'over';
+    state = 'dying';
     clearTimeout(timer);
     saveBest();
     haptic([40,50,60]);
     tone(180,.18,'sawtooth',.035);
     draw();
-    overlayEmoji.textContent = '💥';
-    overlayTitle.textContent = '本局 ' + score + ' 分';
-    overlayText.textContent = '最高 ' + best + ' 分 · 再来一局，试试更快的节奏。';
-    startBtn.textContent = '再来一局';
-    overlay.classList.remove('hidden');
+    gameOverTimer=setTimeout(()=>{
+      state='over';
+      overlayEmoji.textContent = '💥';
+      overlayTitle.textContent = '本局 ' + score + ' 分';
+      overlayText.textContent = '最高 ' + best + ' 分 · 再来一局，试试更快的节奏。';
+      startBtn.textContent = '再来一局';
+      overlay.classList.remove('hidden');
+    },120);
   }
 
   function winGame(){

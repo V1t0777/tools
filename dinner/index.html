@@ -2,7 +2,16 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex,nofollow,noarchive"><meta name="theme-color" content="#11131a"><title>今晚吃什么｜钊的工具箱</title>
-<link rel="stylesheet" href="./style.css?v=20260917-1">
+<link rel="stylesheet" href="../shared/toolbox-ui.css">
+<link rel="stylesheet" href="../shared/toolbox-motion.css">
+<link rel="stylesheet" href="./style.css?v=20260921-2">
+<style>
+.reel.rolling{animation:reelBreathe .42s cubic-bezier(.2,.8,.2,1) infinite alternate;filter:none}.reel.settled{animation:resultSettle .42s cubic-bezier(.22,1,.36,1)}
+.final-card{transition:transform .18s cubic-bezier(.22,1,.36,1),opacity .18s ease,border-color .18s ease,background-color .18s ease}.final-grid.has-active .final-card:not(.active){opacity:.48}.final-card.active{transform:translateY(-4px) scale(1.025)}
+.overlay{animation:overlayIn .2s ease both}.sheet{animation:sheetIn .24s cubic-bezier(.22,1,.36,1) both}
+@keyframes reelBreathe{to{transform:translateY(-2px) scale(1.012)}}@keyframes resultSettle{0%{transform:scale(.975)}58%{transform:scale(1.018)}100%{transform:scale(1)}}@keyframes overlayIn{from{opacity:0}}@keyframes sheetIn{from{transform:translateY(18px);opacity:.85}}
+@media(prefers-reduced-motion:reduce){.reel.rolling,.reel.settled,.overlay,.sheet{animation:none!important}.final-card{transition:none!important}}
+</style>
 </head>
 <body>
 <main class="page">
@@ -26,7 +35,7 @@
 <div id="deleteOverlay" class="overlay hidden"><section class="sheet"><div class="handle"></div><div class="sheet-head"><h2>删除这条历史？</h2><button type="button" class="close" data-close="deleteOverlay">×</button></div><div id="deletePreview" class="confirmbox"></div><button type="button" id="confirmDeleteBtn" class="primary" style="margin-top:13px;background:linear-gradient(135deg,#ffb0a8,#ff7f82)">确认删除</button><button type="button" class="secondary" data-close="deleteOverlay">取消</button></section></div>
 <div id="clearOverlay" class="overlay hidden"><section class="sheet"><div class="handle"></div><div class="sheet-head"><h2>清空全部历史</h2><button type="button" class="close" data-close="clearOverlay">×</button></div><div class="confirmbox">将删除当前模式下的全部“最近吃过”记录。删除后这些记录立即退出智能随机加权，且无法恢复。</div><button type="button" id="holdClearBtn" class="primary hold" style="margin-top:13px;background:linear-gradient(135deg,#ffb0a8,#ff7f82)"><i id="holdProgress" class="progress"></i><span id="holdLabel">按住 1.2 秒确认清空</span></button><button type="button" class="secondary" data-close="clearOverlay">取消</button></section></div>
 <script src="../shared/toolbox-auth.js?v=20260917-4" defer></script>
-<script src="./app.js?v=20260917-4" defer></script>
+<script src="./app.js?v=20260921-4" defer></script>
 <!-- Cloudflare Web Analytics -->
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"bfd3df5c469343eb91856b7f3275def8"}'></script>
 <!-- End Cloudflare Web Analytics -->

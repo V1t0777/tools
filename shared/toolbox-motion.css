@@ -1,0 +1,57 @@
+:root {
+  --tbx-motion-fast: 110ms;
+  --tbx-motion-ui: 180ms;
+  --tbx-motion-panel: 240ms;
+  --tbx-motion-page: 340ms;
+  --tbx-ease-standard: cubic-bezier(.2, .8, .2, 1);
+  --tbx-ease-spring: cubic-bezier(.22, 1, .36, 1);
+}
+
+.tbx-pressable {
+  transition:
+    transform var(--tbx-motion-ui) var(--tbx-ease-spring),
+    opacity var(--tbx-motion-ui) var(--tbx-ease-standard),
+    background-color var(--tbx-motion-ui) var(--tbx-ease-standard),
+    border-color var(--tbx-motion-ui) var(--tbx-ease-standard),
+    color var(--tbx-motion-ui) var(--tbx-ease-standard),
+    box-shadow var(--tbx-motion-ui) var(--tbx-ease-standard);
+}
+
+.tbx-pressable:active {
+  transform: scale(.975);
+  transition-duration: var(--tbx-motion-fast);
+}
+
+.tbx-toast {
+  animation: tbx-toast-in var(--tbx-motion-panel) var(--tbx-ease-spring) both;
+}
+
+.tbx-toast.is-leaving {
+  animation: tbx-toast-out var(--tbx-motion-ui) var(--tbx-ease-standard) both;
+}
+
+@keyframes tbx-toast-in {
+  from { opacity: 0; transform: translateY(8px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes tbx-toast-out {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(5px); }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .tbx-lift:hover { transform: translateY(-3px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto !important; }
+
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    transition-delay: 0ms !important;
+  }
+}

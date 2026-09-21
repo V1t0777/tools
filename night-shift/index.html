@@ -6,6 +6,8 @@
   <meta name="robots" content="noindex,nofollow,noarchive">
   <meta name="theme-color" content="#10131d">
   <title>夜班日历｜钊的工具箱</title>
+  <link rel="stylesheet" href="../shared/toolbox-ui.css?v=20260921-1">
+  <link rel="stylesheet" href="../shared/toolbox-motion.css?v=20260921-1">
   <style>
     *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
     :root{
@@ -25,6 +27,7 @@
     }
     button,input,textarea,select{font:inherit} button{cursor:pointer}
     .hidden{display:none!important}.page{width:min(100%,720px);margin:auto}
+    .calendar-grid.is-changing{animation:monthIn .18s cubic-bezier(.2,.8,.2,1) both}.day{transition:transform .12s ease,background-color .12s ease,border-color .12s ease}.day:active{transform:scale(.975)}.overlay:not(.hidden){animation:overlayIn .2s ease both}.overlay:not(.hidden) .sheet{animation:sheetIn .24s cubic-bezier(.22,1,.36,1) both}@keyframes monthIn{from{opacity:.55;transform:translateY(4px)}}@keyframes overlayIn{from{opacity:0}}@keyframes sheetIn{from{transform:translateY(18px);opacity:.86}}@media(prefers-reduced-motion:reduce){.calendar-grid.is-changing,.overlay:not(.hidden),.overlay:not(.hidden) .sheet{animation:none!important}}
     .topbar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:18px}
     .back,.logout-btn{
       min-height:42px;padding:0 14px;border:1px solid var(--border);border-radius:15px;
@@ -186,7 +189,7 @@
 
   <section id="appPage" class="hidden">
     <div class="topbar">
-      <a class="back" href="../">← 工具箱</a>
+      <a class="back tbx-pressable" href="../">← 工具箱</a>
       <div class="user-area"><span id="currentUserName" class="user-name"></span><button id="logoutBtn" class="logout-btn">退出</button></div>
     </div>
 
@@ -369,7 +372,7 @@
     const year=calendarDate.getFullYear(),month=calendarDate.getMonth();
     $("calendarTitle").textContent=`${year}年${month+1}月`;
     const first=new Date(year,month,1),startOffset=first.getDay(),start=new Date(year,month,1-startOffset),todayYMD=toYMD(new Date());
-    const grid=$("calendarGrid");grid.replaceChildren();
+    const grid=$("calendarGrid");grid.replaceChildren();grid.classList.remove('is-changing');void grid.offsetWidth;grid.classList.add('is-changing');
 
     for(let i=0;i<42;i++){
       const date=new Date(start);date.setDate(start.getDate()+i);

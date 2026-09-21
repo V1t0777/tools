@@ -12,7 +12,7 @@ cp dinner/index.html dinner/app.js dinner/style.css "$OUT/dinner/"
 cp night-shift/index.html "$OUT/night-shift/"
 cp admin-night-shift/index.html "$OUT/admin-night-shift/"
 cp beads/index.html beads/app.js beads/style.css beads/mard-palette.js "$OUT/beads/"
-cp shared/toolbox-auth.js "$OUT/shared/"
+cp shared/toolbox-auth.js shared/toolbox-ui.css shared/toolbox-motion.css shared/toolbox-ui.js "$OUT/shared/"
 cp holidays/*.json "$OUT/holidays/"
 
 cp cloudflare-secure/index.html "$OUT/index.html"

@@ -7,9 +7,13 @@
   <meta name="theme-color" content="#0e0d10">
   <title>电子木鱼｜钊的工具箱</title>
 
+  <link rel="stylesheet" href="../shared/toolbox-ui.css">
+  <link rel="stylesheet" href="../shared/toolbox-motion.css">
+
   <style>
     *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
     :root{
+      color-scheme:dark;
       --bg:#0e0d10;
       --bg2:#171219;
       --card:rgba(255,255,255,.055);
@@ -23,6 +27,11 @@
       --wood2:#6f351f;
       --wood3:#4b2418;
       --shadow:0 24px 70px rgba(0,0,0,.42);
+      --motion-fast:var(--tbx-motion-fast,110ms);
+      --motion-ui:var(--tbx-motion-ui,180ms);
+      --motion-panel:var(--tbx-motion-panel,240ms);
+      --ease-standard:var(--tbx-ease-standard,cubic-bezier(.2,.8,.2,1));
+      --ease-spring:var(--tbx-ease-spring,cubic-bezier(.22,1,.36,1));
     }
 
     html,body{margin:0;min-height:100%}
@@ -38,8 +47,9 @@
       overflow-x:hidden;
       padding:
         max(14px,env(safe-area-inset-top))
-        14px
+        max(14px,env(safe-area-inset-right))
         max(26px,env(safe-area-inset-bottom));
+      padding-left:max(14px,env(safe-area-inset-left));
       user-select:none;
     }
 
@@ -57,20 +67,22 @@
       margin-bottom:14px;
     }
     .back,.icon-btn{
-      min-height:42px;border:1px solid var(--border);border-radius:15px;
+      min-height:44px;border:1px solid var(--border);border-radius:15px;
       background:rgba(255,255,255,.055);color:var(--text);
-      backdrop-filter:blur(16px);
+      -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+      transition:transform var(--motion-fast) var(--ease-standard),background var(--motion-ui) ease,border-color var(--motion-ui) ease;
     }
     .back{
-      padding:0 14px;display:inline-flex;align-items:center;text-decoration:none;
+      padding:0 14px;display:inline-flex;align-items:center;gap:7px;text-decoration:none;
       font-size:14px;font-weight:800;
     }
     .top-actions{display:flex;gap:8px}
     .icon-btn{
-      min-width:42px;padding:0 11px;display:inline-grid;place-items:center;
+      min-width:44px;padding:0 11px;display:inline-grid;place-items:center;
       cursor:pointer;font-size:16px;
     }
     .icon-btn.off{opacity:.48}
+    .back:active,.icon-btn:active{transform:scale(.97);background:rgba(255,255,255,.08)}
 
     header{text-align:center;padding:8px 0 8px}
     .eyebrow{
@@ -92,10 +104,12 @@
       background:rgba(255,255,255,.04);
     }
     .segmented button{
-      min-height:34px;padding:0 14px;border:0;border-radius:10px;
+      min-height:44px;padding:0 16px;border:0;border-radius:10px;
       background:transparent;color:var(--muted);font-weight:850;font-size:12px;
       cursor:pointer;
+      transition:color var(--motion-ui) ease,background var(--motion-ui) ease,transform var(--motion-fast) var(--ease-standard);
     }
+    .segmented button:active{transform:scale(.97)}
     .segmented button.active{
       background:rgba(255,231,177,.12);color:var(--gold2);
     }
@@ -149,6 +163,11 @@
       cursor:pointer;
       touch-action:manipulation;
       z-index:4;
+      outline:none;
+    }
+    .mokugyo-wrap:focus-visible::after{
+      content:"";position:absolute;inset:9%;border:2px solid rgba(255,223,154,.88);
+      border-radius:50%;box-shadow:0 0 0 5px rgba(255,223,154,.08);pointer-events:none;
     }
 
     .halo{
@@ -265,6 +284,21 @@
       transform:rotateX(68deg) scale(.90) translateZ(-80px);
       opacity:.72;
     }
+    .zen .mokugyo-wrap.hit .fish{
+      transform:rotateX(8deg) rotateY(-3deg) scale(.98,.965) translateZ(24px);
+      filter:brightness(1.07);
+    }
+    .zen .mokugyo-wrap.hit .mallet{
+      transform:rotate(-13deg) translate(-8%,-2%) translateZ(78px);
+    }
+    .zen .mokugyo-wrap.pseudo-haptic .fish{
+      transform:rotateX(8deg) rotateY(-3deg) scale(.975,.955) translateZ(23px);
+      filter:brightness(1.08);
+    }
+    .zen .mokugyo-wrap.pseudo-haptic .ground-shadow{
+      transform:rotateX(68deg) scale(.92,.88) translateZ(-80px);
+      opacity:.62;
+    }
 
     /*
       不支持 Vibration API 的设备（尤其 iPhone / iOS Safari）使用拟触觉反馈：
@@ -296,7 +330,7 @@
     }
 
     .haptic-status{
-      min-height:42px;
+      min-height:44px;
       padding:0 12px;
       border:1px solid var(--border);
       border-radius:15px;
@@ -351,6 +385,13 @@
       color:#ffe49f;
       font-size:clamp(23px,6vw,34px);
       text-shadow:0 0 18px rgba(255,202,92,.25),0 6px 18px rgba(0,0,0,.35);
+    }
+    .float-text.zen-text{
+      color:rgba(255,231,186,.72);
+      font-size:clamp(16px,4vw,22px);
+      font-weight:800;
+      animation-duration:1.15s;
+      text-shadow:0 5px 15px rgba(0,0,0,.22);
     }
     @keyframes floatUp{
       0%{opacity:0;transform:translate(-50%,10px) scale(.88)}
@@ -412,7 +453,7 @@
       margin-top:10px;
     }
     .record-manage-btn{
-      min-height:34px;
+      min-height:44px;
       padding:0 12px;
       border:1px solid rgba(255,255,255,.07);
       border-radius:999px;
@@ -543,7 +584,8 @@
     .zen .stats,
     .zen .mode-switch,
     .zen .caption,
-    .zen .footer-card{
+    .zen .footer-card,
+    .zen .record-tools{
       display:none;
     }
     .zen header .subtitle{
@@ -552,6 +594,11 @@
     .zen .stage{
       min-height:620px;
     }
+    .zen .ambient{opacity:.28;transition:opacity .4s ease}
+    .zen .halo{opacity:.48}
+    .zen .ring{border-color:rgba(255,220,158,.32)}
+    .zen .ring.go{animation-duration:.78s}
+    .zen .float-layer{opacity:.78}
 
     .zen-return-wrap{
       display:none;
@@ -566,7 +613,7 @@
     }
     .zen-return{
       pointer-events:auto;
-      min-height:40px;
+      min-height:44px;
       padding:0 14px;
       border:1px solid rgba(255,224,170,.10);
       border-radius:999px;
@@ -614,6 +661,8 @@
         scroll-behavior:auto!important;
       }
       .mallet,.fish,.ground-shadow{transition:none!important}
+      .ambient{display:none}
+      .stage.pseudo-haptic{animation:none!important}
     }
   </style>
 </head>
@@ -621,11 +670,11 @@
 <body>
   <main id="page" class="page">
     <div class="topbar">
-      <a class="back" href="../">← 工具箱</a>
+      <a class="back toolbox-back tbx-pressable" href="../" aria-label="返回工具箱"><span aria-hidden="true">←</span><span>工具箱</span></a>
 
       <div class="top-actions">
-        <button id="soundBtn" class="icon-btn" type="button" aria-label="音效开关" title="音效开关">🔊</button>
-        <button id="vibrateBtn" class="icon-btn" type="button" aria-label="震动开关" title="震动开关">📳</button>
+        <button id="soundBtn" class="icon-btn tbx-pressable" type="button" aria-label="音效开关" title="音效开关">🔊</button>
+        <button id="vibrateBtn" class="icon-btn tbx-pressable" type="button" aria-label="震动开关" title="震动开关">📳</button>
         <div id="hapticStatus" class="haptic-status hidden" aria-label="触感反馈状态">
           <span class="dot"></span>
           <span>触感：视觉模拟</span>
@@ -641,8 +690,8 @@
 
     <div class="mode-switch">
       <div class="segmented">
-        <button id="normalModeBtn" class="active" type="button">普通模式</button>
-        <button id="zenModeBtn" type="button">禅模式</button>
+        <button id="normalModeBtn" class="active tbx-pressable" type="button">普通模式</button>
+        <button id="zenModeBtn" class="tbx-pressable" type="button">禅模式</button>
       </div>
     </div>
 
@@ -688,7 +737,7 @@
     </section>
 
     <div class="zen-return-wrap">
-      <button id="zenReturnBtn" class="zen-return" type="button" aria-label="返回普通模式">
+      <button id="zenReturnBtn" class="zen-return tbx-pressable" type="button" aria-label="返回普通模式">
         <span class="moon">☾</span>返回普通模式
       </button>
     </div>
@@ -707,7 +756,7 @@
     </div>
 
     <div class="record-tools">
-      <button id="recordManageBtn" class="record-manage-btn" type="button">
+      <button id="recordManageBtn" class="record-manage-btn tbx-pressable" type="button">
         管理本地记录
       </button>
     </div>
@@ -724,18 +773,19 @@
         此操作无法恢复。
       </div>
 
-      <button id="holdClearBtn" class="hold-clear" type="button">
+      <button id="holdClearBtn" class="hold-clear tbx-pressable" type="button">
         <span id="holdProgress" class="progress"></span>
         <span id="holdLabel" class="label">按住 1.2 秒确认清空</span>
       </button>
 
-      <button id="clearCancelBtn" class="clear-cancel" type="button">取消</button>
+      <button id="clearCancelBtn" class="clear-cancel tbx-pressable" type="button">取消</button>
     </section>
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 <script>
     const STORAGE_KEY = "mokugyo.v1";
+    const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
 
     const vibrationSupported =
       typeof navigator !== "undefined" &&
@@ -854,6 +904,8 @@
       els.soundBtn.textContent = state.sound ? "🔊" : "🔇";
       els.soundBtn.classList.toggle("off", !state.sound);
       els.soundBtn.setAttribute("aria-pressed", String(state.sound));
+      els.soundBtn.setAttribute("aria-label", state.sound ? "关闭音效" : "开启音效");
+      els.soundBtn.title = state.sound ? "关闭音效" : "开启音效";
 
       if (usePseudoHaptics) {
         els.vibrateBtn.classList.add("hidden");
@@ -864,11 +916,15 @@
         els.vibrateBtn.textContent = state.vibrate ? "📳" : "📴";
         els.vibrateBtn.classList.toggle("off", !state.vibrate);
         els.vibrateBtn.setAttribute("aria-pressed", String(state.vibrate));
+        els.vibrateBtn.setAttribute("aria-label", state.vibrate ? "关闭震动" : "开启震动");
+        els.vibrateBtn.title = state.vibrate ? "关闭震动" : "开启震动";
       }
 
       els.page.classList.toggle("zen", state.zen);
       els.normalModeBtn.classList.toggle("active", !state.zen);
       els.zenModeBtn.classList.toggle("active", state.zen);
+      els.normalModeBtn.setAttribute("aria-pressed", String(!state.zen));
+      els.zenModeBtn.setAttribute("aria-pressed", String(state.zen));
     }
 
     function showToast(message, ms=1400) {
@@ -970,7 +1026,7 @@
       osc1.frequency.setValueAtTime(520 + Math.random()*24,now);
       osc2.frequency.setValueAtTime(835 + Math.random()*35,now);
 
-      gain.gain.setValueAtTime(0.17,now);
+      gain.gain.setValueAtTime(state.zen ? 0.095 : 0.17,now);
       gain.gain.exponentialRampToValueAtTime(0.0001,now + 0.12);
 
       osc1.connect(gain);
@@ -999,7 +1055,7 @@
 
       source.buffer = hitBuffers[Math.floor(Math.random()*hitBuffers.length)];
       source.playbackRate.value = 0.97 + Math.random()*0.06;
-      gain.gain.value = 0.94;
+      gain.gain.value = state.zen ? 0.54 : 0.94;
 
       source.connect(gain);
       gain.connect(masterGain);
@@ -1049,11 +1105,11 @@
       if (!state.vibrate) return;
 
       try {
-        navigator.vibrate(16);
+        navigator.vibrate(state.zen ? 9 : 16);
       } catch {}
     }
 
-    function animateHit() {
+    function animateHit(showRing=true) {
       els.mokugyo.classList.remove("hit");
       void els.mokugyo.offsetWidth;
       els.mokugyo.classList.add("hit");
@@ -1063,14 +1119,16 @@
         els.mokugyo.classList.remove("hit");
       }, 145);
 
-      els.ring.classList.remove("go");
-      void els.ring.offsetWidth;
-      els.ring.classList.add("go");
+      if (showRing && !reducedMotionQuery.matches) {
+        els.ring.classList.remove("go");
+        void els.ring.offsetWidth;
+        els.ring.classList.add("go");
+      }
     }
 
-    function floatText(text, rare=false) {
+    function floatText(text, rare=false, zen=false) {
       const el = document.createElement("div");
-      el.className = `float-text ${rare ? "rare" : ""}`;
+      el.className = `float-text${rare ? " rare" : ""}${zen ? " zen-text" : ""}`;
       el.textContent = text;
 
       const x = 44 + Math.random() * 12;
@@ -1106,15 +1164,6 @@
       if (r < 0.01) {
         return { amount: 10, text: "✨ 功德暴击 +10", rare: true };
       }
-      if (r < 0.04) {
-        return { amount: 1, text: "好运 +1", rare: false };
-      }
-      if (r < 0.08) {
-        return { amount: 1, text: "烦恼 -1", rare: false };
-      }
-      if (r < 0.11) {
-        return { amount: 1, text: "心静 +1", rare: false };
-      }
 
       return { amount: 1, text: "功德 +1", rare: false };
     }
@@ -1135,6 +1184,8 @@
     }
 
     function checkRapidHits(now) {
+      if (state.zen || reducedMotionQuery.matches) return;
+
       state.recentHits.push(now);
       state.recentHits = state.recentHits.filter(t => now - t <= 5000);
 
@@ -1147,10 +1198,14 @@
       }
     }
 
+    let zenHitCadence = 0;
+
     function hit() {
       // 声音放在事件处理最前面，尽可能缩短“触摸→发声”的体感延迟。
       playHitLowLatency();
-      animateHit();
+      zenHitCadence += 1;
+      const showRing = !state.zen || zenHitCadence % 4 === 1;
+      animateHit(showRing);
       hapticFeedback();
 
       const now = performance.now();
@@ -1169,11 +1224,16 @@
       state.todayMerit += reward.amount;
       state.totalMerit += reward.amount;
 
-      floatText(reward.text, reward.rare);
-      checkEggs();
-      checkRapidHits(now);
+      // 普通模式每次保留简洁功德反馈；禅模式仅间歇显示轻量 +1。
+      if (!state.zen) {
+        floatText(reward.text, reward.rare);
+        checkEggs();
+        checkRapidHits(now);
+      } else if (zenHitCadence % 5 === 1) {
+        floatText(reward.amount > 1 ? `+${reward.amount}` : "+1", false, true);
+      }
 
-      if ([10,30,50,100].includes(state.combo)) {
+      if (!state.zen && [10,30,50,100].includes(state.combo)) {
         showComboPop(`🔥 ${state.combo} 连击`);
         if (state.combo === 100) {
           showToast("百连功德 ✨", 1500);
@@ -1186,6 +1246,7 @@
 
     function setMode(zen) {
       state.zen = zen;
+      zenHitCadence = 0;
       saveState();
       render();
     }
@@ -1346,7 +1407,9 @@
     });
 
     function createAmbientParticles() {
-      const count = 14;
+      if (reducedMotionQuery.matches) return;
+
+      const count = 10;
 
       for (let i=0;i<count;i++) {
         const p = document.createElement("span");
