@@ -4,7 +4,7 @@
   const COLORS = ['#111827','#ef4444','#f59e0b','#22c55e','#3b82f6','#8b5cf6','#ec4899','#ffffff'];
   const $ = id => document.getElementById(id);
   const screens = ['authScreen','homeScreen','roomScreen','gameScreen','finishScreen'];
-  let session=null, me=null, state=null, stateGeneration=0, channel=null, realtime=null, pollTimer=null, clockTimer=null;
+  let session=null, me=null, state=null, stateGeneration=0, channel=null, realtime=null, pollTimer=null, clockTimer=null, statePollMs=0;
   let currentRoundId=null, strokes=[], activeStroke=null, sendPoints=[], sendTimer=null, selectedColor=COLORS[0], brushSize=7, erasing=false;
   let canvas=$('canvas'), ctx=canvas.getContext('2d'), logical={w:1,h:1}, busy=false, transitionBusy=false, presenceMembers=new Set();
   let realtimeStatus='CLOSED', reconnectTimer=null, snapshotTimer=null, snapshotAssemblies=new Map();
@@ -15,6 +15,12 @@
   function show(id){ screens.forEach(x => $(x).classList.toggle('active',x===id)); }
   function toast(message){ const el=$('toast'); el.textContent=message; el.classList.add('show'); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),2300); }
   function escapeHTML(v=''){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
+  function makeClientId(){
+    if(crypto.randomUUID)return crypto.randomUUID();
+    const b=new Uint8Array(16);crypto.getRandomValues(b);b[6]=(b[6]&15)|64;b[8]=(b[8]&63)|128;
+    const h=[...b].map(x=>x.toString(16).padStart(2,'0')).join('');
+    return `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`;
+  }
   function codeFromURL(){ return (new URLSearchParams(location.search).get('room')||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6); }
   function setURL(code){ const u=new URL(location.href); code?u.searchParams.set('room',code):u.searchParams.delete('room'); history.replaceState({},'',u); }
 
@@ -76,7 +82,8 @@
     clearInterval(canvasSyncTimer);canvasSyncTimer=setInterval(pullCanvasFallback,650);
   }
   function setStatePoll(ms){
-    clearInterval(pollTimer);
+    if(pollTimer&&statePollMs===ms)return;
+    clearInterval(pollTimer);statePollMs=ms;
     pollTimer=setInterval(refreshState,ms);
   }
   async function mutate(action,payload={}){if(busy)return;busy=true;const generation=++stateGeneration;try{const data=await api(action,{room_id:state.room.id,...payload});if(data.state&&generation===stateGeneration){state=data.state;renderState();sendEvent('state_changed',{at:Date.now()});}return data;}finally{busy=false;}}
@@ -154,8 +161,8 @@
     const pill=$('connectionStatus');if(!pill)return;
     const healthy=isRealtimeHealthy();
     if(status==='SUBSCRIBED'){
-      pill.textContent=healthy&&Number.isFinite(realtimeRtt)?`实时在线 · ${Math.round(realtimeRtt)}ms`:'实时在线';
-      pill.classList.add('online');
+      pill.textContent=healthy?(Number.isFinite(realtimeRtt)?`实时在线 · ${Math.round(realtimeRtt)}ms`:'实时在线'):'实时降级';
+      pill.classList.toggle('online',healthy);
     }else{
       pill.textContent=status==='CHANNEL_ERROR'||status==='TIMED_OUT'?'正在重连':'连接中';
       pill.classList.remove('online');
@@ -172,6 +179,7 @@
   }
   function sendPing(){
     if(realtimeStatus!=='SUBSCRIBED'||!state?.room?.id||!me?.id)return;
+    const healthy=isRealtimeHealthy();setStatePoll(healthy?5000:1800);updateRealtimeStatus();
     const sent=Date.now(),id=`${sent}-${++pingSeq}`;
     sendEvent('ping',{ping_id:id,sender_member_id:me.id,sent_at:sent});
   }
@@ -194,7 +202,7 @@
     if(channel&&realtime)realtime.removeChannel(channel);channel=realtime=null;realtimeStatus='CLOSED';lastPongAt=0;realtimeRtt=null;presenceMembers.clear();
     if(stopTimers){
       clearInterval(pollTimer);clearInterval(clockTimer);clearInterval(canvasSyncTimer);clearTimeout(serverSaveTimer);
-      pollTimer=clockTimer=canvasSyncTimer=serverSaveTimer=null;
+      pollTimer=clockTimer=canvasSyncTimer=serverSaveTimer=null;statePollMs=0;
     }
   }
   function sendEvent(event,payload){
@@ -299,7 +307,7 @@
     const input=$('guessInput'),text=input.value.trim();
     if(!text||!state||state.room.status!=='playing'||isDrawer()||hasGuessed(me?.id))return;
     if(guessRequests.size>=4){toast('发送太快了，稍等一下');return;}
-    const clientId=crypto.randomUUID?.()||`${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const clientId=makeClientId();
     const item={client_id:clientId,round_id:currentRoundId,member_id:me.id,nickname:me.nickname,text,is_correct:false,created_at:new Date().toISOString(),pending:true};
     liveGuesses.set(clientId,item);input.value='';renderGuessFeed();
     const request=api('guess',{room_id:state.room.id,text,client_id:clientId});
