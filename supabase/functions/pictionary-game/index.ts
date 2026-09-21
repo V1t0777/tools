@@ -1,8 +1,19 @@
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 
 const URL=Deno.env.get("SUPABASE_URL")!;
-const SERVICE_KEY=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const admin=createClient(URL,SERVICE_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
+function adminKey(){
+  try{
+    const raw=Deno.env.get("SUPABASE_SECRET_KEYS");
+    if(raw){
+      const keys=JSON.parse(raw);
+      if(keys?.default)return keys.default;
+    }
+  }catch{}
+  return Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"";
+}
+const ADMIN_KEY=adminKey();
+if(!ADMIN_KEY)throw new Error("服务端数据库密钥未配置");
+const admin=createClient(URL,ADMIN_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
 const ORIGINS=new Set(["https://v1t0777.github.io","https://zhao-toolbox-secure.pages.dev","http://localhost:8000","http://127.0.0.1:8000"]);
 const headers=(req:Request)=>({"Access-Control-Allow-Origin":ORIGINS.has(req.headers.get("origin")||"")?(req.headers.get("origin")||""):"https://v1t0777.github.io","Access-Control-Allow-Headers":"authorization, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store","Vary":"Origin"});
 const reply=(req:Request,body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:headers(req)});
@@ -15,13 +26,17 @@ async function identify(req:Request){
   const key=req.headers.get("apikey")||Deno.env.get("SUPABASE_ANON_KEY")||"";
   const client=createClient(URL,key,{global:{headers:{Authorization:authorization}},auth:{persistSession:false,autoRefreshToken:false}});
   const {data,error}=await client.rpc("toolbox_session_status");if(error||!data?.active||!data?.member_id)fail("当前账号不在工具箱成员名单中",403);
-  const {data:member}=await admin.from("members").select("id,user_id,nickname,color").eq("id",data.member_id).maybeSingle();if(!member)fail("成员资料不存在",403);return member;
+  const {data:member,error:memberError}=await admin.from("members").select("id,user_id,nickname,color").eq("id",data.member_id).maybeSingle();
+  if(memberError){console.error("members lookup failed",memberError);fail("成员资料读取失败，请稍后重试",503);}
+  if(!member)fail("成员资料不存在",403);return member;
 }
 async function room(id:string){const {data}=await admin.from("pictionary_rooms").select("*").eq("id",id).maybeSingle();if(!data)fail("房间不存在",404);return data;}
 async function player(roomId:string,userId:string){const {data}=await admin.from("pictionary_players").select("*").eq("room_id",roomId).eq("user_id",userId).eq("active",true).maybeSingle();if(!data)fail("你不在这个房间",403);return data;}
 async function players(roomId:string){
   const {data,error}=await admin.from("pictionary_players").select("user_id,display_name,seat,score,ready,active,joined_at").eq("room_id",roomId).eq("active",true).order("seat");if(error)throw error;
-  const ids=(data||[]).map(x=>x.user_id);const {data:members}=ids.length?await admin.from("members").select("id,user_id,nickname,color").in("user_id",ids):{data:[]};const map=new Map((members||[]).map(m=>[m.user_id,m]));
+  const ids=(data||[]).map(x=>x.user_id);let members:any[]=[];
+  if(ids.length){const out=await admin.from("members").select("id,user_id,nickname,color").in("user_id",ids);if(out.error){console.error("room members lookup failed",out.error);fail("成员资料读取失败，请稍后重试",503);}members=out.data||[];}
+  const map=new Map(members.map(m=>[m.user_id,m]));
   return (data||[]).map(p=>({member_id:map.get(p.user_id)?.id||p.user_id,user_id:p.user_id,nickname:map.get(p.user_id)?.nickname||p.display_name,color:map.get(p.user_id)?.color||"#8EC5FF",turn_order:p.seat-1,score:p.score,ready:p.ready,joined_at:p.joined_at}));
 }
 async function makeRound(r:any,ps:any[]){
@@ -36,7 +51,9 @@ async function state(roomId:string,member:any){
   if(r.current_round_no>0){
     const {data:rd}=await admin.from("pictionary_rounds").select("*").eq("room_id",roomId).eq("round_no",r.current_round_no).maybeSingle();
     if(rd){
-      roundData={id:rd.id,round_number:rd.round_no,drawer_member_id:byUser.get(rd.drawer_user_id)?.member_id||rd.drawer_user_id,drawer_nickname:byUser.get(rd.drawer_user_id)?.nickname||"好友",category:rd.category,difficulty:rd.difficulty,char_count:rd.word_length,hint:rd.hint||`它属于「${rd.category||'常见事物'}」类`,started_at:rd.started_at,ends_at:rd.ends_at};
+      const privileged=member.user_id===rd.drawer_user_id||["summary","finished"].includes(r.status);
+      const hintUnlocked=privileged||(r.status==="playing"&&rd.ends_at&&new Date(rd.ends_at).getTime()-Date.now()<=30000);
+      roundData={id:rd.id,round_number:rd.round_no,drawer_member_id:byUser.get(rd.drawer_user_id)?.member_id||rd.drawer_user_id,drawer_nickname:byUser.get(rd.drawer_user_id)?.nickname||"好友",category:hintUnlocked?rd.category:null,difficulty:rd.difficulty,char_count:rd.word_length,hint:hintUnlocked?(rd.hint||`它属于「${rd.category||'常见事物'}」类`):null,started_at:rd.started_at,ends_at:rd.ends_at};
       if(member.user_id===rd.drawer_user_id)answer=rd.answer;if(["summary","finished"].includes(r.status))revealed_answer=rd.answer;
       const {data:gs}=await admin.from("pictionary_guesses").select("user_id,guess_text,is_correct,score_awarded,created_at").eq("round_id",rd.id).order("created_at").limit(80);guesses=(gs||[]).map(g=>({member_id:byUser.get(g.user_id)?.member_id||g.user_id,nickname:byUser.get(g.user_id)?.nickname||"好友",text:g.is_correct?"":g.guess_text,is_correct:g.is_correct,score_awarded:g.score_awarded,created_at:g.created_at}));
       if(r.status==="choosing"&&r.current_drawer_user_id===member.user_id){const {data:ws}=await admin.from("pictionary_words").select("id,word,category,difficulty").in("id",rd.option_word_ids||[]);options=(ws||[]).map(w=>({...w,id:String(w.id)}));}
