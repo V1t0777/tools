@@ -68,6 +68,16 @@
       min-height:48px;border:1px solid var(--line);border-radius:15px;background:rgba(255,255,255,.045);
       color:var(--text);font-size:12px;font-weight:850;touch-action:manipulation
     }
+    .hold-action{
+      --hold:0%;position:relative;overflow:hidden;isolation:isolate;touch-action:none;
+      user-select:none;-webkit-user-select:none
+    }
+    .hold-action::before{
+      content:"";position:absolute;z-index:-1;inset:0 auto 0 0;width:var(--hold);
+      background:linear-gradient(90deg,rgba(103,245,154,.11),rgba(103,245,154,.28));
+      transition:width .08s linear
+    }
+    .hold-action.holding{border-color:rgba(103,245,154,.36)}
     .action:active,.dpad button:active{transform:scale(.96);background:rgba(103,245,154,.12)}
     .dpad{display:grid;grid-template-columns:repeat(3,56px);grid-template-rows:repeat(2,52px);gap:6px;grid-template-areas:". up ." "left down right"}
     .dpad button{
@@ -134,7 +144,7 @@
     <section class="controls" aria-label="手机操作区">
       <div class="side-actions">
         <button class="action" id="pauseBtn">暂停</button>
-        <button class="action" id="restartBtn">重开</button>
+        <button class="action hold-action" id="restartBtn" aria-label="长按一秒重新开始">长按重开</button>
       </div>
 
       <div class="dpad">
@@ -150,7 +160,7 @@
       </div>
     </section>
 
-    <div class="hint">休闲模式可穿墙 · 经典模式撞墙结束 · 极速模式更快。<span class="gold-note">金苹果出现概率约 12%，吃到得 3 分并额外增长。</span></div>
+    <div class="hint">休闲模式可穿墙 · 经典模式撞墙结束 · 极速模式更快 · 重开需长按约 1 秒，防止误触。<span class="gold-note">金苹果出现概率约 12%，吃到得 3 分并额外增长。</span></div>
   </main>
 
 <script>
@@ -498,13 +508,84 @@
   startBtn.addEventListener('click',()=> state==='paused' ? resumeGame() : startGame());
   pauseBtn.addEventListener('click',togglePause);
   pauseTop.addEventListener('click',togglePause);
-  restartBtn.addEventListener('click',()=>{
+  const RESTART_HOLD_MS = 1000;
+  let restartHoldTimer = null;
+  let restartHoldFrame = null;
+  let restartHoldStart = 0;
+  let restartHolding = false;
+
+  function setRestartProgress(ratio){
+    const pct = Math.max(0,Math.min(100,ratio*100));
+    restartBtn.style.setProperty('--hold', pct.toFixed(1) + '%');
+  }
+
+  function performRestart(){
     resetGame();
     state='running';
     overlay.classList.add('hidden');
     startBtn.textContent='开始游戏';
+    restartBtn.textContent='已重开';
+    setRestartProgress(1);
+    haptic([18,24,18]);
+    tone(640,.07,'sine',.03);
     schedule();
+    setTimeout(()=>{
+      restartBtn.textContent='长按重开';
+      setRestartProgress(0);
+    },320);
+  }
+
+  function stopRestartHold(resetProgress=true){
+    restartHolding=false;
+    clearTimeout(restartHoldTimer);
+    restartHoldTimer=null;
+    if(restartHoldFrame) cancelAnimationFrame(restartHoldFrame);
+    restartHoldFrame=null;
+    restartBtn.classList.remove('holding');
+    if(resetProgress) setRestartProgress(0);
+  }
+
+  function updateRestartHold(){
+    if(!restartHolding) return;
+    const ratio=(performance.now()-restartHoldStart)/RESTART_HOLD_MS;
+    setRestartProgress(ratio);
+    if(ratio<1) restartHoldFrame=requestAnimationFrame(updateRestartHold);
+  }
+
+  restartBtn.addEventListener('pointerdown',e=>{
+    if(e.pointerType==='mouse' && e.button!==0) return;
+    e.preventDefault();
+    stopRestartHold(true);
+    restartHolding=true;
+    restartHoldStart=performance.now();
+    restartBtn.classList.add('holding');
+    setRestartProgress(0);
+    restartHoldFrame=requestAnimationFrame(updateRestartHold);
+    restartHoldTimer=setTimeout(()=>{
+      if(!restartHolding) return;
+      restartHolding=false;
+      restartBtn.classList.remove('holding');
+      if(restartHoldFrame) cancelAnimationFrame(restartHoldFrame);
+      restartHoldFrame=null;
+      restartHoldTimer=null;
+      performRestart();
+    },RESTART_HOLD_MS);
   });
+
+  restartBtn.addEventListener('pointermove',e=>{
+    if(!restartHolding) return;
+    const r=restartBtn.getBoundingClientRect();
+    const margin=12;
+    if(e.clientX<r.left-margin || e.clientX>r.right+margin || e.clientY<r.top-margin || e.clientY>r.bottom+margin){
+      stopRestartHold(true);
+    }
+  });
+
+  ['pointerup','pointercancel','pointerleave'].forEach(ev=>{
+    restartBtn.addEventListener(ev,()=>stopRestartHold(true));
+  });
+  restartBtn.addEventListener('click',e=>e.preventDefault());
+  restartBtn.addEventListener('contextmenu',e=>e.preventDefault());
 
   const boostOn=e=>{e.preventDefault();boosted=true;if(state==='running')schedule();};
   const boostOff=e=>{e.preventDefault();boosted=false;if(state==='running')schedule();};
