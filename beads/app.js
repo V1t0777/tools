@@ -55,7 +55,7 @@
     resultBody:$('resultBody'), autoBlank:$('autoBlank'),
     diagGeometry:$('diagGeometry'), diagPerspective:$('diagPerspective'), diagSource:$('diagSource'), diagBackground:$('diagBackground'),
     diagAmbiguous:$('diagAmbiguous'), diagUnknown:$('diagUnknown'), diagnosticList:$('diagnosticList'),
-    runBenchmark:$('runBenchmarkBtn'), benchmarkResult:$('benchmarkResult'),
+    runBenchmark:$('runBenchmarkBtn'), benchmarkResult:$('benchmarkResult'), benchmarkBox:$('benchmarkBox'),
     auditCells:$('auditCells'), auditBeads:$('auditBeads'), auditBlank:$('auditBlank'), auditLow:$('auditLow'),
     integrity:$('integrity'), quality:$('qualityBadge'), resultSub:$('resultSub'),
     cellEditor:$('cellEditor'), cellLabel:$('cellLabel'), cellConfidence:$('cellConfidence'), cellSelect:$('cellColorSelect'),
@@ -1100,7 +1100,7 @@
     return {accuracy:correct/raw.length,cells:raw.length,predictedColors,expectedColors,raw,cols,rows};
   }
   function renderBenchmarkPattern(result){
-    const old=benchmarkBox.querySelector?.('.benchmark-canvas'); if(old)old.remove();
+    const old=els.benchmarkBox.querySelector?.('.benchmark-canvas'); if(old)old.remove();
     if(!result)return;
     const cv=document.createElement('canvas');cv.className='benchmark-canvas';cv.width=240;cv.height=180;
     const ctx=cv.getContext('2d'),cw=cv.width/result.cols,ch=cv.height/result.rows;
@@ -1129,7 +1129,8 @@
     selectedCellIndex=row*analysisMeta.cols+col;
     const c=cells[selectedCellIndex];if(!c)return;
     els.cellLabel.textContent='第 '+(row+1)+' 行 · 第 '+(col+1)+' 列';
-    els.cellConfidence.textContent='当前 '+(colorCatalog.get(c.key)?.code||c.key)+(c.delta!=null?' · ΔE '+c.delta.toFixed(2):'')+(c.low?' · 待确认':'');
+    const cand=c.candidates?.length?(' · 候选 '+c.candidates.map((x,i)=>(i+1)+'.'+x.code+' '+x.delta.toFixed(1)).join(' / ')):'';
+    els.cellConfidence.textContent='当前 '+(colorCatalog.get(c.key)?.code||c.key)+(c.delta!=null?' · ΔE '+c.delta.toFixed(2):'')+(c.ambiguous?' · 色号歧义':'')+(c.low?' · 待确认':'')+cand;
     els.cellSelect.textContent='';
     for(const item of resultItems){
       const op=create('option');op.value=item.key;op.textContent=item.code+' · '+item.name;op.selected=item.key===c.key;els.cellSelect.append(op);
@@ -1218,13 +1219,13 @@
     const title=els.projectTitle.value.trim();if(!title){setStatus(els.projectStatus,'请填写项目名称。','error');return;}
     const scope=els.projectScope.value;if(scope==='group'&&!group){setStatus(els.projectStatus,'当前账号没有共享项目权限。','error');return;}
     aggregate();
-    const items=resultItems.filter(x=>!blankKeys.has(x.key)).map(x=>({code:x.code,name:x.name,hex:x.hex,quantity:x.qty,low_confidence:x.low,avg_delta:x.avgDelta==null?null:Number(x.avgDelta.toFixed(3))}));
-    const blank=cells.reduce((n,c)=>n+(blankKeys.has(c.key)?1:0),0),low=cells.reduce((n,c)=>n+(c.low&&!blankKeys.has(c.key)?1:0),0);
+    const items=resultItems.map(x=>({code:x.code,name:x.name,hex:x.hex,quantity:x.qty,low_confidence:x.low,ambiguous:x.ambiguous||0,avg_delta:x.avgDelta==null?null:Number(x.avgDelta.toFixed(3)),candidates:(x.candidateRanks||[]).map(v=>({code:v.code,delta:Number(v.delta.toFixed(3))}))}));
+    const blank=cells.reduce((n,c)=>n+(isCellBlank(c)?1:0),0),low=cells.reduce((n,c)=>n+(c.low&&!isCellBlank(c)?1:0),0);
     const body={
       owner_user_id:session.user.id,group_id:scope==='group'?group.id:null,title,
       palette_name:analysisMeta.paletteName,source_mode:'grid',grid_width:analysisMeta.cols,grid_height:analysisMeta.rows,
       total_cells:cells.length,blank_cells:blank,total_beads:cells.length-blank,low_confidence_cells:low,items,
-      analysis_settings:{sample_ratio:analysisMeta.ratio,crop:analysisMeta.crop,match_mode:analysisMeta.mode,cluster_tolerance:analysisMeta.tolerance,source_merge_tolerance:analysisMeta.sourceMergeTolerance,source_color_count:analysisMeta.sourceColorCount,delta_threshold:analysisMeta.deltaThreshold,bead_pitch_mm:analysisMeta.beadPitchMm,physical_width_cm:analysisMeta.physicalWidthCm,physical_height_cm:analysisMeta.physicalHeightCm}
+      analysis_settings:{sample_ratio:analysisMeta.ratio,crop:analysisMeta.crop,match_mode:analysisMeta.mode,cluster_tolerance:analysisMeta.tolerance,source_merge_tolerance:analysisMeta.sourceMergeTolerance,source_raw_color_count:analysisMeta.sourceRawColorCount,source_color_count:analysisMeta.sourceColorCount,delta_threshold:analysisMeta.deltaThreshold,bead_pitch_mm:analysisMeta.beadPitchMm,physical_width_cm:analysisMeta.physicalWidthCm,physical_height_cm:analysisMeta.physicalHeightCm,phase_x:analysisMeta.phaseX,phase_y:analysisMeta.phaseY,perspective:analysisMeta.perspective,perspective_corners:analysisMeta.perspective?perspectiveCorners:null,background_tolerance:analysisMeta.backgroundTolerance,background_count:analysisMeta.backgroundCount,limited_palette:analysisMeta.limitedPalette,expected_colors:analysisMeta.expectedColors}
     };
     try{
       await ToolboxAuth.rest('bead_projects',{method:'POST',body,prefer:'return=minimal'});
