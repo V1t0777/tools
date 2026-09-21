@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#f3f4f7" />
   <title>抛硬币｜工具箱</title>
+  <link rel="stylesheet" href="../shared/toolbox-ui.css" />
+  <link rel="stylesheet" href="../shared/toolbox-motion.css" />
   <style>
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     :root {
@@ -405,8 +407,9 @@
           { transform: 'translate3d(0,0,0) scale(1)', offset: 0, easing: 'cubic-bezier(.28,.02,.58,.25)' },
           { transform: `translate3d(${drift}px,-${height}px,0) scale(.985)`, offset: .42, easing: 'cubic-bezier(.28,.62,.32,1)' },
           { transform: `translate3d(${drift}px,-${height - 4}px,0) scale(.985)`, offset: .50, easing: 'cubic-bezier(.55,.05,.78,.42)' },
-          { transform: 'translate3d(0,0,0) scaleY(.988)', offset: .80, easing: 'cubic-bezier(.16,.74,.3,1)' },
-          { transform: 'translate3d(0,-7px,0) scale(1)', offset: .865, easing: 'cubic-bezier(.36,.02,.68,.34)' },
+          { transform: 'translate3d(0,0,0) scale(1)', offset: .80, easing: 'cubic-bezier(.16,.74,.3,1)' },
+          { transform: 'translate3d(0,0,0) scale3d(1.01,.975,1)', offset: .825, easing: 'cubic-bezier(.2,.7,.3,1)' },
+          { transform: 'translate3d(0,-7px,0) scale(1)', offset: .87, easing: 'cubic-bezier(.36,.02,.68,.34)' },
           { transform: 'translate3d(0,0,0)', offset: .925, easing: 'cubic-bezier(.2,.72,.25,1)' },
           { transform: 'translate3d(0,-2px,0)', offset: .962, easing: 'ease-in' },
           { transform: 'translate3d(0,0,0)', offset: 1 }
@@ -423,9 +426,10 @@
         ], { duration, easing: 'linear', fill: 'forwards' });
         const shadow = coinShadow.animate([
           { transform: 'translateX(-50%) scaleX(.92)', opacity: .68, filter: 'blur(5px)', offset: 0 },
-          { transform: 'translateX(-50%) scaleX(.52)', opacity: .22, filter: 'blur(10px)', offset: .46 },
-          { transform: 'translateX(-50%) scaleX(1.03)', opacity: .76, filter: 'blur(4px)', offset: .80 },
-          { transform: 'translateX(-50%) scaleX(.88)', opacity: .55, filter: 'blur(5px)', offset: .865 },
+          { transform: 'translateX(-50%) scaleX(.50)', opacity: .20, filter: 'blur(11px)', offset: .46 },
+          { transform: 'translateX(-50%) scaleX(1.03)', opacity: .75, filter: 'blur(4px)', offset: .80 },
+          { transform: 'translateX(-50%) scaleX(1.06)', opacity: .79, filter: 'blur(3.8px)', offset: .825 },
+          { transform: 'translateX(-50%) scaleX(.87)', opacity: .53, filter: 'blur(5.5px)', offset: .87 },
           { transform: 'translateX(-50%) scaleX(.92)', opacity: .68, filter: 'blur(5px)', offset: 1 }
         ], { duration, easing: 'linear', fill: 'forwards' });
         await Promise.all([flight.finished, rotation.finished, shadow.finished]);
@@ -440,7 +444,8 @@
       else tails++;
       updateStats();
       if (navigator.vibrate) navigator.vibrate(12);
-      await new Promise(resolve => setTimeout(resolve, reduceMotion.matches ? 20 : 85));
+      // 等硬币完全稳定后再揭晓结果，避免文字抢在物理动画之前出现。
+      await new Promise(resolve => setTimeout(resolve, reduceMotion.matches ? 20 : 90));
       revealResult(isHeads);
       coin.classList.remove('flipping');
       coinCard.classList.remove('is-flipping');

@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#070a0f">
   <title>CS2 专属灵敏度生成器</title>
+  <link rel="stylesheet" href="../shared/toolbox-ui.css?v=20260921-1">
+  <link rel="stylesheet" href="../shared/toolbox-motion.css?v=20260921-1">
   <style>
     :root {
       color-scheme: dark;
@@ -51,7 +53,11 @@
 
     button, input, select { font: inherit; }
     button { -webkit-tap-highlight-color: transparent; }
-    .shell { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 56px; }
+    .shell {
+      width: min(1180px, calc(100% - 32px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+      margin: 0 auto;
+      padding: max(28px, env(safe-area-inset-top)) 0 max(56px, calc(28px + env(safe-area-inset-bottom)));
+    }
 
     .topbar {
       display: flex;
@@ -81,12 +87,15 @@
     .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 12px var(--green); }
     .top-actions { display: flex; align-items: center; gap: 9px; }
     .back-link {
-      min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px;
+      min-height: 44px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px;
       display: inline-flex; align-items: center; gap: 6px; color: #cbd7e7;
       background: rgba(255,255,255,.025); text-decoration: none; font-size: 12px;
       transition: border-color .18s, color .18s, transform .18s;
     }
-    .back-link:hover { border-color: rgba(54,230,255,.38); color: var(--cyan); transform: translateY(-1px); }
+    @media (hover:hover) and (pointer:fine) {
+      .back-link:hover { border-color: rgba(54,230,255,.38); color: var(--cyan); transform: translateY(-1px); }
+      .btn:hover { transform: translateY(-1px); filter: brightness(1.05); }
+    }
 
     .hero {
       position: relative; overflow: hidden;
@@ -150,20 +159,21 @@
     .hint { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 11px; }
     .hint b { color: var(--orange); }
     .btn {
-      border: 0; border-radius: 10px; min-height: 42px; padding: 0 17px;
+      border: 0; border-radius: 10px; min-height: 44px; padding: 0 17px;
       display: inline-flex; align-items: center; justify-content: center; gap: 8px;
       color: #071018; font-weight: 850; cursor: pointer;
       background: linear-gradient(135deg, var(--cyan), #63f4c5);
       box-shadow: 0 10px 28px rgba(54,230,255,.16);
       transition: transform .15s, filter .15s;
     }
-    .btn:hover { transform: translateY(-1px); filter: brightness(1.05); }
     .btn:active { transform: translateY(1px) scale(.99); }
     .btn.secondary { color: #dfe8f5; background: rgba(255,255,255,.065); box-shadow: none; border: 1px solid var(--line); }
     .btn.danger { color: #ffdce3; background: rgba(255,83,112,.1); box-shadow: none; border: 1px solid rgba(255,83,112,.25); }
     .btn:disabled { opacity: .38; cursor: not-allowed; transform: none; }
 
     #testPanel, #resultPanel { display: none; }
+    .panel.panel-enter { animation: panelEnter .22s cubic-bezier(.2,.8,.2,1) both; }
+    @keyframes panelEnter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
     .test-layout { display: grid; grid-template-columns: 260px 1fr; gap: 16px; }
     .test-list { display: flex; flex-direction: column; gap: 9px; }
     .test-card {
@@ -223,11 +233,14 @@
       background:
         radial-gradient(circle, #fff 0 8%, var(--cyan) 9% 20%, transparent 21% 38%, rgba(54,230,255,.72) 39% 55%, rgba(54,230,255,.14) 56%);
       box-shadow: 0 0 0 6px rgba(54,230,255,.06), 0 0 28px rgba(54,230,255,.28);
-      animation: targetIn .13s ease-out;
+      animation: none;
     }
     .target.micro { width: 34px; height: 34px; box-shadow: 0 0 0 5px rgba(54,230,255,.05), 0 0 22px rgba(54,230,255,.25); }
     .target.track { width: 58px; height: 58px; border-color: var(--green); background: radial-gradient(circle, #fff 0 8%, var(--green) 9% 22%, transparent 23% 39%, rgba(89,242,173,.7) 40% 56%, rgba(89,242,173,.12) 57%); }
-    @keyframes targetIn { from { opacity: 0; transform: translate(-50%, -50%) scale(.72); } }
+    body.test-running *, body.test-running *::before, body.test-running *::after {
+      animation: none !important;
+      transition: none !important;
+    }
 
     #crosshair {
       --cross: #eafcff;
@@ -251,7 +264,8 @@
     .sens-number { margin: 5px 0 3px; font-size: clamp(50px, 8vw, 82px); line-height: 1; font-weight: 950; letter-spacing: -.07em; font-variant-numeric: tabular-nums; }
     .sens-range { color: var(--muted); font-size: 11px; }
     .copy-row { position: relative; z-index: 2; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
-    .copy-row .btn { min-height: 38px; font-size: 12px; }
+    .copy-row .btn { min-height: 44px; font-size: 12px; }
+    .btn.copied { color: #072018; background: var(--green); }
 
     .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .metric { border: 1px solid var(--line); border-radius: 13px; padding: 14px; background: rgba(255,255,255,.025); }
@@ -274,7 +288,7 @@
     .command-box button { flex: none; }
 
     .footer-note { margin-top: 20px; color: #647184; font-size: 10px; text-align: center; }
-    .toast { position: fixed; z-index: 100; left: 50%; bottom: 28px; transform: translate(-50%, 20px); opacity: 0; pointer-events: none; padding: 10px 14px; border: 1px solid rgba(89,242,173,.26); border-radius: 10px; background: rgba(8,16,20,.95); color: #cbffe8; font-size: 12px; transition: .22s ease; }
+    .toast { position: fixed; z-index: 100; left: 50%; bottom: max(28px, calc(16px + env(safe-area-inset-bottom))); transform: translate(-50%, 12px); opacity: 0; pointer-events: none; padding: 11px 15px; border: 1px solid rgba(89,242,173,.26); border-radius: 12px; background: rgba(8,16,20,.95); color: #cbffe8; font-size: 12px; transition: opacity .18s ease, transform .18s ease; }
     .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
     @media (max-width: 860px) {
@@ -288,7 +302,7 @@
       .hero, .panel { padding: 18px; border-radius: 16px; }
       .topbar { align-items: flex-start; }
       .status-pill { display: none; }
-      .back-link { min-height: 34px; padding: 0 10px; }
+      .back-link { min-height: 44px; padding: 0 12px; }
       .step { padding: 8px; justify-content: center; }
       .step span { display: none; }
       .form-grid, .test-list { grid-template-columns: 1fr; }
@@ -508,7 +522,12 @@
           el.classList.toggle('active', i + 1 === active);
           el.classList.toggle('done', i + 1 < active);
         });
-        window.scrollTo({ top: Math.max(0, document.querySelector('.stepper').offsetTop - 14), behavior: 'smooth' });
+        const shown = name === 'profile' ? els.profilePanel : name === 'test' ? els.testPanel : els.resultPanel;
+        shown.classList.remove('panel-enter');
+        if (!state.running && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          requestAnimationFrame(() => shown.classList.add('panel-enter'));
+        }
+        window.scrollTo({ top: Math.max(0, document.querySelector('.stepper').offsetTop - 14), behavior: state.running ? 'auto' : 'smooth' });
       }
 
       function readProfile() {
@@ -531,6 +550,7 @@
         els.crosshair.style.display = 'none';
         els.crosshair.classList.remove('on-target');
         els.overlay.classList.remove('hidden');
+        document.body.classList.remove('test-running');
         els.overlayKicker.textContent = `TEST 0${idx + 1} / 03`;
         els.overlayTitle.textContent = test.name;
         els.overlayText.textContent = test.text;
@@ -558,6 +578,7 @@
         state.lastTickAt = state.startedAt;
         els.overlay.classList.add('hidden');
         els.arena.classList.add('testing');
+        document.body.classList.add('test-running');
         els.crosshair.style.display = state.pointer.valid ? 'block' : 'none';
         els.target.hidden = false;
         els.target.className = `target ${state.current === 'micro' ? 'micro' : state.current === 'track' ? 'track' : ''}`;
@@ -615,8 +636,8 @@
         state.target.path = 0;
         state.target.direct = Math.hypot(x - state.target.startPointerX, y - state.target.startPointerY);
         state.directDistances.push(state.target.direct);
+        // Immediate appearance keeps reaction measurements free of visual entrance bias.
         els.target.style.left = x + 'px'; els.target.style.top = y + 'px';
-        els.target.animate([{transform:'translate(-50%,-50%) scale(.75)',opacity:.4},{transform:'translate(-50%,-50%) scale(1)',opacity:1}], {duration:120, easing:'ease-out'});
       }
 
       function placeTrackTarget(now) {
@@ -662,6 +683,7 @@
       function finishTest() {
         if (!state.running) return;
         state.running = false;
+        document.body.classList.remove('test-running');
         stopLoop();
         els.arena.classList.remove('testing');
         els.crosshair.style.display = 'none';
@@ -785,20 +807,26 @@
         $(`#score${name}Text`).textContent = valid ? String(v) : '跳过';
       }
 
-      function copy(text) {
-        if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(() => toast('已复制到剪贴板')).catch(() => fallbackCopy(text));
-        else fallbackCopy(text);
+      function markCopied(button) {
+        if (!button) return;
+        const original = button.textContent;
+        button.classList.add('copied'); button.textContent = '已复制';
+        setTimeout(() => { button.classList.remove('copied'); button.textContent = original; }, 900);
       }
-      function fallbackCopy(text) {
+      function copy(text, button) {
+        if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(() => { toast('已复制到剪贴板'); markCopied(button); }).catch(() => fallbackCopy(text, button));
+        else fallbackCopy(text, button);
+      }
+      function fallbackCopy(text, button) {
         const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select();
-        try { document.execCommand('copy'); toast('已复制到剪贴板'); } catch (_) { toast('复制失败，请手动复制'); }
+        try { document.execCommand('copy'); toast('已复制到剪贴板'); markCopied(button); } catch (_) { toast('复制失败，请手动复制'); }
         ta.remove();
       }
       let toastTimer = 0;
       function toast(msg) { els.toast.textContent = msg; els.toast.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => els.toast.classList.remove('show'), 1700); }
 
       function resetTestState() {
-        stopLoop(); state.runId += 1; state.running = false; state.results = {}; state.pointer.valid = false;
+        stopLoop(); state.runId += 1; state.running = false; state.results = {}; state.pointer.valid = false; document.body.classList.remove('test-running');
         $$('.test-card').forEach(c => { c.classList.remove('done','active'); c.querySelector('.test-state').textContent = '待测试'; });
         prepareTest('flick');
       }
@@ -815,9 +843,9 @@
       els.arena.addEventListener('pointerenter', pointerMove);
       window.addEventListener('resize', () => { if (state.running && state.current !== 'track') spawnTarget(); });
       document.addEventListener('visibilitychange', () => { if (state.running && !document.hidden) tick(performance.now()); });
-      $('#copyValue').addEventListener('click', () => copy($('#resultSens').textContent));
-      $('#copyCommand').addEventListener('click', () => copy($('#commandText').textContent));
-      $('#copyCommand2').addEventListener('click', () => copy($('#commandText').textContent));
+      $('#copyValue').addEventListener('click', e => copy($('#resultSens').textContent, e.currentTarget));
+      $('#copyCommand').addEventListener('click', e => copy($('#commandText').textContent, e.currentTarget));
+      $('#copyCommand2').addEventListener('click', e => copy($('#commandText').textContent, e.currentTarget));
       $('#redoTests').addEventListener('click', () => { resetTestState(); showPanel('test'); });
       $('#resetAll').addEventListener('click', () => {
         if (!confirm('确定清除本次参数与测试结果吗？')) return;

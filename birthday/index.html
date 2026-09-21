@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#120d18" />
   <title>生日倒计时｜钊的工具箱</title>
+  <link rel="stylesheet" href="../shared/toolbox-ui.css" />
+  <link rel="stylesheet" href="../shared/toolbox-motion.css" />
   <style>
     *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
     :root{
@@ -46,6 +48,18 @@
     }
     .stars:before{transform:translate(18px,28px);opacity:.15}
     .stars:after{transform:translate(-25px,45px);opacity:.10}
+    .stars{animation:star-drift-main 36s ease-in-out infinite alternate}
+    .stars:before{animation:star-drift-before 40s ease-in-out infinite alternate}
+    .stars:after{animation:star-drift-after 32s ease-in-out infinite alternate}
+    @keyframes star-drift-main{
+      from{transform:translate3d(0,0,0)}to{transform:translate3d(8px,-6px,0)}
+    }
+    @keyframes star-drift-before{
+      from{transform:translate3d(18px,28px,0)}to{transform:translate3d(11px,34px,0)}
+    }
+    @keyframes star-drift-after{
+      from{transform:translate3d(-25px,45px,0)}to{transform:translate3d(-17px,39px,0)}
+    }
     .page{position:relative;z-index:1;width:min(100%,720px);margin:0 auto}
     .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
     .back{
@@ -86,6 +100,11 @@
       background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09)
     }
     .unit b{display:block;font-size:clamp(22px,7vw,34px);font-variant-numeric:tabular-nums}
+    .unit b.value-change{animation:countdown-change 180ms cubic-bezier(.2,.75,.25,1)}
+    @keyframes countdown-change{
+      from{opacity:.15;transform:translateY(4px)}
+      to{opacity:1;transform:translateY(0)}
+    }
     .unit span{display:block;margin-top:3px;color:var(--muted);font-size:11px}
     .section-head{
       display:flex;align-items:end;justify-content:space-between;margin:24px 2px 12px
@@ -131,6 +150,9 @@
       .person-top{align-items:flex-start}
       .solar{display:block}
       .solar span:last-child{display:block;margin-top:5px}
+    }
+    @media(prefers-reduced-motion:reduce){
+      .stars,.stars:before,.stars:after,.unit b.value-change{animation:none}
     }
   </style>
 </head>
@@ -336,6 +358,16 @@
     let nextBirthday = null;
     let countdownTimer = null;
 
+    function setCountdownValue(id, value) {
+      const el = document.getElementById(id);
+      const next = String(value);
+      if (el.textContent === next) return;
+      el.textContent = next;
+      el.classList.remove("value-change");
+      void el.offsetWidth;
+      el.classList.add("value-change");
+    }
+
     async function setup() {
       document.getElementById("todayText").textContent =
         new Intl.DateTimeFormat("zh-CN", {
@@ -401,10 +433,10 @@
       let diff = target - new Date();
 
       if (diff <= 0 && dayDiff(nextBirthday.date) === 0) {
-        document.getElementById("cdDays").textContent = "🎂";
-        document.getElementById("cdHours").textContent = "00";
-        document.getElementById("cdMinutes").textContent = "00";
-        document.getElementById("cdSeconds").textContent = "00";
+        setCountdownValue("cdDays", "🎂");
+        setCountdownValue("cdHours", "00");
+        setCountdownValue("cdMinutes", "00");
+        setCountdownValue("cdSeconds", "00");
         return;
       }
 
@@ -415,10 +447,10 @@
       const minutes = Math.floor((diff % 3600000) / 60000);
       const seconds = Math.floor((diff % 60000) / 1000);
 
-      document.getElementById("cdDays").textContent = days;
-      document.getElementById("cdHours").textContent = String(hours).padStart(2, "0");
-      document.getElementById("cdMinutes").textContent = String(minutes).padStart(2, "0");
-      document.getElementById("cdSeconds").textContent = String(seconds).padStart(2, "0");
+      setCountdownValue("cdDays", days);
+      setCountdownValue("cdHours", String(hours).padStart(2, "0"));
+      setCountdownValue("cdMinutes", String(minutes).padStart(2, "0"));
+      setCountdownValue("cdSeconds", String(seconds).padStart(2, "0"));
     }
 
     setup();

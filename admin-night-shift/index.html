@@ -6,6 +6,8 @@
   <meta name="robots" content="noindex,nofollow,noarchive">
   <meta name="theme-color" content="#0d1320">
   <title>科室排班｜钊的工具箱</title>
+  <link rel="stylesheet" href="../shared/toolbox-ui.css?v=20260921-1">
+  <link rel="stylesheet" href="../shared/toolbox-motion.css?v=20260921-1">
 
   <style>
     *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -44,6 +46,7 @@
     button{cursor:pointer}
     .hidden{display:none!important}
     .page{width:min(100%,1080px);margin:0 auto}
+    .grid.is-changing,.table-panel.is-changing{animation:monthIn .18s cubic-bezier(.2,.8,.2,1) both}.day{transition:transform .12s ease,background-color .12s ease,border-color .12s ease}.day:active{transform:scale(.98)}.overlay:not(.hidden){animation:overlayIn .2s ease both}.overlay:not(.hidden) .sheet{animation:sheetIn .24s cubic-bezier(.22,1,.36,1) both}@keyframes monthIn{from{opacity:.55;transform:translateY(4px)}}@keyframes overlayIn{from{opacity:0}}@keyframes sheetIn{from{transform:translateY(18px);opacity:.86}}@media(prefers-reduced-motion:reduce){.grid.is-changing,.table-panel.is-changing,.overlay:not(.hidden),.overlay:not(.hidden) .sheet{animation:none!important}}
 
     .topbar{
       display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:16px
@@ -426,7 +429,7 @@
 
   <section id="appPage" class="hidden">
     <div class="topbar">
-      <a class="back" href="../">← 工具箱</a>
+      <a class="back tbx-pressable" href="../">← 工具箱</a>
       <div class="user">
         <span id="who" class="who"></span>
         <button id="logoutBtn" class="ghost">退出</button>
@@ -1258,6 +1261,7 @@
       1
     );
     await loadMonth();
+    [$("grid"),$("tableView")].forEach(el=>{el.classList.remove("is-changing");void el.offsetWidth;el.classList.add("is-changing");});
   }
 
   $("prev").addEventListener("click",() => changeMonth(-1));
