@@ -37,10 +37,11 @@
 
   function bind(){
     $('loginForm').addEventListener('submit',async e=>{e.preventDefault();$('loginError').textContent='';try{const out=await ToolboxAuth.signIn($('emailInput').value.trim(),$('passwordInput').value);session=out;const data=await api('me');me=data.member;$('welcomeName').textContent=me.nickname;show('homeScreen');const code=codeFromURL();if(code)await joinRoom(code,true);}catch(err){$('loginError').textContent=ToolboxAuth.authMessage(err);}});
-    $('signOutBtn').onclick=async()=>{leaveRealtime();await ToolboxAuth.signOut();session=me=state=null;setURL('');show('authScreen');};
+    $('signOutBtn').onclick=async()=>{leaveRealtime();await ToolboxAuth.signOut();session=me=state=null;setURL('');$('shareBtn').classList.add('hidden');$('leaveBtn').classList.add('hidden');show('authScreen');};
     $('createBtn').onclick=async()=>{try{const data=await api('create_room');await enterRoom(data.state);}catch(err){toast(err.message);}};
     $('joinForm').addEventListener('submit',async e=>{e.preventDefault();await joinRoom($('roomCodeInput').value);});
     $('shareBtn').onclick=shareRoom;
+    $('leaveBtn').onclick=leaveRoom;
     $('readyBtn').onclick=async()=>mutate('toggle_ready');
     $('startBtn').onclick=async()=>mutate('start_game');
     $('guessForm').addEventListener('submit',submitGuess);
@@ -66,14 +67,47 @@
     try{const data=await api('join_room',{code});await enterRoom(data.state);}catch(err){toast(err.message);if(silent)setURL('');}
   }
   async function enterRoom(next){
-    stateGeneration++;state=next;setURL(state.room.code);$('shareBtn').classList.remove('hidden');
+    stateGeneration++;state=next;setURL(state.room.code);$('shareBtn').classList.remove('hidden');$('leaveBtn').classList.remove('hidden');
     await connectRealtime();renderState();
     clearInterval(pollTimer);pollTimer=setInterval(refreshState,1600);
     clearInterval(clockTimer);clockTimer=setInterval(tick,250);
     clearInterval(canvasSyncTimer);canvasSyncTimer=setInterval(pullCanvasFallback,500);
   }
   async function mutate(action,payload={}){if(busy)return;busy=true;const generation=++stateGeneration;try{const data=await api(action,{room_id:state.room.id,...payload});if(data.state&&generation===stateGeneration){state=data.state;renderState();sendEvent('state_changed',{at:Date.now()});}return data;}finally{busy=false;}}
-  async function refreshState(){if(!state||busy||transitionBusy)return;const generation=stateGeneration;transitionBusy=true;try{const data=await api('state',{room_id:state.room.id});if(generation!==stateGeneration)return;state=data.state;renderState();}catch(err){if(/不在房间|房间不存在/.test(err.message)){leaveRealtime();show('homeScreen');setURL('');}else console.warn(err);}finally{transitionBusy=false;}}
+  function exitToHome(message=''){
+    leaveRealtime();state=null;currentRoundId=null;strokes=[];activeStroke=null;setURL('');
+    $('shareBtn').classList.add('hidden');$('leaveBtn').classList.add('hidden');$('wordModal').classList.add('hidden');
+    show('homeScreen');if(message)toast(message);
+  }
+  async function leaveRoom(){
+    if(!state||busy)return;
+    const host=state.room.host_member_id===me?.id;
+    const active=!['lobby','finished'].includes(state.room.status);
+    const message=host
+      ? '你是房主，退出将结束这个房间。确定退出吗？'
+      : active
+        ? '对局正在进行，主动退出会结束本局。确定退出吗？'
+        : '确定退出这个房间吗？';
+    if(!window.confirm(message))return;
+    busy=true;
+    try{
+      await api(host?'close_room':'leave_room',{room_id:state.room.id});
+      exitToHome(host?'房间已结束':'已退出房间');
+    }catch(err){toast(err.message);}
+    finally{busy=false;}
+  }
+  async function refreshState(){
+    if(!state||busy||transitionBusy)return;
+    const generation=stateGeneration;transitionBusy=true;
+    try{
+      const data=await api('state',{room_id:state.room.id});
+      if(generation!==stateGeneration)return;state=data.state;renderState();
+    }catch(err){
+      if(/不在房间|房间不存在|房间已由房主结束|房间因长时间无人活动已过期|房间已过期|房间已结束/.test(err.message)){
+        exitToHome(err.message);
+      }else console.warn(err);
+    }finally{transitionBusy=false;}
+  }
 
   async function connectRealtime(){
     leaveRealtime(false);
@@ -130,7 +164,10 @@
 
   function renderState(){
     if(!state)return;
+    if(['closed','abandoned'].includes(state.room.status)){exitToHome(state.room.status==='closed'?'房间已结束':'房间已过期');return;}
     $('roomCode').textContent=state.room.code;$('playerCount').textContent=`${state.players.length} / 8`;renderPlayers();renderScores();
+    const host=state.room.host_member_id===me?.id;
+    $('leaveBtn').textContent=host?'结束':'退出';
     const status=state.room.status;
     if(status==='lobby'){show('roomScreen');renderLobby();$('wordModal').classList.add('hidden');}
     else if(status==='finished'){show('finishScreen');renderRanking();$('wordModal').classList.add('hidden');}
