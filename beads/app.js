@@ -630,6 +630,80 @@
     return share>=0.60&&cornerHits>=3?key:null;
   }
 
+  function rankPalette(lab,palette,limit=3){
+    return palette
+      .map(p=>({key:p.key,code:p.code,name:p.name,hex:p.hex,special:p.special||null,delta:dE00(lab,p.lab)}))
+      .sort((a,b)=>a.delta-b.delta)
+      .slice(0,limit);
+  }
+
+  function detectConnectedBackground(list,cols,rows,tolerance){
+    list.forEach(c=>{c.autoBlank=false;});
+    if(!list.length)return {count:0,seed:null};
+    const corners=[0,cols-1,(rows-1)*cols,rows*cols-1].map(i=>list[i]).filter(Boolean);
+    if(corners.length<2)return {count:0,seed:null};
+    let seed=corners[0],bestN=0;
+    for(const candidate of corners){
+      const n=corners.filter(x=>dE00(candidate.lab,x.lab)<=tolerance).length;
+      if(n>bestN){bestN=n;seed=candidate;}
+    }
+    if(bestN<2)return {count:0,seed:null};
+    const q=[],seen=new Uint8Array(list.length);
+    for(let i=0;i<list.length;i++){
+      const cell=list[i];
+      if(cell.row===0||cell.col===0||cell.row===rows-1||cell.col===cols-1){
+        if(dE00(cell.lab,seed.lab)<=tolerance){q.push(i);seen[i]=1;}
+      }
+    }
+    let count=0;
+    while(q.length){
+      const i=q.shift(),cell=list[i];
+      if(dE00(cell.lab,seed.lab)>tolerance*1.2)continue;
+      cell.autoBlank=true;count++;
+      const next=[i-cols,i+cols,i-1,i+1];
+      for(const ni of next){
+        if(ni<0||ni>=list.length||seen[ni])continue;
+        const n=list[ni];
+        if(Math.abs(n.row-cell.row)+Math.abs(n.col-cell.col)!==1)continue;
+        if(dE00(n.lab,seed.lab)<=tolerance || dE00(n.lab,cell.lab)<=tolerance*.8){seen[ni]=1;q.push(ni);}
+      }
+    }
+    return {count,seed:seed.hex};
+  }
+
+  function isCellBlank(c){return !!c.autoBlank || blankKeys.has(c.key);}
+
+  function updateDiagnostics(){
+    if(!analysisMeta||!cells.length){
+      els.diagGeometry.textContent='等待分析';els.diagPerspective.textContent=perspectiveEnabled?'已启用':'未启用';
+      els.diagSource.textContent='—';els.diagBackground.textContent='—';els.diagAmbiguous.textContent='—';els.diagUnknown.textContent='—';
+      els.diagnosticList.innerHTML='<div class="empty-note">分析后这里会给出针对本张图纸的误差诊断。</div>';return;
+    }
+    const nonBlank=cells.filter(c=>!isCellBlank(c));
+    const ambiguous=nonBlank.filter(c=>c.ambiguous).length;
+    const unknown=nonBlank.filter(c=>String(c.key).startsWith('__unknown_')).length;
+    const bg=cells.filter(c=>isCellBlank(c)).length;
+    els.diagGeometry.textContent=(analysisMeta.phaseScore==null?'固定居中':'相位 '+analysisMeta.phaseX.toFixed(2)+' / '+analysisMeta.phaseY.toFixed(2));
+    els.diagPerspective.textContent=analysisMeta.perspective?'四角校正已用':'未启用';
+    els.diagSource.textContent=analysisMeta.sourceRawColorCount+' → '+analysisMeta.sourceColorCount+' 色';
+    els.diagBackground.textContent=bg+' 格';
+    els.diagAmbiguous.textContent=ambiguous+' 格';
+    els.diagUnknown.textContent=unknown+' 格';
+    els.diagnosticList.textContent='';
+    const add=(type,msg)=>els.diagnosticList.append(create('div','diag-item '+type,msg));
+    if(analysisMeta.phaseScore!=null)add('good','已自动搜索网格 X/Y 采样相位，减少采样落到网格线或相邻色块的概率。');
+    else add('info','当前使用固定居中采样；若图纸网格有边距或偏移，建议开启自动相位。');
+    if(perspectiveEnabled)add('good','已使用四角透视拉正，适合手机拍照或斜拍图纸。');
+    else add('info','未启用透视校正；标准截图通常不需要，拍照图建议开启。');
+    if(analysisMeta.sourceRawColorCount>analysisMeta.sourceColorCount*1.6)add('good','源色已明显收敛：压缩/抗锯齿产生的近似色被合并。');
+    if(ambiguous)add('warn','有 '+ambiguous+' 格最佳与次佳 MARD 色号过近，请重点复核 Top-3 候选。');
+    if(unknown)add('bad','有 '+unknown+' 格超过 ΔE00 拒识阈值，没有强制塞入 MARD 色号。');
+    if(bg)add('good','连通背景分割识别 '+bg+' 格，只从边缘/角落向内扩散，不会全局删除同色孤立区域。');
+    const expected=Number(els.expectedColors.value)||0;
+    if(expected&&analysisMeta.sourceColorCount!==expected)add('info','期望颜色数为 '+expected+'，算法只会合并足够接近的色群，不会为了凑数强制合并明显不同颜色。');
+    if(els.limitPalette.checked)add('good','本次匹配启用了项目限定色板，共 '+parseProjectPaletteCodes().size+' 个候选色号。');
+  }
+
   // ---------- Image / grid ----------
   function currentCrop(){
     return {
