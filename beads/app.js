@@ -877,69 +877,70 @@
 
   async function analyze(){
     if(!imageBitmap){setStatus(els.imageStatus,'请先上传图纸。','error');return;}
-    if(!prepareWorkCanvas()){setStatus(els.imageStatus,'当前裁切范围无效。','error');return;}
+    if(!prepareWorkCanvas()){setStatus(els.imageStatus,'当前裁切或四角校正范围无效。','error');return;}
     const cols=clamp(parseInt(els.cols.value)||0,1,300),rows=clamp(parseInt(els.rows.value)||0,1,300);
     const total=cols*rows;
     if(total>60000){setStatus(els.imageStatus,'当前网格超过 60,000 格。请确认行列数是否填写正确。','error');return;}
     const ratio=Number(els.ratio.value)||.55,mode=els.mode.value;
+    if(els.limitPalette.checked && !parseProjectPaletteCodes().size && (mode==='mard221'||mode==='mard291')){
+      setStatus(els.imageStatus,'已启用项目限定色板，但还没有填写任何 MARD 色号。','error');return;
+    }
     let palette=[];
     if(mode==='palette'){
       palette=parsePalette();
       if(!palette.length){setStatus(els.imageStatus,'自定义色卡模式下没有有效色卡。格式：色号,#RRGGBB,名称。','error');return;}
     }else if(mode==='mard221'||mode==='mard291'){
       palette=getMardPalette(mode);
-      if(!palette.length){setStatus(els.imageStatus,'MARD 电子色卡没有正确加载，请刷新页面后重试。','error');return;}
+      if(!palette.length){setStatus(els.imageStatus,'MARD 候选色卡为空，请检查项目限定色板。','error');return;}
     }
 
     els.analyze.disabled=true;els.analyze.textContent='分析中…';
     await new Promise(r=>requestAnimationFrame(r));
     try{
       const img=workCtx.getImageData(0,0,workCanvas.width,workCanvas.height).data;
-      const raw=[],cw=workCanvas.width/cols,ch=workCanvas.height/rows;
+      const cw=workCanvas.width/cols,ch=workCanvas.height/rows;
+      phaseOffset=findGridPhase(img,workCanvas.width,workCanvas.height,cols,rows);
+      els.phaseStatus.textContent=phaseOffset.score==null?'相位：固定居中':'相位：X '+phaseOffset.x.toFixed(2)+' / Y '+phaseOffset.y.toFixed(2);
+      const raw=[];
       for(let row=0;row<rows;row++){
         for(let col=0;col<cols;col++){
-          const s=sampleCell(img,workCanvas.width,workCanvas.height,col*cw,row*ch,(col+1)*cw,(row+1)*ch,ratio);
-          raw.push({row,col,...s,key:null,delta:null,low:false});
+          const dx=phaseOffset.x*cw,dy=phaseOffset.y*ch;
+          const s=sampleCell(img,workCanvas.width,workCanvas.height,col*cw+dx,row*ch+dy,(col+1)*cw+dx,(row+1)*ch+dy,ratio);
+          raw.push({row,col,...s,key:null,delta:null,low:false,ambiguous:false,candidates:null,autoBlank:false});
         }
       }
 
       colorCatalog=new Map();
       const sourceTol=clamp(Number(els.sourceMerge.value)||2.4,.5,8);
-      const sourceClusters=clusterSourceCells(raw,sourceTol);
-      for(const c of raw){if(c.alpha<40){c.key='__transparent__';c.low=false;c.delta=0;}}
+      const rawColorCount=new Set(raw.filter(x=>x.alpha>=40).map(x=>x.hex)).size;
+      let sourceClusters=clusterSourceCells(raw,sourceTol);
+      sourceClusters=spatialRefineClusters(raw,sourceClusters,cols,rows,sourceTol);
+      sourceClusters=constrainClusterCount(raw,sourceClusters,Number(els.expectedColors.value)||0);
+      for(const cell of raw){if(cell.alpha<40){cell.key='__transparent__';cell.low=false;cell.delta=0;cell.autoBlank=true;}}
 
       if(mode!=='cluster'){
         const threshold=clamp(Number(els.delta.value)||8,1,30);
-        const exact=new Map(palette.map(p=>[p.hex.toUpperCase(),p]));
         let unknownSeq=0;
         for(const cl of sourceClusters){
-          let best=exact.get(cl.hex.toUpperCase())||null,bestD=best?0:Infinity,second=Infinity;
-          if(!best){
-            for(const p of palette){
-              const d=dE00(cl.lab,p.lab);
-              if(d<bestD){second=bestD;bestD=d;best=p;} else if(d<second) second=d;
-            }
-          }else{
-            for(const p of palette){
-              if(p.key===best.key) continue;
-              const d=dE00(cl.lab,p.lab);
-              if(d<second) second=d;
-            }
-          }
+          const ranked=rankPalette(cl.lab,palette,3),best=ranked[0],second=ranked[1];
+          const bestD=best?.delta??Infinity;
           const rejected=!best||bestD>threshold;
+          const ambiguous=!rejected && !!second && (second.delta-bestD<1.2) && bestD>1.0;
           let key;
           if(rejected){
             key='__unknown_'+(++unknownSeq);
-            colorCatalog.set(key,{key,code:'未知'+String(unknownSeq).padStart(2,'0'),name:'未匹配色',hex:cl.hex,rgb:cl.rgb,lab:cl.lab,unknown:true});
+            colorCatalog.set(key,{key,code:'未知'+String(unknownSeq).padStart(2,'0'),name:'未匹配色',hex:cl.hex,rgb:cl.rgb,lab:cl.lab,unknown:true,candidateRanks:ranked});
           }else{
             key=best.key;
+            const old=colorCatalog.get(key);
+            if(!old||!old._clusterCount||cl.count>old._clusterCount) colorCatalog.set(key,{...palette.find(p=>p.key===key),candidateRanks:ranked,_clusterCount:cl.count});
           }
-          const uncertain=rejected || (second-bestD<1.2 && bestD>1.5) || !!best?.special;
+          const uncertain=rejected||ambiguous||!!best?.special;
           for(const cell of cl.cells){
-            cell.key=key;cell.delta=bestD;cell.low=uncertain||cell.std>24;
+            cell.key=key;cell.delta=bestD;cell.low=uncertain||cell.std>24;cell.ambiguous=ambiguous;cell.candidates=ranked;
           }
         }
-        for(const p of palette) colorCatalog.set(p.key,{...p});
+        for(const p of palette) if(!colorCatalog.has(p.key)) colorCatalog.set(p.key,{...p});
       }else{
         sourceClusters.sort((a,b)=>b.count-a.count);
         sourceClusters.forEach((cl,i)=>{
@@ -951,20 +952,25 @@
 
       colorCatalog.set('__transparent__',{key:'__transparent__',code:'透明',name:'透明 / 空白',hex:'#FFFFFF',rgb:[255,255,255],lab:rgbToLab([255,255,255])});
       cells=raw;
+      blankKeys=new Set(['__transparent__']);
+      const bgTol=clamp(Number(els.backgroundTol.value)||4,1,12);
+      const bgResult=els.autoBlank.checked?detectConnectedBackground(cells,cols,rows,bgTol):{count:0,seed:null};
+
       const paletteName=mode==='mard221'?'MARD 221 (2026)':mode==='mard291'?'MARD 291 (2026)':mode==='palette'?(els.paletteName.value.trim()||'我的色卡'):'自动聚类';
       const pitch=clamp(Number(els.beadPitch.value)||2.6,2,4);
-      analysisMeta={cols,rows,mode,ratio,crop:currentCrop(),paletteName,tolerance:Number(els.tolerance.value)||5,sourceMergeTolerance:sourceTol,sourceColorCount:sourceClusters.length,deltaThreshold:Number(els.delta.value)||8,beadPitchMm:pitch,physicalWidthCm:cols*pitch/10,physicalHeightCm:rows*pitch/10};
+      analysisMeta={
+        cols,rows,mode,ratio,crop:currentCrop(),paletteName,tolerance:Number(els.tolerance.value)||5,
+        sourceMergeTolerance:sourceTol,sourceRawColorCount:rawColorCount,sourceColorCount:sourceClusters.length,
+        deltaThreshold:Number(els.delta.value)||8,beadPitchMm:pitch,physicalWidthCm:cols*pitch/10,physicalHeightCm:rows*pitch/10,
+        phaseX:phaseOffset.x,phaseY:phaseOffset.y,phaseScore:phaseOffset.score,perspective:perspectiveEnabled,
+        backgroundTolerance:bgTol,backgroundCount:bgResult.count,limitedPalette:els.limitPalette.checked?parseProjectPaletteCodes().size:0,
+        expectedColors:Number(els.expectedColors.value)||0
+      };
 
-      blankKeys=new Set();
-      if(cells.some(c=>c.key==='__transparent__')) blankKeys.add('__transparent__');
-      if(els.autoBlank.checked){
-        const borderBlank=findBorderBlankKey(cells,cols,rows);
-        if(borderBlank) blankKeys.add(borderBlank);
-      }
       aggregate();
       highlightKey=null;selectedCellIndex=-1;els.cellEditor.classList.add('hidden');
-      renderPreview(true);renderResults();
-      setStatus(els.imageStatus,'分析完成。请重点检查网格对齐、待确认格和自动空白颜色；必要时点击格子人工修正。');
+      renderPreview(true);renderResults();updateDiagnostics();
+      setStatus(els.imageStatus,'V2 分析完成：已执行网格相位、源色空间合并、连通背景、Top-3 MARD 候选与拒识判断。请检查“精度诊断”。');
     }catch(err){
       console.error(err);setStatus(els.imageStatus,'分析失败：'+err.message,'error');
     }finally{
