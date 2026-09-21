@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#f6f3ff" />
   <meta name="robots" content="noindex,nofollow,noarchive" />
   <title>拼豆计算器｜钊的工具箱</title>
-  <link rel="stylesheet" href="./style.css?v=20260921-1" />
+  <link rel="stylesheet" href="./style.css?v=20260921-2" />
 </head>
 <body>
   <main class="app">
@@ -117,6 +117,35 @@
           </div>
         </div>
 
+        <div class="precision-box">
+          <div class="precision-head"><b>精确识别 V2</b><span>几何定位优先于颜色匹配</span></div>
+          <div class="precision-grid">
+            <label>网格相位
+              <select id="phaseMode"><option value="auto" selected>自动寻找 X/Y 偏移</option><option value="center">固定居中</option></select>
+            </label>
+            <label>智能背景阈值 ΔE00
+              <input id="backgroundTolerance" type="number" min="1" max="12" step="0.2" value="4.0" />
+            </label>
+            <label>期望颜色数（可选）
+              <input id="expectedColors" type="number" min="0" max="100" step="1" value="0" inputmode="numeric" placeholder="0=自动" />
+            </label>
+            <label>透视校正
+              <select id="perspectiveMode"><option value="off" selected>关闭</option><option value="manual">四角手动校正</option></select>
+            </label>
+          </div>
+          <div class="tool-row compact-row">
+            <button class="btn secondary" id="openPerspectiveBtn" type="button">设置四角</button>
+            <button class="btn secondary" id="resetPerspectiveBtn" type="button">重置四角</button>
+            <span class="mini" id="phaseStatus">相位：等待分析</span>
+          </div>
+        </div>
+
+        <div class="perspective-editor hidden" id="perspectiveEditor">
+          <div class="perspective-head"><b>四角透视校正</b><span>拖动 ①②③④ 到图纸四个角，顺序为左上、右上、右下、左下。</span></div>
+          <canvas id="perspectiveCanvas" width="900" height="650"></canvas>
+          <div class="tool-row"><button class="btn primary" id="applyPerspectiveBtn" type="button">应用四角校正</button><button class="btn ghost" id="cancelPerspectiveBtn" type="button">取消</button></div>
+        </div>
+
         <div class="tool-row">
           <button class="btn secondary" id="autoGridBtn" type="button">自动估算网格</button>
           <button class="btn secondary" id="previewGridBtn" type="button">预览网格</button>
@@ -152,6 +181,14 @@
         <div class="mard-note" id="mardNote">标准 221 色用于普通实色匹配；P/Q/R/T/Y/ZG 属于特殊材质，单一 HEX 不能完整表达实物效果。</div>
         <div class="mard-grid" id="mardGrid" aria-label="MARD 电子色卡"></div>
         <div class="mard-foot"><span id="mardCount">显示 221 / 291 色</span><span>HEX 为屏幕参考值，实物受光线、批次和材质影响。</span></div>
+        <div class="project-palette">
+          <div class="project-palette-head"><b>项目限定色板</b><span id="projectPaletteStatus">未限制：在当前 MARD 色库中匹配</span></div>
+          <div class="project-palette-row">
+            <label class="toggle-line"><input id="limitPaletteEnabled" type="checkbox" /> 只在指定色号中匹配</label>
+            <input id="projectPaletteCodes" type="text" placeholder="例如 A1,A7,A23,B12,H2,H7" />
+            <button class="btn secondary" id="paletteFromInventoryBtn" type="button">从当前库存生成</button>
+          </div>
+        </div>
 
         <details class="custom-palette">
           <summary>自定义色卡 / 其他品牌</summary>
@@ -232,6 +269,26 @@
         </div>
         <div class="status" id="projectStatus"></div>
       </section>
+
+      <section class="card diagnostics-card" id="diagnosticsCard">
+        <div class="section-head">
+          <div><h2>5. 精度诊断</h2><p>把几何、源色、MARD 映射和背景识别分开报告，方便定位误差来源。</p></div>
+          <button class="btn secondary" id="runBenchmarkBtn" type="button">运行内置标准图自检</button>
+        </div>
+        <div class="diag-grid">
+          <div><span>网格几何</span><b id="diagGeometry">等待分析</b></div>
+          <div><span>四角校正</span><b id="diagPerspective">未启用</b></div>
+          <div><span>源色收敛</span><b id="diagSource">—</b></div>
+          <div><span>背景分割</span><b id="diagBackground">—</b></div>
+          <div><span>MARD 歧义</span><b id="diagAmbiguous">—</b></div>
+          <div><span>拒识 / 未知</span><b id="diagUnknown">—</b></div>
+        </div>
+        <div class="diagnostic-list" id="diagnosticList"><div class="empty-note">分析后这里会给出针对本张图纸的误差诊断。</div></div>
+        <div class="benchmark-box" id="benchmarkBox">
+          <div><b>内置合成标准图</b><span>用于回归测试颜色引擎，不代表所有实拍图的真实世界准确率。</span></div>
+          <div id="benchmarkResult" class="benchmark-result">尚未运行</div>
+        </div>
+      </section>
     </section>
 
     <section class="tab-panel" id="tab-inventory">
@@ -294,13 +351,15 @@
         <h2>如何获得更高精度</h2>
         <ol>
           <li><strong>优先使用标准图纸：</strong>每格颜色应尽可能均匀，避免透视拍照、强反光和大面积文字水印。</li>
-          <li><strong>先校准网格：</strong>行列数必须正确，网格线应与预览完全重合；不确定时优先手动填写。</li>
+          <li><strong>先校准网格：</strong>行列数必须正确；V2 会自动搜索 X/Y 网格相位，拍照图还可拖动四角进行透视校正。</li>
           <li><strong>2.6 mm Mini 优化：</strong>系统按 2.6 mm 名义间距计算物理尺寸，高密度图纸优先保留足够的每格像素并关闭缩放平滑，减少相邻色混合。</li>
           <li><strong>先聚类、后映射色号：</strong>同一图纸中因压缩产生的近似颜色会先按 ΔE00 合并，再统一匹配 MARD，避免一种颜色被拆成多个色号。</li>
           <li><strong>中心区域采样：</strong>默认读取格子中央 55%，并使用真实采样像素的代表色而不是人为组合 RGB，降低网格线和压缩边缘污染。</li>
           <li><strong>MARD 默认使用 221 标准色：</strong>完整 291 色还包含珠光、温变、果冻、透明、夜光与光变系列；这些特殊效果无法由单一 HEX 完整表达。</li>
           <li><strong>其他品牌可导入自定义色卡：</strong>自动聚类适合精确“数量统计”，但 C01/C02 不是跨项目稳定的品牌色号。</li>
           <li><strong>检查待确认格：</strong>系统同时看 ΔE00 和格内颜色离散程度；低置信度格建议人工点选修正。</li>
+          <li><strong>项目限定色板：</strong>如果你知道本图只会用某些 MARD 色号，限制候选集通常能明显降低相近色误判。</li>
+          <li><strong>Top-3 候选：</strong>识别结果保留前三候选和 ΔE00；第一、第二名过近时会明确标记为歧义。</li>
           <li><strong>数学自检：</strong>所有颜色格 + 空白格必须严格等于 行 × 列，防止漏格和重复统计。</li>
         </ol>
         <div class="privacy-note">隐私：图纸识别在本机 Canvas 完成。只有你主动“保存项目”时，统计结果才会写入 Supabase；原始图片不会被本功能上传。</div>
@@ -309,8 +368,8 @@
   </main>
 
   <script src="../shared/toolbox-auth.js?v=20260917-4"></script>
-  <script src="./mard-palette.js?v=20260921-1"></script>
-  <script src="./app.js?v=20260921-1"></script>
+  <script src="./mard-palette.js?v=20260921-2"></script>
+  <script src="./app.js?v=20260921-2"></script>
   <!-- Cloudflare Web Analytics -->
   <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"bfd3df5c469343eb91856b7f3275def8"}'></script>
   <!-- End Cloudflare Web Analytics -->
