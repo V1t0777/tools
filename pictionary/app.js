@@ -9,8 +9,12 @@
   let canvas=$('canvas'), ctx=canvas.getContext('2d'), logical={w:1,h:1}, busy=false, transitionBusy=false, presenceMembers=new Set();
   let realtimeStatus='CLOSED', reconnectTimer=null, snapshotTimer=null, snapshotAssemblies=new Map();
   let canvasSyncTimer=null, serverSaveTimer=null, canvasFetchBusy=false, canvasSaveBusy=false, canvasSaveQueued=false, lastCanvasVersion=0;
-  let pingTimer=null, lastPongAt=0, realtimeRtt=null, pingSeq=0;
+  let pingTimer=null, lastPongAt=0, realtimeRtt=null, subscribedAt=0, realtimeToken=null;
   let liveGuesses=new Map(), appliedGuessResults=new Set(), guessRequests=new Map();
+  let roomEpoch=0, connectionEpoch=0, requests=new Set(), refreshQueued=false, refreshTimer=null;
+  let heartbeatTimer=null, lastDrawerAt=0, pendingPings=new Map(), reconnectAttempt=0;
+  let canvasRevision=0, canvasDirty=false, lastCanvasCheck=0, lastSnapshotRequest=0, canvasNeedsSync=false;
+  let scoreRevision=-1, scoreTotals=new Map(), hintRequested=false, suspended=false;
 
   function show(id){ screens.forEach(x => $(x).classList.toggle('active',x===id)); }
   function toast(message){ const el=$('toast'); el.textContent=message; el.classList.add('show'); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),2300); }
@@ -24,13 +28,67 @@
   function codeFromURL(){ return (new URLSearchParams(location.search).get('room')||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6); }
   function setURL(code){ const u=new URL(location.href); code?u.searchParams.set('room',code):u.searchParams.delete('room'); history.replaceState({},'',u); }
 
-  async function api(action,payload={}){
-    session=await ToolboxAuth.getSession();
-    if(!session) throw new Error('请先登录');
-    const r=await fetch(FUNCTION_URL,{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json','apikey':ToolboxAuth.key,'Authorization':`Bearer ${session.access_token}`},body:JSON.stringify({action,...payload})});
-    const data=await r.json().catch(()=>({}));
-    if(!r.ok||data.error) throw new Error(data.error||`请求失败（${r.status}）`);
-    return data;
+  async function api(action,payload={},options={}){
+    const controller=new AbortController(), epoch=roomEpoch;
+    requests.add(controller);
+    let timer;
+    const cancelled=new Promise((_,reject)=>{
+      controller.signal.addEventListener('abort',()=>reject(controller.signal.reason),{once:true});
+      timer=setTimeout(()=>controller.abort(Object.assign(new Error('网络较慢，尚未确认，请重试'),{retryable:true})),options.timeout||8000);
+    });
+    const work=(async()=>{
+      const auth=await ToolboxAuth.getSession();
+      if(controller.signal.aborted)throw controller.signal.reason;
+      if(!auth)throw new Error('请先登录');
+      session=auth;
+      if(realtime&&realtimeToken!==auth.access_token){realtimeToken=auth.access_token;Promise.resolve(realtime.realtime.setAuth(auth.access_token)).catch(()=>scheduleReconnect());}
+      const r=await fetch(FUNCTION_URL,{method:'POST',cache:'no-store',signal:controller.signal,headers:{'Content-Type':'application/json','apikey':ToolboxAuth.key,'Authorization':`Bearer ${auth.access_token}`},body:JSON.stringify({action,...payload})});
+      const data=await r.json().catch(()=>({}));
+      if(!r.ok||data.error)throw Object.assign(new Error(data.error||`请求失败（${r.status}）`),{retryable:r.status>=500||r.status===429});
+      if(epoch!==roomEpoch)throw Object.assign(new Error('会话已切换'),{cancelled:true});
+      return data;
+    })();
+    try{return await Promise.race([work,cancelled]);}
+    catch(err){if(err instanceof TypeError)err.retryable=true;throw err;}
+    finally{clearTimeout(timer);requests.delete(controller);}
+  }
+  function invalidateRoom(){
+    roomEpoch++;stateGeneration++;
+    for(const c of requests)c.abort(Object.assign(new Error('会话已切换'),{cancelled:true}));
+    requests.clear();guessRequests.clear();liveGuesses.clear();appliedGuessResults.clear();
+    busy=false;transitionBusy=false;refreshQueued=false;
+    clearTimeout(refreshTimer);refreshTimer=null;
+    scoreRevision=-1;scoreTotals.clear();
+  }
+  function applyScores(data){
+    if(!data||!Number.isSafeInteger(Number(data.revision))||Number(data.revision)<scoreRevision||!Array.isArray(data.scores))return;
+    scoreRevision=Number(data.revision);
+    scoreTotals=new Map(data.scores.map(x=>[x.member_id,Number(x.score)||0]));
+    for(const p of state?.players||[])if(scoreTotals.has(p.member_id))p.score=scoreTotals.get(p.member_id);
+  }
+  function adoptState(next){
+    state=next;applyScores(next.score_state);
+    for(const p of state?.players||[])if(scoreTotals.has(p.member_id))p.score=scoreTotals.get(p.member_id);
+    renderState();
+  }
+  function requestState(delay=80){
+    if(!state||suspended)return;
+    if(transitionBusy||busy){refreshQueued=true;return;}
+    if(refreshTimer)return;
+    refreshTimer=setTimeout(()=>{refreshTimer=null;refreshState();},delay);
+  }
+  function startRoomTimers(){
+    if(!state||suspended)return;
+    setStatePoll(3000);
+    clearInterval(clockTimer);clockTimer=setInterval(tick,250);
+    clearInterval(canvasSyncTimer);canvasSyncTimer=setInterval(pullCanvasFallback,650);
+    clearInterval(heartbeatTimer);heartbeatTimer=setInterval(checkHealth,1000);
+  }
+  function resumeRoom(){
+    if(!state||document.hidden)return;
+    suspended=false;startRoomTimers();requestState(0);
+    if(realtimeStatus!=='SUBSCRIBED')scheduleReconnect();
+    else {sendPing();requestCanvas();}
   }
 
   async function boot(){
@@ -45,7 +103,7 @@
 
   function bind(){
     $('loginForm').addEventListener('submit',async e=>{e.preventDefault();$('loginError').textContent='';try{const out=await ToolboxAuth.signIn($('emailInput').value.trim(),$('passwordInput').value);session=out;const data=await api('me');me=data.member;$('welcomeName').textContent=me.nickname;show('homeScreen');const code=codeFromURL();if(code)await joinRoom(code,true);}catch(err){$('loginError').textContent=ToolboxAuth.authMessage(err);}});
-    $('signOutBtn').onclick=async()=>{leaveRealtime();await ToolboxAuth.signOut();session=me=state=null;setURL('');$('shareBtn').classList.add('hidden');$('leaveBtn').classList.add('hidden');show('authScreen');};
+    $('signOutBtn').onclick=async()=>{invalidateRoom();leaveRealtime();await ToolboxAuth.signOut();session=me=state=null;setURL('');$('shareBtn').classList.add('hidden');$('leaveBtn').classList.add('hidden');show('authScreen');};
     $('createBtn').onclick=async()=>{try{const data=await api('create_room');await enterRoom(data.state);}catch(err){toast(err.message);}};
     $('joinForm').addEventListener('submit',async e=>{e.preventDefault();await joinRoom($('roomCodeInput').value);});
     $('shareBtn').onclick=shareRoom;
@@ -53,6 +111,10 @@
     $('readyBtn').onclick=async()=>mutate('toggle_ready');
     $('startBtn').onclick=async()=>mutate('start_game');
     $('guessForm').addEventListener('submit',submitGuess);
+    $('guessFeed').addEventListener('click',e=>{
+      const id=e.target.closest('[data-retry]')?.dataset.retry;
+      const item=liveGuesses.get(id);if(item&&!item.pending)deliverGuess(item);
+    });
     $('againBtn').onclick=async()=>mutate('play_again');
     $('wordOptions').addEventListener('click',async e=>{const b=e.target.closest('[data-option]');if(!b||busy)return;const modal=$('wordModal');b.disabled=true;modal.classList.add('hidden');$('canvasCover').classList.remove('hidden');$('coverText').textContent='正在开始本轮…';try{await mutate('choose_word',{option_id:b.dataset.option});}catch(err){b.disabled=false;modal.classList.remove('hidden');toast(err.message);}});
     $('colors').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;selectedColor=b.dataset.color;erasing=false;document.querySelectorAll('#colors button').forEach(x=>x.classList.toggle('active',x===b));$('eraserBtn').classList.remove('active');});
@@ -61,8 +123,11 @@
     $('undoBtn').onclick=undoStroke; bindHoldClear();
     canvas.addEventListener('pointerdown',pointerDown);canvas.addEventListener('pointermove',pointerMove);canvas.addEventListener('pointerup',pointerUp);canvas.addEventListener('pointercancel',pointerUp);
     window.addEventListener('resize',()=>{resizeCanvas();redraw();});
-    document.addEventListener('visibilitychange',()=>{if(!document.hidden&&state){refreshState();if(realtimeStatus!=='SUBSCRIBED')scheduleReconnect();}});
-    window.addEventListener('pagehide',leaveRealtime);
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)resumeRoom();else if(activeStroke)pointerUp({preventDefault(){}});});
+    window.addEventListener('pagehide',()=>{if(activeStroke)pointerUp({preventDefault(){}});suspended=true;invalidateRoom();leaveRealtime();});
+    window.addEventListener('pageshow',resumeRoom);
+    window.addEventListener('online',resumeRoom);
+    window.addEventListener('offline',()=>{lastPongAt=lastDrawerAt=0;checkHealth();});
   }
 
   function buildTools(){
@@ -75,20 +140,26 @@
     try{const data=await api('join_room',{code});await enterRoom(data.state);}catch(err){toast(err.message);if(silent)setURL('');}
   }
   async function enterRoom(next){
-    stateGeneration++;state=next;setURL(state.room.code);$('shareBtn').classList.remove('hidden');$('leaveBtn').classList.remove('hidden');
-    await connectRealtime();renderState();
-    setStatePoll(5000);
-    clearInterval(clockTimer);clockTimer=setInterval(tick,250);
-    clearInterval(canvasSyncTimer);canvasSyncTimer=setInterval(pullCanvasFallback,650);
+    invalidateRoom();state=next;suspended=false;currentRoundId=null;canvasRevision=0;
+    setURL(state.room.code);$('shareBtn').classList.remove('hidden');$('leaveBtn').classList.remove('hidden');
+    adoptState(next);startRoomTimers();await connectRealtime();
   }
   function setStatePoll(ms){
     if(pollTimer&&statePollMs===ms)return;
-    clearInterval(pollTimer);statePollMs=ms;
-    pollTimer=setInterval(refreshState,ms);
+    clearInterval(pollTimer);statePollMs=ms;pollTimer=setInterval(refreshState,ms);
   }
-  async function mutate(action,payload={}){if(busy)return;busy=true;const generation=++stateGeneration;try{const data=await api(action,{room_id:state.room.id,...payload});if(data.state&&generation===stateGeneration){state=data.state;renderState();sendEvent('state_changed',{at:Date.now()});}return data;}finally{busy=false;}}
+  async function mutate(action,payload={}){
+    if(busy||!state)return;
+    busy=true;const generation=++stateGeneration,epoch=roomEpoch;
+    try{
+      const data=await api(action,{room_id:state.room.id,round_id:currentRoundId,...payload});
+      if(data.state&&epoch===roomEpoch&&generation===stateGeneration){adoptState(data.state);sendEvent('state_changed',{at:Date.now()});}
+      return data;
+    }finally{if(epoch===roomEpoch){busy=false;if(refreshQueued){refreshQueued=false;requestState();}}}
+  }
+
   function exitToHome(message=''){
-    leaveRealtime();state=null;currentRoundId=null;strokes=[];activeStroke=null;setURL('');
+    invalidateRoom();leaveRealtime();state=null;currentRoundId=null;strokes=[];activeStroke=null;setURL('');
     $('shareBtn').classList.add('hidden');$('leaveBtn').classList.add('hidden');$('wordModal').classList.add('hidden');
     show('homeScreen');if(message)toast(message);
   }
@@ -110,107 +181,115 @@
     finally{busy=false;}
   }
   async function refreshState(){
-    if(!state||busy||transitionBusy)return;
-    const generation=stateGeneration;transitionBusy=true;
+    if(!state||suspended)return;
+    if(busy||transitionBusy){refreshQueued=true;return;}
+    const generation=stateGeneration,epoch=roomEpoch,roomId=state.room.id;transitionBusy=true;
     try{
-      const data=await api('state',{room_id:state.room.id});
-      if(generation!==stateGeneration)return;state=data.state;renderState();
+      const data=await api('state',{room_id:roomId});
+      if(epoch!==roomEpoch||generation!==stateGeneration||state?.room.id!==roomId)return;
+      adoptState(data.state);
     }catch(err){
-      if(/不在房间|房间不存在|房间已由房主结束|房间因长时间无人活动已过期|房间已过期|房间已结束/.test(err.message)){
-        exitToHome(err.message);
-      }else console.warn(err);
-    }finally{transitionBusy=false;}
-  }
-
-  async function connectRealtime(){
-    leaveRealtime(false);
-    if(!window.supabase?.createClient){toast('实时组件加载失败，请刷新页面');return;}
-    try{session=await ToolboxAuth.getSession();}catch{}
-    if(!session?.access_token){toast('登录状态已失效，请重新登录');return;}
-    realtimeStatus='CONNECTING';
-    realtime=window.supabase.createClient(ToolboxAuth.url,ToolboxAuth.key,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
-    await realtime.realtime.setAuth(session.access_token);
-    const topic=`pictionary:${state.room.id}`;
-    channel=realtime.channel(topic,{config:{private:true,presence:{key:session.user.id},broadcast:{ack:false,self:false}}});
-    channel.on('broadcast',{event:'stroke'},({payload})=>{markRealtimeRx();receiveStroke(payload);})
-      .on('broadcast',{event:'clear'},({payload})=>{markRealtimeRx();if(payload?.round_id&&payload.round_id!==currentRoundId)return;strokes=[];activeStroke=null;redraw();})
-      .on('broadcast',{event:'undo'},({payload})=>{markRealtimeRx();if(payload?.round_id&&payload.round_id!==currentRoundId)return;strokes=strokes.filter(s=>s.id!==payload.id);redraw();})
-      .on('broadcast',{event:'sync_request'},()=>{markRealtimeRx();if(isDrawer())sendSnapshot();})
-      .on('broadcast',{event:'snapshot'},({payload})=>{markRealtimeRx();receiveSnapshot(payload);})
-      .on('broadcast',{event:'guess_result'},({payload})=>{markRealtimeRx();receiveGuessResult(payload);})
-      .on('broadcast',{event:'state_changed'},()=>{markRealtimeRx();refreshState();})
-      .on('broadcast',{event:'ping'},({payload})=>{markRealtimeRx();handlePing(payload);})
-      .on('broadcast',{event:'pong'},({payload})=>{markRealtimeRx();handlePong(payload);})
-      .on('presence',{event:'sync'},()=>{markRealtimeRx();presenceMembers=new Set(Object.values(channel.presenceState()).flat().map(x=>x.member_id));renderPlayers();})
-      .subscribe(async status=>{
-        realtimeStatus=status;
-        updateRealtimeStatus(status);
-        if(status==='SUBSCRIBED'){
-          clearTimeout(reconnectTimer);reconnectTimer=null;lastPongAt=Date.now();setStatePoll(5000);
-          await channel.track({member_id:me.id,nickname:me.nickname,online_at:new Date().toISOString()});
-          sendEvent('sync_request',{member_id:me.id,round_id:currentRoundId});
-          startPing();
-          clearInterval(snapshotTimer);
-          snapshotTimer=setInterval(()=>{if(isDrawer()&&state?.room?.status==='playing'&&(strokes.length||activeStroke))sendSnapshot();},1800);
-        }else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED'){
-          setStatePoll(1800);scheduleReconnect();
-        }
-      });
-  }
-  function updateRealtimeStatus(status=realtimeStatus){
-    const pill=$('connectionStatus');if(!pill)return;
-    const healthy=isRealtimeHealthy();
-    if(status==='SUBSCRIBED'){
-      pill.textContent=healthy?(Number.isFinite(realtimeRtt)?`实时在线 · ${Math.round(realtimeRtt)}ms`:'实时在线'):'实时降级';
-      pill.classList.toggle('online',healthy);
-    }else{
-      pill.textContent=status==='CHANNEL_ERROR'||status==='TIMED_OUT'?'正在重连':'连接中';
-      pill.classList.remove('online');
+      if(epoch!==roomEpoch||err.cancelled)return;
+      if(/不在.*房间|房间不存在|房间已由房主结束|房间因长时间无人活动已过期|房间已过期|房间已结束/.test(err.message))exitToHome(err.message);
+      else console.warn(err.message);
+    }finally{
+      if(epoch===roomEpoch){transitionBusy=false;if(refreshQueued){refreshQueued=false;requestState();}}
     }
   }
-  function markRealtimeRx(){if(realtimeStatus==='SUBSCRIBED'){lastPongAt=Date.now();updateRealtimeStatus();}}
+  async function connectRealtime(){
+    leaveRealtime(false);
+    const generation=connectionEpoch,epoch=roomEpoch,roomId=state?.room.id;
+    const current=()=>generation===connectionEpoch&&epoch===roomEpoch&&roomId===state?.room.id&&!suspended;
+    if(!roomId||!window.supabase?.createClient)return;
+    const auth=await ToolboxAuth.getSession();if(!current()||!auth?.access_token)return;
+    realtimeStatus='CONNECTING';
+    const client=window.supabase.createClient(ToolboxAuth.url,ToolboxAuth.key,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
+    realtime=client;realtimeToken=auth.access_token;await client.realtime.setAuth(auth.access_token);if(!current()){client.realtime.disconnect();return;}
+    const ch=client.channel(`pictionary:${roomId}`,{config:{private:true,presence:{key:auth.user.id},broadcast:{ack:false,self:false}}});
+    channel=ch;
+    const on=(event,fn)=>ch.on('broadcast',{event},({payload})=>{if(current())fn(payload);});
+    on('stroke',receiveStroke);on('snapshot',receiveSnapshot);
+    on('clear',p=>receiveCanvasControl('clear',p));on('undo',p=>receiveCanvasControl('undo',p));
+    on('sync_request',p=>{if(isDrawer()&&p?.round_id===currentRoundId)sendSnapshot();});
+    on('guess_result',receiveGuessResult);on('state_changed',()=>requestState());
+    on('ping',handlePing);on('pong',handlePong);
+    ch.on('presence',{event:'sync'},()=>{if(!current())return;presenceMembers=new Set(Object.values(ch.presenceState()).flat().map(x=>x.member_id));renderPlayers();});
+    ch.subscribe(async status=>{
+      if(!current())return;
+      realtimeStatus=status;updateRealtimeStatus();
+      if(status==='SUBSCRIBED'){
+        clearTimeout(reconnectTimer);reconnectTimer=null;reconnectAttempt=0;
+        lastPongAt=lastDrawerAt=0;subscribedAt=Date.now();requestState(0);requestCanvas();startPing();
+        try{await ch.track({member_id:me.id,nickname:me.nickname,online_at:new Date().toISOString()});}catch{}
+        if(!current())return;
+        clearInterval(snapshotTimer);snapshotTimer=setInterval(()=>{if(isDrawer()&&canvasDirty)persistCanvasFallback();},2000);
+      }else if(['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(status)){
+        lastPongAt=lastDrawerAt=0;checkHealth();scheduleReconnect();
+      }
+    });
+  }
   function isRealtimeHealthy(){
-    if(realtimeStatus!=='SUBSCRIBED')return false;
-    if((state?.players?.length||0)<2)return true;
-    return Date.now()-lastPongAt<9000;
+    return realtimeStatus==='SUBSCRIBED'&&((state?.players?.length||0)<2||Date.now()-lastPongAt<5500);
   }
-  function startPing(){
-    clearInterval(pingTimer);sendPing();pingTimer=setInterval(sendPing,4000);
+  function isCanvasHealthy(){
+    return realtimeStatus==='SUBSCRIBED'&&!canvasNeedsSync&&(isDrawer()?isRealtimeHealthy():Date.now()-lastDrawerAt<5500);
   }
+  function updateRealtimeStatus(){
+    const healthy=isRealtimeHealthy()&&(state?.room.status!=='playing'||isCanvasHealthy());
+    for(const id of ['connectionStatus','gameConnectionStatus']){
+      const pill=$(id);if(!pill)continue;
+      pill.textContent=healthy?(Number.isFinite(realtimeRtt)?`实时在线 · ${Math.round(realtimeRtt)}ms`:'实时在线'):'同步恢复中';
+      pill.classList.toggle('online',healthy);
+    }
+  }
+  function checkHealth(){
+    if(!state||suspended||document.hidden)return;
+    const healthy=isRealtimeHealthy();setStatePoll(healthy?3000:1200);updateRealtimeStatus();
+    if(!isCanvasHealthy())pullCanvasFallback(true);
+    if(realtimeStatus==='SUBSCRIBED'&&!healthy&&Date.now()-(lastPongAt||subscribedAt)>12000)scheduleReconnect();
+  }
+  function startPing(){clearInterval(pingTimer);sendPing();pingTimer=setInterval(sendPing,2000);}
   function sendPing(){
-    if(realtimeStatus!=='SUBSCRIBED'||!state?.room?.id||!me?.id)return;
-    const healthy=isRealtimeHealthy();setStatePoll(healthy?5000:1800);updateRealtimeStatus();
-    const sent=Date.now(),id=`${sent}-${++pingSeq}`;
-    sendEvent('ping',{ping_id:id,sender_member_id:me.id,sent_at:sent});
+    if(realtimeStatus!=='SUBSCRIBED'||!state||document.hidden)return;
+    const sent=Date.now(),id=makeClientId();pendingPings.set(id,sent);
+    for(const [key,at] of pendingPings)if(sent-at>10000)pendingPings.delete(key);
+    sendEvent('ping',{ping_id:id,sender_member_id:me.id,round_id:currentRoundId});
   }
   function handlePing(p){
-    if(!p?.ping_id||!p?.sender_member_id||p.sender_member_id===me?.id)return;
-    sendEvent('pong',{ping_id:p.ping_id,target_member_id:p.sender_member_id,responder_member_id:me.id,sent_at:Number(p.sent_at)||Date.now()});
+    if(!p?.ping_id||!p.sender_member_id||p.sender_member_id===me?.id)return;
+    sendEvent('pong',{ping_id:p.ping_id,target_member_id:p.sender_member_id,responder_member_id:me.id,round_id:currentRoundId,canvas_revision:canvasRevision});
   }
   function handlePong(p){
-    if(!p||p.target_member_id!==me?.id)return;
-    lastPongAt=Date.now();
-    if(Number.isFinite(Number(p.sent_at)))realtimeRtt=Math.max(0,Date.now()-Number(p.sent_at));
+    const sent=pendingPings.get(p?.ping_id);
+    if(!sent||p.target_member_id!==me?.id||!state?.players.some(x=>x.member_id===p.responder_member_id))return;
+    lastPongAt=Date.now();realtimeRtt=Math.max(0,lastPongAt-sent);
+    if(p.responder_member_id===state.room.current_drawer_member_id&&p.round_id===currentRoundId){
+      lastDrawerAt=Date.now();
+      if(Number(p.canvas_revision)>canvasRevision){canvasNeedsSync=true;requestCanvas();}
+    }
     updateRealtimeStatus();
   }
   function scheduleReconnect(){
-    if(reconnectTimer||document.hidden||!state?.room?.id)return;
-    reconnectTimer=setTimeout(async()=>{reconnectTimer=null;try{await connectRealtime();}catch{scheduleReconnect();}},850);
+    if(reconnectTimer||document.hidden||suspended||!state)return;
+    const epoch=roomEpoch,delay=Math.min(8000,500*2**Math.min(4,reconnectAttempt++))+Math.random()*250;
+    reconnectTimer=setTimeout(async()=>{reconnectTimer=null;if(epoch!==roomEpoch)return;try{await connectRealtime();}catch{scheduleReconnect();}},delay);
   }
   function leaveRealtime(stopTimers=true){
-    clearTimeout(reconnectTimer);reconnectTimer=null;clearInterval(snapshotTimer);snapshotTimer=null;clearInterval(pingTimer);pingTimer=null;
-    if(channel&&realtime)realtime.removeChannel(channel);channel=realtime=null;realtimeStatus='CLOSED';lastPongAt=0;realtimeRtt=null;presenceMembers.clear();
+    connectionEpoch++;
+    clearTimeout(reconnectTimer);reconnectTimer=null;clearInterval(snapshotTimer);clearInterval(pingTimer);
+    snapshotTimer=pingTimer=null;
+    const old=realtime;channel=realtime=null;realtimeToken=null;realtimeStatus='CLOSED';lastPongAt=lastDrawerAt=0;realtimeRtt=null;pendingPings.clear();presenceMembers.clear();
+    if(old){Promise.resolve(old.removeAllChannels()).finally(()=>old.realtime.disconnect()).catch(()=>{});}
     if(stopTimers){
-      clearInterval(pollTimer);clearInterval(clockTimer);clearInterval(canvasSyncTimer);clearTimeout(serverSaveTimer);
-      pollTimer=clockTimer=canvasSyncTimer=serverSaveTimer=null;statePollMs=0;
+      clearInterval(pollTimer);clearInterval(clockTimer);clearInterval(canvasSyncTimer);clearInterval(heartbeatTimer);clearTimeout(serverSaveTimer);clearTimeout(sendTimer);
+      pollTimer=clockTimer=canvasSyncTimer=heartbeatTimer=serverSaveTimer=sendTimer=null;statePollMs=0;
     }
   }
   function sendEvent(event,payload){
     if(!channel||realtimeStatus!=='SUBSCRIBED')return Promise.resolve('not_connected');
+    const epoch=connectionEpoch;
     try{
-      const out=channel.send({type:'broadcast',event,payload});
-      Promise.resolve(out).then(status=>{if(status&&status!=='ok')scheduleReconnect();}).catch(()=>scheduleReconnect());
-      return out;
+      return Promise.resolve(channel.send({type:'broadcast',event,payload})).then(status=>{if(epoch===connectionEpoch&&status&&status!=='ok')scheduleReconnect();return status;}).catch(()=>{if(epoch===connectionEpoch)scheduleReconnect();return 'error';});
     }catch{scheduleReconnect();return Promise.resolve('error');}
   }
 
@@ -247,7 +326,7 @@
   function isDrawer(){return !!state&&state.room.current_drawer_member_id===me?.id;}
   function hasGuessed(memberId){
     return !!memberId&&(
-      (state?.guesses||[]).some(g=>g.member_id===memberId&&g.is_correct)
+      (state?.solved_members||[]).includes(memberId)||(state?.guesses||[]).some(g=>g.member_id===memberId&&g.is_correct)
       || [...liveGuesses.values()].some(g=>g.round_id===currentRoundId&&g.member_id===memberId&&g.is_correct)
     );
   }
@@ -260,32 +339,18 @@
       ...authoritative.map(g=>({...g,pending:false,sort_at:new Date(g.created_at||0).getTime()})),
       ...live.map(g=>({...g,sort_at:new Date(g.created_at||Date.now()).getTime()}))
     ].sort((a,b)=>a.sort_at-b.sort_at);
-    $('guessFeed').innerHTML=rows.map(g=>`<p class="${g.is_correct?'correct':''}${g.pending?' pending':''}"><b>${escapeHTML(g.nickname||'好友')}</b>：${g.is_correct?'猜中了！':escapeHTML(g.text||'')}${g.pending?'<span class="pending-dot"> ···</span>':''}</p>`).join('')||'<p class="system">画面就绪，开始猜吧。</p>';
+    $('guessFeed').innerHTML=rows.map(g=>`<p class="${g.is_correct?'correct':''}${g.pending?' pending':''}"><b>${escapeHTML(g.nickname||'好友')}</b>：${g.is_correct?'猜中了！':escapeHTML(g.text||'')}${g.pending?'<span class="pending-dot"> ···</span>':g.failed?`<button class="retry-guess" data-retry="${escapeHTML(g.client_id)}">尚未确认 · 重试</button>`:''}</p>`).join('')||'<p class="system">画面就绪，开始猜吧。</p>';
     $('guessFeed').scrollTop=$('guessFeed').scrollHeight;
   }
   function receiveGuessResult(p){
-    if(!p||p.round_id!==currentRoundId||!p.client_id)return;
+    if(!state||!p||p.round_id!==currentRoundId||!p.client_id)return;
     const prev=liveGuesses.get(p.client_id)||{};
-    liveGuesses.set(p.client_id,{
-      ...prev,
-      client_id:p.client_id,guess_id:p.guess_id,round_id:p.round_id,
-      member_id:p.member_id,nickname:p.nickname||prev.nickname||'好友',
-      text:p.correct?'':String(p.text||prev.text||''),is_correct:!!p.correct,
-      score_awarded:Number(p.points)||0,created_at:p.created_at||prev.created_at||new Date().toISOString(),
-      pending:false
-    });
-    const key=p.guess_id||p.client_id;
-    if(p.correct&&!appliedGuessResults.has(key)){
-      appliedGuessResults.add(key);
-      const guesser=state?.players?.find(x=>x.member_id===p.member_id);
-      if(guesser)guesser.score+=Number(p.points)||0;
-      const drawer=state?.players?.find(x=>x.member_id===p.drawer_member_id);
-      if(drawer)drawer.score+=50;
-      renderScores();
-    }
-    renderGuessFeed();
+    liveGuesses.set(p.client_id,{...prev,client_id:p.client_id,guess_id:p.guess_id,round_id:p.round_id,
+      member_id:p.member_id,nickname:p.nickname||prev.nickname||'好友',text:p.correct?'':String(p.text||prev.text||''),
+      is_correct:!!p.correct,score_awarded:Number(p.points)||0,created_at:p.created_at||prev.created_at||new Date().toISOString(),pending:false,failed:false});
+    applyScores(p.score_state);renderScores();renderGuessFeed();
     if(p.member_id===me?.id&&p.correct)renderGame();
-    if(p.round_complete)setTimeout(refreshState,120);
+    if(p.correct)requestState(p.round_complete?50:200);
   }
 
   function tick(){
@@ -294,6 +359,7 @@
     else if(state.room.status==='summary')remaining=Math.max(0,Math.ceil((new Date(state.room.summary_until).getTime()-Date.now())/1000));
     $('timer').textContent=remaining;$('timer').classList.toggle('urgent',remaining<=10);$('timer').classList.toggle('critical',remaining<=5);
     if(state.room.status==='playing'){
+      if(remaining<=30&&!state.round?.hint&&!hintRequested){hintRequested=true;requestState(0);}
       if(remaining<=30&&state.round?.hint){$('hintBar').textContent=`范围提示：${state.round.hint}`;$('hintBar').classList.add('revealed');}
       else{$('hintBar').textContent='范围提示将在剩余 30 秒时出现';$('hintBar').classList.remove('revealed');}
       if(remaining<=0&&!transitionBusy)mutate('finish_round').catch(()=>{});
@@ -303,35 +369,42 @@
     }else{$('hintBar').textContent='画手选词后开始 60 秒倒计时';$('hintBar').classList.remove('revealed');}
   }
   async function submitGuess(e){
-    e.preventDefault();
-    const input=$('guessInput'),text=input.value.trim();
+    e.preventDefault();const input=$('guessInput'),text=input.value.trim();
     if(!text||!state||state.room.status!=='playing'||isDrawer()||hasGuessed(me?.id))return;
-    if(guessRequests.size>=4){toast('发送太快了，稍等一下');return;}
-    const clientId=makeClientId();
-    const item={client_id:clientId,round_id:currentRoundId,member_id:me.id,nickname:me.nickname,text,is_correct:false,created_at:new Date().toISOString(),pending:true};
-    liveGuesses.set(clientId,item);input.value='';renderGuessFeed();
-    const request=api('guess',{room_id:state.room.id,text,client_id:clientId});
-    guessRequests.set(clientId,request);
+    if(guessRequests.size>=4){toast('消息正在确认，稍等一下');return;}
+    const item={client_id:makeClientId(),room_id:state.room.id,round_id:currentRoundId,member_id:me.id,nickname:me.nickname,text,is_correct:false,created_at:new Date().toISOString()};
+    input.value='';await deliverGuess(item);
+  }
+  async function deliverGuess(item){
+    if(!state||item.room_id!==state.room.id||item.round_id!==currentRoundId||guessRequests.has(item.client_id)||guessRequests.size>=4)return;
+    const epoch=roomEpoch,id=item.client_id;
+    liveGuesses.set(id,{...item,pending:true,failed:false});renderGuessFeed();
+    const request=api('guess',{room_id:item.room_id,round_id:item.round_id,text:item.text,client_id:id});guessRequests.set(id,request);
     try{
       const data=await request;
-      const current=liveGuesses.get(clientId)||item;
-      liveGuesses.set(clientId,{...current,guess_id:data?.guess_id||current.guess_id,is_correct:!!data?.correct,text:data?.correct?'':text,score_awarded:Number(data?.points)||0,created_at:data?.created_at||current.created_at,pending:false});
-      renderGuessFeed();
-      if(data?.correct){
-        toast(`猜对了！+${data.points} 分`);
-        setTimeout(refreshState,data?.round_complete?80:350);
+      if(epoch!==roomEpoch||item.round_id!==currentRoundId)return;
+      if(data.client_id!==id)liveGuesses.delete(id);
+      receiveGuessResult({...data,round_id:item.round_id,member_id:me.id,nickname:me.nickname,text:item.text});
+      if(data.correct&&!appliedGuessResults.has(data.guess_id||id)){
+        appliedGuessResults.add(data.guess_id||id);toast(data.already_correct?'你已经猜中了':`猜对了！+${data.points} 分`);
       }
     }catch(err){
-      const current=liveGuesses.get(clientId);
-      if(!current?.guess_id)liveGuesses.delete(clientId);
-      renderGuessFeed();toast(err.message);
-    }finally{guessRequests.delete(clientId);}
+      if(epoch!==roomEpoch||item.round_id!==currentRoundId||err.cancelled)return;
+      const current=liveGuesses.get(id);
+      const confirmed=state.guesses?.some(g=>g.client_id===id)||current?.guess_id;
+      if(!confirmed){
+        if(err.retryable)liveGuesses.set(id,{...item,pending:false,failed:true});
+        else liveGuesses.delete(id);
+        renderGuessFeed();toast(err.message);requestState();
+      }
+    }finally{if(guessRequests.get(id)===request)guessRequests.delete(id);}
   }
+
   async function shareRoom(){const url=new URL('../pictionary/',location.href);url.searchParams.set('room',state.room.code);const text=`来玩你画我猜！房间码 ${state.room.code}\n${url.href}`;try{if(navigator.share)await navigator.share({title:'你画我猜好友房',text,url:url.href});else{await navigator.clipboard.writeText(text);toast('邀请链接已复制');}}catch(err){if(err.name!=='AbortError')toast('复制失败，请手动分享房间码');}}
 
   function resizeCanvas(){const rect=canvas.getBoundingClientRect();if(!rect.width)return;const dpr=Math.min(2,window.devicePixelRatio||1);logical={w:rect.width,h:rect.height};canvas.width=Math.round(rect.width*dpr);canvas.height=Math.round(rect.height*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);ctx.lineCap='round';ctx.lineJoin='round';redraw();}
   function point(e){const r=canvas.getBoundingClientRect();return [Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)),Math.max(0,Math.min(1,(e.clientY-r.top)/r.height))];}
-  function pointerDown(e){if(!isDrawer()||state.room.status!=='playing')return;e.preventDefault();canvas.setPointerCapture(e.pointerId);const p=point(e);activeStroke={id:crypto.randomUUID?.()||`${Date.now()}-${Math.random()}`,color:erasing?'#ffffff':selectedColor,size:brushSize,points:[p]};sendPoints=[p];drawDot(activeStroke,p);flushStroke(false);scheduleServerCanvasSave();}
+  function pointerDown(e){if(!isDrawer()||state.room.status!=='playing'||activeStroke)return;e.preventDefault();canvas.setPointerCapture(e.pointerId);const p=point(e);activeStroke={id:makeClientId(),color:erasing?'#ffffff':selectedColor,size:brushSize,points:[p]};sendPoints=[p];drawDot(activeStroke,p);flushStroke(false);scheduleServerCanvasSave();}
   function pointerMove(e){
     if(!activeStroke)return;e.preventDefault();
     const events=typeof e.getCoalescedEvents==='function'?(e.getCoalescedEvents()||[]):[];
@@ -345,109 +418,143 @@
   }
   function pointerUp(e){
     if(!activeStroke)return;e.preventDefault();flushStroke(true);strokes.push(activeStroke);activeStroke=null;sendPoints=[];saveCanvas();
-    if(isRealtimeHealthy())scheduleServerCanvasSave();else persistCanvasFallback();
+    if(isCanvasHealthy())scheduleServerCanvasSave();else persistCanvasFallback();
   }
   function encodePoints(points){return points.map(p=>[Math.round(p[0]*4095),Math.round(p[1]*4095)]);}
   function decodePoints(points,q){return q===1?points.map(p=>[Number(p[0])/4095,Number(p[1])/4095]):points;}
   function scheduleSend(){if(sendTimer)return;sendTimer=setTimeout(()=>flushStroke(false),28);}
+  function nextCanvasRevision(){const base=canvasRevision;canvasRevision=Math.max(canvasRevision+1,Date.now()*1000);canvasDirty=true;return base;}
   function flushStroke(done){
-    clearTimeout(sendTimer);sendTimer=null;if(!activeStroke)return;
-    if(done){sendEvent('stroke',{round_id:currentRoundId,id:activeStroke.id,color:activeStroke.color,size:activeStroke.size,points:encodePoints(activeStroke.points),q:1,done:true,replace:true,sent_at:Date.now()});return;}
-    if(!sendPoints.length)return;
-    sendEvent('stroke',{round_id:currentRoundId,id:activeStroke.id,color:activeStroke.color,size:activeStroke.size,points:encodePoints(sendPoints),q:1,done:false,sent_at:Date.now()});
-    sendPoints=[activeStroke.points.at(-1)];
+    clearTimeout(sendTimer);sendTimer=null;if(!activeStroke||(!done&&sendPoints.length<1))return;
+    const base=nextCanvasRevision();
+    const payload={round_id:currentRoundId,revision:canvasRevision,base_revision:base,id:activeStroke.id,color:activeStroke.color,size:activeStroke.size,q:1};
+    if(done){
+      const replace=activeStroke.points.length<=600;
+      sendEvent('stroke',{...payload,points:encodePoints(replace?activeStroke.points:sendPoints),done:true,replace});
+      sendPoints=[];if(!replace)sendSnapshot();return;
+    }
+    sendEvent('stroke',{...payload,points:encodePoints(sendPoints),done:false});
+    sendPoints=[];
+  }
+  function acceptCanvasDelta(p){
+    if(!p||p.round_id!==currentRoundId||isDrawer()||!Number.isSafeInteger(p.revision)||p.revision<=canvasRevision)return false;
+    lastDrawerAt=Date.now();
+    if(p.base_revision!==canvasRevision){canvasNeedsSync=true;requestCanvas();return false;}
+    canvasRevision=p.revision;return true;
   }
   function receiveStroke(p){
-    if(!p?.id||!Array.isArray(p.points)||p.round_id!==currentRoundId||isDrawer())return;
-    const incoming=decodePoints(p.points,p.q);
-    let s=strokes.find(x=>x.id===p.id);
-    if(p.replace){
-      const next={id:p.id,color:p.color||'#111827',size:Number(p.size)||7,points:incoming};
-      if(s)Object.assign(s,next);else strokes.push(next);
-      redraw();return;
-    }
+    if(!p?.id||!Array.isArray(p.points)||!acceptCanvasDelta(p))return;
+    const incoming=decodePoints(p.points,p.q);let s=strokes.find(x=>x.id===p.id);
+    if(p.replace){const next={id:p.id,color:p.color||'#111827',size:Number(p.size)||7,points:incoming};if(s)Object.assign(s,next);else strokes.push(next);redraw();return;}
     if(!s){s={id:p.id,color:p.color||'#111827',size:Number(p.size)||7,points:[]};strokes.push(s);}
-    for(const pt of incoming){
-      const last=s.points.at(-1);
-      if(!last||last[0]!==pt[0]||last[1]!==pt[1]){
-        s.points.push(pt);
-        if(last)drawSegment(s,last,pt);else drawDot(s,pt);
-      }
-    }
+    for(const pt of incoming){const last=s.points.at(-1);if(!last||last[0]!==pt[0]||last[1]!==pt[1]){s.points.push(pt);if(last)drawSegment(s,last,pt);else drawDot(s,pt);}}
   }
+  function receiveCanvasControl(event,p){
+    if(!acceptCanvasDelta(p))return;
+    if(event==='clear')strokes=[];else strokes=strokes.filter(s=>s.id!==p.id);
+    activeStroke=null;snapshotAssemblies.clear();redraw();
+  }
+
   function drawDot(s,p){ctx.fillStyle=s.color;ctx.beginPath();ctx.arc(p[0]*logical.w,p[1]*logical.h,s.size/2,0,Math.PI*2);ctx.fill();}
   function drawSegment(s,a,b){ctx.strokeStyle=s.color;ctx.lineWidth=s.size;ctx.beginPath();ctx.moveTo(a[0]*logical.w,a[1]*logical.h);ctx.lineTo(b[0]*logical.w,b[1]*logical.h);ctx.stroke();}
   function redraw(){if(!logical.w)return;ctx.clearRect(0,0,logical.w,logical.h);ctx.fillStyle='#fff';ctx.fillRect(0,0,logical.w,logical.h);for(const s of strokes){if(s.points.length===1)drawDot(s,s.points[0]);for(let i=1;i<s.points.length;i++)drawSegment(s,s.points[i-1],s.points[i]);}if(activeStroke){if(activeStroke.points.length===1)drawDot(activeStroke,activeStroke.points[0]);for(let i=1;i<activeStroke.points.length;i++)drawSegment(activeStroke,activeStroke.points[i-1],activeStroke.points[i]);}}
-  function undoStroke(){if(!isDrawer()||!strokes.length)return;const s=strokes.pop();redraw();saveCanvas();sendEvent('undo',{round_id:currentRoundId,id:s.id});sendSnapshot();persistCanvasFallback();}
+  function undoStroke(){if(!isDrawer()||!strokes.length)return;if(activeStroke)pointerUp({preventDefault(){}});const s=strokes.pop(),base=nextCanvasRevision();redraw();saveCanvas();sendEvent('undo',{round_id:currentRoundId,id:s.id,base_revision:base,revision:canvasRevision});sendSnapshot();persistCanvasFallback();}
   function bindHoldClear(){
     let t=null;const b=$('clearBtn');
     const cancel=()=>{clearTimeout(t);t=null;b.classList.remove('holding');};
-    b.addEventListener('pointerdown',e=>{if(!isDrawer())return;e.preventDefault();b.classList.add('holding');t=setTimeout(()=>{strokes=[];activeStroke=null;sendPoints=[];redraw();saveCanvas();sendEvent('clear',{round_id:currentRoundId,sent_at:Date.now()});persistCanvasFallback();toast('画布已清空');cancel();},480);});
+    b.addEventListener('pointerdown',e=>{if(!isDrawer())return;e.preventDefault();b.classList.add('holding');t=setTimeout(()=>{strokes=[];activeStroke=null;sendPoints=[];const base=nextCanvasRevision();redraw();saveCanvas();sendEvent('clear',{round_id:currentRoundId,revision:canvasRevision,base_revision:base});sendSnapshot();persistCanvasFallback();toast('画布已清空');cancel();},480);});
     ['pointerup','pointercancel','pointerleave'].forEach(x=>b.addEventListener(x,cancel));
   }
   function storageKey(){return currentRoundId?`pictionary.canvas.${currentRoundId}`:'';}
-  function saveCanvas(){try{if(storageKey())sessionStorage.setItem(storageKey(),JSON.stringify(strokes));}catch{}}
+  function saveCanvas(){try{if(storageKey())sessionStorage.setItem(storageKey(),JSON.stringify({revision:canvasRevision,strokes}));}catch{}}
   function switchRound(id){
-    currentRoundId=id;strokes=[];activeStroke=null;sendPoints=[];snapshotAssemblies.clear();lastCanvasVersion=0;liveGuesses.clear();appliedGuessResults.clear();
-    if(id&&isDrawer()){try{strokes=JSON.parse(sessionStorage.getItem(storageKey())||'[]');}catch{strokes=[];}}
-    redraw();
-    if(id&&!isDrawer()){setTimeout(()=>sendEvent('sync_request',{member_id:me.id,round_id:id}),120);setTimeout(pullCanvasFallback,180);}
+    clearTimeout(sendTimer);clearTimeout(serverSaveTimer);sendTimer=serverSaveTimer=null;
+    currentRoundId=id;strokes=[];activeStroke=null;sendPoints=[];snapshotAssemblies.clear();lastCanvasVersion=0;
+    canvasRevision=0;canvasDirty=false;canvasNeedsSync=!!id;lastDrawerAt=0;lastCanvasCheck=lastSnapshotRequest=0;hintRequested=false;
+    liveGuesses.clear();appliedGuessResults.clear();guessRequests.clear();
+    if(id&&isDrawer()){
+      try{const saved=JSON.parse(sessionStorage.getItem(storageKey())||'null');if(saved&&!Array.isArray(saved)){strokes=saved.strokes||[];canvasRevision=Number(saved.revision)||0;}}catch{}
+      canvasNeedsSync=false;
+    }
+    redraw();if(id){requestCanvas();pullCanvasFallback(true);}
+  }
+  function requestCanvas(){
+    if(!currentRoundId||isDrawer()||Date.now()-lastSnapshotRequest<700)return;
+    lastSnapshotRequest=Date.now();sendEvent('sync_request',{member_id:me.id,round_id:currentRoundId});
   }
   function sendSnapshot(){
     if(!currentRoundId||!isDrawer())return;
-    const snapshotId=`${currentRoundId}:${Date.now()}:${Math.random().toString(36).slice(2,7)}`;
-    const all=activeStroke?[...strokes,activeStroke]:strokes;
-    const chunks=[];for(let i=0;i<all.length;i+=8)chunks.push(all.slice(i,i+8));if(!chunks.length)chunks.push([]);
-    chunks.forEach((items,i)=>sendEvent('snapshot',{snapshot_id:snapshotId,round_id:currentRoundId,index:i,total:chunks.length,strokes:items,sent_at:Date.now()}));
+    if(activeStroke&&sendPoints.length)flushStroke(false);
+    const text=JSON.stringify(canvasPayload()),size=12000,total=Math.max(1,Math.ceil(text.length/size));
+    const id=makeClientId(),roundId=currentRoundId,revision=canvasRevision,epoch=connectionEpoch;
+    // Keep each UTF-8 payload bounded (the encoded canvas contains ASCII only).
+    for(let i=0;i<total;i++){
+      setTimeout(()=>{if(epoch===connectionEpoch&&roundId===currentRoundId)sendEvent('snapshot',{snapshot_id:id,round_id:roundId,revision,index:i,total,part:text.slice(i*size,(i+1)*size)});},i*8);
+    }
+  }
+  function applyCanvasSnapshot(roundId,revision,next){
+    if(roundId!==currentRoundId||!Number.isSafeInteger(revision)||revision<canvasRevision||!Array.isArray(next))return false;
+    // Equal versions never replace already-applied drawing operations.
+    if(revision===canvasRevision&&!canvasNeedsSync)return false;
+    if(isDrawer()&&(activeStroke||canvasDirty))return false;
+    canvasRevision=revision;strokes=next;activeStroke=null;canvasNeedsSync=false;redraw();return true;
   }
   function receiveSnapshot(p){
-    if(!p||p.round_id!==currentRoundId||isDrawer()||!p.snapshot_id)return;
+    if(!p||p.round_id!==currentRoundId||isDrawer()||!p.snapshot_id||!Number.isSafeInteger(p.revision)||p.revision<canvasRevision)return;
+    if(!Number.isInteger(p.total)||p.total<1||p.total>100||!Number.isInteger(p.index)||p.index<0||p.index>=p.total||typeof p.part!=='string'||p.part.length>12000)return;
+    lastDrawerAt=Date.now();
+    for(const [id,v] of snapshotAssemblies)if(Date.now()-v.created>5000)snapshotAssemblies.delete(id);
     let entry=snapshotAssemblies.get(p.snapshot_id);
-    if(!entry){entry={total:Number(p.total)||1,chunks:new Map(),created:Date.now()};snapshotAssemblies.set(p.snapshot_id,entry);}
-    entry.chunks.set(Number(p.index)||0,p.strokes||[]);
-    for(const [id,v] of snapshotAssemblies){if(Date.now()-v.created>8000)snapshotAssemblies.delete(id);}
-    if(entry.chunks.size<entry.total)return;
-    const merged=[];for(let i=0;i<entry.total;i++)merged.push(...(entry.chunks.get(i)||[]));
-    strokes=merged;activeStroke=null;snapshotAssemblies.clear();redraw();
+    if(!entry){if(snapshotAssemblies.size>=4)snapshotAssemblies.delete(snapshotAssemblies.keys().next().value);entry={total:p.total,revision:p.revision,chunks:new Map(),created:Date.now()};snapshotAssemblies.set(p.snapshot_id,entry);}
+    if(entry.total!==p.total||entry.revision!==p.revision)return;
+    entry.chunks.set(p.index,p.part);if(entry.chunks.size!==entry.total)return;
+    const text=Array.from({length:entry.total},(_,i)=>entry.chunks.get(i)).join('');snapshotAssemblies.delete(p.snapshot_id);
+    try{applyCanvasSnapshot(p.round_id,p.revision,JSON.parse(text));}catch{canvasNeedsSync=true;}
   }
-
   function canvasPayload(){
     const all=activeStroke?[...strokes,activeStroke]:strokes;
     return all.map(s=>({id:s.id,color:s.color,size:s.size,points:s.points}));
   }
   function scheduleServerCanvasSave(){
     if(serverSaveTimer||!isDrawer()||state?.room?.status!=='playing'||!currentRoundId)return;
-    serverSaveTimer=setTimeout(()=>{serverSaveTimer=null;persistCanvasFallback();},2000);
+    serverSaveTimer=setTimeout(()=>{serverSaveTimer=null;persistCanvasFallback();},isCanvasHealthy()?1800:500);
   }
   async function persistCanvasFallback(){
     clearTimeout(serverSaveTimer);serverSaveTimer=null;
     if(!isDrawer()||state?.room?.status!=='playing'||!currentRoundId)return;
     if(canvasSaveBusy){canvasSaveQueued=true;return;}
+    if(activeStroke&&sendPoints.length)flushStroke(false);
+    if(!canvasDirty)return;
     canvasSaveBusy=true;
-    const roundId=currentRoundId,roomId=state.room.id,payload=canvasPayload();
+    const epoch=roomEpoch,roundId=currentRoundId,revision=canvasRevision,roomId=state.room.id;
     try{
-      const data=await api('save_canvas',{room_id:roomId,round_id:roundId,strokes:payload});
-      if(roundId===currentRoundId)lastCanvasVersion=Math.max(lastCanvasVersion,Number(data?.version)||0);
-    }catch(err){console.warn('canvas fallback save failed',err);}
-    finally{
-      canvasSaveBusy=false;
-      if(canvasSaveQueued){canvasSaveQueued=false;scheduleServerCanvasSave();}
-    }
-  }
-  async function pullCanvasFallback(){
-    if(canvasFetchBusy||!state||!currentRoundId||isDrawer()||state.room.status!=='playing'||isRealtimeHealthy())return;
-    canvasFetchBusy=true;
-    const roundId=currentRoundId,roomId=state.room.id;
-    try{
-      const data=await api('canvas',{room_id:roomId,round_id:roundId});
-      if(roundId!==currentRoundId)return;
-      const version=Number(data?.version)||0;
-      if(version>lastCanvasVersion&&Array.isArray(data?.strokes)){
-        lastCanvasVersion=version;strokes=data.strokes;activeStroke=null;redraw();
+      const data=await api('save_canvas',{room_id:roomId,round_id:roundId,revision,strokes:canvasPayload()});
+      if(epoch===roomEpoch&&roundId===currentRoundId){
+        lastCanvasVersion=Math.max(lastCanvasVersion,Number(data.version)||0);
+        if(canvasRevision===revision)canvasDirty=false;
+        if(data.accepted===false){canvasDirty=false;canvasNeedsSync=true;pullCanvasFallback(true);}
       }
-    }catch(err){console.warn('canvas fallback fetch failed',err);}
+    }catch(err){if(!err.cancelled)console.warn('画布保存尚未确认');}
+    finally{canvasSaveBusy=false;if(canvasSaveQueued||canvasDirty){canvasSaveQueued=false;scheduleServerCanvasSave();}}
+  }
+  async function pullCanvasFallback(force=false){
+    if(canvasFetchBusy||!state||!currentRoundId||state.room.status!=='playing'||document.hidden||suspended)return;
+    if(isDrawer()&&(activeStroke||canvasDirty))return;
+    const now=Date.now();
+    if(!force&&now-lastCanvasCheck<(isCanvasHealthy()?5000:650))return;
+    lastCanvasCheck=now;canvasFetchBusy=true;
+    const epoch=roomEpoch,roundId=currentRoundId,roomId=state.room.id;
+    try{
+      const data=await api('canvas',{room_id:roomId,round_id:roundId,known_version:canvasRevision});
+      if(epoch!==roomEpoch||roundId!==currentRoundId)return;
+      const version=Number(data.version)||0;
+      if(Array.isArray(data.strokes))applyCanvasSnapshot(roundId,version,data.strokes);
+      if(data.unchanged&&version===0&&canvasRevision===0)canvasNeedsSync=false;
+      lastCanvasVersion=Math.max(lastCanvasVersion,version);
+    }catch(err){if(!err.cancelled)console.warn('画布同步尚未确认');}
     finally{canvasFetchBusy=false;}
   }
+
 
   boot();
 })();
