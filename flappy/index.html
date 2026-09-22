@@ -74,8 +74,8 @@
     }
     .ready-layer.hidden{opacity:0;visibility:hidden;pointer-events:none}
     .ready-card{transform:translateY(-8px);pointer-events:none}
-    .bird-mark{font-size:46px;filter:drop-shadow(0 10px 18px rgba(0,0,0,.24))}
-    .ready-card h2{margin:12px 0 6px;font-size:27px}
+    .bird-mark{font-size:10px;font-weight:950;letter-spacing:.16em;color:#9edce7}
+    .ready-card h2{margin:10px 0 6px;font-size:27px}
     .ready-card p{margin:0;color:#a6b8c9;font-size:13px;line-height:1.7}
     .tap-hint{
       display:inline-flex;align-items:center;gap:7px;margin-top:15px;padding:8px 11px;border-radius:999px;
@@ -156,9 +156,9 @@
 
         <div class="ready-layer" id="readyLayer">
           <div class="ready-card">
-            <div class="bird-mark">🐦</div>
+            <div class="bird-mark">RANDOM FLIGHT</div>
             <h2>准备起飞</h2>
-            <p>轻触画面开始。之后每次轻触都会向上扑翼。</p>
+            <p>每局会随机出现暖棕或青灰小鸟。轻触画面开始。</p>
             <div class="tap-hint">轻触任意位置</div>
           </div>
         </div>
@@ -211,12 +211,28 @@
   var W=360,H=600,dpr=1,groundY=530;
   var state='ready';
   var bird={x:110,y:285,vy:0,rot:0,wing:0,squash:0};
+  var birdSkin='warm';
   var pipes=[];
   var score=0,best=0,newRecord=false;
   var lastTime=0,raf=0,elapsed=0,scroll=0,prevGapY=null;
   var hitFreezeUntil=0,groundHitAt=0;
   var audioCtx=null,soundOn=true;
   var BEST_KEY='zhaoFlappyBest.v1';
+
+  var BIRD_SKINS={
+    warm:{
+      name:'暖棕',
+      back:'#a77550',mid:'#c79a6e',belly:'#ead8b8',head:'#d1aa82',
+      wing:'#7d563d',wingHi:'#a97a58',tail:'#76513b',beak:'#d99552',
+      eye:'#172630',shine:'rgba(255,255,255,.20)'
+    },
+    slate:{
+      name:'青灰',
+      back:'#5f7886',mid:'#7f98a5',belly:'#d8e0e2',head:'#a6b6bd',
+      wing:'#4a606d',wingHi:'#69818d',tail:'#425762',beak:'#c59b63',
+      eye:'#14232c',shine:'rgba(255,255,255,.18)'
+    }
+  };
 
   var clouds=[
     {x:.08,y:.16,s:.78,o:.08},{x:.42,y:.23,s:1.12,o:.10},{x:.76,y:.11,s:.66,o:.07},
@@ -271,7 +287,12 @@
     draw(performance.now());
   }
 
-  function resetGame(){
+  function pickBirdSkin(){
+    birdSkin=Math.random()<.5?'warm':'slate';
+  }
+
+  function resetGame(rerollSkin){
+    if(rerollSkin)pickBirdSkin();
     pipes=[];score=0;newRecord=false;elapsed=0;scroll=0;prevGapY=null;hitFreezeUntil=0;groundHitAt=0;
     bird.x=W*.28;bird.y=H*.45;bird.vy=0;bird.rot=0;bird.wing=0;bird.squash=0;
     scoreEl.textContent='0';scoreEl.classList.add('hidden');newBestEl.classList.remove('show');
@@ -283,7 +304,7 @@
   function startGame(){
     if(state==='running')return;
     if(state==='over'||state==='ready'){
-      resetGame();
+      resetGame(state==='over');
       state='running';
       readyLayer.classList.add('hidden');
       scoreEl.classList.remove('hidden');
@@ -525,31 +546,79 @@
   }
 
   function drawBird(now){
-    var r=birdRadius(),wingCycle=state==='ready'?Math.sin((now||0)*.009):Math.sin(elapsed*14);
+    var r=birdRadius(),skin=BIRD_SKINS[birdSkin];
+    var wingCycle=state==='ready'?Math.sin((now||0)*.009):Math.sin(elapsed*14);
     var flapBoost=bird.wing>0?bird.wing:0;
-    var wingAngle=-.2+wingCycle*.28-flapBoost*.65;
+    var wingAngle=-.10+wingCycle*.24-flapBoost*.78;
     ctx.save();ctx.translate(bird.x,bird.y);ctx.rotate(bird.rot);
-    var sx=1+bird.squash*.45,sy=1-bird.squash*.55;ctx.scale(sx,sy);
+    var sx=1+bird.squash*.30,sy=1-bird.squash*.38;ctx.scale(sx,sy);
 
-    ctx.save();ctx.shadowColor='rgba(0,0,0,.22)';ctx.shadowBlur=10;ctx.shadowOffsetY=5;
-    var bodyG=ctx.createLinearGradient(-r,-r,r,r);
-    bodyG.addColorStop(0,'#f3d59f');bodyG.addColorStop(.5,'#d9ad72');bodyG.addColorStop(1,'#9e744b');
-    ctx.fillStyle=bodyG;ctx.beginPath();ctx.ellipse(0,0,r*1.08,r*.84,-.08,0,Math.PI*2);ctx.fill();ctx.restore();
+    /* 分叉尾羽：先建立明确的飞行方向，避免圆团感 */
+    ctx.fillStyle=skin.tail;
+    ctx.beginPath();
+    ctx.moveTo(-r*.78,-r*.12);
+    ctx.lineTo(-r*1.56,-r*.44);
+    ctx.lineTo(-r*1.30,-r*.04);
+    ctx.lineTo(-r*1.58,r*.28);
+    ctx.lineTo(-r*.72,r*.12);
+    ctx.closePath();
+    ctx.fill();
 
-    ctx.save();ctx.rotate(wingAngle);ctx.translate(-r*.30,r*.10);
-    var wg=ctx.createLinearGradient(-r*.3,-r*.3,r*.5,r*.4);
-    wg.addColorStop(0,'#d8b581');wg.addColorStop(1,'#8e6747');
-    ctx.fillStyle=wg;ctx.beginPath();ctx.ellipse(0,0,r*.70,r*.36,-.12,0,Math.PI*2);ctx.fill();ctx.restore();
+    /* 水滴形躯干：前胸饱满、后段收窄 */
+    ctx.save();
+    ctx.shadowColor='rgba(0,0,0,.20)';ctx.shadowBlur=9;ctx.shadowOffsetY=4;
+    var bodyG=ctx.createLinearGradient(-r*1.05,-r*.7,r*.95,r*.7);
+    bodyG.addColorStop(0,skin.back);bodyG.addColorStop(.48,skin.mid);bodyG.addColorStop(1,skin.belly);
+    ctx.fillStyle=bodyG;
+    ctx.beginPath();
+    ctx.moveTo(-r*.95,-r*.05);
+    ctx.bezierCurveTo(-r*.72,-r*.68,-r*.10,-r*.78,r*.48,-r*.54);
+    ctx.bezierCurveTo(r*.92,-r*.36,r*1.08,-r*.02,r*.82,r*.34);
+    ctx.bezierCurveTo(r*.46,r*.72,-r*.15,r*.69,-r*.64,r*.36);
+    ctx.bezierCurveTo(-r*.86,r*.21,-r*.98,r*.08,-r*.95,-r*.05);
+    ctx.closePath();ctx.fill();ctx.restore();
 
-    ctx.fillStyle='#8a6446';
-    ctx.beginPath();ctx.moveTo(-r*.92,-r*.05);ctx.lineTo(-r*1.42,-r*.32);ctx.lineTo(-r*1.30,r*.16);ctx.closePath();ctx.fill();
+    /* 独立头部，略向前上方，强化“鸟”的头身层次 */
+    ctx.fillStyle=skin.head;
+    ctx.beginPath();
+    ctx.ellipse(r*.56,-r*.28,r*.48,r*.42,-.08,0,Math.PI*2);
+    ctx.fill();
 
-    ctx.fillStyle='#f1d7ad';ctx.beginPath();ctx.ellipse(r*.42,-r*.23,r*.48,r*.43,0,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#fff6df';ctx.beginPath();ctx.arc(r*.58,-r*.29,r*.16,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#192833';ctx.beginPath();ctx.arc(r*.63,-r*.28,r*.075,0,Math.PI*2);ctx.fill();
+    /* 翅膀从圆贴片改成后尖的流线羽翼 */
+    ctx.save();
+    ctx.translate(-r*.18,r*.04);ctx.rotate(wingAngle);
+    var wg=ctx.createLinearGradient(-r*.28,-r*.35,r*.78,r*.42);
+    wg.addColorStop(0,skin.wingHi);wg.addColorStop(1,skin.wing);
+    ctx.fillStyle=wg;
+    ctx.beginPath();
+    ctx.moveTo(-r*.34,-r*.10);
+    ctx.bezierCurveTo(r*.02,-r*.48,r*.60,-r*.34,r*.80,-r*.04);
+    ctx.bezierCurveTo(r*.46,r*.10,r*.18,r*.34,-r*.20,r*.42);
+    ctx.bezierCurveTo(-r*.02,r*.16,-r*.18,r*.02,-r*.34,-r*.10);
+    ctx.closePath();ctx.fill();
+    ctx.restore();
 
-    ctx.fillStyle='#e79b54';ctx.beginPath();ctx.moveTo(r*.82,-r*.05);ctx.lineTo(r*1.34,r*.06);ctx.lineTo(r*.82,r*.18);ctx.closePath();ctx.fill();
-    ctx.fillStyle='rgba(255,255,255,.20)';ctx.beginPath();ctx.ellipse(-r*.12,-r*.34,r*.42,r*.12,-.35,0,Math.PI*2);ctx.fill();
+    /* 眼位更靠前、略上移，瞳孔更小 */
+    ctx.fillStyle='rgba(255,255,255,.86)';
+    ctx.beginPath();ctx.arc(r*.72,-r*.39,r*.135,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=skin.eye;
+    ctx.beginPath();ctx.arc(r*.755,-r*.39,r*.058,0,Math.PI*2);ctx.fill();
+
+    /* 更细、更尖的喙 */
+    ctx.fillStyle=skin.beak;
+    ctx.beginPath();
+    ctx.moveTo(r*.93,-r*.17);
+    ctx.lineTo(r*1.43,-r*.05);
+    ctx.lineTo(r*.93,r*.06);
+    ctx.closePath();ctx.fill();
+    ctx.strokeStyle='rgba(80,55,35,.24)';ctx.lineWidth=Math.max(1,r*.035);
+    ctx.beginPath();ctx.moveTo(r*.98,-r*.055);ctx.lineTo(r*1.35,-r*.045);ctx.stroke();
+
+    /* 克制的背部高光，减少“充气球”观感 */
+    ctx.fillStyle=skin.shine;
+    ctx.beginPath();
+    ctx.ellipse(-r*.12,-r*.42,r*.36,r*.08,-.30,0,Math.PI*2);
+    ctx.fill();
 
     ctx.restore();
   }
@@ -570,7 +639,7 @@
 
   stage.addEventListener('pointerdown',handleAction,{passive:false});
   ['contextmenu','selectstart','dragstart'].forEach(function(type){stage.addEventListener(type,function(e){e.preventDefault();});});
-  retryBtn.addEventListener('pointerdown',function(e){e.stopPropagation();e.preventDefault();state='ready';readyLayer.classList.add('hidden');startGame();});
+  retryBtn.addEventListener('pointerdown',function(e){e.stopPropagation();e.preventDefault();startGame();});
   pauseBtn.addEventListener('click',function(e){e.stopPropagation();togglePause();});
   soundBtn.addEventListener('click',function(e){
     e.stopPropagation();soundOn=!soundOn;soundBtn.textContent=soundOn?'♪':'×';soundBtn.classList.toggle('active',!soundOn);
@@ -588,7 +657,7 @@
   document.addEventListener('visibilitychange',function(){if(document.hidden&&state==='running')pauseGame();});
   window.addEventListener('resize',function(){requestAnimationFrame(resize);});
 
-  loadBest();resetGame();state='ready';readyLayer.classList.remove('hidden');
+  loadBest();resetGame(true);state='ready';readyLayer.classList.remove('hidden');
   requestAnimationFrame(resize);raf=requestAnimationFrame(frame);
 })();
 </script>
