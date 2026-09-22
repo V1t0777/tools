@@ -9,7 +9,7 @@
   <title>你画我猜｜钊的工具箱</title>
   <link rel="stylesheet" href="../shared/toolbox-ui.css">
   <link rel="stylesheet" href="../shared/toolbox-motion.css">
-  <link rel="stylesheet" href="./style.css?v=20260921-6">
+  <link rel="stylesheet" href="./style.css?v=20260922-1">
   <style>
     .player{animation:stateIn .18s cubic-bezier(.2,.8,.2,1) both}.timer{transition:color .18s ease,background-color .18s ease,box-shadow .18s ease}.timer.critical{box-shadow:0 0 0 1px rgba(255,111,125,.24)}
     .hint-bar{transition:color .18s ease,background-color .18s ease,border-color .18s ease}.hint-bar.revealed{animation:stateIn .2s cubic-bezier(.2,.8,.2,1) both}
@@ -62,6 +62,7 @@
 
     <section class="screen" id="gameScreen">
       <div class="game-head"><div><small id="roundLabel">第 1 轮</small><strong id="drawerLabel" aria-live="polite">准备中</strong></div><div class="timer" id="timer" aria-label="剩余时间">60</div></div>
+      <div class="sync-status"><span class="status-pill" id="gameConnectionStatus" aria-live="polite">连接中</span></div>
       <div class="word-box" id="wordBox"><span id="wordLabel">等待画手选词</span></div>
       <div class="hint-bar" id="hintBar" aria-live="polite">范围提示将在剩余 30 秒时出现</div>
       <section class="canvas-shell" id="canvasShell"><canvas id="canvas"></canvas><div class="canvas-cover" id="canvasCover"><div id="coverText">等待本轮开始</div></div></section>
@@ -89,6 +90,6 @@
 
   <script src="../shared/toolbox-auth.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/dist/umd/supabase.min.js" integrity="sha384-AkNSQdptcXlJ0/NBZc4qGk86cDVXcCevwoWgEKIpHOEfbvlXGLlIkimQtONt8KNf" crossorigin="anonymous"></script>
-  <script src="./app.js?v=20260921-10"></script>
+  <script src="./app.js?v=20260922-1"></script>
 </body>
 </html>

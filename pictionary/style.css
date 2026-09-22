@@ -26,3 +26,6 @@ button,input{font:inherit}button{cursor:pointer}.app{width:min(100%,760px);margi
 /* Low-latency guess feedback */
 .feed .pending{opacity:.72}
 .feed .pending-dot{color:var(--muted);letter-spacing:.08em}
+
+
+.sync-status{display:flex;justify-content:flex-end;margin:-4px 0 8px}.sync-status .status-pill{font-size:11px;padding:4px 8px}.retry-guess{font:inherit;font-size:11px;margin-left:8px;padding:2px 7px;border:1px solid currentColor;border-radius:6px;background:transparent;color:var(--muted,#abb4cb);cursor:pointer}
