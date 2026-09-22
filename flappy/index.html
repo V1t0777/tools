@@ -342,8 +342,8 @@
   }
 
   function addPipe(x){
-    var d=difficulty(),gapY=nextGap(d.gap);
-    pipes.push({x:x,gapY:gapY,passed:false});
+    var d=difficulty(),gap=d.gap,gapY=nextGap(gap);
+    pipes.push({x:x,gapY:gapY,gap:gap,passed:false});
   }
   function spawnInitialPipes(){
     var d=difficulty();
@@ -411,9 +411,9 @@
   function collides(){
     var r=birdRadius(),bx=bird.x,by=bird.y;
     if(by-r<0||by+r>=groundY)return true;
-    var pw=pipeWidth(),d=difficulty(),gap=d.gap;
+    var pw=pipeWidth();
     for(var i=0;i<pipes.length;i++){
-      var p=pipes[i];
+      var p=pipes[i],gap=p.gap;
       if(bx+r>p.x&&bx-r<p.x+pw){
         var topEnd=p.gapY-gap*.5,bottomStart=p.gapY+gap*.5;
         if(by-r<topEnd||by+r>bottomStart)return true;
@@ -505,9 +505,9 @@
   }
 
   function drawPipes(){
-    var d=difficulty(),gap=d.gap,pw=pipeWidth();
+    var pw=pipeWidth();
     for(var i=0;i<pipes.length;i++){
-      var p=pipes[i],topEnd=p.gapY-gap*.5,bottomStart=p.gapY+gap*.5;
+      var p=pipes[i],gap=p.gap,topEnd=p.gapY-gap*.5,bottomStart=p.gapY+gap*.5;
       drawPipePart(p.x,-8,pw,topEnd+8,true);
       drawPipePart(p.x,bottomStart,pw,groundY-bottomStart+8,false);
     }
