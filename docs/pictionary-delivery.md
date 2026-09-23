@@ -50,3 +50,29 @@ be committed.
 Network delivery times still depend on the players' connections. These checks
 verify ordering and recovery, not a production latency percentile or an iOS
 background-execution guarantee.
+
+## Login and reconnect follow-up — 2026-09-23
+
+- Shared authentication bounds network requests/body reads to 10 seconds and
+  cross-tab refresh lock waits to 12 seconds. Transient failures preserve refresh
+  credentials; only explicit revocation/invalid-refresh responses clear them.
+  A still-valid access token can continue while proactive refresh backs off.
+- Password submissions and refresh/probe requests coalesce. Local logout is
+  immediate, and delayed responses cannot resurrect a signed-out session.
+- Pictionary uses one authenticated `bootstrap` request for member information and
+  invitation entry. A recovery screen retries without submitting the password
+  again. `me` and `join_room` remain compatible with older clients.
+- The pinned 2.57.4 browser SDK is served locally and loaded asynchronously.
+  Its SRI hash matches the former CDN dependency.
+- Server heartbeat health is separate from peer/drawer availability. Silent
+  players trigger canvas repair, not socket rebuilds. SDK recovery gets an
+  8-second grace period; full rebuilds use exponential jitter. Backoff resets
+  only after 20 seconds of stable subscription. Connection setup has a 12-second
+  watchdog and late callbacks remain epoch-fenced.
+- Offline polling is suppressed; online/page restore resumes synchronization.
+  Auth probe intervals also restart after page-cache restoration.
+
+Validation: `node --test scripts/toolbox-auth.test.cjs scripts/pictionary-sync.test.cjs`,
+Deno typecheck, repository security/build checks, and served asset comparison.
+Tests simulate network failures and lifecycle transitions; they do not replace
+multi-device mobile network testing or measure production login percentiles.
