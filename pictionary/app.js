@@ -3,7 +3,7 @@
   const FUNCTION_URL = `${ToolboxAuth.url}/functions/v1/pictionary-game`;
   const COLORS = ['#111827','#ef4444','#f59e0b','#22c55e','#3b82f6','#8b5cf6','#ec4899','#ffffff'];
   const $ = id => document.getElementById(id);
-  const screens = ['authScreen','homeScreen','roomScreen','gameScreen','finishScreen'];
+  const screens = ['authScreen','homeScreen','roomScreen','gameScreen','finishScreen','recoveryScreen'];
   let session=null, me=null, state=null, stateGeneration=0, channel=null, realtime=null, pollTimer=null, clockTimer=null, statePollMs=0;
   let currentRoundId=null, strokes=[], activeStroke=null, sendPoints=[], sendTimer=null, selectedColor=COLORS[0], brushSize=7, erasing=false;
   let canvas=$('canvas'), ctx=canvas.getContext('2d'), logical={w:1,h:1}, busy=false, transitionBusy=false, presenceMembers=new Set();
@@ -14,6 +14,7 @@
   let roomEpoch=0, connectionEpoch=0, requests=new Set(), refreshQueued=false, refreshTimer=null;
   let heartbeatTimer=null, lastDrawerAt=0, pendingPings=new Map(), reconnectAttempt=0;
   let canvasRevision=0, canvasDirty=false, lastCanvasCheck=0, lastSnapshotRequest=0, canvasNeedsSync=false;
+  let sdkPromise=null,initializing=null,startupEpoch=0,loginBusy=false,connectPromise=null,connectDeadline=null,serverHeartbeatAt=0,transportFailed=false;
   let scoreRevision=-1, scoreTotals=new Map(), hintRequested=false, suspended=false;
 
   function show(id){ screens.forEach(x => $(x).classList.toggle('active',x===id)); }
@@ -29,6 +30,7 @@
   function setURL(code){ const u=new URL(location.href); code?u.searchParams.set('room',code):u.searchParams.delete('room'); history.replaceState({},'',u); }
 
   async function api(action,payload={},options={}){
+    if(window.navigator?.onLine===false)throw Object.assign(new Error("网络已断开，恢复后请重试"),{retryable:true});
     const controller=new AbortController(), epoch=roomEpoch;
     requests.add(controller);
     let timer;
@@ -39,12 +41,12 @@
     const work=(async()=>{
       const auth=await ToolboxAuth.getSession();
       if(controller.signal.aborted)throw controller.signal.reason;
-      if(!auth)throw new Error('请先登录');
+      if(!auth)throw Object.assign(new Error('请先登录'),{code:'AUTH_REQUIRED',status:401});
       session=auth;
       if(realtime&&realtimeToken!==auth.access_token){realtimeToken=auth.access_token;Promise.resolve(realtime.realtime.setAuth(auth.access_token)).catch(()=>scheduleReconnect());}
       const r=await fetch(FUNCTION_URL,{method:'POST',cache:'no-store',signal:controller.signal,headers:{'Content-Type':'application/json','apikey':ToolboxAuth.key,'Authorization':`Bearer ${auth.access_token}`},body:JSON.stringify({action,...payload})});
       const data=await r.json().catch(()=>({}));
-      if(!r.ok||data.error)throw Object.assign(new Error(data.error||`请求失败（${r.status}）`),{retryable:r.status>=500||r.status===429});
+      if(!r.ok||data.error)throw Object.assign(new Error(data.error||`请求失败（${r.status}）`),{status:r.status,code:data.code,retryable:r.status>=500||r.status===429});
       if(epoch!==roomEpoch)throw Object.assign(new Error('会话已切换'),{cancelled:true});
       return data;
     })();
@@ -72,37 +74,80 @@
     renderState();
   }
   function requestState(delay=80){
-    if(!state||suspended)return;
+    if(!state||suspended||window.navigator?.onLine===false)return;
     if(transitionBusy||busy){refreshQueued=true;return;}
     if(refreshTimer)return;
     refreshTimer=setTimeout(()=>{refreshTimer=null;refreshState();},delay);
   }
   function startRoomTimers(){
-    if(!state||suspended)return;
+    if(!state||suspended||window.navigator?.onLine===false)return;
     setStatePoll(3000);
     clearInterval(clockTimer);clockTimer=setInterval(tick,250);
     clearInterval(canvasSyncTimer);canvasSyncTimer=setInterval(pullCanvasFallback,650);
     clearInterval(heartbeatTimer);heartbeatTimer=setInterval(checkHealth,1000);
   }
   function resumeRoom(){
-    if(!state||document.hidden)return;
+    if(!state||document.hidden||window.navigator?.onLine===false)return;
     suspended=false;startRoomTimers();requestState(0);
-    if(realtimeStatus!=='SUBSCRIBED')scheduleReconnect();
+    if(!isRealtimeHealthy()&&realtimeStatus!=='CONNECTING')scheduleReconnect(0);
     else {sendPing();requestCanvas();}
   }
 
+  function ensureRealtimeSDK(){
+    if(window.supabase?.createClient)return Promise.resolve();
+    if(sdkPromise)return sdkPromise;
+    sdkPromise=new Promise((resolve,reject)=>{
+      const script=document.createElement('script');
+      const finish=err=>{clearTimeout(timer);script.onload=script.onerror=null;if(err){script.remove();reject(err);}else resolve();};
+      const timer=setTimeout(()=>finish(new Error('实时连接组件加载超时')),8000);
+      script.src='../shared/vendor/supabase-2.57.4.min.js';
+      script.integrity='sha384-AkNSQdptcXlJ0/NBZc4qGk86cDVXcCevwoWgEKIpHOEfbvlXGLlIkimQtONt8KNf';
+      script.onload=()=>finish(window.supabase?.createClient?null:new Error('实时连接组件加载失败'));
+      script.onerror=()=>finish(new Error('实时连接组件加载失败'));document.head.appendChild(script);
+    }).catch(err=>{sdkPromise=null;throw err;});return sdkPromise;
+  }
+  function initializeSession(){
+    if(initializing)return initializing;
+    const epoch=++startupEpoch;
+    initializing=(async()=>{
+      show('recoveryScreen');$('recoveryMessage').textContent='正在恢复登录和房间…';$('retrySessionBtn').disabled=true;
+      try{
+        session=await ToolboxAuth.getSession();
+        if(epoch!==startupEpoch)return;
+        if(!session){show('authScreen');return;}
+        const code=codeFromURL();let data;
+        try{data=await api('bootstrap',{code});}
+        catch(err){
+          if(code&&[400,404,410].includes(err.status)){setURL('');toast(err.message);data=await api('bootstrap');}
+          else throw err;
+        }
+        if(epoch!==startupEpoch)return;
+        me=data.member;$('welcomeName').textContent=me.nickname;show('homeScreen');
+        if(data.state)await enterRoom(data.state);
+      }catch(err){
+        if(epoch!==startupEpoch)return;
+        if(['AUTH_REQUIRED','SESSION_REVOKED'].includes(err.code)){
+          await ToolboxAuth.signOut();session=null;show('authScreen');$('loginError').textContent=ToolboxAuth.authMessage(err);
+        }else{show('recoveryScreen');$('recoveryMessage').textContent=err.message||'网络暂时不可用，请重试。';}
+      }finally{$('retrySessionBtn').disabled=false;}
+    })().finally(()=>{if(epoch===startupEpoch)initializing=null;});return initializing;
+  }
   async function boot(){
-    buildTools(); bind(); resizeCanvas();
-    try{ session=await ToolboxAuth.getSession(); }catch{}
-    if(!session){show('authScreen');return;}
-    try{
-      const data=await api('me'); me=data.member; $('welcomeName').textContent=me.nickname; show('homeScreen');
-      const code=codeFromURL(); if(code){$('roomCodeInput').value=code; await joinRoom(code,true);}
-    }catch(err){ await ToolboxAuth.signOut(); show('authScreen'); $('loginError').textContent=err.message; }
+    buildTools();bind();resizeCanvas();
+    ensureRealtimeSDK().catch(()=>{});
+    await initializeSession();
   }
 
   function bind(){
-    $('loginForm').addEventListener('submit',async e=>{e.preventDefault();$('loginError').textContent='';try{const out=await ToolboxAuth.signIn($('emailInput').value.trim(),$('passwordInput').value);session=out;const data=await api('me');me=data.member;$('welcomeName').textContent=me.nickname;show('homeScreen');const code=codeFromURL();if(code)await joinRoom(code,true);}catch(err){$('loginError').textContent=ToolboxAuth.authMessage(err);}});
+    $('loginForm').addEventListener('submit',async e=>{
+      e.preventDefault();if(loginBusy)return;loginBusy=true;
+      const button=$('loginForm').querySelector('button');button.disabled=true;button.textContent='正在登录…';$('loginError').textContent='';
+      try{session=await ToolboxAuth.signIn($('emailInput').value.trim(),$('passwordInput').value);$('passwordInput').value='';await initializeSession();}
+      catch(err){$('loginError').textContent=ToolboxAuth.authMessage(err);}
+      finally{loginBusy=false;button.disabled=false;button.textContent='登录';}
+    });
+    $('retrySessionBtn').onclick=initializeSession;
+    $('resetSessionBtn').onclick=async()=>{startupEpoch++;initializing=null;await ToolboxAuth.signOut();session=null;show('authScreen');};
     $('signOutBtn').onclick=async()=>{invalidateRoom();leaveRealtime();await ToolboxAuth.signOut();session=me=state=null;setURL('');$('shareBtn').classList.add('hidden');$('leaveBtn').classList.add('hidden');show('authScreen');};
     $('createBtn').onclick=async()=>{try{const data=await api('create_room');await enterRoom(data.state);}catch(err){toast(err.message);}};
     $('joinForm').addEventListener('submit',async e=>{e.preventDefault();await joinRoom($('roomCodeInput').value);});
@@ -126,8 +171,8 @@
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)resumeRoom();else if(activeStroke)pointerUp({preventDefault(){}});});
     window.addEventListener('pagehide',()=>{if(activeStroke)pointerUp({preventDefault(){}});suspended=true;invalidateRoom();leaveRealtime();});
     window.addEventListener('pageshow',resumeRoom);
-    window.addEventListener('online',resumeRoom);
-    window.addEventListener('offline',()=>{lastPongAt=lastDrawerAt=0;checkHealth();});
+    window.addEventListener('online',()=>{if(state)resumeRoom();else if(ToolboxAuth.peekSession?.())initializeSession();});
+    window.addEventListener('offline',()=>{lastPongAt=lastDrawerAt=0;transportFailed=true;clearTimeout(reconnectTimer);reconnectTimer=null;updateRealtimeStatus();});
   }
 
   function buildTools(){
@@ -137,12 +182,12 @@
   async function joinRoom(raw,silent=false){
     const code=String(raw||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6);
     if(code.length!==6){if(!silent)toast('请输入 6 位房间码');return;}
-    try{const data=await api('join_room',{code});await enterRoom(data.state);}catch(err){toast(err.message);if(silent)setURL('');}
+    try{const data=await api('join_room',{code});await enterRoom(data.state);}catch(err){toast(err.message);if(silent&&!err.retryable)setURL('');}
   }
   async function enterRoom(next){
     invalidateRoom();state=next;suspended=false;currentRoundId=null;canvasRevision=0;
     setURL(state.room.code);$('shareBtn').classList.remove('hidden');$('leaveBtn').classList.remove('hidden');
-    adoptState(next);startRoomTimers();await connectRealtime();
+    adoptState(next);startRoomTimers();connectRealtime().catch(()=>scheduleReconnect());
   }
   function setStatePoll(ms){
     if(pollTimer&&statePollMs===ms)return;
@@ -181,7 +226,7 @@
     finally{busy=false;}
   }
   async function refreshState(){
-    if(!state||suspended)return;
+    if(!state||suspended||window.navigator?.onLine===false)return;
     if(busy||transitionBusy){refreshQueued=true;return;}
     const generation=stateGeneration,epoch=roomEpoch,roomId=state.room.id;transitionBusy=true;
     try{
@@ -196,14 +241,26 @@
       if(epoch===roomEpoch){transitionBusy=false;if(refreshQueued){refreshQueued=false;requestState();}}
     }
   }
-  async function connectRealtime(){
+  function connectRealtime(){
+    if(connectPromise)return connectPromise;
+    const task=openRealtime();connectPromise=task;
+    task.finally(()=>{if(connectPromise===task)connectPromise=null;}).catch(()=>{});return task;
+  }
+  async function openRealtime(){
     leaveRealtime(false);
     const generation=connectionEpoch,epoch=roomEpoch,roomId=state?.room.id;
     const current=()=>generation===connectionEpoch&&epoch===roomEpoch&&roomId===state?.room.id&&!suspended;
-    if(!roomId||!window.supabase?.createClient)return;
-    const auth=await ToolboxAuth.getSession();if(!current()||!auth?.access_token)return;
+    if(!roomId||window.navigator?.onLine===false)return;
     realtimeStatus='CONNECTING';
-    const client=window.supabase.createClient(ToolboxAuth.url,ToolboxAuth.key,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
+    // Includes SDK loading, auth and subscription. Epoch fences late completion.
+    connectDeadline=setTimeout(()=>{if(current()){leaveRealtime(false);connectPromise=null;scheduleReconnect();}},12000);
+    await ensureRealtimeSDK();if(!current())return;
+    const auth=await ToolboxAuth.getSession();if(!current()||!auth?.access_token)return;
+    const client=window.supabase.createClient(ToolboxAuth.url,ToolboxAuth.key,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},realtime:{heartbeatCallback:status=>{
+      if(!current())return;
+      if(status==='ok'){serverHeartbeatAt=Date.now();transportFailed=false;if(realtimeStatus==='SUBSCRIBED'){clearTimeout(reconnectTimer);reconnectTimer=null;}}
+      else if(['timeout','error','disconnected'].includes(status)){transportFailed=true;scheduleReconnect(8000);}
+    }}});
     realtime=client;realtimeToken=auth.access_token;await client.realtime.setAuth(auth.access_token);if(!current()){client.realtime.disconnect();return;}
     const ch=client.channel(`pictionary:${roomId}`,{config:{private:true,presence:{key:auth.user.id},broadcast:{ack:false,self:false}}});
     channel=ch;
@@ -218,18 +275,18 @@
       if(!current())return;
       realtimeStatus=status;updateRealtimeStatus();
       if(status==='SUBSCRIBED'){
-        clearTimeout(reconnectTimer);reconnectTimer=null;reconnectAttempt=0;
+        clearTimeout(reconnectTimer);reconnectTimer=null;clearTimeout(connectDeadline);connectDeadline=null;serverHeartbeatAt=Date.now();transportFailed=false;
         lastPongAt=lastDrawerAt=0;subscribedAt=Date.now();requestState(0);requestCanvas();startPing();
         try{await ch.track({member_id:me.id,nickname:me.nickname,online_at:new Date().toISOString()});}catch{}
         if(!current())return;
         clearInterval(snapshotTimer);snapshotTimer=setInterval(()=>{if(isDrawer()&&canvasDirty)persistCanvasFallback();},2000);
       }else if(['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(status)){
-        lastPongAt=lastDrawerAt=0;checkHealth();scheduleReconnect();
+        lastPongAt=lastDrawerAt=0;transportFailed=true;checkHealth();scheduleReconnect(8000);
       }
     });
   }
   function isRealtimeHealthy(){
-    return realtimeStatus==='SUBSCRIBED'&&((state?.players?.length||0)<2||Date.now()-lastPongAt<5500);
+    return realtimeStatus==='SUBSCRIBED'&&!transportFailed&&Date.now()-serverHeartbeatAt<65000&&window.navigator?.onLine!==false;
   }
   function isCanvasHealthy(){
     return realtimeStatus==='SUBSCRIBED'&&!canvasNeedsSync&&(isDrawer()?isRealtimeHealthy():Date.now()-lastDrawerAt<5500);
@@ -243,10 +300,11 @@
     }
   }
   function checkHealth(){
-    if(!state||suspended||document.hidden)return;
+    if(!state||suspended||document.hidden||window.navigator?.onLine===false)return;
     const healthy=isRealtimeHealthy();setStatePoll(healthy?3000:1200);updateRealtimeStatus();
     if(!isCanvasHealthy())pullCanvasFallback(true);
-    if(realtimeStatus==='SUBSCRIBED'&&!healthy&&Date.now()-(lastPongAt||subscribedAt)>12000)scheduleReconnect();
+    if(healthy&&Date.now()-subscribedAt>20000)reconnectAttempt=0;
+    if(realtimeStatus==='SUBSCRIBED'&&!healthy)scheduleReconnect(8000);
   }
   function startPing(){clearInterval(pingTimer);sendPing();pingTimer=setInterval(sendPing,2000);}
   function sendPing(){
@@ -269,13 +327,13 @@
     }
     updateRealtimeStatus();
   }
-  function scheduleReconnect(){
-    if(reconnectTimer||document.hidden||suspended||!state)return;
-    const epoch=roomEpoch,delay=Math.min(8000,500*2**Math.min(4,reconnectAttempt++))+Math.random()*250;
+  function scheduleReconnect(grace=0){
+    if(reconnectTimer||document.hidden||suspended||!state||window.navigator?.onLine===false)return;
+    const epoch=roomEpoch,delay=grace+250+Math.random()*Math.min(15000,500*2**Math.min(5,reconnectAttempt++));
     reconnectTimer=setTimeout(async()=>{reconnectTimer=null;if(epoch!==roomEpoch)return;try{await connectRealtime();}catch{scheduleReconnect();}},delay);
   }
   function leaveRealtime(stopTimers=true){
-    connectionEpoch++;
+    connectionEpoch++;connectPromise=null;clearTimeout(connectDeadline);connectDeadline=null;serverHeartbeatAt=0;transportFailed=false;
     clearTimeout(reconnectTimer);reconnectTimer=null;clearInterval(snapshotTimer);clearInterval(pingTimer);
     snapshotTimer=pingTimer=null;
     const old=realtime;channel=realtime=null;realtimeToken=null;realtimeStatus='CLOSED';lastPongAt=lastDrawerAt=0;realtimeRtt=null;pendingPings.clear();presenceMembers.clear();
@@ -521,7 +579,7 @@
   }
   async function persistCanvasFallback(){
     clearTimeout(serverSaveTimer);serverSaveTimer=null;
-    if(!isDrawer()||state?.room?.status!=='playing'||!currentRoundId)return;
+    if(window.navigator?.onLine===false||!isDrawer()||state?.room?.status!=='playing'||!currentRoundId)return;
     if(canvasSaveBusy){canvasSaveQueued=true;return;}
     if(activeStroke&&sendPoints.length)flushStroke(false);
     if(!canvasDirty)return;
@@ -538,7 +596,7 @@
     finally{canvasSaveBusy=false;if(canvasSaveQueued||canvasDirty){canvasSaveQueued=false;scheduleServerCanvasSave();}}
   }
   async function pullCanvasFallback(force=false){
-    if(canvasFetchBusy||!state||!currentRoundId||state.room.status!=='playing'||document.hidden||suspended)return;
+    if(window.navigator?.onLine===false||canvasFetchBusy||!state||!currentRoundId||state.room.status!=='playing'||document.hidden||suspended)return;
     if(isDrawer()&&(activeStroke||canvasDirty))return;
     const now=Date.now();
     if(!force&&now-lastCanvasCheck<(isCanvasHealthy()?5000:650))return;

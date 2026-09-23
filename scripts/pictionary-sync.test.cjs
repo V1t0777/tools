@@ -5,8 +5,8 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 const path=require('node:path');
 const source=fs.readFileSync(path.join(__dirname,'../pictionary/app.js'),'utf8');
-const fields=['state','me','currentRoundId','strokes','canvasRevision','canvasDirty','canvasNeedsSync','lastDrawerAt','lastPongAt','realtimeStatus','suspended','scoreRevision','roomEpoch','connectionEpoch','clockTimer','canvasSyncTimer','heartbeatTimer','pollTimer','refreshQueued','transitionBusy','guessRequests','liveGuesses','pendingPings','reconnectTimer','subscribedAt'];
-const injected=source.replace('  boot();',`globalThis.audit={api,bind,enterRoom,connectRealtime,leaveRealtime,refreshState,requestState,exitToHome,adoptState,applyScores,receiveGuessResult,submitGuess,deliverGuess,hasGuessed,switchRound,receiveStroke,receiveCanvasControl,receiveSnapshot,applyCanvasSnapshot,pullCanvasFallback,persistCanvasFallback,sendSnapshot,sendPing,handlePong,isRealtimeHealthy,isCanvasHealthy,checkHealth,startRoomTimers,resumeRoom,
+const fields=['state','me','currentRoundId','strokes','canvasRevision','canvasDirty','canvasNeedsSync','lastDrawerAt','lastPongAt','realtimeStatus','suspended','scoreRevision','roomEpoch','connectionEpoch','clockTimer','canvasSyncTimer','heartbeatTimer','pollTimer','refreshQueued','transitionBusy','guessRequests','liveGuesses','pendingPings','reconnectTimer','subscribedAt','serverHeartbeatAt','transportFailed','reconnectAttempt'];
+const injected=source.replace('  boot();',`globalThis.audit={api,initializeSession,bind,enterRoom,connectRealtime,leaveRealtime,refreshState,requestState,exitToHome,adoptState,applyScores,receiveGuessResult,submitGuess,deliverGuess,hasGuessed,switchRound,receiveStroke,receiveCanvasControl,receiveSnapshot,applyCanvasSnapshot,pullCanvasFallback,persistCanvasFallback,sendSnapshot,sendPing,handlePong,isRealtimeHealthy,isCanvasHealthy,checkHealth,startRoomTimers,resumeRoom,
 setApi(fn){api=fn;},set(v){${fields.map(f=>`if('${f}' in v)${f}=v.${f};`).join('')}} ,get(){return {${fields.join(',')}}}};`);
 function setup(){
  const elements=new Map(),timeouts=new Map(),intervals=new Map(),events=new Map(),channels=[];
@@ -14,7 +14,7 @@ function setup(){
  const ctx=new Proxy({},{get:()=>noop,set:()=>true});
  const element=id=>{if(!elements.has(id))elements.set(id,{value:'',innerHTML:'',textContent:'',classList:{add:noop,remove:noop,toggle:noop},getContext:()=>ctx,querySelector:()=>element(id+'button'),addEventListener:(name,fn)=>events.set(id+':'+name,fn),getBoundingClientRect:()=>({width:800,height:500}),dataset:{}});return elements.get(id);};
  const client=()=>({realtime:{setAuth:async()=>{},disconnect:noop},channel(){const c={handlers:new Map(),on(type,filter,fn){c.handlers.set(type+':'+filter.event,fn);return c;},subscribe(fn){c.status=fn;return c;},track:async()=>{},send:async()=> 'ok',presenceState:()=>({})};channels.push(c);return c;},removeAllChannels:async()=>{}});
- const sandbox={ToolboxAuth:{url:'https://example.invalid',key:'public',getSession:async()=>({access_token:'test',user:{id:'user'}})},document:{getElementById:element,querySelector:element,querySelectorAll:()=>[],addEventListener:(name,fn)=>events.set('document:'+name,fn),hidden:false},window:{supabase:{createClient:client},addEventListener:(name,fn)=>events.set('window:'+name,fn)},console:{warn:noop},crypto:require('node:crypto').webcrypto,URL,AbortController,TypeError,Error,location:{href:'https://example.invalid/'},history:{replaceState:noop},sessionStorage:{getItem:()=>null,setItem:noop},fetch:async()=>new Promise(()=>{}),setTimeout:(fn,ms)=>{const id=++serial;timeouts.set(id,{fn,ms});return id;},clearTimeout:id=>timeouts.delete(id),setInterval:(fn,ms)=>{const id=++serial;intervals.set(id,{fn,ms});return id;},clearInterval:id=>intervals.delete(id),requestAnimationFrame:noop};
+ const sandbox={ToolboxAuth:{url:'https://example.invalid',key:'public',getSession:async()=>({access_token:'test',user:{id:'user'}})},document:{getElementById:element,querySelector:element,querySelectorAll:()=>[],addEventListener:(name,fn)=>events.set('document:'+name,fn),hidden:false},window:{supabase:{createClient:client},addEventListener:(name,fn)=>events.set('window:'+name,fn)},console:{warn:noop},crypto:require('node:crypto').webcrypto,URL,URLSearchParams,AbortController,TypeError,Error,location:{href:'https://example.invalid/'},history:{replaceState:noop},sessionStorage:{getItem:()=>null,setItem:noop},fetch:async()=>new Promise(()=>{}),setTimeout:(fn,ms)=>{const id=++serial;timeouts.set(id,{fn,ms});return id;},clearTimeout:id=>timeouts.delete(id),setInterval:(fn,ms)=>{const id=++serial;intervals.set(id,{fn,ms});return id;},clearInterval:id=>intervals.delete(id),requestAnimationFrame:noop};
  vm.createContext(sandbox);vm.runInContext(injected,sandbox);const a=sandbox.audit;
  const state={room:{id:'room',code:'ABCDEF',status:'playing',current_drawer_member_id:'drawer',round_no:1,total_rounds:6},round:{id:'r1'},players:[{member_id:'me',score:0,nickname:'me',ready:true},{member_id:'other',score:150,nickname:'other',ready:true},{member_id:'drawer',score:50,nickname:'drawer',ready:true}],guesses:[]};
  a.set({me:{id:'me',nickname:'me'},currentRoundId:'r1',state});
@@ -59,7 +59,7 @@ test('out of order snapshot chunks do not restore a pre-clear canvas',()=>{
  assert.equal(a.get().strokes.length,0);
 });
 test('non-drawer pong does not suppress canvas fallback',()=>{
- const {a}=setup();a.set({realtimeStatus:'SUBSCRIBED',lastDrawerAt:0});a.get().pendingPings.set('p',Date.now()-20);
+ const {a}=setup();a.set({realtimeStatus:'SUBSCRIBED',serverHeartbeatAt:Date.now(),lastDrawerAt:0});a.get().pendingPings.set('p',Date.now()-20);
  a.handlePong({ping_id:'p',target_member_id:'me',responder_member_id:'other',round_id:'r1',canvas_revision:0});
  assert.equal(a.isRealtimeHealthy(),true);assert.equal(a.isCanvasHealthy(),false);
 });
@@ -111,4 +111,38 @@ test('page cache restore restarts countdown, fallback, and health timers',()=>{
 });
 test('guessed status is independent of truncated chat history',()=>{
  const {a}=setup();a.get().state.solved_members=['me'];a.get().state.guesses=[];assert.equal(a.hasGuessed('me'),true);
+});
+
+test('silent peers do not force a healthy server connection to reconnect',()=>{
+ const {a}=setup();a.set({realtimeStatus:'SUBSCRIBED',serverHeartbeatAt:Date.now(),subscribedAt:Date.now()-30000,lastPongAt:0,lastDrawerAt:0,reconnectAttempt:4});a.checkHealth();
+ assert.equal(a.get().reconnectTimer,null);assert.equal(a.get().reconnectAttempt,0);
+});
+test('transport failure schedules one recovery with SDK grace',()=>{
+ const {a,timeouts}=setup();a.set({realtimeStatus:'SUBSCRIBED',transportFailed:true,subscribedAt:Date.now(),reconnectAttempt:2});a.checkHealth();const timer=a.get().reconnectTimer;a.checkHealth();
+ assert.equal(a.get().reconnectTimer,timer);assert.ok(timeouts.get(timer).ms>=8000);assert.equal(a.get().reconnectAttempt,3);
+});
+test('offline health checks issue no fallback requests or reconnections',()=>{
+ const {a,sandbox}=setup();sandbox.window.navigator={onLine:false};let calls=0;a.setApi(async()=>{calls++;return {};});a.checkHealth();a.resumeRoom();assert.equal(calls,0);assert.equal(a.get().reconnectTimer,null);
+});
+test('concurrent connection attempts share auth and a client',async()=>{
+ const {a,channels}=setup();const one=a.connectRealtime(),two=a.connectRealtime();assert.equal(one,two);await one;assert.equal(channels.length,1);
+});
+test('connection watchdog fences stalled auth and allows a fresh attempt',async()=>{
+ const {a,sandbox,runTimers,channels}=setup();let resolve;sandbox.ToolboxAuth.getSession=()=>new Promise(r=>resolve=r);
+ const old=a.connectRealtime();await Promise.resolve();await Promise.resolve();await runTimers(12000);
+ sandbox.ToolboxAuth.getSession=async()=>({access_token:'fresh',user:{id:'u'}});await a.connectRealtime();assert.equal(channels.length,1);
+ resolve({access_token:'old',user:{id:'u'}});await old;assert.equal(channels.length,1);
+});
+test('subscription flapping does not reset backoff',async()=>{
+ const {a,channels}=setup();a.set({reconnectAttempt:4});await a.connectRealtime();await channels[0].status('SUBSCRIBED');assert.equal(a.get().reconnectAttempt,4);
+});
+
+test('bootstrap transient failure retains login and invitation for retry',async()=>{
+ const {a,sandbox,element}=setup();sandbox.location.search='?room=ABCDEF';let signedOut=false;sandbox.ToolboxAuth.signOut=async()=>{signedOut=true;};
+ a.setApi(async()=>{throw Object.assign(new Error('temporary outage'),{status:503});});await a.initializeSession();assert.equal(signedOut,false);assert.equal(element('recoveryMessage').textContent,'temporary outage');assert.equal(sandbox.location.search,'?room=ABCDEF');assert.equal(element('retrySessionBtn').disabled,false);
+});
+test('startup recovery is single-flight and uses one bootstrap request',async()=>{
+ const {a,sandbox}=setup();sandbox.location.search='';const calls=[];
+ a.setApi(async action=>{calls.push(action);return {member:{id:'me',nickname:'me'}};});
+ const one=a.initializeSession(),two=a.initializeSession();assert.equal(one,two);await one;assert.deepEqual(calls,['bootstrap']);
 });

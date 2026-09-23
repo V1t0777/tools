@@ -17,7 +17,7 @@ const admin=createClient(URL,ADMIN_KEY,{auth:{persistSession:false,autoRefreshTo
 const ORIGINS=new Set(["https://v1t0777.github.io","https://zhao-toolbox-secure.pages.dev","http://localhost:8000","http://127.0.0.1:8000"]);
 const headers=(req:Request)=>({"Access-Control-Allow-Origin":ORIGINS.has(req.headers.get("origin")||"")?(req.headers.get("origin")||""):"https://v1t0777.github.io","Access-Control-Allow-Headers":"authorization, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store","Vary":"Origin"});
 const reply=(req:Request,body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:headers(req)});
-function fail(message:string,status=400):never{const e=new Error(message) as Error&{status?:number};e.status=status;throw e;}
+function fail(message:string,status=400,code?:string):never{const e=new Error(message) as Error&{status?:number,code?:string};e.status=status;e.code=code;throw e;}
 function code(){const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789",a=new Uint8Array(6);crypto.getRandomValues(a);return [...a].map(x=>chars[x%chars.length]).join("");}
 function shuffle<T>(items:T[]){const a=[...items];for(let i=a.length-1;i;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 
@@ -25,7 +25,7 @@ async function identify(req:Request){
   const authorization=req.headers.get("authorization")||"";if(!authorization.startsWith("Bearer "))fail("请先登录",401);
   const key=req.headers.get("apikey")||Deno.env.get("SUPABASE_ANON_KEY")||"";
   const client=createClient(URL,key,{global:{headers:{Authorization:authorization}},auth:{persistSession:false,autoRefreshToken:false}});
-  const {data,error}=await client.rpc("toolbox_session_status");if(error||!data?.active||!data?.member_id)fail("当前账号不在工具箱成员名单中",403);
+  const {data,error}=await client.rpc("toolbox_session_status");if(error)fail("登录状态暂时无法验证，请重试",503);if(!data?.active||!data?.member_id)fail("当前账号不在工具箱成员名单中或会话已失效",403,"SESSION_REVOKED");
   const {data:member,error:memberError}=await admin.from("members").select("id,user_id,nickname,color").eq("id",data.member_id).maybeSingle();
   if(memberError){console.error("members lookup failed",memberError);fail("成员资料读取失败，请稍后重试",503);}
   if(!member)fail("成员资料不存在",403);return member;
@@ -128,12 +128,12 @@ Deno.serve(async(req:Request)=>{
   if(req.method==="OPTIONS")return new Response("ok",{headers:headers(req)});if(req.method!=="POST")return reply(req,{error:"仅支持 POST"},405);
   const origin=req.headers.get("origin")||"";if(origin&&!ORIGINS.has(origin))return reply(req,{error:"来源未获授权"},403);
   try{
-    const member=await identify(req);const b=await req.json().catch(()=>({}));const action=String(b.action||"");if(action==="me")return reply(req,{member});
+    const member=await identify(req);const b=await req.json().catch(()=>({}));const action=String(b.action||"");if(action==="me"||(action==="bootstrap"&&!b.code))return reply(req,{member});
     if(action==="create_room"){
       let r:any=null;for(let i=0;i<8&&!r;i++){const out=await admin.from("pictionary_rooms").insert({room_code:code(),host_user_id:member.user_id,status:"lobby"}).select("*").single();if(!out.error)r=out.data;}if(!r)fail("暂时无法生成房间码",503);
       const {error}=await admin.from("pictionary_players").insert({room_id:r.id,user_id:member.user_id,display_name:member.nickname,seat:1,ready:true,active:true});if(error)throw error;return reply(req,{state:await state(r.id,member)});
     }
-    if(action==="join_room"){
+    if(action==="join_room"||action==="bootstrap"){
       const c=String(b.code||"").toUpperCase().replace(/[^A-Z2-9]/g,"").slice(0,6);
       const {data:found}=await admin.from("pictionary_rooms").select("*").eq("room_code",c).maybeSingle();if(!found)fail("没有找到这个房间",404);
       const r=await repairRoomState(found);
@@ -149,7 +149,7 @@ Deno.serve(async(req:Request)=>{
         const {error}=await admin.from("pictionary_players").insert({room_id:r.id,user_id:member.user_id,display_name:member.nickname,seat:ps.length+1});if(error)throw error;
       }
       await touchRoom(r.id);
-      return reply(req,{state:await state(r.id,member)});
+      return reply(req,{member,state:await state(r.id,member)});
     }
     const id=String(b.room_id||"");
     if(action==="guess"){
@@ -239,5 +239,5 @@ Deno.serve(async(req:Request)=>{
     }
     if(action==="play_again"){if(r.host_user_id!==member.user_id)fail("只有房主可以再开一局");if(r.status!=="finished")fail("本局尚未结束");await admin.from("pictionary_rounds").delete().eq("room_id",id);await admin.from("pictionary_players").update({score:0,ready:false,updated_at:new Date().toISOString()}).eq("room_id",id);await admin.from("pictionary_players").update({ready:true}).eq("room_id",id).eq("user_id",member.user_id);await admin.from("pictionary_rooms").update({status:"lobby",current_round_no:0,total_rounds:0,current_drawer_user_id:null,ends_at:null,summary_until:null,finished_at:null,closed_reason:null,last_activity_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",id);return reply(req,{state:await state(id,member)});}
     fail("未知操作");
-  }catch(e){console.error(e);return reply(req,{error:(e as Error)?.message||"服务器暂时不可用"},(e as any)?.status||400);}
+  }catch(e){console.error(e);return reply(req,{error:(e as Error)?.message||"服务器暂时不可用",code:(e as any)?.code},(e as any)?.status||400);}
 });

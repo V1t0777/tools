@@ -40,6 +40,9 @@
       </form>
     </section>
 
+    <section class="screen" id="recoveryScreen">
+      <div class="panel form"><h2>恢复连接</h2><p id="recoveryMessage" role="status">正在恢复登录和房间…</p><button class="primary" id="retrySessionBtn">重试连接</button><button class="ghost" id="resetSessionBtn">切换账号</button></div>
+    </section>
     <section class="screen" id="homeScreen">
       <div class="welcome"><div><small>欢迎回来</small><h1 id="welcomeName">好友</h1></div><button class="ghost" id="signOutBtn">退出</button></div>
       <div class="action-grid">
@@ -88,8 +91,7 @@
   <div class="modal hidden" id="wordModal"><div class="modal-card"><small>你是本轮画手</small><h2>请选择题目</h2><p>其他玩家不会看到正确答案</p><div id="wordOptions"></div></div></div>
   <div class="toast" id="toast" role="status"></div>
 
-  <script src="../shared/toolbox-auth.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/dist/umd/supabase.min.js" integrity="sha384-AkNSQdptcXlJ0/NBZc4qGk86cDVXcCevwoWgEKIpHOEfbvlXGLlIkimQtONt8KNf" crossorigin="anonymous"></script>
-  <script src="./app.js?v=20260922-1"></script>
+  <script src="../shared/toolbox-auth.js?v=20260923-1"></script>
+  <script src="./app.js?v=20260923-1"></script>
 </body>
 </html>
