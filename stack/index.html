@@ -391,6 +391,7 @@
     current=buildObject(def);
     state='moving';
     pauseBtn.disabled=false;
+    if(document.hidden)pauseGame();
   }
 
   function resetGame(reroll){
@@ -403,7 +404,6 @@
     floorNum.innerHTML='0<small>FLOORS</small>';comboEl.innerHTML='PERFECT<b>×0</b>';
     hud.classList.add('hidden');resultLayer.classList.remove('active');pauseLayer.classList.remove('active');
     pauseBtn.disabled=true;pauseBtn.textContent='Ⅱ';pauseBtn.classList.remove('active');
-    resultOnlineBest.textContent='--';resultOnlineRank.textContent='--';
   }
 
   function startGame(){
