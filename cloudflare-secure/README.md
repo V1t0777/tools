@@ -19,6 +19,7 @@
 - `admin-night-shift/`
 - `flappy/`
 - `games/`
+- `stack/`
 - `pictionary/`
 - `shared/toolbox-auth.js`
 - 本地固定版本的 Supabase Realtime SDK
