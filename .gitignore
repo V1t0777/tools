@@ -20,6 +20,7 @@ supabase/.temp/
 
 # Generated output
 dist-secure/
+dist-public/
 
 # OS/editor noise
 .DS_Store
