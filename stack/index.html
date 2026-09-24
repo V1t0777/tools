@@ -1,0 +1,745 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#101923">
+  <title>搭建高塔｜钊的工具箱</title>
+  <link rel="stylesheet" href="../shared/toolbox-ui.css">
+  <link rel="stylesheet" href="../shared/toolbox-motion.css">
+  <style>
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    :root{
+      --bg:#0b1219;--panel:rgba(17,27,37,.82);--line:rgba(255,255,255,.09);
+      --text:#f4f7fb;--muted:#91a0b0;--accent:#89d7db;--accent2:#5bb8c0;--warm:#f2c887;
+      --shadow:0 28px 70px rgba(0,0,0,.34)
+    }
+    html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","PingFang SC","Microsoft YaHei",sans-serif;overscroll-behavior:none}
+    body{
+      min-height:100dvh;
+      padding:max(12px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));
+      background:
+        radial-gradient(circle at 16% 0%,rgba(91,177,184,.14),transparent 34%),
+        radial-gradient(circle at 100% 30%,rgba(160,118,87,.10),transparent 28%),
+        linear-gradient(180deg,#111d28 0%,#081018 100%);
+    }
+    button,input{font:inherit}
+    .app{width:min(100%,540px);margin:0 auto;display:flex;flex-direction:column;gap:10px}
+    .topbar{display:flex;align-items:center;justify-content:space-between;min-height:44px}
+    .back,.icon-btn{
+      height:44px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.045);
+      color:var(--text);text-decoration:none;display:inline-flex;align-items:center;justify-content:center;
+      font-weight:850;font-size:13px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)
+    }
+    .back{padding:0 13px}.top-actions{display:flex;gap:8px}
+    .icon-btn{width:44px;padding:0;cursor:pointer;transition:transform 120ms ease,background 180ms ease,border-color 180ms ease,opacity 180ms ease}
+    .icon-btn:active{transform:scale(.94)}.icon-btn[disabled]{opacity:.34;pointer-events:none}
+    .icon-btn.active{background:rgba(137,215,219,.11);border-color:rgba(137,215,219,.28);color:#c8fbff}
+    .heading{display:flex;align-items:end;justify-content:space-between;gap:14px;padding:2px 2px 0}
+    h1{margin:0;font-size:clamp(32px,8vw,44px);line-height:1;letter-spacing:-.045em}
+    .sub{margin:6px 0 0;color:var(--muted);font-size:12px;line-height:1.6}
+    .score-chips{display:flex;gap:7px;flex:0 0 auto}
+    .best-chip{min-width:70px;border:1px solid var(--line);border-radius:15px;padding:8px 10px;text-align:center;background:rgba(255,255,255,.035);color:var(--text)}
+    .best-chip span{display:block;color:var(--muted);font-size:9px;font-weight:800;letter-spacing:.08em}
+    .best-chip b{display:block;margin-top:1px;font-size:19px}
+    .rank-chip{cursor:pointer;transition:transform 120ms ease,border-color 180ms ease,background 180ms ease}
+    .rank-chip:active{transform:scale(.96)}.rank-chip.online{border-color:rgba(137,215,219,.24);background:rgba(137,215,219,.07)}
+    .stage-wrap{display:flex;justify-content:center}
+    .stage{
+      position:relative;width:min(100%,430px);aspect-ratio:9/15.2;border-radius:30px;padding:7px;
+      border:1px solid rgba(137,215,219,.14);background:rgba(6,14,20,.88);box-shadow:var(--shadow);
+      overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;isolation:isolate
+    }
+    canvas{
+      display:block;width:100%;height:100%;border-radius:23px;background:#101c25;
+      touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none
+    }
+    .hud{
+      position:absolute;z-index:3;top:24px;left:20px;right:20px;display:flex;justify-content:space-between;align-items:start;
+      pointer-events:none;transition:opacity 160ms ease
+    }
+    .hud.hidden{opacity:0}
+    .floor-num{font-size:42px;line-height:.9;font-weight:950;letter-spacing:-.04em;text-shadow:0 3px 18px rgba(0,0,0,.32)}
+    .floor-num small{display:block;margin-top:7px;font-size:9px;letter-spacing:.11em;color:rgba(235,245,248,.66)}
+    .combo{min-width:82px;text-align:right;font-size:11px;font-weight:900;color:#f3d49a;opacity:.9}
+    .combo b{display:block;font-size:18px;margin-top:1px}
+    .perfect-toast{
+      position:absolute;z-index:3;top:88px;left:50%;transform:translate(-50%,4px);
+      color:#ffe2a7;font-size:12px;font-weight:950;letter-spacing:.12em;opacity:0;pointer-events:none
+    }
+    .perfect-toast.show{animation:perfectToast 620ms ease both}
+    .ready-layer,.pause-layer,.result-layer{position:absolute;z-index:4;inset:7px;border-radius:23px}
+    .ready-layer{
+      display:flex;align-items:center;justify-content:center;text-align:center;padding:30px;
+      background:linear-gradient(180deg,rgba(7,15,21,.08),rgba(4,9,13,.48));
+      backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);
+      transition:opacity 180ms ease,visibility 180ms
+    }
+    .ready-layer.hidden{opacity:0;visibility:hidden;pointer-events:none}
+    .ready-card{transform:translateY(-5px);max-width:280px;pointer-events:none}
+    .ready-mark{font-size:10px;font-weight:950;letter-spacing:.16em;color:#a5e4e7}
+    .ready-card h2{margin:10px 0 7px;font-size:28px}
+    .ready-card p{margin:0;color:#a8b6c3;font-size:13px;line-height:1.7}
+    .fair-note{margin-top:12px!important;color:#d6e6ea!important;font-size:11px!important}
+    .tap-hint{
+      display:inline-flex;align-items:center;gap:7px;margin-top:15px;padding:8px 11px;border-radius:999px;
+      border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.05);color:#e0ebf0;font-size:11px;font-weight:850
+    }
+    .pause-layer{
+      display:flex;align-items:center;justify-content:center;text-align:center;
+      background:rgba(5,12,17,.42);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+      opacity:0;visibility:hidden;pointer-events:none;transition:opacity 170ms ease,visibility 170ms
+    }
+    .pause-layer.active{opacity:1;visibility:visible}
+    .pause-card{padding:18px 20px;border:1px solid rgba(255,255,255,.08);border-radius:20px;background:rgba(12,23,31,.74)}
+    .pause-card strong{display:block;font-size:22px}.pause-card span{display:block;margin-top:5px;color:#9fb0bd;font-size:11px}
+    .result-layer{
+      display:flex;align-items:flex-end;justify-content:center;padding:16px;
+      pointer-events:none;opacity:0;visibility:hidden;transition:opacity 200ms ease,visibility 200ms
+    }
+    .result-layer.active{opacity:1;visibility:visible;pointer-events:auto}
+    .result-card{
+      width:100%;padding:19px;border:1px solid rgba(255,255,255,.09);border-radius:24px;
+      background:rgba(9,19,26,.84);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+      box-shadow:0 22px 55px rgba(0,0,0,.34);transform:translateY(10px) scale(.985);opacity:0;
+      transition:transform 230ms cubic-bezier(.22,1,.36,1),opacity 180ms ease
+    }
+    .result-layer.active .result-card{transform:none;opacity:1}
+    .result-title small{display:block;color:#91a3b1;font-size:10px;font-weight:850;letter-spacing:.12em}
+    .result-title strong{display:block;margin-top:3px;font-size:22px}
+    .result-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:14px 0}
+    .result-stat{padding:12px;border-radius:16px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.035)}
+    .result-stat span{display:block;color:#8fa2af;font-size:10px;font-weight:800}.result-stat b{display:block;margin-top:2px;font-size:24px}
+    .result-meta{display:flex;gap:7px;flex-wrap:wrap;margin:-4px 0 13px}
+    .result-meta span{padding:6px 9px;border-radius:999px;background:rgba(255,255,255,.05);color:#bac8d0;font-size:10px;font-weight:800}
+    .online-result-status{min-height:17px;margin:-2px 2px 11px;color:#91a3b1;font-size:10px;line-height:1.5}
+    .online-result-status.good{color:#92d6b0}.online-result-status.warn{color:#dfbd86}
+    .retry{
+      width:100%;min-height:48px;border:0;border-radius:16px;background:linear-gradient(135deg,#bce9df,#73c6c9);
+      color:#08252a;font-weight:950;font-size:15px;box-shadow:0 13px 28px rgba(87,190,193,.17);cursor:pointer
+    }
+    .retry:active{transform:scale(.985)}
+    .footer-note{text-align:center;color:#687a87;font-size:10px;line-height:1.55}
+
+    .leaderboard-layer{position:fixed;z-index:30;inset:0;display:flex;align-items:flex-end;justify-content:center;opacity:0;visibility:hidden;transition:opacity 180ms ease,visibility 180ms}
+    .leaderboard-layer.active{opacity:1;visibility:visible}
+    .leaderboard-backdrop{position:absolute;inset:0;border:0;background:rgba(2,7,10,.66);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+    .leaderboard-sheet{
+      position:relative;width:min(100%,520px);max-height:min(80dvh,680px);overflow:auto;border-radius:26px 26px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));
+      border:1px solid rgba(255,255,255,.09);border-bottom:0;background:#0e1921;box-shadow:0 -24px 70px rgba(0,0,0,.38);
+      transform:translateY(18px);transition:transform 220ms cubic-bezier(.22,1,.36,1)
+    }
+    .leaderboard-layer.active .leaderboard-sheet{transform:none}
+    .leaderboard-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.leaderboard-head small{display:block;color:#82cbd0;font-size:9px;font-weight:900;letter-spacing:.15em}.leaderboard-head h2{margin:3px 0 0;font-size:25px}
+    .sheet-close{width:42px;height:42px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.05);color:#e6eef2;font-size:23px;cursor:pointer}
+    .leaderboard-list{display:grid;gap:8px;margin-top:16px}
+    .leaderboard-row{display:grid;grid-template-columns:34px 1fr auto;align-items:center;gap:9px;padding:11px 12px;border:1px solid rgba(255,255,255,.065);border-radius:16px;background:rgba(255,255,255,.03)}
+    .leaderboard-row.me{border-color:rgba(137,215,219,.25);background:rgba(137,215,219,.07)}
+    .rank-num{font-weight:950;color:#9aaab5}.rank-num.top{color:#f1ce8d}.player strong{display:block;font-size:13px}.player span{display:block;margin-top:3px;color:#758994;font-size:9px}.leader-score{text-align:right}.leader-score strong{display:block;font-size:20px}.leader-score span{display:block;color:#8395a0;font-size:9px}
+    .leaderboard-empty{padding:26px 12px;text-align:center;color:#81929d;font-size:12px;line-height:1.7}
+    .account-panel{margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.07)}
+    .account-copy{color:#93a5b0;font-size:11px;line-height:1.6;margin-bottom:9px}
+    .login-form{display:grid;grid-template-columns:1fr 1fr auto;gap:7px}.login-form input{min-width:0;height:42px;border:1px solid rgba(255,255,255,.09);border-radius:12px;background:rgba(255,255,255,.05);color:#edf4f6;padding:0 11px;font-size:16px;outline:none}.login-form button{height:42px;border:0;border-radius:12px;padding:0 14px;background:#9edbdd;color:#0a252a;font-size:12px;font-weight:900}.login-form button[disabled]{opacity:.5}
+    .login-error{min-height:15px;margin-top:6px;color:#e9a6a6;font-size:10px}
+
+    :where(a,button,input):focus-visible{outline:3px solid rgba(137,215,219,.55);outline-offset:3px}
+    @keyframes perfectToast{0%{opacity:0;transform:translate(-50%,7px) scale(.96)}18%,64%{opacity:1;transform:translate(-50%,0) scale(1)}100%{opacity:0;transform:translate(-50%,-5px) scale(.98)}}
+    @media(max-height:760px) and (orientation:portrait){.app{gap:7px}.heading h1{font-size:29px}.sub{display:none}.stage{width:min(100%,49dvh)}.footer-note{display:none}}
+    @media(orientation:landscape) and (max-height:620px){
+      .app{width:min(100%,900px);display:grid;grid-template-columns:minmax(270px,58vh) minmax(260px,1fr);grid-template-rows:auto auto 1fr;column-gap:18px}
+      .topbar{grid-column:1/3}.heading{grid-column:2;grid-row:2;align-self:start}.stage-wrap{grid-column:1;grid-row:2/4}.stage{width:min(58vh,355px)}.footer-note{grid-column:2;grid-row:3;align-self:end}.heading{display:block}.score-chips{margin-top:14px}.best-chip{width:90px}
+    }
+    @media(max-width:430px){.login-form{grid-template-columns:1fr}.login-form button{width:100%}.heading{gap:8px}.best-chip{min-width:64px;padding:8px 7px}}
+    @media(prefers-reduced-motion:reduce){.perfect-toast.show{animation:none!important}.ready-layer,.pause-layer,.result-layer,.result-card,.leaderboard-layer,.leaderboard-sheet{transition:none!important}}
+    [hidden]{display:none!important}
+  </style>
+</head>
+<body>
+  <main class="app">
+    <div class="topbar">
+      <a class="back" href="../games/" aria-label="返回小游戏">← 小游戏</a>
+      <div class="top-actions">
+        <button class="icon-btn" id="soundBtn" aria-label="切换音效">♪</button>
+        <button class="icon-btn" id="pauseBtn" aria-label="暂停或继续" disabled>Ⅱ</button>
+      </div>
+    </div>
+
+    <div class="heading">
+      <div>
+        <h1>搭建高塔</h1>
+        <p class="sub">什么都能叠 · 对齐承重点 · 连续 Perfect</p>
+      </div>
+      <div class="score-chips">
+        <div class="best-chip"><span>本地 BEST</span><b id="bestTop">0</b></div>
+        <button class="best-chip rank-chip" id="leaderboardBtn" aria-label="打开好友排行榜"><span>好友榜</span><b id="rankTop">--</b></button>
+      </div>
+    </div>
+
+    <div class="stage-wrap">
+      <section class="stage" id="stage" aria-label="搭建高塔游戏区域">
+        <canvas id="canvas"></canvas>
+        <div class="hud hidden" id="hud">
+          <div class="floor-num" id="floorNum">0<small>FLOORS</small></div>
+          <div class="combo" id="combo">PERFECT<b>×0</b></div>
+        </div>
+        <div class="perfect-toast" id="perfectToast">PERFECT</div>
+
+        <div class="ready-layer" id="readyLayer">
+          <div class="ready-card">
+            <div class="ready-mark">FAIR CONTACT SYSTEM</div>
+            <h2>什么都能叠</h2>
+            <p>物体左右移动，轻触后垂直落下。书、杯子、行李箱、花盆甚至西瓜都会出现。</p>
+            <p class="fair-note">底部亮线就是实际承重点；塔顶亮线就是有效落点。所有不规则物体都只按这两条可见线判定。</p>
+            <div class="tap-hint">轻触开始</div>
+          </div>
+        </div>
+
+        <div class="pause-layer" id="pauseLayer">
+          <div class="pause-card"><strong>已暂停</strong><span>点击右上角继续</span></div>
+        </div>
+
+        <div class="result-layer" id="resultLayer">
+          <div class="result-card">
+            <div class="result-title"><small>TOWER REPORT</small><strong id="resultTitle">本局结束</strong></div>
+            <div class="result-stats">
+              <div class="result-stat"><span>本局层数</span><b id="resultScore">0</b></div>
+              <div class="result-stat"><span>本地最高</span><b id="resultBest">0</b></div>
+              <div class="result-stat"><span>在线最好</span><b id="resultOnlineBest">--</b></div>
+              <div class="result-stat"><span>好友排名</span><b id="resultOnlineRank">--</b></div>
+            </div>
+            <div class="result-meta">
+              <span id="resultPerfect">Perfect 0</span>
+              <span id="resultCombo">最高连击 ×0</span>
+              <span id="resultTheme">主题</span>
+            </div>
+            <div class="online-result-status" id="onlineResultStatus">登录工具箱后，新完成的成绩可进入好友榜</div>
+            <button class="retry" id="retryBtn">再来一局</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="footer-note">支持触摸、鼠标、空格键 / ↑ / W。页面切到后台会自动暂停。</div>
+  </main>
+
+  <div class="leaderboard-layer" id="leaderboardLayer" aria-hidden="true">
+    <button class="leaderboard-backdrop" id="leaderboardBackdrop" aria-label="关闭排行榜"></button>
+    <section class="leaderboard-sheet" role="dialog" aria-modal="true" aria-labelledby="leaderboardTitle">
+      <div class="leaderboard-head">
+        <div><small>ONLINE FRIENDS</small><h2 id="leaderboardTitle">高塔好友榜</h2></div>
+        <button class="sheet-close" id="leaderboardClose" aria-label="关闭">×</button>
+      </div>
+      <div class="leaderboard-list" id="leaderboardList"><div class="leaderboard-empty">正在读取好友成绩…</div></div>
+      <div class="account-panel" id="accountPanel">
+        <div class="account-copy" id="accountCopy">未登录也可以正常游玩；登录后新完成的有效成绩会自动提交。</div>
+        <form class="login-form" id="leaderboardLoginForm">
+          <input id="leaderboardEmail" type="email" autocomplete="username" placeholder="邮箱" aria-label="邮箱" required>
+          <input id="leaderboardPassword" type="password" autocomplete="current-password" placeholder="密码" aria-label="密码" required>
+          <button type="submit">登录</button>
+        </form>
+        <div class="login-error" id="leaderboardLoginError"></div>
+      </div>
+    </section>
+  </div>
+
+<script src="../shared/toolbox-auth.js?v=20260924-1"></script>
+<script>
+(function(){
+  'use strict';
+
+  var ToolboxAuth=window.ToolboxAuth||{
+    url:'https://tmxpueakxibsaakdyusn.supabase.co',
+    key:'sb_publishable_8sCgnOXk3XuRE28Qmk_ekg_9VSS4ASZ',
+    peekSession:function(){return null;},
+    getSession:async function(){return null;},
+    signIn:async function(){throw new Error('登录服务未加载，请刷新后重试');},
+    authMessage:function(e){return e.message;},
+    onAuthStateChange:function(){}
+  };
+
+  var canvas=document.getElementById('canvas');
+  var ctx=canvas.getContext('2d');
+  var stage=document.getElementById('stage');
+  var hud=document.getElementById('hud');
+  var floorNum=document.getElementById('floorNum');
+  var comboEl=document.getElementById('combo');
+  var perfectToast=document.getElementById('perfectToast');
+  var bestTop=document.getElementById('bestTop');
+  var readyLayer=document.getElementById('readyLayer');
+  var pauseLayer=document.getElementById('pauseLayer');
+  var resultLayer=document.getElementById('resultLayer');
+  var resultTitle=document.getElementById('resultTitle');
+  var resultScore=document.getElementById('resultScore');
+  var resultBest=document.getElementById('resultBest');
+  var resultPerfect=document.getElementById('resultPerfect');
+  var resultCombo=document.getElementById('resultCombo');
+  var resultTheme=document.getElementById('resultTheme');
+  var retryBtn=document.getElementById('retryBtn');
+  var pauseBtn=document.getElementById('pauseBtn');
+  var soundBtn=document.getElementById('soundBtn');
+  var leaderboardBtn=document.getElementById('leaderboardBtn');
+  var rankTop=document.getElementById('rankTop');
+  var leaderboardLayer=document.getElementById('leaderboardLayer');
+  var leaderboardList=document.getElementById('leaderboardList');
+  var leaderboardClose=document.getElementById('leaderboardClose');
+  var leaderboardBackdrop=document.getElementById('leaderboardBackdrop');
+  var accountCopy=document.getElementById('accountCopy');
+  var loginForm=document.getElementById('leaderboardLoginForm');
+  var loginError=document.getElementById('leaderboardLoginError');
+  var resultOnlineBest=document.getElementById('resultOnlineBest');
+  var resultOnlineRank=document.getElementById('resultOnlineRank');
+  var onlineResultStatus=document.getElementById('onlineResultStatus');
+  var reduceMotion=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var W=360,H=608,dpr=1,groundY=532;
+  var state='ready',beforePause='moving';
+  var placed=[],current=null,fallen=null;
+  var topSupport={x:180,width:210,yWorld:28};
+  var towerTop=28,camera=0,cameraTarget=0;
+  var floors=0,perfectCount=0,combo=0,maxCombo=0,best=0;
+  var elapsed=0,lastTime=0,raf=0,soundOn=true,audioCtx=null;
+  var direction=1,lastRiskFloor=-10,lastTrayFloor=-20;
+  var themeId='night',theme=null;
+  var BEST_KEY='zhaoStackBest.v1';
+  var FUNCTION_URL=ToolboxAuth.url+'/functions/v1/stack-game';
+  var GAME_VERSION='2026.09.24-stack-v1';
+  var activeRun=null,pendingRuns=[],authEpoch=0;
+  var authUserId=(ToolboxAuth.peekSession()||{}).user?.id||null;
+  var leaderboardData=null,leaderboardRequest=0;
+
+  var THEMES={
+    night:{name:'夜幕蓝',bg1:'#142632',bg2:'#09131a',accent:'#91d9dc',ground:'#0b171d',colors:['#658395','#819ba8','#a27d65','#526f6c']},
+    sand:{name:'暖砂',bg1:'#3a3029',bg2:'#161412',accent:'#e4c59b',ground:'#211c18',colors:['#b28f6f','#8f725f','#c3a986','#756760']},
+    slate:{name:'冷石',bg1:'#28313b',bg2:'#10151b',accent:'#b8ced8',ground:'#171d23',colors:['#7a8998','#5f7180','#9aa4ab','#687984']},
+    forest:{name:'苔木',bg1:'#24352f',bg2:'#0e1714',accent:'#a9d2bd',ground:'#121d19',colors:['#6f8879','#8f8067','#57736a','#9b977d']}
+  };
+
+  var OBJECTS=[
+    {id:'book',name:'书',weight:13,base:.95,top:.91,h:.080,tone:1},
+    {id:'crate',name:'木箱',weight:12,base:.93,top:.91,h:.092,tone:2},
+    {id:'parcel',name:'快递盒',weight:12,base:.94,top:.91,h:.083,tone:0},
+    {id:'suitcase',name:'行李箱',weight:9,base:.86,top:.82,h:.095,tone:1},
+    {id:'pillow',name:'抱枕',weight:9,base:.88,top:.84,h:.082,tone:3,soft:true},
+    {id:'bread',name:'面包',weight:8,base:.84,top:.78,h:.078,tone:2,soft:true},
+    {id:'mug',name:'咖啡杯',weight:6,base:.66,top:.60,h:.088,tone:0,risk:true},
+    {id:'can',name:'易拉罐',weight:7,base:.76,top:.73,h:.092,tone:1},
+    {id:'pot',name:'花盆',weight:6,base:.65,top:.78,h:.090,tone:3,risk:true},
+    {id:'tv',name:'小电视',weight:6,base:.84,top:.77,h:.098,tone:0},
+    {id:'watermelon',name:'西瓜',weight:4,base:.62,top:.58,h:.090,tone:3,risk:true},
+    {id:'tray',name:'托盘',weight:3,base:.90,top:.98,h:.046,tone:2,tray:true}
+  ];
+
+  function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+  function hexRgb(hex){var h=hex.replace('#','');return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];}
+  function shade(hex,factor){var r=hexRgb(hex);return 'rgb('+r.map(function(v){return clamp(Math.round(v*factor),0,255);}).join(',')+')';}
+  function escapeHTML(value){return String(value==null?'':value).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c];});}
+
+  function loadBest(){try{best=Number(localStorage.getItem(BEST_KEY))||0;}catch(e){best=0;}bestTop.textContent=String(best);}
+  function saveBest(){if(floors<=best)return false;best=floors;bestTop.textContent=String(best);try{localStorage.setItem(BEST_KEY,String(best));}catch(e){}return true;}
+
+  function initAudio(){
+    if(!soundOn)return null;
+    if(!audioCtx){var AC=window.AudioContext||window.webkitAudioContext;if(AC)audioCtx=new AC();}
+    if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();
+    return audioCtx;
+  }
+  function tone(freq,dur,type,vol){
+    var ac=initAudio();if(!ac)return;
+    var o=ac.createOscillator(),g=ac.createGain();o.type=type||'sine';o.frequency.value=freq;
+    g.gain.setValueAtTime(vol||.024,ac.currentTime);g.gain.exponentialRampToValueAtTime(.0001,ac.currentTime+dur);
+    o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+dur);
+  }
+  function thump(freq){
+    var ac=initAudio();if(!ac)return;
+    var o=ac.createOscillator(),g=ac.createGain();o.type='sine';o.frequency.setValueAtTime(freq||95,ac.currentTime);o.frequency.exponentialRampToValueAtTime(55,ac.currentTime+.11);
+    g.gain.setValueAtTime(.04,ac.currentTime);g.gain.exponentialRampToValueAtTime(.0001,ac.currentTime+.12);
+    o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+.13);
+  }
+  function haptic(p){if(navigator.vibrate)navigator.vibrate(p);}
+
+  function pickTheme(){var ids=Object.keys(THEMES);themeId=ids[Math.floor(Math.random()*ids.length)];theme=THEMES[themeId];}
+  function weightedPick(list){
+    var total=list.reduce(function(sum,o){return sum+o.weight;},0),r=Math.random()*total;
+    for(var i=0;i<list.length;i++){r-=list[i].weight;if(r<=0)return list[i];}
+    return list[list.length-1];
+  }
+  function chooseObject(){
+    var support=topSupport.width;
+    if(floors>=6&&support<60&&floors-lastTrayFloor>5)return OBJECTS.find(function(o){return o.id==='tray';});
+    var pool=OBJECTS.filter(function(o){
+      if(o.tray)return floors>=8&&floors-lastTrayFloor>10&&(support<105||Math.random()<.10);
+      if(o.risk&&(floors<5||floors-lastRiskFloor<3||support<72))return false;
+      return true;
+    });
+    return weightedPick(pool);
+  }
+
+  function buildObject(def){
+    var maxSupport=W*.62;
+    var baseFactor=def.tray?1.00:(def.risk?.94:.98);
+    var baseW=clamp(topSupport.width*baseFactor,42,maxSupport);
+    var visualW=clamp(baseW/def.base,50,W*.72);
+    var topW=clamp(visualW*def.top,40,maxSupport);
+    if(def.tray)topW=Math.min(maxSupport,Math.max(topW,topSupport.width*1.16));
+    var h=clamp(H*def.h,28,55);
+    return {def:def,x:direction>0?-visualW*.55:W+visualW*.55,y:H*.14,w:visualW,h:h,baseW:baseW,topW:topW,vy:0,rot:0,dropTarget:0};
+  }
+  function spawnObject(){
+    var def=chooseObject();
+    if(def.risk)lastRiskFloor=floors;
+    if(def.tray)lastTrayFloor=floors;
+    current=buildObject(def);
+    direction*=-1;
+    state='moving';
+    pauseBtn.disabled=false;
+  }
+
+  function resetGame(reroll){
+    if(reroll||!theme)pickTheme();
+    placed=[];fallen=null;current=null;
+    floors=0;perfectCount=0;combo=0;maxCombo=0;elapsed=0;
+    direction=Math.random()<.5?1:-1;lastRiskFloor=-10;lastTrayFloor=-20;
+    towerTop=28;topSupport={x:W*.5,width:W*.58,yWorld:towerTop};
+    camera=0;cameraTarget=0;
+    floorNum.innerHTML='0<small>FLOORS</small>';comboEl.innerHTML='PERFECT<b>×0</b>';
+    hud.classList.add('hidden');resultLayer.classList.remove('active');pauseLayer.classList.remove('active');
+    pauseBtn.disabled=true;pauseBtn.textContent='Ⅱ';pauseBtn.classList.remove('active');
+    resultOnlineBest.textContent='--';resultOnlineRank.textContent='--';
+  }
+
+  function startGame(){
+    if(state==='moving'||state==='dropping'||state==='settling')return;
+    if(state==='ready'||state==='over'){
+      resetGame(state==='over');
+      readyLayer.classList.add('hidden');hud.classList.remove('hidden');
+      beginOnlineRun();spawnObject();
+    }else if(state==='paused')resumeGame();
+  }
+  function dropObject(){
+    if(state!=='moving'||!current)return;
+    state='dropping';current.vy=H*1.55;
+    current.dropTarget=groundY-(towerTop+current.h)+camera;
+    tone(330,.035,'sine',.014);haptic(4);
+  }
+  function resolveLanding(){
+    if(!current)return;
+    var targetLeft=topSupport.x-topSupport.width/2,targetRight=topSupport.x+topSupport.width/2;
+    var baseLeft=current.x-current.baseW/2,baseRight=current.x+current.baseW/2;
+    var overlap=Math.max(0,Math.min(targetRight,baseRight)-Math.max(targetLeft,baseLeft));
+    var supportRatio=overlap/current.baseW;
+    var centerError=Math.abs(current.x-topSupport.x);
+    var perfectLimit=Math.min(7,Math.max(3,topSupport.width*.045));
+    var isPerfect=centerError<=perfectLimit;
+    if(supportRatio<.55){
+      failCurrent();
+      return;
+    }
+
+    if(isPerfect)current.x=topSupport.x;
+    var nextWidth=current.topW*(isPerfect?1:(.82+.18*clamp(supportRatio,0,1)));
+    nextWidth=clamp(nextWidth,38,W*.62);
+
+    placed.push({
+      def:current.def,x:current.x,bottom:towerTop,w:current.w,h:current.h,
+      baseW:current.baseW,topW:nextWidth,soft:current.def.soft,settle:1
+    });
+    towerTop+=current.h;
+    topSupport={x:current.x,width:nextWidth,yWorld:towerTop};
+    floors++;
+    if(isPerfect){
+      perfectCount++;combo++;maxCombo=Math.max(maxCombo,combo);
+      perfectToast.textContent=combo>1?'PERFECT ×'+combo:'PERFECT';
+      perfectToast.classList.remove('show');void perfectToast.offsetWidth;perfectToast.classList.add('show');
+      tone(510+Math.min(combo,8)*28,.07,'triangle',.025);haptic(8);
+    }else{
+      combo=0;tone(190,.045,'sine',.016);haptic(6);
+    }
+    floorNum.innerHTML=String(floors)+'<small>FLOORS</small>';
+    comboEl.innerHTML='PERFECT<b>×'+combo+'</b>';
+    current=null;
+    updateCameraTarget();
+    state='settling';
+    setTimeout(function(){if(state==='settling')spawnObject();},reduceMotion?0:120);
+  }
+  function failCurrent(){
+    fallen=current;current=null;state='falling';
+    if(fallen){fallen.vy=H*.20;fallen.vx=(fallen.x-topSupport.x)*1.8;fallen.rotV=(fallen.x>=topSupport.x?1:-1)*2.1;}
+    combo=0;comboEl.innerHTML='PERFECT<b>×0</b>';
+    thump(82);haptic(24);
+  }
+  function finishGame(){
+    if(state==='over')return;
+    state='over';pauseBtn.disabled=true;pauseBtn.textContent='Ⅱ';pauseBtn.classList.remove('active');
+    var record=saveBest();
+    resultTitle.textContent=record?'新纪录！':'本局结束';
+    resultScore.textContent=String(floors);resultBest.textContent=String(best);
+    resultPerfect.textContent='Perfect '+perfectCount;
+    resultCombo.textContent='最高连击 ×'+maxCombo;
+    resultTheme.textContent=theme.name;
+    onlineResultStatus.textContent='正在读取本局线上状态…';
+    resultLayer.classList.add('active');
+    submitOnlineRun(floors,perfectCount,maxCombo,Math.max(250,Math.round(elapsed*1000)),themeId);
+  }
+  function pauseGame(){
+    if(!['moving','dropping','settling'].includes(state))return;
+    beforePause=state;state='paused';pauseLayer.classList.add('active');pauseBtn.textContent='▶';pauseBtn.classList.add('active');
+  }
+  function resumeGame(){
+    if(state!=='paused')return;
+    state=beforePause||'moving';lastTime=performance.now();pauseLayer.classList.remove('active');pauseBtn.textContent='Ⅱ';pauseBtn.classList.remove('active');
+  }
+  function togglePause(){if(state==='paused')resumeGame();else pauseGame();}
+  function updateCameraTarget(){
+    var desired=towerTop-(groundY-H*.43);
+    cameraTarget=Math.max(0,desired);
+  }
+
+  function update(dt){
+    if(state==='ready'){
+      camera+=(cameraTarget-camera)*Math.min(1,dt*4);
+      return;
+    }
+    if(state==='paused'||state==='over')return;
+    elapsed+=dt;
+    camera+=(cameraTarget-camera)*Math.min(1,dt*(reduceMotion?15:4.8));
+    placed.forEach(function(o){o.settle=Math.max(0,o.settle-dt*6);});
+
+    if(state==='moving'&&current){
+      var speed=W*(.33+Math.min(floors,45)*.0042);
+      var wave=floors>18?1+Math.sin(elapsed*2.1)*.07:1;
+      current.x+=direction*speed*wave*dt;
+      var half=current.w*.5;
+      if(current.x>W-half*.72){current.x=W-half*.72;direction=-1;}
+      if(current.x<half*.72){current.x=half*.72;direction=1;}
+      current.y=H*.14+(reduceMotion?0:Math.sin(elapsed*2.4)*2.2);
+    }else if(state==='dropping'&&current){
+      current.vy=Math.min(H*2.1,current.vy+H*2.8*dt);
+      current.y+=current.vy*dt;
+      current.dropTarget=groundY-(towerTop+current.h)+camera;
+      if(current.y>=current.dropTarget){current.y=current.dropTarget;resolveLanding();}
+    }else if(state==='falling'&&fallen){
+      fallen.vy+=H*2.4*dt;fallen.y+=fallen.vy*dt;fallen.x+=(fallen.vx||0)*dt;fallen.rot+=(fallen.rotV||0)*dt;
+      if(fallen.y>H+fallen.h*1.4){finishGame();}
+    }
+  }
+
+  function roundedRect(x,y,w,h,r){
+    r=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();
+  }
+  function drawBackground(){
+    var g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,theme.bg1);g.addColorStop(1,theme.bg2);ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    var glow=ctx.createRadialGradient(W*.72,H*.17,5,W*.72,H*.17,W*.58);glow.addColorStop(0,'rgba(255,255,255,.07)');glow.addColorStop(1,'rgba(255,255,255,0)');ctx.fillStyle=glow;ctx.fillRect(0,0,W,H);
+    ctx.save();ctx.globalAlpha=.13;ctx.fillStyle=theme.accent;
+    for(var i=0;i<6;i++){var x=((i*97-camera*.06)%(W+120))-50;var y=H*.20+i%3*H*.09;ctx.beginPath();ctx.ellipse(x,y,55+i*3,15+i,0,0,Math.PI*2);ctx.fill();}
+    ctx.restore();
+  }
+  function worldToScreen(bottom,h){return groundY-(bottom+h)+camera;}
+  function drawGround(){
+    var y=groundY+camera;
+    ctx.fillStyle=theme.ground;ctx.fillRect(0,y,W,H-y+40);
+    var lg=ctx.createLinearGradient(0,y,0,y+14);lg.addColorStop(0,'rgba(255,255,255,.10)');lg.addColorStop(1,'rgba(255,255,255,0)');ctx.fillStyle=lg;ctx.fillRect(0,y,W,14);
+    ctx.save();ctx.translate(W*.5,y-28);ctx.fillStyle=shade(theme.colors[0],.72);roundedRect(-W*.31,0,W*.62,28,7);ctx.fill();ctx.fillStyle='rgba(255,255,255,.08)';roundedRect(-W*.27,3,W*.54,4,2);ctx.fill();ctx.restore();
+  }
+  function drawSupportLine(x,y,w,alpha){
+    ctx.save();ctx.strokeStyle=theme.accent;ctx.globalAlpha=alpha==null?.92:alpha;ctx.lineWidth=2.2;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(x-w/2,y);ctx.lineTo(x+w/2,y);ctx.stroke();
+    ctx.globalAlpha=.32;ctx.lineWidth=6;ctx.beginPath();ctx.moveTo(x-w/2,y);ctx.lineTo(x+w/2,y);ctx.stroke();ctx.restore();
+  }
+  function drawObjectShape(o,screenY,rotation){
+    var d=o.def,x=o.x,y=screenY,w=o.w,h=o.h,base=theme.colors[d.tone%theme.colors.length],dark=shade(base,.72),light=shade(base,1.16);
+    ctx.save();ctx.translate(x,y+h/2);ctx.rotate(rotation||0);ctx.translate(-x,-(y+h/2));
+    ctx.shadowColor='rgba(0,0,0,.20)';ctx.shadowBlur=8;ctx.shadowOffsetY=4;
+    if(d.id==='book'){
+      ctx.fillStyle=base;roundedRect(x-w/2,y,w,h,5);ctx.fill();ctx.shadowBlur=0;ctx.fillStyle=light;ctx.fillRect(x-w*.46,y+h*.18,w*.86,2);ctx.fillStyle=dark;ctx.fillRect(x-w*.46,y+h*.72,w*.06,h*.16);
+    }else if(d.id==='crate'){
+      ctx.fillStyle=base;roundedRect(x-w/2,y,w,h,4);ctx.fill();ctx.shadowBlur=0;ctx.strokeStyle=dark;ctx.lineWidth=3;ctx.strokeRect(x-w*.40,y+h*.18,w*.80,h*.64);ctx.beginPath();ctx.moveTo(x-w*.36,y+h*.22);ctx.lineTo(x+w*.36,y+h*.78);ctx.moveTo(x+w*.36,y+h*.22);ctx.lineTo(x-w*.36,y+h*.78);ctx.stroke();
+    }else if(d.id==='parcel'){
+      ctx.fillStyle=base;roundedRect(x-w/2,y,w,h,5);ctx.fill();ctx.shadowBlur=0;ctx.fillStyle=light;ctx.fillRect(x-w*.08,y,w*.16,h);ctx.fillStyle='rgba(255,255,255,.14)';ctx.fillRect(x-w*.42,y+h*.18,w*.32,h*.18);
+    }else if(d.id==='suitcase'){
+      ctx.fillStyle=base;roundedRect(x-w/2,y+h*.10,w,h*.90,8);ctx.fill();ctx.shadowBlur=0;ctx.strokeStyle=dark;ctx.lineWidth=3;roundedRect(x-w*.18,y,w*.36,h*.24,6);ctx.stroke();ctx.fillStyle=dark;ctx.fillRect(x-w*.34,y+h*.46,w*.05,h*.20);ctx.fillRect(x+w*.29,y+h*.46,w*.05,h*.20);
+    }else if(d.id==='pillow'){
+      ctx.fillStyle=base;ctx.beginPath();ctx.moveTo(x-w*.42,y+h*.06);ctx.bezierCurveTo(x-w*.55,y+h*.28,x-w*.50,y+h*.78,x-w*.38,y+h*.94);ctx.bezierCurveTo(x-w*.12,y+h*.84,x+w*.12,y+h*.84,x+w*.38,y+h*.94);ctx.bezierCurveTo(x+w*.50,y+h*.78,x+w*.55,y+h*.28,x+w*.42,y+h*.06);ctx.bezierCurveTo(x+w*.12,y+h*.16,x-w*.12,y+h*.16,x-w*.42,y+h*.06);ctx.fill();ctx.shadowBlur=0;ctx.strokeStyle='rgba(255,255,255,.14)';ctx.stroke();
+    }else if(d.id==='bread'){
+      ctx.fillStyle=base;ctx.beginPath();ctx.moveTo(x-w*.46,y+h);ctx.lineTo(x-w*.46,y+h*.52);ctx.bezierCurveTo(x-w*.45,y+h*.12,x-w*.18,y,x,y);ctx.bezierCurveTo(x+w*.18,y,x+w*.45,y+h*.12,x+w*.46,y+h*.52);ctx.lineTo(x+w*.46,y+h);ctx.closePath();ctx.fill();ctx.shadowBlur=0;ctx.strokeStyle=light;ctx.lineWidth=2;for(var bi=-1;bi<=1;bi++){ctx.beginPath();ctx.moveTo(x+bi*w*.16,y+h*.22);ctx.lineTo(x+bi*w*.16-w*.06,y+h*.38);ctx.stroke();}
+    }else if(d.id==='mug'){
+      ctx.fillStyle=base;roundedRect(x-w*.34,y+h*.10,w*.58,h*.88,7);ctx.fill();ctx.shadowBlur=0;ctx.strokeStyle=base;ctx.lineWidth=Math.max(5,w*.08);ctx.beginPath();ctx.arc(x+w*.26,y+h*.46,w*.18,-Math.PI/2,Math.PI/2);ctx.stroke();ctx.fillStyle=light;ctx.beginPath();ctx.ellipse(x-w*.05,y+h*.11,w*.28,h*.07,0,0,Math.PI*2);ctx.fill();
+    }else if(d.id==='can'){
+      ctx.fillStyle=base;roundedRect(x-w*.34,y+h*.07,w*.68,h*.90,9);ctx.fill();ctx.shadowBlur=0;ctx.fillStyle=light;ctx.beginPath();ctx.ellipse(x,y+h*.08,w*.34,h*.06,0,0,Math.PI*2);ctx.fill();ctx.fillStyle=dark;ctx.beginPath();ctx.ellipse(x,y+h*.92,w*.34,h*.05,0,0,Math.PI*2);ctx.fill();
+    }else if(d.id==='pot'){
+      ctx.fillStyle=base;ctx.beginPath();ctx.moveTo(x-w*.34,y+h*.18);ctx.lineTo(x+w*.34,y+h*.18);ctx.lineTo(x+w*.24,y+h);ctx.lineTo(x-w*.24,y+h);ctx.closePath();ctx.fill();ctx.shadowBlur=0;ctx.fillStyle=light;roundedRect(x-w*.38,y+h*.08,w*.76,h*.18,5);ctx.fill();
+    }else if(d.id==='tv'){
+      ctx.fillStyle=base;roundedRect(x-w*.46,y+h*.10,w*.92,h*.84,7);ctx.fill();ctx.shadowBlur=0;ctx.fillStyle=dark;roundedRect(x-w*.36,y+h*.22,w*.58,h*.49,5);ctx.fill();ctx.fillStyle=light;ctx.beginPath();ctx.arc(x+w*.32,y+h*.38,w*.05,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.arc(x+w*.32,y+h*.56,w*.035,0,Math.PI*2);ctx.fill();
+    }else if(d.id==='watermelon'){
+      ctx.fillStyle=base;ctx.beginPath();ctx.ellipse(x,y+h*.52,w*.43,h*.48,0,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.strokeStyle=dark;ctx.lineWidth=2;for(var wi=-2;wi<=2;wi++){ctx.beginPath();ctx.moveTo(x+wi*w*.12,y+h*.15);ctx.quadraticCurveTo(x+wi*w*.16,y+h*.50,x+wi*w*.10,y+h*.87);ctx.stroke();}
+      ctx.fillStyle=theme.bg2;ctx.fillRect(x-o.baseW/2,y+h-2,o.baseW,4);
+    }else if(d.id==='tray'){
+      ctx.fillStyle=base;roundedRect(x-w/2,y+h*.28,w,h*.52,6);ctx.fill();ctx.shadowBlur=0;ctx.fillStyle=light;roundedRect(x-w*.48,y+h*.20,w*.96,h*.18,5);ctx.fill();
+    }
+    ctx.shadowBlur=0;
+    drawSupportLine(x,y+h,o.baseW,.96);
+    ctx.restore();
+  }
+  function drawPlaced(){
+    for(var i=0;i<placed.length;i++){
+      var o=placed[i],y=worldToScreen(o.bottom,o.h),settle=o.settle||0;
+      ctx.save();if(settle&&!reduceMotion){ctx.translate(o.x,y+o.h);ctx.scale(1+settle*.012,1-settle*.025);ctx.translate(-o.x,-(y+o.h));}
+      drawObjectShape(o,y,0);ctx.restore();
+    }
+  }
+  function drawTopTarget(){
+    var y=groundY-topSupport.yWorld+camera;
+    drawSupportLine(topSupport.x,y,topSupport.width,.84);
+  }
+  function drawCurrent(){
+    if(current)drawObjectShape(current,current.y,0);
+    if(fallen)drawObjectShape(fallen,fallen.y,fallen.rot||0);
+  }
+  function draw(){
+    ctx.clearRect(0,0,W,H);drawBackground();drawGround();drawPlaced();drawTopTarget();drawCurrent();
+  }
+
+  function resize(){
+    var r=canvas.getBoundingClientRect();W=Math.max(260,Math.round(r.width));H=Math.max(430,Math.round(r.height));groundY=H*.875;
+    dpr=Math.min(window.devicePixelRatio||1,2.5);canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);
+    if(state==='ready'){towerTop=28;topSupport={x:W*.5,width:W*.58,yWorld:towerTop};}
+    draw();
+  }
+  function frame(t){
+    if(!lastTime)lastTime=t;var dt=Math.min(.033,(t-lastTime)/1000);lastTime=t;update(dt);draw();raf=requestAnimationFrame(frame);
+  }
+
+  function requestTimeout(ms){var controller=new AbortController(),timer=setTimeout(function(){controller.abort();},ms||8000);return {controller:controller,clear:function(){clearTimeout(timer);}};}
+  async function onlineApi(action,payload,requireAuth){
+    var auth=null;try{auth=await ToolboxAuth.getSession();}catch(e){if(requireAuth)throw e;}
+    if(requireAuth&&!auth)throw Object.assign(new Error('请先登录'),{code:'AUTH_REQUIRED',status:401});
+    var timeout=requestTimeout(8000);
+    try{
+      var headers={'Content-Type':'application/json','apikey':ToolboxAuth.key};
+      if(auth&&auth.access_token)headers.Authorization='Bearer '+auth.access_token;
+      var response=await fetch(FUNCTION_URL,{method:'POST',cache:'no-store',signal:timeout.controller.signal,headers:headers,body:JSON.stringify(Object.assign({action:action},payload||{}))});
+      var data=await response.json().catch(function(){return {};});
+      if(!response.ok||data.error)throw Object.assign(new Error(data.error||'线上服务暂时不可用'),{status:response.status,code:data.code});
+      return data;
+    }catch(error){
+      if(error&&error.name==='AbortError')throw Object.assign(new Error('网络超时，单机成绩已正常保存'),{code:'NETWORK_TIMEOUT'});
+      throw error;
+    }finally{timeout.clear();}
+  }
+  function personalFrom(data){return data&&data.viewer&&data.viewer.all_time?data.viewer.all_time:null;}
+  function applyLeaderboard(data){
+    if(!data)return;leaderboardData=data;
+    var personal=personalFrom(data);
+    rankTop.textContent=personal?'#'+personal.rank:'--';leaderboardBtn.classList.toggle('online',!!data.viewer);
+    resultOnlineBest.textContent=personal?String(personal.score):'--';resultOnlineRank.textContent=personal?'#'+personal.rank:'--';
+    renderLeaderboard();renderAccount();
+  }
+  async function refreshLeaderboard(silent){
+    var request=++leaderboardRequest,epoch=authEpoch;
+    if(!silent)leaderboardList.innerHTML='<div class="leaderboard-empty">正在读取好友成绩…</div>';
+    try{var data=await onlineApi('leaderboard',{},false);if(request===leaderboardRequest&&epoch===authEpoch)applyLeaderboard(data);}
+    catch(error){if(!silent&&request===leaderboardRequest)leaderboardList.innerHTML='<div class="leaderboard-empty">排行榜暂时无法加载<br>稍后再试</div>';}
+  }
+  function renderLeaderboard(){
+    if(!leaderboardData)return;
+    var rows=leaderboardData.all_time||[],me=leaderboardData.viewer&&leaderboardData.viewer.member_id;
+    if(!rows.length){leaderboardList.innerHTML='<div class="leaderboard-empty">还没有有效线上成绩<br>成为第一个登上高塔的人吧</div>';return;}
+    leaderboardList.innerHTML=rows.map(function(row){
+      var top=row.rank<=3?' top':'',mine=row.member_id===me?' me':'';
+      var crown=row.rank===1?'①':row.rank===2?'②':row.rank===3?'③':String(row.rank);
+      return '<div class="leaderboard-row'+mine+'"><div class="rank-num'+top+'">'+crown+'</div><div class="player"><strong>'+escapeHTML(row.nickname)+'</strong><span>Perfect '+Number(row.perfect_count||0)+' · 最高连击 ×'+Number(row.max_combo||0)+'</span></div><div class="leader-score"><strong>'+Number(row.score||0)+'</strong><span>层</span></div></div>';
+    }).join('');
+  }
+  function renderAccount(){
+    var session=ToolboxAuth.peekSession(),viewer=leaderboardData&&leaderboardData.viewer;
+    if(leaderboardData&&leaderboardData.excluded_account){
+      accountCopy.textContent='当前为测试/排除账号，可以正常单机游玩，但不会进入好友排行榜。';loginForm.hidden=true;return;
+    }
+    if(session){
+      accountCopy.textContent=viewer?'已登录：'+viewer.nickname+'。新完成的有效成绩会自动提交，仅保留个人历史最高成绩。':'已登录工具箱；完成一局后会尝试提交线上成绩。';
+      loginForm.hidden=true;
+    }else{
+      accountCopy.textContent='未登录也可以正常游玩；登录后新完成的有效成绩会自动提交。';
+      loginForm.hidden=false;
+    }
+  }
+  function openLeaderboard(){leaderboardLayer.classList.add('active');leaderboardLayer.setAttribute('aria-hidden','false');document.body.style.overflow='hidden';refreshLeaderboard(false);setTimeout(function(){leaderboardClose.focus();},50);}
+  function closeLeaderboard(){leaderboardLayer.classList.remove('active');leaderboardLayer.setAttribute('aria-hidden','true');document.body.style.overflow='';leaderboardBtn.focus();}
+  function beginOnlineRun(){
+    var run={epoch:authEpoch,attempts:0,busy:false,payload:null};
+    run.promise=onlineApi('start_run',{theme_id:themeId,game_version:GAME_VERSION},true).catch(function(error){run.error=error;return null;});
+    activeRun=run;
+  }
+  async function submitOnlineRun(height,perfect,maxC,durationMs,themeName){
+    var run=activeRun,issued=run?await run.promise:null;if(!run||run.epoch!==authEpoch)return;
+    if(!issued){
+      if(run===activeRun){
+        onlineResultStatus.textContent=run.error&&run.error.code==='LEADERBOARD_EXCLUDED'?'当前账号不参与排名，本地 BEST 正常保留':ToolboxAuth.peekSession()?'线上计分未连接，本地纪录已正常保存':'登录工具箱后，新完成的成绩可进入好友榜';
+        onlineResultStatus.className='online-result-status warn';
+      }
+      return;
+    }
+    run.payload={run_token:issued.run_token,height:height,perfect_count:perfect,max_combo:maxC,duration_ms:durationMs,theme_id:themeName,game_version:GAME_VERSION};
+    pendingRuns.push(run);pendingRuns=pendingRuns.slice(-5);await sendRun(run);
+  }
+  async function sendRun(run){
+    if(run.busy||run.epoch!==authEpoch||run.attempts>=2)return;
+    run.busy=true;run.attempts++;
+    function message(text,kind){if(run===activeRun&&run.epoch===authEpoch){onlineResultStatus.textContent=text;onlineResultStatus.className='online-result-status '+(kind||'');}}
+    message('正在验证线上成绩…');
+    try{
+      var response=await onlineApi('submit_run',run.payload,true);pendingRuns=pendingRuns.filter(function(item){return item!==run;});
+      if(run.epoch!==authEpoch)return;if(run===activeRun){++leaderboardRequest;applyLeaderboard(response.leaderboard);}else refreshLeaderboard(true);
+      var personal=personalFrom(response.leaderboard);
+      message(personal&&personal.score===run.payload.height?'线上最好 '+personal.score+' 层 · 当前第 '+personal.rank+' 名':'成绩已验证，线上最好仍为 '+(personal?personal.score:run.payload.height)+' 层','good');
+    }catch(error){
+      if(error.status>=400&&error.status<500){pendingRuns=pendingRuns.filter(function(item){return item!==run;});
+        if(error.code==='RUN_ALREADY_SUBMITTED'){refreshLeaderboard(true);message('本局凭证已处理，已刷新线上排名');}
+        else message(error.message+'；本地 BEST 正常保留','warn');
+      }else message('网络连接失败，本地 BEST 已保存；恢复联网后重试一次','warn');
+    }finally{run.busy=false;}
+  }
+  function retryPendingSubmission(){pendingRuns.slice().forEach(function(run){sendRun(run);});}
+
+  function handleAction(e){
+    if(e&&e.target&&e.target.closest&&e.target.closest('button,a,input'))return;
+    if(e)e.preventDefault();initAudio();
+    if(state==='ready'||state==='over')startGame();else if(state==='moving')dropObject();
+  }
+
+  stage.addEventListener('pointerdown',handleAction,{passive:false});
+  ['contextmenu','selectstart','dragstart'].forEach(function(type){stage.addEventListener(type,function(e){e.preventDefault();});});
+  retryBtn.addEventListener('click',function(e){e.stopPropagation();startGame();});
+  pauseBtn.addEventListener('click',function(e){e.stopPropagation();togglePause();});
+  soundBtn.addEventListener('click',function(e){e.stopPropagation();soundOn=!soundOn;soundBtn.textContent=soundOn?'♪':'×';soundBtn.classList.toggle('active',!soundOn);if(soundOn){initAudio();tone(520,.05,'sine',.02);}});
+  leaderboardBtn.addEventListener('click',function(e){e.stopPropagation();openLeaderboard();});
+  leaderboardClose.addEventListener('click',closeLeaderboard);leaderboardBackdrop.addEventListener('click',closeLeaderboard);
+  loginForm.addEventListener('submit',async function(e){
+    e.preventDefault();loginError.textContent='';var button=loginForm.querySelector('button');button.disabled=true;button.textContent='登录中…';
+    try{await ToolboxAuth.signIn(document.getElementById('leaderboardEmail').value.trim(),document.getElementById('leaderboardPassword').value);document.getElementById('leaderboardPassword').value='';await refreshLeaderboard(false);}
+    catch(error){loginError.textContent=ToolboxAuth.authMessage(error);}
+    finally{button.disabled=false;button.textContent='登录';}
+  });
+
+  document.addEventListener('keydown',function(e){
+    if(e.key==='Escape'&&leaderboardLayer.classList.contains('active')){e.preventDefault();closeLeaderboard();return;}
+    if(leaderboardLayer.classList.contains('active'))return;
+    if(e.target.closest&&e.target.closest('input,textarea,button,a,[contenteditable]'))return;
+    if(e.key==='p'||e.key==='P'||e.key==='Escape'){e.preventDefault();togglePause();return;}
+    if(e.key===' '||e.key==='ArrowUp'||e.key==='w'||e.key==='W'||e.key==='Enter'){
+      e.preventDefault();initAudio();if(state==='ready'||state==='over')startGame();else if(state==='moving')dropObject();
+    }
+  });
+  document.addEventListener('visibilitychange',function(){if(document.hidden&&['moving','dropping','settling'].includes(state))pauseGame();});
+  window.addEventListener('resize',function(){requestAnimationFrame(resize);});
+  window.addEventListener('online',function(){retryPendingSubmission();refreshLeaderboard(true);});
+  ToolboxAuth.onAuthStateChange(function(){
+    var next=(ToolboxAuth.peekSession()||{}).user?.id||null;
+    if(next!==authUserId){authUserId=next;authEpoch++;pendingRuns=[];leaderboardData={all_time:[],viewer:null};renderLeaderboard();renderAccount();refreshLeaderboard(true);}
+  });
+
+  loadBest();pickTheme();resetGame(false);state='ready';readyLayer.classList.remove('hidden');refreshLeaderboard(true);
+  requestAnimationFrame(resize);raf=requestAnimationFrame(frame);
+})();
+</script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"bfd3df5c469343eb91856b7f3275def8"}'></script>
+</body>
+</html>
