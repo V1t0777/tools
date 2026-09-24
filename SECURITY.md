@@ -18,8 +18,11 @@ Use a private contact channel with the repository owner. If GitHub Private Vulne
 ## Security controls in this repository
 
 - The Cloudflare secure mirror is built from an allowlist of authenticated pages and their direct dependencies.
+- GitHub Pages is deployed from a separate allowlist artifact that contains no Supabase URL, publishable key, authentication client, migrations, functions, tests, or internal documentation.
 - Cloudflare response headers include CSP, anti-framing, MIME sniffing protection, and a restrictive permissions policy.
+- Authenticated pages do not load third-party analytics JavaScript, reducing the impact of a compromised analytics supply chain on browser-stored sessions.
 - GitHub Actions security checks run with read-only repository permissions and without persisted checkout credentials.
+- Every third-party GitHub Action is pinned to an immutable full commit SHA.
 - CI scans tracked files for common high-risk secret patterns without printing matching secret values.
 - Dependabot monitors GitHub Actions dependencies.
 
