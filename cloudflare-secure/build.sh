@@ -3,7 +3,7 @@ set -euo pipefail
 
 OUT="dist-secure"
 rm -rf "$OUT"
-mkdir -p "$OUT"/{dinner,night-shift,admin-night-shift,beads,shared,holidays}
+mkdir -p "$OUT"/{dinner,night-shift,admin-night-shift,beads,flappy,games,pictionary,shared/vendor,holidays}
 
 # Publish tools that use the shared Supabase login plus their direct dependencies.
 # Beads also supports a local-only mode, but its online inventory/project features live on this origin
@@ -12,7 +12,11 @@ cp dinner/index.html dinner/app.js dinner/style.css "$OUT/dinner/"
 cp night-shift/index.html "$OUT/night-shift/"
 cp admin-night-shift/index.html "$OUT/admin-night-shift/"
 cp beads/index.html beads/app.js beads/style.css beads/mard-palette.js "$OUT/beads/"
+cp flappy/index.html "$OUT/flappy/"
+cp games/index.html "$OUT/games/"
+cp pictionary/index.html pictionary/app.js pictionary/style.css "$OUT/pictionary/"
 cp shared/toolbox-auth.js shared/toolbox-ui.css shared/toolbox-motion.css shared/toolbox-ui.js "$OUT/shared/"
+cp shared/vendor/supabase-2.57.4.min.js shared/vendor/supabase-LICENSE "$OUT/shared/vendor/"
 cp holidays/*.json "$OUT/holidays/"
 
 cp cloudflare-secure/index.html "$OUT/index.html"
