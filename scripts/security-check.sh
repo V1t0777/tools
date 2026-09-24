@@ -71,6 +71,7 @@ required_paths=(
   dist-secure/night-shift/index.html
   dist-secure/admin-night-shift/index.html
   dist-secure/flappy/index.html
+  dist-secure/stack/index.html
   dist-secure/pictionary/index.html
   dist-secure/pictionary/app.js
   dist-secure/shared/toolbox-auth.js
@@ -128,6 +129,7 @@ public_forbidden_paths=(
   dist-public/flappy
   dist-public/night-shift
   dist-public/pictionary
+  dist-public/stack
   dist-public/scripts
   dist-public/supabase
   dist-public/tests
