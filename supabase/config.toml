@@ -1,0 +1,15 @@
+# Public leaderboard reads are intentional; start/submit authenticate in code.
+[functions.flappy-game]
+verify_jwt = false
+entrypoint = "./functions/flappy-game/index.ts"
+import_map = "./functions/flappy-game/deno.json"
+
+[functions.stack-game]
+verify_jwt = false
+entrypoint = "./functions/stack-game/index.ts"
+import_map = "./functions/stack-game/deno.json"
+
+[functions.pictionary-game]
+verify_jwt = true
+entrypoint = "./functions/pictionary-game/index.ts"
+import_map = "./functions/pictionary-game/deno.json"
