@@ -9,7 +9,7 @@ import {test} from 'node:test';
 
 const source=stripTypeScriptTypes(readFileSync(new URL('../supabase/functions/flappy-game/index.ts',import.meta.url),'utf8').replace(/^import .*\n/,''));
 function setup(){
-  const db={members:[{id:'m1',user_id:'u1',nickname:'好友',color:'#ffffff'},{id:'mt',user_id:'ut',nickname:'test'}],flappy_runs:[],flappy_best_scores:[],flappy_weekly_bests:[]};
+  const db={members:[{id:'m1',user_id:'u1',nickname:'好友',color:'#ffffff',exclude_from_leaderboard:false},{id:'mt',user_id:'ut',nickname:'test',exclude_from_leaderboard:true}],flappy_runs:[],flappy_best_scores:[],flappy_weekly_bests:[]};
   const users={good:{id:'u1',email:'friend@example.com'},test:{id:'ut',email:'TEST@test.com'},nonmember:{id:'ux',email:'x@example.com'}};
   let handler;
   function query(table){
@@ -28,7 +28,7 @@ function setup(){
     createClient(url,key,opts){
       const token=opts?.global?.headers.Authorization?.slice(7);
       return {from:query,
-        rpc:async()=>({data:{active:token!=='revoked',member_id:token==='test'?'mt':token==='nonmember'?null:'m1'},error:null}),
+        rpc:async(name)=>name==='flappy_rate_limit_check'?{data:true,error:null}:({data:{active:token!=='revoked',member_id:token==='test'?'mt':token==='nonmember'?null:'m1'},error:null}),
         auth:{getUser:async()=>({data:{user:users[token]||null},error:null}),
           admin:{getUserById:async id=>({data:{user:Object.values(users).find(u=>u.id===id)},error:null})}
         }
@@ -77,4 +77,3 @@ test('test account rows are excluded from both boards',async()=>{
   const s=setup();const row={user_id:'ut',member_id:'mt',best_score:99,bird_skin:'warm',achieved_at:new Date().toISOString()};s.db.flappy_best_scores.push(row);
   const r=await s.call('leaderboard',{},'test');assert.equal(r.excluded_account,true);assert.deepEqual(r.all_time,[]);assert.equal(r.viewer,null);
 });
-
