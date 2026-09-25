@@ -16,7 +16,7 @@ function setup({active=true,excluded=false,limited=false}={}){
         return Promise.resolve({data:table==='members'?(single?member:[member]):single?null:[],error:null}).then(resolve,reject);}
     };return q;
   };
-  vm.runInNewContext(source,{Request,Response,TextEncoder,Uint8Array,btoa,crypto:webcrypto,console:{error(){}},
+  vm.runInNewContext(source,{Request,Response,TextEncoder,TextDecoder,Uint8Array,btoa,crypto:webcrypto,console:{error(){}},
     Deno:{env:{get:k=>k==='SUPABASE_URL'?'https://example.invalid':'mock'},serve:fn=>handler=fn},
     createClient:()=>({from:query,rpc:async name=>({data:name==='stack_rate_limit_check'?!limited:{active,member_id:'m1'},error:null}),
       auth:{getUser:async token=>({data:{user:token==='valid'?{id:'u1'}:null},error:null})}})});
