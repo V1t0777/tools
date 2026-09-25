@@ -92,8 +92,35 @@ async function rateLimit(req:Request,action:string,limit:number,windowSeconds:nu
   const {data,error}=await admin.rpc("stack_rate_limit_check",{
     p_key:key,p_action:action,p_limit:limit,p_window_seconds:windowSeconds
   });
-  if(error)fail("请求过于频繁，请稍后再试",429,"RATE_LIMIT_UNAVAILABLE");
+  if(error)fail("请求校验暂时不可用，请稍后重试",503,"RATE_LIMIT_UNAVAILABLE");
   return data===true;
+}
+
+async function accountLimit(userId:string,action:string,limit:number){
+  const key=await sha256("stack|account|"+userId);
+  const {data,error}=await admin.rpc("stack_rate_limit_check",{
+    p_key:key,p_action:"account:"+action,p_limit:limit,p_window_seconds:60
+  });
+  if(error)fail("请求校验暂时不可用，请稍后重试",503,"RATE_LIMIT_UNAVAILABLE");
+  if(data!==true)fail("请求过于频繁，请稍后再试",429,"RATE_LIMITED");
+}
+
+async function readBody(req:Request){
+  const maxBytes=16*1024;
+  if(Number(req.headers.get("content-length"))>maxBytes)fail("请求数据过大",413);
+  const reader=req.body?.getReader();if(!reader)fail("请求数据无效",400);
+  const decoder=new TextDecoder();let size=0,text="";
+  try{
+    for(;;){
+      const {done,value}=await reader.read();if(done)break;
+      size+=value.byteLength;if(size>maxBytes){await reader.cancel();fail("请求数据过大",413);}
+      text+=decoder.decode(value,{stream:true});
+    }
+    text+=decoder.decode();
+  }finally{reader.releaseLock();}
+  let body;try{body=JSON.parse(text);}catch{fail("请求数据无效",400);}
+  if(!body||typeof body!=="object"||Array.isArray(body))fail("请求数据无效",400);
+  return body;
 }
 
 async function leaderboardBase(){
@@ -149,6 +176,7 @@ async function leaderboard(req:Request){
 
 async function startRun(req:Request,body:any){
   const member=await identify(req);
+  await accountLimit(member.user_id,"start_run",30);
   const themeId=String(body.theme_id||"");
   const version=String(body.game_version||"");
   if(!["night","sand","slate","forest"].includes(themeId))fail("主题无效",400,"INVALID_THEME");
@@ -178,6 +206,7 @@ async function startRun(req:Request,body:any){
 
 async function submitRun(req:Request,body:any){
   const member=await identify(req);
+  await accountLimit(member.user_id,"submit_run",60);
   const token=String(body.run_token||"");
   const height=Number(body.height);
   const perfectCount=Number(body.perfect_count);
@@ -236,9 +265,10 @@ Deno.serve(async(req:Request)=>{
   const origin=req.headers.get("origin")||"";
   if(origin&&!ORIGINS.has(origin))return reply(req,{error:"来源未获授权"},403);
   try{
-    const body=await req.json().catch(()=>({}));
-    const action=String(body.action||"leaderboard");
-    const limit=action==="leaderboard"?60:action==="start_run"?30:action==="submit_run"?60:20;
+    const body=await readBody(req);
+    const action=body.action===undefined?"leaderboard":body.action;
+    if(typeof action!=="string"||!["leaderboard","start_run","submit_run"].includes(action))fail("未知操作",400,"UNKNOWN_ACTION");
+    const limit=action==="start_run"?30:60;
     if(!await rateLimit(req,action,limit,60))return reply(req,{error:"请求过于频繁，请稍后再试",code:"RATE_LIMITED"},429);
     if(action==="leaderboard")return reply(req,await leaderboard(req));
     if(action==="start_run")return reply(req,await startRun(req,body));
