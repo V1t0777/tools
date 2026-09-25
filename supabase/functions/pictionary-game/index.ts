@@ -102,6 +102,7 @@ async function repairRoomState(input:any){
   return await room(r.id);
 }
 async function state(roomId:string,member:any){
+  await player(roomId,member.user_id);
   const r=await repairRoomState(await room(roomId));
   if(TERMINAL.has(r.status))fail(r.status==="closed"?"房间已由房主结束":"房间因长时间无人活动已过期",410);
   await player(roomId,member.user_id);const ps=await players(roomId);const byUser=new Map(ps.map(p=>[p.user_id,p]));let roundData:any=null,answer=null,revealed_answer=null,options:any=null,guesses:any[]=[],solved_members:string[]=[];
@@ -124,11 +125,37 @@ async function state(roomId:string,member:any){
   return {room:{id:r.id,code:r.room_code,host_member_id:byUser.get(r.host_user_id)?.member_id||r.host_user_id,status:r.status,round_no:r.current_round_no,rounds_per_player:r.rounds_per_player,total_rounds:r.total_rounds,current_drawer_member_id:byUser.get(r.current_drawer_user_id)?.member_id||r.current_drawer_user_id,ends_at:r.ends_at,summary_until:r.summary_until},players:ps.map(({user_id,...p})=>p),round:roundData,answer,revealed_answer,options,guesses,solved_members,score_state:scoreSnapshot.data};
 }
 
+const ACTION_LIMITS:Record<string,number>={me:60,bootstrap:30,create_room:6,join_room:30,guess:120,state:240,close_room:20,leave_room:30,canvas:240,save_canvas:120,toggle_ready:60,start_game:20,choose_word:30,finish_round:60,next_round:60,play_again:20};
+async function readBody(req:Request){
+  const maxBytes=1024*1024;
+  if(Number(req.headers.get("content-length"))>maxBytes)fail("请求数据过大",413);
+  const reader=req.body?.getReader();if(!reader)fail("请求数据无效",400);
+  const decoder=new TextDecoder();let size=0,text="";
+  try{
+    for(;;){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>maxBytes){await reader.cancel();fail("请求数据过大",413);}text+=decoder.decode(value,{stream:true});}
+    text+=decoder.decode();
+  }finally{reader.releaseLock();}
+  let body;try{body=JSON.parse(text);}catch{fail("请求数据无效",400);}
+  if(!body||typeof body!=="object"||Array.isArray(body))fail("请求数据无效",400);
+  return body;
+}
+async function limitAction(userId:string,action:string){
+  const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode("pictionary|"+userId));
+  const key=[...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,"0")).join("");
+  // Reuse the deployed atomic limiter with a separate action namespace.
+  // Only the service role can call it; the verified user ID cannot be spoofed via IP headers.
+  const {data,error}=await admin.rpc("flappy_rate_limit_check",{p_key:key,p_action:"pictionary:"+action,p_limit:ACTION_LIMITS[action],p_window_seconds:60});
+  if(error)fail("请求校验暂时不可用，请稍后重试",503,"RATE_LIMIT_UNAVAILABLE");
+  if(data!==true)fail("请求过于频繁，请稍后再试",429,"RATE_LIMITED");
+}
 Deno.serve(async(req:Request)=>{
   if(req.method==="OPTIONS")return new Response("ok",{headers:headers(req)});if(req.method!=="POST")return reply(req,{error:"仅支持 POST"},405);
   const origin=req.headers.get("origin")||"";if(origin&&!ORIGINS.has(origin))return reply(req,{error:"来源未获授权"},403);
   try{
-    const member=await identify(req);const b=await req.json().catch(()=>({}));const action=String(b.action||"");if(action==="me"||(action==="bootstrap"&&!b.code))return reply(req,{member});
+    const b=await readBody(req);const action=String(b.action||"");
+    if(!Object.hasOwn(ACTION_LIMITS,action))fail("未知操作",400,"UNKNOWN_ACTION");
+    const member=await identify(req);await limitAction(member.user_id,action);
+    if(action==="me"||(action==="bootstrap"&&!b.code))return reply(req,{member});
     if(action==="create_room"){
       let r:any=null;for(let i=0;i<8&&!r;i++){const out=await admin.from("pictionary_rooms").insert({room_code:code(),host_user_id:member.user_id,status:"lobby"}).select("*").single();if(!out.error)r=out.data;}if(!r)fail("暂时无法生成房间码",503);
       const {error}=await admin.from("pictionary_players").insert({room_id:r.id,user_id:member.user_id,display_name:member.nickname,seat:1,ready:true,active:true});if(error)throw error;return reply(req,{state:await state(r.id,member)});
@@ -136,7 +163,10 @@ Deno.serve(async(req:Request)=>{
     if(action==="join_room"||action==="bootstrap"){
       const c=String(b.code||"").toUpperCase().replace(/[^A-Z2-9]/g,"").slice(0,6);
       const {data:found}=await admin.from("pictionary_rooms").select("*").eq("room_code",c).maybeSingle();if(!found)fail("没有找到这个房间",404);
-      const r=await repairRoomState(found);
+      const {data:membership}=await admin.from("pictionary_players").select("active").eq("room_id",found.id).eq("user_id",member.user_id).maybeSingle();
+      if(!membership?.active&&found.status!=="lobby"&&!(membership&&found.status==="finished"))fail("只有原房间成员可以重连",403);
+      const r=membership?.active?await repairRoomState(found):found;
+      if(r.status==="lobby"&&Date.now()-new Date(r.last_activity_at||r.updated_at||r.created_at).getTime()>30*60*1000)fail("这个房间已过期",410);
       if(TERMINAL.has(r.status))fail(r.status==="closed"?"这个房间已由房主结束":"这个房间已过期",410);
       const {data:old}=await admin.from("pictionary_players").select("*").eq("room_id",r.id).eq("user_id",member.user_id).maybeSingle();
       if(old&&!old.active){
@@ -166,6 +196,7 @@ Deno.serve(async(req:Request)=>{
       return reply(req,data||{});
     }
 
+    await player(id,member.user_id);
     let r=await repairRoomState(await room(id));
     if(TERMINAL.has(r.status))fail(r.status==="closed"?"房间已由房主结束":"房间因长时间无人活动已过期",410);
     await player(id,member.user_id);
@@ -209,7 +240,7 @@ Deno.serve(async(req:Request)=>{
       if(!Array.isArray(b.strokes)||b.strokes.length>1500)fail("画布数据无效",400);
       let points=0;
       const strokes=b.strokes.map((s:any)=>{
-        if(typeof s.id!=="string"||s.id.length>100||!/^#[0-9a-f]{6}$/i.test(s.color)||![3,7,14].includes(s.size)||!Array.isArray(s.points))fail("画布数据无效");
+        if(!s||typeof s!=="object"||typeof s.id!=="string"||s.id.length>100||!/^#[0-9a-f]{6}$/i.test(s.color)||![3,7,14].includes(s.size)||!Array.isArray(s.points))fail("画布数据无效");
         points+=s.points.length;if(points>55000)fail("画布数据过大，请适当简化线条",413);
         const clean=s.points.map((p:any)=>{
           if(!Array.isArray(p)||p.length!==2||!p.every((v:any)=>typeof v==="number"&&Number.isFinite(v)&&v>=0&&v<=1))fail("画布坐标无效");
@@ -241,3 +272,4 @@ Deno.serve(async(req:Request)=>{
     fail("未知操作");
   }catch(e){console.error(e);return reply(req,{error:(e as Error)?.message||"服务器暂时不可用",code:(e as any)?.code},(e as any)?.status||400);}
 });
+
