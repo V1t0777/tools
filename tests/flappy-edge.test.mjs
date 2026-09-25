@@ -23,7 +23,7 @@ function setup(){
       }catch(e){return Promise.reject(e).then(resolve,reject);}
     }};return q;
   }
-  const context={Request,Response,TextEncoder,Uint8Array,Intl,Date,JSON,Set,Map,Error,Number,String,Math,Promise,btoa,crypto:webcrypto,console:{error(){}},
+  const context={Request,Response,TextEncoder,TextDecoder,Uint8Array,Intl,Date,JSON,Set,Map,Error,Number,String,Math,Promise,btoa,crypto:webcrypto,console:{error(){}},
     Deno:{env:{get(k){return k==='SUPABASE_URL'?'https://example.supabase.co':'mock';}},serve(fn){handler=fn;}},
     createClient(url,key,opts){
       const token=opts?.global?.headers.Authorization?.slice(7);
