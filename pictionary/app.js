@@ -138,7 +138,19 @@
     await initializeSession();
   }
 
+  function clearLocalSession(){
+    startupEpoch++;initializing=null;
+    invalidateRoom();leaveRealtime();
+    session=me=state=null;currentRoundId=null;
+    strokes=[];activeStroke=null;sendPoints=[];snapshotAssemblies.clear();
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    setURL('');$('shareBtn').classList.add('hidden');$('leaveBtn').classList.add('hidden');
+    $('wordModal').classList.add('hidden');show('authScreen');
+  }
   function bind(){
+    ToolboxAuth.onAuthStateChange((event,next)=>{
+      if(event==='SIGNED_OUT'||(session?.user?.id&&next?.user?.id&&session.user.id!==next.user.id))clearLocalSession();
+    });
     $('loginForm').addEventListener('submit',async e=>{
       e.preventDefault();if(loginBusy)return;loginBusy=true;
       const button=$('loginForm').querySelector('button');button.disabled=true;button.textContent='正在登录…';$('loginError').textContent='';
