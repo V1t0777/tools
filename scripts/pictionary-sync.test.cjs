@@ -14,7 +14,7 @@ function setup(){
  const ctx=new Proxy({},{get:()=>noop,set:()=>true});
  const element=id=>{if(!elements.has(id))elements.set(id,{value:'',innerHTML:'',textContent:'',classList:{add:noop,remove:noop,toggle:noop},getContext:()=>ctx,querySelector:()=>element(id+'button'),addEventListener:(name,fn)=>events.set(id+':'+name,fn),getBoundingClientRect:()=>({width:800,height:500}),dataset:{}});return elements.get(id);};
  const client=()=>({realtime:{setAuth:async()=>{},disconnect:noop},channel(){const c={handlers:new Map(),on(type,filter,fn){c.handlers.set(type+':'+filter.event,fn);return c;},subscribe(fn){c.status=fn;return c;},track:async()=>{},send:async()=> 'ok',presenceState:()=>({})};channels.push(c);return c;},removeAllChannels:async()=>{}});
- const sandbox={ToolboxAuth:{url:'https://example.invalid',key:'public',getSession:async()=>({access_token:'test',user:{id:'user'}})},document:{getElementById:element,querySelector:element,querySelectorAll:()=>[],addEventListener:(name,fn)=>events.set('document:'+name,fn),hidden:false},window:{supabase:{createClient:client},addEventListener:(name,fn)=>events.set('window:'+name,fn)},console:{warn:noop},crypto:require('node:crypto').webcrypto,URL,URLSearchParams,AbortController,TypeError,Error,location:{href:'https://example.invalid/'},history:{replaceState:noop},sessionStorage:{getItem:()=>null,setItem:noop},fetch:async()=>new Promise(()=>{}),setTimeout:(fn,ms)=>{const id=++serial;timeouts.set(id,{fn,ms});return id;},clearTimeout:id=>timeouts.delete(id),setInterval:(fn,ms)=>{const id=++serial;intervals.set(id,{fn,ms});return id;},clearInterval:id=>intervals.delete(id),requestAnimationFrame:noop};
+ const sandbox={ToolboxAuth:{url:'https://example.invalid',key:'public',onAuthStateChange:()=>{},getSession:async()=>({access_token:'test',user:{id:'user'}})},document:{getElementById:element,querySelector:element,querySelectorAll:()=>[],addEventListener:(name,fn)=>events.set('document:'+name,fn),hidden:false},window:{supabase:{createClient:client},addEventListener:(name,fn)=>events.set('window:'+name,fn)},console:{warn:noop},crypto:require('node:crypto').webcrypto,URL,URLSearchParams,AbortController,TypeError,Error,location:{href:'https://example.invalid/'},history:{replaceState:noop},sessionStorage:{getItem:()=>null,setItem:noop},fetch:async()=>new Promise(()=>{}),setTimeout:(fn,ms)=>{const id=++serial;timeouts.set(id,{fn,ms});return id;},clearTimeout:id=>timeouts.delete(id),setInterval:(fn,ms)=>{const id=++serial;intervals.set(id,{fn,ms});return id;},clearInterval:id=>intervals.delete(id),requestAnimationFrame:noop};
  vm.createContext(sandbox);vm.runInContext(injected,sandbox);const a=sandbox.audit;
  const state={room:{id:'room',code:'ABCDEF',status:'playing',current_drawer_member_id:'drawer',round_no:1,total_rounds:6},round:{id:'r1'},players:[{member_id:'me',score:0,nickname:'me',ready:true},{member_id:'other',score:150,nickname:'other',ready:true},{member_id:'drawer',score:50,nickname:'drawer',ready:true}],guesses:[]};
  a.set({me:{id:'me',nickname:'me'},currentRoundId:'r1',state});
@@ -145,4 +145,18 @@ test('startup recovery is single-flight and uses one bootstrap request',async()=
  const {a,sandbox}=setup();sandbox.location.search='';const calls=[];
  a.setApi(async action=>{calls.push(action);return {member:{id:'me',nickname:'me'}};});
  const one=a.initializeSession(),two=a.initializeSession();assert.equal(one,two);await one;assert.deepEqual(calls,['bootstrap']);
+});
+
+test('cross-tab sign-out clears room, timers and fences old realtime callbacks',async()=>{
+ const {a,sandbox,channels,events}=setup();let authChanged;
+ sandbox.ToolboxAuth.onAuthStateChange=fn=>{authChanged=fn;};
+ a.bind();a.startRoomTimers();await a.connectRealtime();const old=channels[0];
+ authChanged('SIGNED_OUT',null);
+ assert.equal(a.get().state,null);assert.equal(a.get().me,null);
+ assert.equal(a.get().clockTimer,null);assert.equal(a.get().canvasSyncTimer,null);
+ assert.equal(a.get().realtimeStatus,'CLOSED');
+ await old.status('SUBSCRIBED');old.handlers.get('broadcast:guess_result')({payload:result});
+ events.get('window:pageshow')();
+ assert.equal(a.get().state,null);assert.equal(a.get().clockTimer,null);
+ assert.equal(a.get().liveGuesses.size,0);
 });
