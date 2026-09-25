@@ -2,7 +2,8 @@ import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 
 const URL=Deno.env.get("SUPABASE_URL")!;
 const GAME_VERSION="2026.09.23-leaderboard-v1";
-const EXCLUDED_EMAIL="test@test.com";
+const LEADERBOARD_CACHE_MS=15000;
+let leaderboardCache:{expiresAt:number;weekStart:string;allTime:any[];weekly:any[];updatedAt:string}|null=null;
 const ORIGINS=new Set([
   "https://v1t0777.github.io",
   "https://zhao-toolbox-secure.pages.dev",
@@ -43,7 +44,7 @@ function fail(message:string,status=400,code?:string):never{
   error.status=status;error.code=code;throw error;
 }
 
-type Member={id:string;user_id:string;nickname:string;color:string;email:string};
+type Member={id:string;user_id:string;nickname:string;color:string;excluded:boolean};
 
 async function identify(req:Request):Promise<Member>{
   const authorization=req.headers.get("authorization")||"";
@@ -58,18 +59,19 @@ async function identify(req:Request):Promise<Member>{
   ]);
   if(statusError||userError||!userData.user)fail("登录状态暂时无法验证，请重试",401,"AUTH_REQUIRED");
   if(!status?.active||!status?.member_id)fail("当前账号不在工具箱成员名单中或会话已失效",403,"SESSION_REVOKED");
-  const email=String(userData.user.email||"").trim().toLowerCase();
-  if(email===EXCLUDED_EMAIL)fail("测试账号不参与排行榜",403,"TEST_ACCOUNT_EXCLUDED");
-  const {data:member,error}=await admin.from("members").select("id,user_id,nickname,color").eq("id",status.member_id).eq("user_id",userData.user.id).maybeSingle();
+  const {data:member,error}=await admin.from("members").select("id,user_id,nickname,color,exclude_from_leaderboard").eq("id",status.member_id).eq("user_id",userData.user.id).maybeSingle();
   if(error)fail("成员资料读取失败，请稍后重试",503);
   if(!member)fail("成员资料不存在",403,"SESSION_REVOKED");
-  return {...member,email};
+  if(member.exclude_from_leaderboard)fail("当前账号不参与排行榜",403,"LEADERBOARD_EXCLUDED");
+  return {id:member.id,user_id:member.user_id,nickname:member.nickname,color:member.color,excluded:false};
 }
 
 async function optionalViewer(req:Request):Promise<{member:Member|null;excluded:boolean}>{
+  const authorization=req.headers.get("authorization")||"";
+  if(!authorization.startsWith("Bearer "))return {member:null,excluded:false};
   try{return {member:await identify(req),excluded:false};}
   catch(error){
-    if((error as any)?.code==="TEST_ACCOUNT_EXCLUDED")return {member:null,excluded:true};
+    if((error as any)?.code==="LEADERBOARD_EXCLUDED")return {member:null,excluded:true};
     return {member:null,excluded:false};
   }
 }
@@ -91,49 +93,69 @@ function currentWeekStart(){
   return new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Shanghai",year:"numeric",month:"2-digit",day:"2-digit"}).format(date);
 }
 
-async function filterExcluded<T extends {user_id:string}>(rows:T[]){
-  const checked=await Promise.all(rows.map(async row=>{
-    const {data,error}=await admin.auth.admin.getUserById(row.user_id);
-    if(error)fail("排行榜成员校验暂时不可用",503);
-    return !data.user||String(data.user.email||"").trim().toLowerCase()===EXCLUDED_EMAIL?null:row;
-  }));
-  return checked.filter((row):row is T=>row!==null);
+async function rateLimit(req:Request,action:string,limit:number,windowSeconds:number){
+  const ip=(req.headers.get("cf-connecting-ip")||req.headers.get("x-real-ip")||"unknown").trim();
+  const day=new Date().toISOString().slice(0,10);
+  const key=await sha256(ip+"|"+day+"|"+action);
+  const {data,error}=await admin.rpc("flappy_rate_limit_check",{
+    p_key:key,p_action:action,p_limit:limit,p_window_seconds:windowSeconds
+  });
+  if(error)fail("请求过于频繁，请稍后再试",429,"RATE_LIMIT_UNAVAILABLE");
+  return data===true;
+}
+
+async function leaderboardBase(){
+  const weekStart=currentWeekStart();
+  const now=Date.now();
+  if(leaderboardCache&&leaderboardCache.expiresAt>now&&leaderboardCache.weekStart===weekStart){
+    return {
+      game_version:GAME_VERSION,
+      week_start:leaderboardCache.weekStart,
+      all_time:leaderboardCache.allTime,
+      weekly:leaderboardCache.weekly,
+      updated_at:leaderboardCache.updatedAt
+    };
+  }
+
+  const [allResult,weekResult,membersResult]=await Promise.all([
+    admin.from("flappy_best_scores").select("user_id,member_id,best_score,bird_skin,achieved_at").order("best_score",{ascending:false}).order("achieved_at",{ascending:true}),
+    admin.from("flappy_weekly_bests").select("user_id,member_id,best_score,bird_skin,achieved_at").eq("week_start",weekStart).order("best_score",{ascending:false}).order("achieved_at",{ascending:true}),
+    admin.from("members").select("id,nickname,color,exclude_from_leaderboard").eq("exclude_from_leaderboard",false)
+  ]);
+  if(allResult.error||weekResult.error||membersResult.error)fail("排行榜暂时无法加载",503);
+
+  const memberMap=new Map<string,{nickname:string;color:string}>();
+  for(const member of membersResult.data||[])memberMap.set(member.id,{nickname:member.nickname,color:member.color});
+
+  const shape=(rows:any[])=>rows
+    .filter(row=>memberMap.has(row.member_id))
+    .sort((a,b)=>b.best_score-a.best_score||a.achieved_at.localeCompare(b.achieved_at)||a.member_id.localeCompare(b.member_id))
+    .map((row,index)=>({
+      rank:index+1,
+      member_id:row.member_id,
+      nickname:memberMap.get(row.member_id)?.nickname||"好友",
+      color:memberMap.get(row.member_id)?.color||"#8EC5FF",
+      score:row.best_score,
+      bird_skin:row.bird_skin,
+      achieved_at:row.achieved_at
+    }));
+
+  const allTime=shape(allResult.data||[]);
+  const weekly=shape(weekResult.data||[]);
+  const updatedAt=new Date().toISOString();
+  leaderboardCache={expiresAt:now+LEADERBOARD_CACHE_MS,weekStart,allTime,weekly,updatedAt};
+  return {game_version:GAME_VERSION,week_start:weekStart,all_time:allTime,weekly,updated_at:updatedAt};
 }
 
 async function leaderboard(req:Request){
-  const weekStart=currentWeekStart();
-  const [allResult,weekResult,viewerState]=await Promise.all([
-    admin.from("flappy_best_scores").select("user_id,member_id,best_score,bird_skin,achieved_at").order("best_score",{ascending:false}).order("achieved_at",{ascending:true}),
-    admin.from("flappy_weekly_bests").select("user_id,member_id,best_score,bird_skin,achieved_at").eq("week_start",weekStart).order("best_score",{ascending:false}).order("achieved_at",{ascending:true}),
-    optionalViewer(req)
-  ]);
-  if(allResult.error||weekResult.error)fail("排行榜暂时无法加载",503);
-  const allRows=await filterExcluded(allResult.data||[]);
-  const weekRows=await filterExcluded(weekResult.data||[]);
-  const memberIds=[...new Set([...allRows,...weekRows].map(x=>x.member_id))];
-  const memberMap=new Map<string,{nickname:string;color:string}>();
-  if(memberIds.length){
-    const {data,error}=await admin.from("members").select("id,nickname,color").in("id",memberIds);
-    if(error)fail("排行榜暂时无法加载",503);
-    for(const member of data||[])memberMap.set(member.id,member);
-  }
-  const shape=(rows:typeof allRows)=>rows.filter(row=>memberMap.has(row.member_id)).sort((a,b)=>b.best_score-a.best_score||a.achieved_at.localeCompare(b.achieved_at)||a.member_id.localeCompare(b.member_id)).map((row,index)=>({
-    rank:index+1,
-    member_id:row.member_id,
-    nickname:memberMap.get(row.member_id)?.nickname||"好友",
-    color:memberMap.get(row.member_id)?.color||"#8EC5FF",
-    score:row.best_score,
-    bird_skin:row.bird_skin,
-    achieved_at:row.achieved_at
-  }));
-  const all=shape(allRows),weekly=shape(weekRows);
+  const [base,viewerState]=await Promise.all([leaderboardBase(),optionalViewer(req)]);
   const viewer=viewerState.member?{
     member_id:viewerState.member.id,
     nickname:viewerState.member.nickname,
-    all_time:all.find(x=>x.member_id===viewerState.member?.id)||null,
-    weekly:weekly.find(x=>x.member_id===viewerState.member?.id)||null
+    all_time:base.all_time.find((x:any)=>x.member_id===viewerState.member?.id)||null,
+    weekly:base.weekly.find((x:any)=>x.member_id===viewerState.member?.id)||null
   }:null;
-  return {game_version:GAME_VERSION,week_start:weekStart,all_time:all,weekly,viewer,excluded_account:viewerState.excluded,updated_at:new Date().toISOString()};
+  return {...base,viewer,excluded_account:viewerState.excluded};
 }
 
 async function startRun(req:Request,body:any){
@@ -189,6 +211,7 @@ async function submitRun(req:Request,body:any){
   if(updateError)fail("线上成绩校验失败",503);
   if(!updated)fail("本局成绩已经提交",409,"RUN_ALREADY_SUBMITTED");
   if(reason)fail("本局成绩未通过服务器校验",422,reason.toUpperCase());
+  leaderboardCache=null;
   return {accepted:true,score,leaderboard:await leaderboard(req)};
 }
 
@@ -200,6 +223,8 @@ Deno.serve(async(req:Request)=>{
   try{
     const body=await req.json().catch(()=>({}));
     const action=String(body.action||"leaderboard");
+    const limit=action==="leaderboard"?60:action==="start_run"?30:action==="submit_run"?60:20;
+    if(!await rateLimit(req,action,limit,60))return reply(req,{error:"请求过于频繁，请稍后再试",code:"RATE_LIMITED"},429);
     if(action==="leaderboard")return reply(req,await leaderboard(req));
     if(action==="start_run")return reply(req,await startRun(req,body));
     if(action==="submit_run")return reply(req,await submitRun(req,body));
@@ -209,4 +234,3 @@ Deno.serve(async(req:Request)=>{
     return reply(req,{error:(error as Error)?.message||"服务器暂时不可用",code:(error as any)?.code},(error as any)?.status||400);
   }
 });
-
