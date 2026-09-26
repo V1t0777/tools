@@ -5,7 +5,7 @@
   Referrer-Policy: no-referrer
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
   Cross-Origin-Opener-Policy: same-origin
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://tmxpueakxibsaakdyusn.supabase.co wss://tmxpueakxibsaakdyusn.supabase.co; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; frame-src 'none'; form-action 'self'; manifest-src 'self'; worker-src 'self'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; script-src 'self'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://tmxpueakxibsaakdyusn.supabase.co wss://tmxpueakxibsaakdyusn.supabase.co; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; frame-src 'none'; form-action 'self'; manifest-src 'self'; worker-src 'self'; upgrade-insecure-requests
 
 /robots.txt
   Cache-Control: public, max-age=3600
