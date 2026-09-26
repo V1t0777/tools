@@ -24,5 +24,8 @@ cp cloudflare-secure/index.html "$OUT/index.html"
 cp cloudflare-secure/_headers "$OUT/_headers"
 cp cloudflare-secure/robots.txt "$OUT/robots.txt"
 
+# Hash the exact published HTML, not a separately maintained source copy.
+node scripts/secure-csp.mjs "$OUT"
+
 printf 'Secure mirror built at %s\n' "$OUT"
 find "$OUT" -maxdepth 2 -type f -print | sort
