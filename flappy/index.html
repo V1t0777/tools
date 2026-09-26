@@ -388,11 +388,11 @@
     if(!rows||!rows.length){leaderboardList.innerHTML='<div class="leaderboard-empty">'+(leaderboardMode==='weekly'?'本周还没有有效成绩':'还没有好友上榜')+'</div>';return;}
     var viewerId=leaderboardData.viewer&&leaderboardData.viewer.member_id;
     leaderboardList.innerHTML=rows.map(function(row){
-      var medalText=row.rank===1?'🥇':row.rank===2?'🥈':row.rank===3?'🥉':String(row.rank);
+      var medalText=row.rank===1?'🥇':row.rank===2?'🥈':row.rank===3?'🥉':escapeHTML(row.rank);
       var skin=row.bird_skin==='warm'?'暖棕小鸟':'青灰小鸟';
       var color=/^#[0-9a-f]{3,8}$/i.test(row.color)?row.color:'#8EC5FF';
       var date='';try{date=new Intl.DateTimeFormat('zh-CN',{month:'numeric',day:'numeric'}).format(new Date(row.achieved_at));}catch(e){}
-      return '<div class="leaderboard-row '+(row.member_id===viewerId?'me':'')+'"><div class="rank-number">'+medalText+'</div><div><div class="player-name"><span style="color:'+color+'">●</span> '+escapeHTML(row.nickname)+'</div><div class="player-detail">'+skin+(date?' · '+date:'')+'</div></div><div class="player-score">'+row.score+'</div></div>';
+      return '<div class="leaderboard-row '+(row.member_id===viewerId?'me':'')+'"><div class="rank-number">'+medalText+'</div><div><div class="player-name"><span style="color:'+color+'">●</span> '+escapeHTML(row.nickname)+'</div><div class="player-detail">'+skin+(date?' · '+date:'')+'</div></div><div class="player-score">'+escapeHTML(row.score)+'</div></div>';
     }).join('');
   }
   function renderAccount(){
