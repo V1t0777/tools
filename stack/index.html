@@ -769,7 +769,7 @@
     if(!rows.length){leaderboardList.innerHTML='<div class="leaderboard-empty">还没有有效线上成绩<br>成为第一个登上高塔的人吧</div>';return;}
     leaderboardList.innerHTML=rows.map(function(row){
       var top=row.rank<=3?' top':'',mine=row.member_id===me?' me':'';
-      var crown=row.rank===1?'①':row.rank===2?'②':row.rank===3?'③':String(row.rank);
+      var crown=row.rank===1?'①':row.rank===2?'②':row.rank===3?'③':escapeHTML(row.rank);
       return '<div class="leaderboard-row'+mine+'"><div class="rank-num'+top+'">'+crown+'</div><div class="player"><strong>'+escapeHTML(row.nickname)+'</strong><span>Perfect '+Number(row.perfect_count||0)+' · 最高连击 ×'+Number(row.max_combo||0)+'</span></div><div class="leader-score"><strong>'+Number(row.score||0)+'</strong><span>层</span></div></div>';
     }).join('');
   }
