@@ -14,10 +14,16 @@ export function inlineHashes(html, label = 'HTML') {
   // static HTML, NOT an HTML sanitizer or a parser for user-controlled input.
   // Only bare inline <script> tags are supported; new script formats fail closed
   // until reviewed. External scripts keep their original markup and order.
-  const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)];
+  // Recognize malformed end tags too, then reject them explicitly. Otherwise
+  // an early </script foo> could be skipped in favor of a later canonical tag,
+  // hashing bytes that the browser does not treat as part of this script.
+  const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\b([^>]*)>/gi)];
   const openings = html.match(/<script\b/gi) || [];
   if (scripts.length !== openings.length) throw new Error(`${label}: unsupported script markup`);
-  for (const [, attributes, body] of scripts) {
+  for (const [, attributes, body, endAttributes] of scripts) {
+    if (!/^[\t\n\f\r ]*$/.test(endAttributes)) {
+      throw new Error(`${label}: unsupported script end tag`);
+    }
     if (/^\s+src\s*=\s*(["'])[^"'<>]+\1(?:\s+defer)?\s*$/i.test(attributes)) {
       if (body.trim()) throw new Error(`${label}: external script has inline content`);
       continue;
