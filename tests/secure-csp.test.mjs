@@ -37,6 +37,28 @@ test('policy is deterministic, deduplicated and retains other security directive
   assert.doesNotMatch(policy, /script-src[^;]*'unsafe-/);
 });
 
+test('malformed end tags cannot be skipped in favor of a later canonical tag', () => {
+  for (const ending of ['</script\t\n bar>', '</script foo="bar">', '</script/>', '</SCRIPT / >', '</script\u00a0>']) {
+    assert.throws(() => inlineHashes('<script>run()' + ending + 'outside</script>'), /unsupported script end tag/);
+    assert.throws(() => inlineHashes('<script src="app.js">' + ending), /unsupported script end tag/);
+  }
+});
+
+test('ASCII whitespace and mixed-case end tags retain the exact script hash', () => {
+  assert.deepEqual(inlineHashes('<SCRIPT>run()</ScRiPt\t\n\f\r >'), [scriptHash('run()')]);
+  assert.deepEqual(inlineHashes('<script>const text = "</scripture>";</script>'), [scriptHash('const text = "</scripture>";')]);
+});
+
+test('invalid published markup leaves the header template untouched', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'toolbox-csp-invalid-'));
+  try {
+    writeFileSync(join(dir, 'index.html'), '<script>run()</script foo>outside</script>');
+    writeFileSync(join(dir, '_headers'), template);
+    assert.throws(() => generateCsp(dir), /unsupported script end tag/);
+    assert.equal(readFileSync(join(dir, '_headers'), 'utf8'), template);
+  } finally { rmSync(dir, {recursive: true, force: true}); }
+});
+
 test('invalid templates, hash injection and oversized headers fail the build', () => {
   assert.throws(() => renderHeaders(template.replace("script-src 'self';", "script-src 'self' 'unsafe-inline';"), []));
   assert.throws(() => renderHeaders(template, ["'unsafe-inline'"]));
