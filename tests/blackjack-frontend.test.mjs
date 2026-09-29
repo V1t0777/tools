@@ -30,7 +30,8 @@ test('blackjack renders untrusted values through DOM text APIs',()=>{
 
 test('blackjack secure page uses local scripts and constrained CSP',()=>{
   assert.match(html,/\.\.\/shared\/toolbox-auth\.js/);
-  assert.match(html,/\.\.\/shared\/vendor\/supabase-2\.57\.4\.min\.js/);
+  assert.match(app,/\.\.\/shared\/vendor\/supabase-2\.57\.4\.min\.js/);
+  assert.doesNotMatch(html,/shared\/vendor\/supabase-2\.57\.4\.min\.js/);
   assert.match(html,/Content-Security-Policy/);
   assert.match(html,/connect-src 'self' https:\/\/tmxpueakxibsaakdyusn\.supabase\.co wss:\/\/tmxpueakxibsaakdyusn\.supabase\.co/);
 });
