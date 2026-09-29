@@ -78,6 +78,8 @@ required_paths=(
   dist-secure/stack/index.html
   dist-secure/pictionary/index.html
   dist-secure/pictionary/app.js
+  dist-secure/blackjack/index.html
+  dist-secure/blackjack/app.js
   dist-secure/shared/toolbox-auth.js
   dist-secure/shared/vendor/supabase-2.57.4.min.js
   dist-secure/_headers
@@ -126,6 +128,7 @@ done
 public_forbidden_paths=(
   dist-public/.github
   dist-public/admin-night-shift
+  dist-public/blackjack
   dist-public/beads
   dist-public/cloudflare-secure
   dist-public/dinner
