@@ -311,7 +311,7 @@
       const data = await api(action,{room_id:roomId,...payload});
       if (data.state) adoptState(data.state);
     } catch (err) {
-      if (err.status === 409 || err.code === 'STALE_VERSION') {
+      if (err.status === 409 || err.code === 'STALE_ACTION') {
         toast('牌局刚刚更新，已重新同步');
         requestState(0);
       } else if (!err.cancelled) {
