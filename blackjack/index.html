@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#071712">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://tmxpueakxibsaakdyusn.supabase.co wss://tmxpueakxibsaakdyusn.supabase.co; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+  <title>朋友21点｜钊的工具箱</title>
+  <link rel="stylesheet" href="../shared/toolbox-ui.css">
+  <link rel="stylesheet" href="../shared/toolbox-motion.css">
+  <link rel="stylesheet" href="./style.css?v=20260929-1">
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <a class="back" href="../games/">← 小游戏</a>
+      <div class="brand"><span>♠</span><strong>朋友21点</strong><span class="heart">♥</span></div>
+      <div class="top-actions">
+        <button class="ghost hidden" id="shareBtn" type="button">邀请</button>
+        <button class="ghost danger hidden" id="leaveBtn" type="button">退出</button>
+      </div>
+    </header>
+
+    <section class="screen active" id="authScreen">
+      <div class="hero-card">
+        <div class="hero-suits">♠ ♥ ♣ ♦</div>
+        <h1>三人朋友局</h1>
+        <p>2–3 人同时对战系统庄家。无下注、纯积分、低延迟实时同步。</p>
+      </div>
+      <form class="panel form" id="loginForm">
+        <h2>登录工具箱</h2>
+        <label>邮箱<input id="emailInput" type="email" autocomplete="username" required placeholder="你的登录邮箱"></label>
+        <label>密码<input id="passwordInput" type="password" autocomplete="current-password" required placeholder="••••••••"></label>
+        <button class="primary" type="submit">登录</button>
+        <p class="error" id="loginError" role="alert"></p>
+      </form>
+    </section>
+
+    <section class="screen" id="recoveryScreen">
+      <div class="panel form">
+        <h2>恢复连接</h2>
+        <p id="recoveryMessage" role="status">正在恢复登录和房间…</p>
+        <button class="primary" id="retrySessionBtn" type="button">重试连接</button>
+        <button class="ghost" id="resetSessionBtn" type="button">切换账号</button>
+      </div>
+    </section>
+
+    <section class="screen" id="homeScreen">
+      <div class="welcome">
+        <div><small>欢迎回来</small><h1 id="welcomeName">好友</h1></div>
+        <button class="ghost" id="signOutBtn" type="button">退出</button>
+      </div>
+      <div class="action-grid">
+        <div class="action-card create">
+          <span>🃏</span><b>创建好友房</b><small>2–3 人 · 系统庄家</small>
+          <label class="round-select">局数
+            <select id="roundLimit">
+              <option value="3">3 局</option>
+              <option value="5" selected>5 局</option>
+              <option value="10">10 局</option>
+            </select>
+          </label>
+          <button class="primary" id="createBtn" type="button">创建房间</button>
+        </div>
+        <form class="action-card join" id="joinForm">
+          <span>🔑</span><b>加入好友房</b><small>输入朋友发来的 6 位房间码</small>
+          <input id="roomCodeInput" maxlength="6" autocomplete="off" inputmode="text" placeholder="例如 7K3M8P">
+          <button type="submit">加入房间</button>
+        </form>
+      </div>
+      <p class="privacy">🔒 仅工具箱现有成员可进入；牌堆与庄家暗牌只保存在服务端。</p>
+    </section>
+
+    <section class="screen" id="roomScreen">
+      <div class="room-head">
+        <div><small>好友房</small><h1 id="roomCode">------</h1></div>
+        <span class="status-pill" id="connectionStatus">连接中</span>
+      </div>
+      <div class="panel players-panel">
+        <div class="section-title"><b>房间成员</b><span id="playerCount">0 / 3</span></div>
+        <div class="players" id="players"></div>
+      </div>
+      <div class="panel lobby-actions">
+        <p id="lobbyHint">准备好后等待房主开始。</p>
+        <button class="secondary" id="readyBtn" type="button">我准备好了</button>
+        <button class="primary hidden" id="startBtn" type="button">开始游戏</button>
+      </div>
+      <div class="panel rules">
+        <b>本场规则</b>
+        <p id="rulesText">5 局 · 每次决定 20 秒 · 超时自动停牌 · 庄家 17 点停牌 · Blackjack +3</p>
+      </div>
+    </section>
+
+    <section class="screen" id="gameScreen">
+      <div class="game-head">
+        <div><small id="roundLabel">第 1 / 5 局</small><strong id="phaseLabel">等待操作</strong></div>
+        <span class="status-pill" id="gameConnectionStatus">连接中</span>
+      </div>
+
+      <section class="dealer-zone">
+        <div class="dealer-title"><span>庄家</span><b id="dealerValue">?</b></div>
+        <div class="hand dealer-hand" id="dealerHand"></div>
+      </section>
+
+      <section class="table-message" id="tableMessage" aria-live="polite">请选择要牌或停牌</section>
+
+      <section class="player-table" id="playerTable"></section>
+
+      <section class="action-dock panel" id="actionDock">
+        <div class="decision">
+          <div><small>你的点数</small><strong id="myValue">--</strong></div>
+          <div class="countdown" id="countdown">20</div>
+        </div>
+        <div class="action-buttons">
+          <button class="hit" id="hitBtn" type="button">要牌</button>
+          <button class="stand" id="standBtn" type="button">停牌</button>
+        </div>
+        <div class="emoji-row" aria-label="快捷表情">
+          <button type="button" data-emoji="😏">😏</button>
+          <button type="button" data-emoji="😂">😂</button>
+          <button type="button" data-emoji="😱">😱</button>
+          <button type="button" data-emoji="🔥">🔥</button>
+          <button type="button" data-emoji="🤡">🤡</button>
+        </div>
+      </section>
+    </section>
+
+    <section class="screen" id="finishScreen">
+      <div class="finish-hero">
+        <div>🏆</div><h1>本场结束</h1><p id="finishSubtitle">朋友21点 · 最终积分</p>
+      </div>
+      <div class="panel ranking" id="ranking"></div>
+      <button class="primary hidden" id="againBtn" type="button">再来一场</button>
+      <a class="secondary link" href="../games/">返回小游戏</a>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" role="status"></div>
+  <div class="emoji-float" id="emojiFloat" aria-hidden="true"></div>
+
+  <script src="../shared/toolbox-auth.js?v=20260923-1"></script>
+  <script src="../shared/vendor/supabase-2.57.4.min.js" integrity="sha384-AkNSQdptcXlJ0/NBZc4qGk86cDVXcCevwoWgEKIpHOEfbvlXGLlIkimQtONt8KNf"></script>
+  <script src="./app.js?v=20260929-1"></script>
+</body>
+</html>
