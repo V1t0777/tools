@@ -5,6 +5,10 @@ import assert from 'node:assert/strict';
 const app=readFileSync(new URL('../blackjack/app.js',import.meta.url),'utf8');
 const html=readFileSync(new URL('../blackjack/index.html',import.meta.url),'utf8');
 
+test('blackjack frontend source parses as JavaScript',()=>{
+  assert.doesNotThrow(()=>new Function(app));
+});
+
 test('blackjack frontend uses private realtime snapshots with database fallback',()=>{
   assert.match(app,/channel\(`blackjack:\$\{roomId\}`/);
   assert.match(app,/private:true/);
