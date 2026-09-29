@@ -8,6 +8,7 @@
   const STATUS_TEXT = {active:'思考中',stand:'已停牌',bust:'爆牌',blackjack:'Blackjack',none:'等待开局'};
 
   let session = null;
+  let sdkPromise = null;
   let me = null;
   let state = null;
   let roomEpoch = 0;
@@ -573,8 +574,30 @@
     }
   }
 
+  function ensureRealtimeSDK() {
+    if (window.supabase?.createClient) return Promise.resolve();
+    if (sdkPromise) return sdkPromise;
+    sdkPromise = new Promise((resolve,reject) => {
+      const script = document.createElement('script');
+      const finish = (err) => {
+        clearTimeout(timer);
+        script.onload = script.onerror = null;
+        if (err) { script.remove(); reject(err); } else resolve();
+      };
+      const timer = setTimeout(() => finish(new Error('实时连接组件加载超时')),8000);
+      script.src = '../shared/vendor/supabase-2.57.4.min.js';
+      script.integrity = 'sha384-AkNSQdptcXlJ0/NBZc4qGk86cDVXcCevwoWgEKIpHOEfbvlXGLlIkimQtONt8KNf';
+      script.onload = () => finish(window.supabase?.createClient ? null : new Error('实时连接组件加载失败'));
+      script.onerror = () => finish(new Error('实时连接组件加载失败'));
+      document.head.appendChild(script);
+    }).catch((err) => { sdkPromise = null; throw err; });
+    return sdkPromise;
+  }
+
   async function connectRealtime() {
-    if (!state || suspended || navigator.onLine === false || !window.supabase?.createClient) return;
+    if (!state || suspended || navigator.onLine === false) return;
+    await ensureRealtimeSDK();
+    if (!state || suspended || navigator.onLine === false) return;
     leaveRealtime(false);
     const epoch = roomEpoch;
     const roomId = state.room.id;
