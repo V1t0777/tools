@@ -28,6 +28,11 @@ test('blackjack renders untrusted values through DOM text APIs',()=>{
   assert.match(app,/replaceChildren/);
 });
 
+test('blackjack return links leave the secure mirror for the public toolbox',()=>{
+  const target='https://v1t0777.github.io/tools/';
+  assert.equal(html.split(target).length-1,2);
+  assert.doesNotMatch(html,/href="\.\.\/games\/"/);
+});
 test('blackjack secure page uses local scripts and constrained CSP',()=>{
   assert.match(html,/\.\.\/shared\/toolbox-auth\.js/);
   assert.match(app,/\.\.\/shared\/vendor\/supabase-2\.57\.4\.min\.js/);
