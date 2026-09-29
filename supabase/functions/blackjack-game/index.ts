@@ -74,7 +74,7 @@ function randomInt(maxExclusive: number) {
 function shuffledDeck() {
   const ranks = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
   const suits = ["S", "H", "D", "C"];
-  const deck = suits.flatMap((suit) => ranks.map((rank) => \`\${rank}\${suit}\`));
+  const deck = suits.flatMap((suit) => ranks.map((rank) => `${rank}${suit}`));
   for (let i = deck.length - 1; i > 0; i--) {
     const j = randomInt(i + 1);
     [deck[i], deck[j]] = [deck[j], deck[i]];
@@ -137,12 +137,12 @@ async function readBody(req: Request) {
 }
 
 async function limitAction(userId: string, action: string) {
-  const bytes = new TextEncoder().encode(\`blackjack|\${userId}\`);
+  const bytes = new TextEncoder().encode(`blackjack|${userId}`);
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   const key = [...new Uint8Array(digest)].map((x) => x.toString(16).padStart(2, "0")).join("");
   const out = await admin.rpc("flappy_rate_limit_check", {
     p_key: key,
-    p_action: \`blackjack:\${action}\`,
+    p_action: `blackjack:${action}`,
     p_limit: ACTION_LIMITS[action],
     p_window_seconds: 60,
   });
