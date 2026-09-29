@@ -28,8 +28,8 @@ test('blackjack renders untrusted values through DOM text APIs',()=>{
   assert.match(app,/replaceChildren/);
 });
 
-test('blackjack return links leave the secure mirror for the public toolbox',()=>{
-  const target='https://v1t0777.github.io/tools/';
+test('blackjack return links leave the secure mirror for the public games page',()=>{
+  const target='https://v1t0777.github.io/tools/games/';
   assert.equal(html.split(target).length-1,2);
   assert.doesNotMatch(html,/href="\.\.\/games\/"/);
 });
