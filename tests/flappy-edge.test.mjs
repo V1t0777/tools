@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import {webcrypto} from 'node:crypto';
 import {test} from 'node:test';
 
-const source=stripTypeScriptTypes(readFileSync(new URL('../supabase/functions/flappy-game/index.ts',import.meta.url),'utf8').replace(/^import .*\n/,''));
+const source=stripTypeScriptTypes(readFileSync(new URL('../supabase/functions/flappy-game/index.ts',import.meta.url),'utf8').replace(/^import[^\r\n]*\r?\n/,''));
 function setup(){
   const db={members:[{id:'m1',user_id:'u1',nickname:'好友',color:'#ffffff',exclude_from_leaderboard:false},{id:'mt',user_id:'ut',nickname:'test',exclude_from_leaderboard:true}],flappy_runs:[],flappy_best_scores:[],flappy_weekly_bests:[]};
   const users={good:{id:'u1',email:'friend@example.com'},test:{id:'ut',email:'TEST@test.com'},nonmember:{id:'ux',email:'x@example.com'}};

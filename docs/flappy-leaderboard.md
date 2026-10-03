@@ -39,10 +39,15 @@ bounds, exact game version and skin. Pauses are excluded from active duration.
 This is basic anti-cheat, **not authoritative game replay**: a determined modified
 client can fabricate a plausible score within these limits.
 
-Network work never blocks the local game. Up to five in-memory failed submissions
-can retry once on a browser `online` event while the same account remains signed
-in. Closing/reloading the page does not persist pending tokens. Old-game responses
-cannot overwrite a new game's status, and account changes invalidate pending work.
+Network work never blocks the local game. The device keeps the highest unsynced
+score per signed-in account plus up to five server-issued run payloads in local
+storage. Failed submissions retry on a browser `online` event and after a reload
+while the same account remains signed in and the 15-minute run credential is still
+valid. Expired or rejected credentials are discarded, but the local BEST remains;
+the user must complete another valid online run to put an otherwise unverifiable
+offline-only score on the leaderboard. Successful submissions clear `pendingBest`
+only when the authoritative online maximum is at least as high. Old-game responses
+cannot overwrite a new game's status, and stored runs never cross accounts.
 
 ## Verification and deployment
 

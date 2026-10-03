@@ -6,7 +6,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 for(const game of ['flappy','stack']){
   function setup({deny=false,unavailable=false}={}){
-    const source=stripTypeScriptTypes(readFileSync(new URL('../supabase/functions/'+game+'-game/index.ts',import.meta.url),'utf8').replace(/^import .*\n/,''));
+    const source=stripTypeScriptTypes(readFileSync(new URL('../supabase/functions/'+game+'-game/index.ts',import.meta.url),'utf8').replace(/^import[^\r\n]*\r?\n/,''));
     let handler;const calls=[],writes=[];
     function query(table){
       const q={select(){return q;},eq(){return q;},maybeSingle(){return q;},
