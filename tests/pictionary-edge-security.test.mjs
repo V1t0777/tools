@@ -4,7 +4,7 @@ import vm from 'node:vm';
 import {webcrypto} from 'node:crypto';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-const source=stripTypeScriptTypes(readFileSync(new URL('../supabase/functions/pictionary-game/index.ts',import.meta.url),'utf8').replace(/^import .*\n/,''));
+const source=stripTypeScriptTypes(readFileSync(new URL('../supabase/functions/pictionary-game/index.ts',import.meta.url),'utf8').replace(/^import[^\r\n]*\r?\n/,''));
 function setup({limited=false,unavailable=false,active=true,roomMember=false}={}){
   let handler;const writes=[],limits=[],reads=[];
   const oldRoom={id:'r1',status:'playing',current_round_no:1,ends_at:new Date(0).toISOString(),last_activity_at:new Date(0).toISOString()};

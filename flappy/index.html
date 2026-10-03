@@ -12,7 +12,8 @@
     :root{
       --bg:#08121d;--panel:rgba(14,25,38,.78);--line:rgba(255,255,255,.09);
       --text:#f5f8fd;--muted:#8fa1b6;--cyan:#69d8e8;--cyan2:#3bb8cd;--warm:#f6c77f;
-      --shadow:0 28px 70px rgba(0,0,0,.34)
+      --shadow:0 28px 70px rgba(0,0,0,.34);
+      --ease-enter:cubic-bezier(.22,1,.36,1);--ease-press:cubic-bezier(.2,.8,.2,1)
     }
     html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","PingFang SC","Microsoft YaHei",sans-serif;overscroll-behavior:none}
     body{
@@ -33,7 +34,7 @@
     }
     .back{padding:0 13px}
     .top-actions{display:flex;gap:8px}
-    .icon-btn{width:44px;padding:0;cursor:pointer;transition:transform 120ms ease,background 180ms ease,border-color 180ms ease,opacity 180ms ease}
+    .icon-btn{width:44px;padding:0;cursor:pointer;transition:transform 110ms var(--ease-press),background 180ms var(--ease-enter),border-color 180ms var(--ease-enter),opacity 180ms var(--ease-enter)}
     .icon-btn:active{transform:scale(.94)}
     .icon-btn[disabled]{opacity:.34;pointer-events:none}
     .icon-btn.active{background:rgba(105,216,232,.11);border-color:rgba(105,216,232,.28);color:#b8f5ff}
@@ -44,7 +45,7 @@
     .best-chip{min-width:70px;border:1px solid var(--line);border-radius:15px;padding:8px 10px;text-align:center;background:rgba(255,255,255,.035);color:var(--text)}
     .best-chip span{display:block;color:var(--muted);font-size:9px;font-weight:800;letter-spacing:.08em}
     .best-chip b{display:block;margin-top:1px;font-size:19px}
-    .rank-chip{cursor:pointer;transition:transform 120ms ease,border-color 180ms ease,background 180ms ease}
+    .rank-chip{cursor:pointer;transition:transform 110ms var(--ease-press),border-color 180ms var(--ease-enter),background 180ms var(--ease-enter)}
     .rank-chip:active{transform:scale(.96)}
     .rank-chip.online{border-color:rgba(105,216,232,.24);background:rgba(105,216,232,.07)}
     .stage-wrap{display:flex;justify-content:center}
@@ -60,21 +61,22 @@
     .score{
       position:absolute;z-index:3;top:26px;left:50%;transform:translateX(-50%);
       min-width:60px;text-align:center;font-size:42px;line-height:1;font-weight:950;letter-spacing:-.04em;
-      text-shadow:0 3px 18px rgba(0,0,0,.34);pointer-events:none;transition:opacity 160ms ease
+      text-shadow:0 3px 18px rgba(0,0,0,.34);pointer-events:none;transition:opacity 160ms var(--ease-enter);
+      font-variant-numeric:tabular-nums
     }
-    .score.bump{animation:scoreBump 130ms cubic-bezier(.22,1,.36,1)}
+    .score.bump{animation:scoreBump 130ms var(--ease-enter)}
     .score.hidden{opacity:0}
     .new-best{
       position:absolute;z-index:3;top:76px;left:50%;transform:translate(-50%,-4px);
       color:#ffe1a0;font-size:10px;font-weight:950;letter-spacing:.13em;opacity:0;pointer-events:none
     }
-    .new-best.show{animation:newBest 780ms ease both}
+    .new-best.show{animation:newBest 780ms var(--ease-enter) both}
     .ready-layer,.pause-layer,.result-layer{position:absolute;z-index:4;inset:7px;border-radius:23px}
     .ready-layer{
       display:flex;align-items:center;justify-content:center;text-align:center;padding:28px;
       background:linear-gradient(180deg,rgba(7,18,28,.10),rgba(4,10,16,.42));
       backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);
-      transition:opacity 180ms ease,visibility 180ms
+      transition:opacity 180ms var(--ease-enter),visibility 180ms
     }
     .ready-layer.hidden{opacity:0;visibility:hidden;pointer-events:none}
     .ready-card{transform:translateY(-8px);pointer-events:none}
@@ -88,42 +90,47 @@
     .pause-layer{
       display:flex;align-items:center;justify-content:center;text-align:center;
       background:rgba(5,12,19,.42);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-      opacity:0;visibility:hidden;pointer-events:none;transition:opacity 170ms ease,visibility 170ms
+      opacity:0;visibility:hidden;pointer-events:none;transition:opacity 170ms var(--ease-enter),visibility 170ms
     }
     .pause-layer.active{opacity:1;visibility:visible}
     .pause-card{padding:18px 20px;border:1px solid rgba(255,255,255,.08);border-radius:20px;background:rgba(12,23,35,.72)}
     .pause-card strong{display:block;font-size:22px}.pause-card span{display:block;margin-top:5px;color:#9fb0c1;font-size:11px}
     .result-layer{
       display:flex;align-items:flex-end;justify-content:center;padding:16px;
-      pointer-events:none;opacity:0;visibility:hidden;transition:opacity 200ms ease,visibility 200ms
+      pointer-events:none;opacity:0;visibility:hidden;transition:opacity 220ms var(--ease-enter),visibility 220ms
     }
     .result-layer.active{opacity:1;visibility:visible;pointer-events:auto}
     .result-card{
-      width:100%;padding:19px;border:1px solid rgba(255,255,255,.09);border-radius:24px;
-      background:rgba(9,20,31,.82);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
-      box-shadow:0 22px 55px rgba(0,0,0,.34);transform:translateY(10px) scale(.985);opacity:0;
-      transition:transform 230ms cubic-bezier(.22,1,.36,1),opacity 180ms ease
+      width:100%;padding:19px;border:1px solid rgba(255,255,255,.055);border-radius:24px;
+      background:linear-gradient(180deg,rgba(17,32,46,.88),rgba(8,18,28,.86));backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+      box-shadow:inset 0 1px rgba(255,255,255,.065),0 22px 55px rgba(0,0,0,.34);transform:translateY(22px) scale(.985);opacity:0;
+      transition:transform 260ms var(--ease-enter),opacity 200ms var(--ease-enter)
     }
     .result-layer.active .result-card{transform:none;opacity:1}
     .result-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
     .result-title small{display:block;color:#90a3b7;font-size:10px;font-weight:850;letter-spacing:.12em}
     .result-title strong{display:block;margin-top:3px;font-size:22px}
-    .medal{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.055);font-size:23px}
+    .medal{position:relative;overflow:hidden;width:46px;height:46px;border-radius:50%;display:grid;place-items:center;border:1px solid rgba(255,255,255,.075);background:rgba(255,255,255,.045);box-shadow:inset 0 1px rgba(255,255,255,.07);font-size:23px}
+    .medal.shine::after{content:"";position:absolute;inset:-12px;width:15px;background:linear-gradient(90deg,transparent,rgba(255,245,205,.72),transparent);transform:translateX(-42px) rotate(24deg);animation:medalShine 520ms 150ms var(--ease-enter) both}
     .result-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0}
-    .result-stat{padding:12px;border-radius:16px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.035)}
-    .result-stat span{display:block;color:#8fa2b6;font-size:10px;font-weight:800}.result-stat b{display:block;margin-top:2px;font-size:25px}
-    .online-result-status{min-height:18px;margin:-3px 2px 11px;color:#90a3b7;font-size:10px;line-height:1.5;text-align:center}
-    .online-result-status.good{color:#9be6d1}.online-result-status.warn{color:#efc990}
+    .result-stat{padding:12px;border-radius:16px;border:1px solid rgba(255,255,255,.045);background:rgba(255,255,255,.028);box-shadow:inset 0 1px rgba(255,255,255,.035)}
+    .result-stat.primary{background:rgba(105,216,232,.07);border-color:rgba(105,216,232,.10);padding:13px 12px}
+    .result-stat span{display:block;color:#8fa2b6;font-size:10px;font-weight:800}.result-stat b{display:block;margin-top:2px;font-size:25px;font-variant-numeric:tabular-nums}.result-stat.primary b{font-size:29px;color:#eefeff}
+    .online-result-status{display:flex;align-items:center;justify-content:center;gap:6px;min-height:22px;margin:-3px 2px 10px;color:#90a3b7;font-size:10px;line-height:1.5;text-align:center}
+    .online-result-status.synced{color:#9be6d1}.online-result-status.syncing{color:#a9dce5}.online-result-status.offline{color:#efc990}
+    .online-result-status.synced::before{content:'✓'}.online-result-status.syncing::before{content:'↻';animation:statusSpin 850ms linear infinite}.online-result-status.offline::before{content:'○'}
     .retry{
       width:100%;min-height:48px;border:0;border-radius:16px;background:linear-gradient(135deg,#86e9f3,#47bfd4);
-      color:#082430;font-weight:950;font-size:15px;box-shadow:0 13px 28px rgba(65,197,218,.18);cursor:pointer
+      color:#082430;font-weight:950;font-size:15px;box-shadow:0 13px 28px rgba(65,197,218,.18);cursor:pointer;
+      transition:transform 110ms var(--ease-press),filter 180ms var(--ease-enter),box-shadow 180ms var(--ease-enter)
     }
     .retry:active{transform:scale(.985)}
+    .retry:hover{filter:brightness(1.035);box-shadow:0 15px 31px rgba(65,197,218,.22)}
     .footer-note{text-align:center;color:#687b8f;font-size:10px;line-height:1.55}
-    .leaderboard-layer{position:fixed;z-index:20;inset:0;display:flex;align-items:flex-end;justify-content:center;padding:18px max(14px,env(safe-area-inset-right)) max(18px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));opacity:0;visibility:hidden;transition:opacity 180ms ease,visibility 180ms}
+    .leaderboard-layer{position:fixed;z-index:20;inset:0;display:flex;align-items:flex-end;justify-content:center;padding:18px max(14px,env(safe-area-inset-right)) max(18px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));opacity:0;visibility:hidden;transition:opacity 180ms var(--ease-enter),visibility 180ms}
     .leaderboard-layer.active{opacity:1;visibility:visible}
     .leaderboard-backdrop{position:absolute;inset:0;border:0;background:rgba(3,8,13,.68);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px)}
-    .leaderboard-sheet{position:relative;width:min(100%,500px);max-height:min(82dvh,720px);overflow:auto;border:1px solid rgba(255,255,255,.10);border-radius:26px;background:rgba(10,22,34,.96);box-shadow:0 28px 80px rgba(0,0,0,.48);padding:18px;transform:translateY(18px);transition:transform 230ms cubic-bezier(.22,1,.36,1)}
+    .leaderboard-sheet{position:relative;width:min(100%,500px);max-height:min(82dvh,720px);overflow:auto;border:1px solid rgba(255,255,255,.10);border-radius:26px;background:rgba(10,22,34,.96);box-shadow:0 28px 80px rgba(0,0,0,.48);padding:18px;transform:translateY(18px);transition:transform 230ms var(--ease-enter)}
     .leaderboard-layer.active .leaderboard-sheet{transform:none}
     .leaderboard-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
     .leaderboard-head small{display:block;color:#79dce9;font-size:9px;font-weight:950;letter-spacing:.14em}.leaderboard-head h2{margin:4px 0 0;font-size:24px}
@@ -140,8 +147,10 @@
     .login-form{display:grid;grid-template-columns:1fr 1fr auto;gap:7px;margin-top:9px}.login-form input{min-width:0;height:42px;border:1px solid rgba(255,255,255,.10);border-radius:12px;background:rgba(4,12,19,.65);color:var(--text);padding:0 11px;font:inherit;font-size:12px}.login-form button,.signout-btn{height:42px;border:0;border-radius:12px;background:#69d8e8;color:#082630;padding:0 14px;font-size:12px;font-weight:950;cursor:pointer}.signout-btn{height:32px;margin-left:7px;background:rgba(255,255,255,.07);color:#b7c6d3}
     .login-error{min-height:15px;margin-top:6px;color:#e9a6a6;font-size:10px}
     :where(a,button):focus-visible{outline:3px solid rgba(105,216,232,.58);outline-offset:3px}
-    @keyframes scoreBump{50%{transform:translateX(-50%) scale(1.14)}}
+    @keyframes scoreBump{46%{transform:translateX(-50%) scale(1.06)}}
     @keyframes newBest{0%{opacity:0;transform:translate(-50%,3px)}18%,68%{opacity:1;transform:translate(-50%,0)}100%{opacity:0;transform:translate(-50%,-5px)}}
+    @keyframes medalShine{to{transform:translateX(72px) rotate(24deg)}}
+    @keyframes statusSpin{to{transform:rotate(360deg)}}
     @media(max-height:760px) and (orientation:portrait){
       .app{gap:7px}.heading h1{font-size:29px}.sub{display:none}.stage{width:min(100%,49dvh)}.footer-note{display:none}
     }
@@ -152,7 +161,7 @@
     }
     @media(max-width:430px){.login-form{grid-template-columns:1fr}.login-form button{width:100%}.heading{gap:8px}.best-chip{min-width:64px;padding:8px 7px}}
     @media(prefers-reduced-motion:reduce){
-      .score.bump,.new-best.show{animation:none!important}.ready-layer,.pause-layer,.result-layer,.result-card,.leaderboard-layer,.leaderboard-sheet{transition:none!important}
+      .score.bump,.new-best.show,.medal.shine::after,.online-result-status.syncing::before{animation:none!important}.ready-layer,.pause-layer,.result-layer,.result-card,.leaderboard-layer,.leaderboard-sheet{transition:none!important}
     }
     [hidden]{display:none!important}
   </style>
@@ -204,7 +213,7 @@
               <div class="medal" id="medal">·</div>
             </div>
             <div class="result-stats">
-              <div class="result-stat"><span>本局得分</span><b id="resultScore">0</b></div>
+              <div class="result-stat primary"><span>本局得分</span><b id="resultScore">0</b></div>
               <div class="result-stat"><span>本地最高</span><b id="resultBest">0</b></div>
               <div class="result-stat"><span>在线最好</span><b id="resultOnlineBest">--</b></div>
               <div class="result-stat"><span>好友排名</span><b id="resultOnlineRank">--</b></div>
@@ -295,13 +304,16 @@
   var pipes=[];
   var score=0,best=0,newRecord=false;
   var lastTime=0,raf=0,elapsed=0,scroll=0,prevGapY=null;
-  var hitFreezeUntil=0,groundHitAt=0;
+  var hitSlowUntil=0,groundHitAt=0;
   var audioCtx=null,soundOn=true;
   var BEST_KEY='zhaoFlappyBest.v1';
+  var PENDING_BEST_KEY='zhaoFlappyPendingBest.v1';
+  var PENDING_RUNS_KEY='zhaoFlappyPendingRuns.v1';
   var FUNCTION_URL=ToolboxAuth.url+'/functions/v1/flappy-game';
   var GAME_VERSION='2026.09.23-leaderboard-v1';
   var activeRun=null,pendingRuns=[],authEpoch=0;
   var authUserId=(ToolboxAuth.peekSession()||{}).user?.id||null;
+  var pendingBest=0;
   var leaderboardData=null,leaderboardMode='all_time',leaderboardRequest=0;
 
   var BIRD_SKINS={
@@ -334,6 +346,57 @@
     best=score;bestTop.textContent=String(best);
     try{localStorage.setItem(BEST_KEY,String(best));}catch(e){}
     return true;
+  }
+  function pendingBucket(){return authUserId||'guest';}
+  function readPendingBests(){
+    try{var value=JSON.parse(localStorage.getItem(PENDING_BEST_KEY)||'{}');return value&&typeof value==='object'&&!Array.isArray(value)?value:{};}catch(e){return {};}
+  }
+  function loadPendingBest(){
+    var values=readPendingBests();pendingBest=Math.max(0,Number(values[pendingBucket()])||0);
+  }
+  function rememberPendingBest(value){
+    value=Math.max(0,Number(value)||0);if(value<=pendingBest)return;
+    pendingBest=value;
+    try{var values=readPendingBests();values[pendingBucket()]=pendingBest;localStorage.setItem(PENDING_BEST_KEY,JSON.stringify(values));}catch(e){}
+  }
+  function clearPendingBestThrough(value){
+    if(!pendingBest||Number(value)<pendingBest)return false;
+    pendingBest=0;
+    try{var values=readPendingBests();delete values[pendingBucket()];localStorage.setItem(PENDING_BEST_KEY,JSON.stringify(values));}catch(e){}
+    return true;
+  }
+  function readStoredRuns(){
+    try{var value=JSON.parse(localStorage.getItem(PENDING_RUNS_KEY)||'[]');return Array.isArray(value)?value:[];}catch(e){return [];}
+  }
+  function writeStoredRuns(runs){try{localStorage.setItem(PENDING_RUNS_KEY,JSON.stringify(runs.slice(-5)));}catch(e){}}
+  function persistRun(run){
+    if(!run||!run.payload||!run.userId)return;
+    var runs=readStoredRuns().filter(function(item){return item&&item.payload&&item.payload.run_token!==run.payload.run_token;});
+    runs.push({userId:run.userId,payload:run.payload,expiresAt:run.expiresAt||null});writeStoredRuns(runs);
+  }
+  function forgetRun(run){
+    if(!run||!run.payload)return;
+    writeStoredRuns(readStoredRuns().filter(function(item){return !item.payload||item.payload.run_token!==run.payload.run_token;}));
+  }
+  function restorePendingRuns(){
+    var now=Date.now(),stored=readStoredRuns(),kept=[];pendingRuns=[];
+    stored.forEach(function(item){
+      if(!item||!item.payload||!item.userId)return;
+      if(item.expiresAt&&Date.parse(item.expiresAt)<=now)return;
+      kept.push(item);
+      if(item.userId===authUserId&&item.payload.game_version===GAME_VERSION){
+        pendingRuns.push({epoch:authEpoch,attempts:0,busy:false,payload:item.payload,userId:item.userId,expiresAt:item.expiresAt,restored:true});
+      }
+    });
+    writeStoredRuns(kept);
+  }
+  function setSyncStatus(mode,detail){
+    onlineResultStatus.textContent=mode+(detail?' · '+detail:'');
+    onlineResultStatus.className='online-result-status '+(mode==='已同步'?'synced':mode==='正在同步'?'syncing':'offline');
+  }
+  function reconcilePendingBest(personal){
+    if(personal&&clearPendingBestThrough(personal.score))return true;
+    return !pendingBest;
   }
 
   function escapeHTML(value){
@@ -368,6 +431,7 @@
     if(!data)return;
     leaderboardData=data;
     var personal=personalFrom(data);
+    reconcilePendingBest(personal);
     rankTop.textContent=personal?'#'+personal.rank:'--';
     leaderboardBtn.classList.toggle('online',!!data.viewer);
     resultOnlineBest.textContent=personal?String(personal.score):'--';
@@ -423,7 +487,7 @@
     allTimeTab.setAttribute('aria-selected',String(mode==='all_time'));weeklyTab.setAttribute('aria-selected',String(mode==='weekly'));renderLeaderboard();
   }
   function beginOnlineRun(){
-    var run={epoch:authEpoch,attempts:0,busy:false,payload:null};
+    var run={epoch:authEpoch,attempts:0,busy:false,payload:null,userId:authUserId,expiresAt:null};
     run.promise=onlineApi('start_run',{bird_skin:birdSkin,game_version:GAME_VERSION},true).catch(function(error){run.error=error;return null;});
     activeRun=run;
   }
@@ -432,32 +496,41 @@
     var issued=run?await run.promise:null;
     if(!run||run.epoch!==authEpoch)return;
     if(!issued){
-      if(run===activeRun){onlineResultStatus.textContent=run.error?.code==='TEST_ACCOUNT_EXCLUDED'?'测试账号不参与排名，本地 BEST 正常保留':ToolboxAuth.peekSession()?'线上计分未连接，本地纪录已正常保存':'登录工具箱后，新完成的成绩可进入好友榜';onlineResultStatus.className='online-result-status warn';}return;
+      if(run.error?.code==='LEADERBOARD_EXCLUDED'||run.error?.code==='TEST_ACCOUNT_EXCLUDED'){
+        clearPendingBestThrough(Number.MAX_SAFE_INTEGER);setSyncStatus('离线保存','测试账号不参与排名，本地 BEST 正常保留');
+      }else setSyncStatus('离线保存',ToolboxAuth.peekSession()?pendingBest+' 分已保存在本机，联网后自动重试':'登录后新完成的成绩可进入好友榜');
+      return;
     }
     run.payload={run_token:issued.run_token,score:finalScore,duration_ms:durationMs,bird_skin:skin,game_version:GAME_VERSION};
+    run.expiresAt=issued.expires_at||null;
     pendingRuns.push(run);pendingRuns=pendingRuns.slice(-5);
+    persistRun(run);
     await sendRun(run);
   }
   async function sendRun(run){
     if(run.busy||run.epoch!==authEpoch||run.attempts>=2)return;
     run.busy=true;run.attempts++;
-    function message(text,kind){if(run===activeRun&&run.epoch===authEpoch){onlineResultStatus.textContent=text;onlineResultStatus.className='online-result-status '+(kind||'');}}
-    message('正在验证线上成绩…');
+    function message(mode,detail){if((run===activeRun||resultLayer.classList.contains('active'))&&run.epoch===authEpoch)setSyncStatus(mode,detail);}
+    message('正在同步','正在验证成绩');
     try{
       var response=await onlineApi('submit_run',run.payload,true);
       pendingRuns=pendingRuns.filter(function(item){return item!==run;});
+      forgetRun(run);
       if(run.epoch!==authEpoch)return;
       if(run===activeRun){++leaderboardRequest;applyLeaderboard(response.leaderboard);}else refreshLeaderboard(true);
       var personal=personalFrom(response.leaderboard);
-      message(personal&&personal.score===run.payload.score?'线上最好 '+personal.score+' · 当前第 '+personal.rank+' 名':'成绩已验证，线上最好仍为 '+(personal?personal.score:run.payload.score),'good');
+      var fullySynced=reconcilePendingBest(personal);
+      if(fullySynced)message('已同步',personal?'线上最好 '+personal.score+'，当前第 '+personal.rank+' 名':'成绩已验证');
+      else message('离线保存',pendingBest+' 分仍在本机等待有效局补传');
     }catch(error){
       if(error.status>=400&&error.status<500){pendingRuns=pendingRuns.filter(function(item){return item!==run;});
-        if(error.code==='RUN_ALREADY_SUBMITTED'){refreshLeaderboard(true);message('本局凭证已处理，已刷新线上排名');}
-        else message(error.message+'；本地 BEST 正常保留','warn');
-      }else message('网络连接失败，本地 BEST 已保存；恢复联网后重试一次','warn');
+        forgetRun(run);
+        if(error.code==='RUN_ALREADY_SUBMITTED'){await refreshLeaderboard(true);message(pendingBest?'离线保存':'已同步',pendingBest?pendingBest+' 分仍在本机':'线上排名已刷新');}
+        else message('离线保存',error.message+'；本地 BEST 正常保留');
+      }else message('离线保存',pendingBest+' 分已保存在本机，联网后自动重试');
     }finally{run.busy=false;}
   }
-  function retryPendingSubmission(){pendingRuns.slice().forEach(function(run){sendRun(run);});}
+  function retryPendingSubmission(){pendingRuns.slice().forEach(function(run){if(!run.busy&&run.attempts<2)sendRun(run);});}
 
   function initAudio(){
     if(!soundOn)return null;
@@ -468,11 +541,12 @@
     if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();
     return audioCtx;
   }
-  function tone(freq,dur,type,vol){
+  function tone(freq,dur,type,vol,endFreq){
     var ac=initAudio();if(!ac)return;
     var o=ac.createOscillator(),g=ac.createGain();
-    o.type=type||'sine';o.frequency.value=freq;
-    g.gain.setValueAtTime(vol||.025,ac.currentTime);
+    o.type=type||'sine';o.frequency.setValueAtTime(freq,ac.currentTime);
+    if(endFreq)o.frequency.exponentialRampToValueAtTime(endFreq,ac.currentTime+dur);
+    g.gain.setValueAtTime(.0001,ac.currentTime);g.gain.linearRampToValueAtTime(vol||.025,ac.currentTime+.004);
     g.gain.exponentialRampToValueAtTime(.0001,ac.currentTime+dur);
     o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+dur);
   }
@@ -501,7 +575,7 @@
 
   function resetGame(rerollSkin){
     if(rerollSkin)pickBirdSkin();
-    pipes=[];score=0;newRecord=false;elapsed=0;scroll=0;prevGapY=null;hitFreezeUntil=0;groundHitAt=0;
+    pipes=[];score=0;newRecord=false;elapsed=0;scroll=0;prevGapY=null;hitSlowUntil=0;groundHitAt=0;
     bird.x=W*.28;bird.y=H*.45;bird.vy=0;bird.rot=0;bird.wing=0;bird.squash=0;
     scoreEl.textContent='0';scoreEl.classList.add('hidden');newBestEl.classList.remove('show');
     resultLayer.classList.remove('active');pauseLayer.classList.remove('active');
@@ -530,8 +604,7 @@
     bird.vy=Math.min(bird.vy,0)*.12-flapPower;
     bird.wing=1;
     bird.squash=.08;
-    tone(340,.045,'sine',.018);
-    haptic(5);
+    tone(370,.052,'sine',.016,315);
   }
 
   function pauseGame(){
@@ -589,10 +662,10 @@
     if(state==='paused'||state==='over')return;
 
     if(state==='falling'){
-      if(now<hitFreezeUntil)return;
-      bird.vy=Math.min(H*.98,bird.vy+H*2.45*dt);
-      bird.y+=bird.vy*dt;
-      bird.rot=Math.min(1.42,bird.rot+2.9*dt);
+      var fallDt=now<hitSlowUntil&&!reduceMotion?dt*.18:dt;
+      bird.vy=Math.min(H*.98,bird.vy+H*2.45*fallDt);
+      bird.y+=bird.vy*fallDt;
+      bird.rot=Math.min(1.22,bird.rot+2.7*fallDt);
       if(bird.y+birdRadius()>=groundY){
         bird.y=groundY-birdRadius();
         if(!groundHitAt){
@@ -619,7 +692,7 @@
       if(!pipes[i].passed&&pipes[i].x+pipeWidth()<bird.x-birdRadius()){
         pipes[i].passed=true;score++;scoreEl.textContent=String(score);
         scoreEl.classList.remove('bump');void scoreEl.offsetWidth;scoreEl.classList.add('bump');
-        tone(650,.065,'sine',.03);haptic(9);
+        tone(620,.068,'sine',.024,760);
         if(score>best&&!newRecord){
           newRecord=true;newBestEl.classList.remove('show');void newBestEl.offsetWidth;newBestEl.classList.add('show');
           tone(880,.12,'triangle',.025);haptic([12,18,12]);
@@ -631,7 +704,7 @@
     if(last&&last.x<W-d.spacing)addPipe(last.x+d.spacing);
 
     if(collides()){
-      state='falling';hitFreezeUntil=now+65;bird.vy=Math.max(bird.vy,H*.12);
+      state='falling';hitSlowUntil=now+(reduceMotion?0:250);bird.vy=Math.max(bird.vy,H*.12);
       thump();haptic(24);
     }
   }
@@ -655,22 +728,30 @@
   function finishGame(){
     state='over';pauseBtn.disabled=true;pauseBtn.textContent='Ⅱ';pauseBtn.classList.remove('active');
     var record=saveBest();
+    var personal=personalFrom(leaderboardData),onlineBest=personal?personal.score:0;
+    if(!leaderboardData?.excluded_account&&score>onlineBest)rememberPendingBest(score);
     resultScore.textContent=String(score);resultBest.textContent=String(best);
     resultTitle.textContent=record?'新纪录！':'本局结束';
     medal.textContent=score>=70?'💎':score>=40?'🥇':score>=20?'🥈':score>=10?'🥉':'·';
+    medal.classList.remove('shine');if(record&&!reduceMotion){void medal.offsetWidth;medal.classList.add('shine');}
     resultLayer.classList.add('active');
-    onlineResultStatus.textContent='正在读取本局线上状态…';
+    setSyncStatus('正在同步','正在验证本局成绩');
     submitOnlineRun(score,Math.max(250,Math.round(elapsed*1000)),birdSkin);
   }
 
   function draw(now){
     ctx.clearRect(0,0,W,H);
+    ctx.save();
+    if(state==='falling'&&now<hitSlowUntil&&!reduceMotion){
+      var force=clamp((hitSlowUntil-now)/250,0,1);ctx.translate(Math.sin(now*.095)*1.6*force,Math.cos(now*.073)*.8*force);
+    }
     drawBackground();
     drawClouds();
     drawRidges();
     drawPipes();
     drawGround();
     drawBird(now);
+    ctx.restore();
   }
 
   function drawBackground(){
@@ -680,10 +761,15 @@
     var rg=ctx.createRadialGradient(W*.78,H*.16,10,W*.78,H*.16,W*.62);
     rg.addColorStop(0,'rgba(111,206,220,.10)');rg.addColorStop(1,'rgba(111,206,220,0)');
     ctx.fillStyle=rg;ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='rgba(218,242,242,.075)';
+    for(var i=0;i<8;i++){
+      var px=((i*.173*W-scroll*.018)%(W*1.18)+W*1.18)%(W*1.18)-W*.08;
+      var py=H*(.10+(i%4)*.105);ctx.beginPath();ctx.arc(px,py,i%3===0?1.1:.7,0,Math.PI*2);ctx.fill();
+    }
   }
 
   function drawClouds(){
-    var travel=scroll*.18;
+    var travel=scroll*.055;
     for(var i=0;i<clouds.length;i++){
       var c=clouds[i],span=W*2.05;
       var x=((c.x*W-travel)%span+span)%span-W*.2,y=c.y*H,sz=W*.12*c.s;
@@ -697,7 +783,7 @@
   }
 
   function drawRidges(){
-    var off=(scroll*.08)%(W*.9);
+    var off=(scroll*.11)%(W*.9);
     ctx.save();
     ctx.fillStyle='rgba(8,28,38,.40)';
     ctx.beginPath();ctx.moveTo(0,groundY);
@@ -709,7 +795,7 @@
     ctx.fillStyle='rgba(5,21,29,.47)';
     ctx.beginPath();ctx.moveTo(0,groundY);
     for(var x2=-W*.8;x2<=W*1.8;x2+=W*.14){
-      var xx2=x2-(scroll*.13%(W*.8)),yy2=groundY-H*.075-Math.sin((x2/W)*7.8+1.1)*H*.024;
+      var xx2=x2-(scroll*.22%(W*.8)),yy2=groundY-H*.075-Math.sin((x2/W)*7.8+1.1)*H*.024;
       ctx.lineTo(xx2,yy2);
     }
     ctx.lineTo(W,groundY);ctx.closePath();ctx.fill();
@@ -752,7 +838,7 @@
     lg.addColorStop(0,'rgba(132,225,220,.22)');lg.addColorStop(1,'rgba(132,225,220,0)');
     ctx.fillStyle=lg;ctx.fillRect(0,groundY,W,12);
     ctx.strokeStyle='rgba(255,255,255,.055)';ctx.lineWidth=2;
-    var off=-(scroll*.45%28);
+    var off=-(scroll*.58%28);
     for(var x=off;x<W+28;x+=28){ctx.beginPath();ctx.moveTo(x,groundY+13);ctx.lineTo(x+12,groundY+25);ctx.stroke();}
   }
 
@@ -762,7 +848,8 @@
     var flapBoost=bird.wing>0?bird.wing:0;
     var wingAngle=-.10+wingCycle*.24-flapBoost*.78;
     ctx.save();ctx.translate(bird.x,bird.y);ctx.rotate(bird.rot);
-    var sx=1+bird.squash*.30,sy=1-bird.squash*.38;ctx.scale(sx,sy);
+    var fallStretch=state==='running'?clamp(bird.vy/(H*.92),0,.035):0;
+    var sx=1+bird.squash*.30-fallStretch*.30,sy=1-bird.squash*.38+fallStretch;ctx.scale(sx,sy);
 
     /* 分叉尾羽：先建立明确的飞行方向，避免圆团感 */
     ctx.fillStyle=skin.tail;
@@ -895,11 +982,14 @@
   window.addEventListener('online',function(){retryPendingSubmission();refreshLeaderboard(true);});
   ToolboxAuth.onAuthStateChange(function(){
     var next=(ToolboxAuth.peekSession()||{}).user?.id||null;
-    if(next!==authUserId){authUserId=next;authEpoch++;pendingRuns=[];applyLeaderboard({all_time:[],weekly:[],viewer:null});refreshLeaderboard(true);}
+    if(next!==authUserId){
+      authUserId=next;authEpoch++;activeRun=null;loadPendingBest();restorePendingRuns();
+      applyLeaderboard({all_time:[],weekly:[],viewer:null});refreshLeaderboard(true).then(retryPendingSubmission);
+    }
   });
 
-  loadBest();resetGame(true);state='ready';readyLayer.classList.remove('hidden');
-  refreshLeaderboard(true);
+  loadBest();loadPendingBest();restorePendingRuns();resetGame(true);state='ready';readyLayer.classList.remove('hidden');
+  refreshLeaderboard(true).then(retryPendingSubmission);
   requestAnimationFrame(resize);raf=requestAnimationFrame(frame);
 })();
 </script>
