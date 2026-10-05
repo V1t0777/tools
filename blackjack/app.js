@@ -6,6 +6,9 @@
   const SCREENS = ['authScreen','recoveryScreen','homeScreen','roomScreen','gameScreen','finishScreen'];
   const SUITS = {S:'♠',H:'♥',D:'♦',C:'♣'};
   const STATUS_TEXT = {active:'思考中',stand:'已停牌',bust:'爆牌',blackjack:'Blackjack',none:'等待开局'};
+  const HEALTHY_POLL_MS = 12000;
+  const DEGRADED_POLL_MS = 1200;
+  const PING_MS = 6000;
 
   let session = null;
   let sdkPromise = null;
@@ -31,6 +34,9 @@
   let advanceRequested = false;
   let clockOffset = 0;
   let suspended = false;
+  const playerSeatNodes = new Map();
+  let lastActionRtt = null;
+  let lastRenderCost = null;
 
   function show(id) {
     SCREENS.forEach((name) => $(name).classList.toggle('active', name === id));
@@ -203,6 +209,7 @@
       busy = true;
       $('createBtn').disabled = true;
       try {
+        ensureRealtimeSDK().catch(() => {});
         const data = await api('create_room',{round_limit:Number($('roundLimit').value)});
         me = data.member || me;
         await enterRoom(data.state);
@@ -247,6 +254,7 @@
     if (busy) return;
     busy = true;
     try {
+      ensureRealtimeSDK().catch(() => {});
       const data = await api('join_room',{code});
       me = data.member || me;
       await enterRoom(data.state);
@@ -275,6 +283,8 @@
     pollTimer = clockTimer = refreshTimer = null;
     pollMs = 0;
     state = null;
+    playerSeatNodes.clear();
+    $('playerTable').replaceChildren();
     presenceMembers.clear();
     setURL('');
     $('shareBtn').classList.add('hidden');
@@ -308,8 +318,10 @@
     busy = true;
     updateActions();
     const roomId = state.room.id;
+    const startedAt = performance.now();
     try {
       const data = await api(action,{room_id:roomId,...payload});
+      lastActionRtt = Math.round(performance.now()-startedAt);
       if (data.state) adoptState(data.state);
     } catch (err) {
       if (err.status === 409 || err.code === 'STALE_ACTION') {
@@ -382,37 +394,54 @@
       : (mine?.ready ? '已准备，等待房主开始。' : '准备好后，等待房主开始。');
   }
 
+  function createPlayerSeatNode() {
+    const seat = document.createElement('article');
+    const left = document.createElement('div');
+    const head = document.createElement('div');
+    head.className = 'seat-head';
+    const name = document.createElement('b');
+    const score = document.createElement('span');
+    score.className = 'seat-score';
+    head.append(name,score);
+    const status = document.createElement('div');
+    status.className = 'seat-status';
+    left.append(head,status);
+    const hand = document.createElement('div');
+    hand.className = 'hand';
+    seat.append(left,hand);
+    return {seat,name,score,status,hand};
+  }
+
   function renderGame() {
+    const renderStartedAt = performance.now();
     $('roundLabel').textContent = `第 ${state.room.current_round} / ${state.room.round_limit} 局`;
     $('phaseLabel').textContent = state.room.phase === 'settlement' ? '本局结算' : '同时行动';
     renderHand($('dealerHand'),state.dealer.cards || []);
     $('dealerValue').textContent = state.dealer.value == null ? '?' : String(state.dealer.value);
 
     const table = $('playerTable');
-    table.replaceChildren();
+    const wanted = new Set();
     for (const player of state.players) {
-      const seat = document.createElement('article');
-      seat.className = 'player-seat' + (String(player.member_id) === String(me?.id) ? ' me' : '');
-      const left = document.createElement('div');
-      const head = document.createElement('div');
-      head.className = 'seat-head';
-      const name = document.createElement('b');
-      name.textContent = player.nickname || '好友';
-      const score = document.createElement('span');
-      score.className = 'seat-score';
-      score.textContent = `${player.score} 分`;
-      head.append(name,score);
-      const status = document.createElement('div');
-      status.className = 'seat-status';
-      status.textContent = player.result && state.room.phase === 'settlement'
+      const key = String(player.member_id);
+      wanted.add(key);
+      let node = playerSeatNodes.get(key);
+      if (!node) {
+        node = createPlayerSeatNode();
+        playerSeatNodes.set(key,node);
+      }
+      node.seat.className = 'player-seat' + (key === String(me?.id) ? ' me' : '');
+      node.name.textContent = player.nickname || '好友';
+      node.score.textContent = `${player.score} 分`;
+      node.status.textContent = player.result && state.room.phase === 'settlement'
         ? resultText(player)
         : `${STATUS_TEXT[player.hand_status] || '等待'}${player.hand_value == null ? '' : ` · ${player.hand_value}`}`;
-      left.append(head,status);
-      const hand = document.createElement('div');
-      hand.className = 'hand';
-      renderHand(hand,player.hand_cards || []);
-      seat.append(left,hand);
-      table.append(seat);
+      renderHand(node.hand,player.hand_cards || []);
+      table.append(node.seat);
+    }
+    for (const [key,node] of playerSeatNodes) {
+      if (wanted.has(key)) continue;
+      node.seat.remove();
+      playerSeatNodes.delete(key);
     }
 
     const mine = myPlayer();
@@ -434,6 +463,7 @@
     }
     updateActions();
     tick();
+    lastRenderCost = Math.round((performance.now()-renderStartedAt)*10)/10;
   }
 
   function renderFinish() {
@@ -481,13 +511,21 @@
   }
 
   function renderHand(container,cards) {
-    container.replaceChildren();
-    for (const code of cards) container.append(createCard(code));
+    const desired = cards.map((code) => String(code));
+    for (let i=0;i<desired.length;i++) {
+      const current = container.children[i];
+      if (current?.dataset.code === desired[i]) continue;
+      const card = createCard(desired[i]);
+      if (current) current.replaceWith(card);
+      else container.append(card);
+    }
+    while (container.children.length > desired.length) container.lastElementChild.remove();
   }
 
   function createCard(code) {
     const card = document.createElement('div');
     card.className = 'card';
+    card.dataset.code = String(code);
     if (code === 'BACK') {
       card.classList.add('back');
       card.setAttribute('aria-label','暗牌');
@@ -540,11 +578,28 @@
     }
   }
 
+  function scheduleClockTick(delay = 0) {
+    clearTimeout(clockTimer);
+    if (!state || suspended) return;
+    clockTimer = setTimeout(() => {
+      tick();
+      if (!state || suspended) return;
+      const now = Date.now() + clockOffset;
+      const mine = myPlayer();
+      const decisionMs = state.room.phase === 'player_action' && mine?.hand_status === 'active' && mine.decision_deadline
+        ? Date.parse(mine.decision_deadline)-now
+        : Infinity;
+      const summaryMs = state.room.phase === 'settlement' && state.room.summary_until
+        ? Date.parse(state.room.summary_until)-now
+        : Infinity;
+      scheduleClockTick(Math.min(decisionMs,summaryMs) <= 3000 ? 250 : 1000);
+    },delay);
+  }
+
   function startTimers() {
     if (!state || suspended) return;
-    clearInterval(clockTimer);
-    clockTimer = setInterval(tick,250);
-    setPollInterval(isRealtimeHealthy() ? 3500 : 1200);
+    scheduleClockTick(0);
+    setPollInterval(isRealtimeHealthy() ? HEALTHY_POLL_MS : DEGRADED_POLL_MS);
   }
 
   function setPollInterval(ms) {
@@ -675,8 +730,10 @@
 
   function updateConnection() {
     const healthy = isRealtimeHealthy();
-    setPollInterval(healthy ? 3500 : 1200);
-    const label = healthy ? (Number.isFinite(realtimeRtt) ? `实时在线 · ${Math.round(realtimeRtt)}ms` : '实时在线') : '同步恢复中';
+    setPollInterval(healthy ? HEALTHY_POLL_MS : DEGRADED_POLL_MS);
+    const network = Number.isFinite(realtimeRtt) ? `${Math.round(realtimeRtt)}ms` : null;
+    const action = Number.isFinite(lastActionRtt) ? `操作 ${lastActionRtt}ms` : null;
+    const label = healthy ? ['实时在线',network,action].filter(Boolean).join(' · ') : '同步恢复中';
     for (const id of ['connectionStatus','gameConnectionStatus']) {
       const el = $(id);
       if (!el) continue;
@@ -688,7 +745,7 @@
   function startPing() {
     clearInterval(pingTimer);
     sendPing();
-    pingTimer = setInterval(sendPing,3000);
+    pingTimer = setInterval(sendPing,PING_MS);
   }
 
   function sendPing() {
