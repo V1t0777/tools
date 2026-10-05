@@ -18,3 +18,11 @@ button,input,select{font:inherit}.app{width:min(880px,100%);margin:auto}.hidden{
 @media(max-width:620px){.topbar{grid-template-columns:auto 1fr auto}.brand strong{display:none}.action-grid{grid-template-columns:1fr}.player-table{grid-template-columns:1fr}.player-seat{display:grid;grid-template-columns:110px 1fr;align-items:center;text-align:left}.player-seat .hand{justify-content:flex-start;margin:0;transform:scale(.76);transform-origin:left center}.seat-head,.seat-status{justify-content:flex-start;text-align:left}.dealer-zone{padding-top:12px}.card{width:62px;height:88px}.hero-card{margin-top:24px}.action-card{min-height:235px}}
 @media(max-width:390px){.top-actions .ghost{padding:0 9px}.back{padding:0 9px}.player-seat{grid-template-columns:96px 1fr}.player-seat .hand{transform:scale(.7)}}
 @media(prefers-reduced-motion:reduce){.screen.active,.emoji-float.show{animation:none}.back,.ghost,.secondary,.primary,.action-card button,.action-buttons button,.toast{transition:none}}
+
+
+/* Blackjack hot-table performance: reduce compositor work during active play. */
+#gameScreen .panel{backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px)}
+@media(max-width:620px){
+  #gameScreen .panel{backdrop-filter:none;-webkit-backdrop-filter:none;background:rgba(13,35,29,.96)}
+  #gameScreen .player-seat{box-shadow:none}
+}

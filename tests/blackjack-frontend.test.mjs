@@ -13,7 +13,16 @@ test('blackjack frontend uses private realtime snapshots with database fallback'
   assert.match(app,/channel\(`blackjack:\$\{roomId\}`/);
   assert.match(app,/private:true/);
   assert.match(app,/event:'state_snapshot'/);
-  assert.match(app,/setPollInterval\(isRealtimeHealthy\(\) \? 3500 : 1200\)/);
+  assert.match(app,/HEALTHY_POLL_MS = 12000/);
+  assert.match(app,/DEGRADED_POLL_MS = 1200/);
+  assert.match(app,/PING_MS = 6000/);
+});
+
+test('blackjack hot table avoids full DOM rebuilds and uses adaptive clock ticks',()=>{
+  assert.match(app,/playerSeatNodes = new Map\(\)/);
+  assert.match(app,/current\?\.dataset\.code === desired\[i\]/);
+  assert.match(app,/scheduleClockTick\(Math\.min\(decisionMs,summaryMs\) <= 3000 \? 250 : 1000\)/);
+  assert.doesNotMatch(app,/playerTable'\)\.replaceChildren\(\);\n    for \(const player of state\.players\)/);
 });
 
 test('blackjack player actions use per-player one-time token rather than global room version',()=>{
