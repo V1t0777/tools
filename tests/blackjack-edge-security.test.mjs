@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 const source=readFileSync(new URL('../supabase/functions/blackjack-game/index.ts',import.meta.url),'utf8');
 const sql=readFileSync(new URL('../supabase/migrations/20260929160000_blackjack_v1.sql',import.meta.url),'utf8');
 const perf=readFileSync(new URL('../supabase/migrations/20261005220000_blackjack_performance_v11.sql',import.meta.url),'utf8');
+const hardening=readFileSync(new URL('../supabase/migrations/20261005221500_blackjack_session_context_hardening.sql',import.meta.url),'utf8');
 
 test('blackjack deck generation is server side and cryptographically sourced',()=>{
   assert.match(source,/function shuffledDeck\(\)/);
@@ -33,6 +34,13 @@ test('blackjack authoritative snapshot is server broadcast and cannot be client-
   const policy=sql.slice(sql.indexOf('create policy "blackjack members send realtime"'));
   assert.match(policy,/event in \('state_changed','ping','pong','emoji'\)/);
   assert.doesNotMatch(policy,/event in \([^)]*state_snapshot/);
+});
+
+test('blackjack session context keeps public RPC invoker-only',()=>{
+  assert.match(hardening,/private\.blackjack_current_member_context\(\)/);
+  assert.match(hardening,/security definer/);
+  assert.match(hardening,/public\.blackjack_session_context\(\)[\s\S]*security invoker/);
+  assert.match(hardening,/grant execute on function public\.blackjack_session_context\(\) to authenticated/);
 });
 
 test('blackjack V1.1 narrows action locks and keeps gateway server-only',()=>{
