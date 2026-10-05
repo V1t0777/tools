@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 
 const source=readFileSync(new URL('../supabase/functions/blackjack-game/index.ts',import.meta.url),'utf8');
 const sql=readFileSync(new URL('../supabase/migrations/20260929160000_blackjack_v1.sql',import.meta.url),'utf8');
+const perf=readFileSync(new URL('../supabase/migrations/20261005220000_blackjack_performance_v11.sql',import.meta.url),'utf8');
 
 test('blackjack deck generation is server side and cryptographically sourced',()=>{
   assert.match(source,/function shuffledDeck\(\)/);
@@ -11,11 +12,13 @@ test('blackjack deck generation is server side and cryptographically sourced',()
   assert.doesNotMatch(source,/Math\.random\(\).*deck/);
 });
 
-test('blackjack edge verifies toolbox membership before game actions',()=>{
-  assert.match(source,/toolbox_session_status/);
-  assert.match(source,/member_id/);
-  assert.match(source,/flappy_rate_limit_check/);
-  assert.match(source,/blackjack:\$\{action\}/);
+test('blackjack edge uses one session context lookup and a rate-limited hot-path gateway',()=>{
+  assert.match(source,/blackjack_session_context/);
+  assert.doesNotMatch(source,/toolbox_session_status/);
+  assert.match(source,/blackjack_action_gateway_service/);
+  assert.match(source,/action !== "hit" && action !== "stand"/);
+  assert.match(perf,/flappy_rate_limit_check/);
+  assert.match(perf,/blackjack:\'\|\|p_action/);
 });
 
 test('blackjack hidden deck is private and browser roles have no table access',()=>{
@@ -30,6 +33,14 @@ test('blackjack authoritative snapshot is server broadcast and cannot be client-
   const policy=sql.slice(sql.indexOf('create policy "blackjack members send realtime"'));
   assert.match(policy,/event in \('state_changed','ping','pong','emoji'\)/);
   assert.doesNotMatch(policy,/event in \([^)]*state_snapshot/);
+});
+
+test('blackjack V1.1 narrows action locks and keeps gateway server-only',()=>{
+  assert.match(perf,/Lock only the acting player's row first/);
+  assert.match(perf,/from private\.blackjack_secrets[\s\S]*for update/);
+  assert.match(perf,/where id=p_room_id and status='playing' and phase='player_action'/);
+  assert.match(perf,/revoke all on function public\.blackjack_action_gateway_service/);
+  assert.match(perf,/grant execute on function public\.blackjack_action_gateway_service[\s\S]*service_role/);
 });
 
 test('blackjack actions use rotating token and service RPC is server-only',()=>{
