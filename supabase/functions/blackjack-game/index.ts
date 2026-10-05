@@ -105,19 +105,12 @@ async function identify(req: Request) {
     global: { headers: { Authorization: authorization } },
     auth: { persistSession: false, autoRefreshToken: false },
   });
-  const status = await client.rpc("toolbox_session_status");
-  if (status.error) fail("登录状态暂时无法验证，请重试", 503, "SESSION_CHECK_FAILED");
-  if (!status.data?.active || !status.data?.member_id) {
+  const context = await client.rpc("blackjack_session_context");
+  if (context.error) fail("登录状态暂时无法验证，请重试", 503, "SESSION_CHECK_FAILED");
+  if (!context.data?.id || !context.data?.user_id) {
     fail("当前账号不在工具箱成员名单中或会话已失效", 403, "SESSION_REVOKED");
   }
-  const memberResult = await admin
-    .from("members")
-    .select("id,user_id,nickname,color")
-    .eq("id", status.data.member_id)
-    .maybeSingle();
-  if (memberResult.error) fail("成员资料读取失败，请稍后重试", 503);
-  if (!memberResult.data) fail("成员资料不存在", 403);
-  return memberResult.data;
+  return context.data;
 }
 
 async function readBody(req: Request) {
@@ -178,6 +171,7 @@ async function gameRpc(name: string, args: Record<string, unknown>) {
   const out = await admin.rpc(name, args);
   if (!out.error) return out.data;
   if (out.error.code === "40001") fail("操作状态已更新，请重试", 409, "STALE_ACTION");
+  if (out.error.code === "P4290") fail("请求过于频繁，请稍后再试", 429, "RATE_LIMITED");
   fail(out.error.message || "操作失败", 400, out.error.code);
 }
 
@@ -192,7 +186,9 @@ Deno.serve(async (req: Request) => {
     const action = String(body.action || "");
     if (!Object.hasOwn(ACTION_LIMITS, action)) fail("未知操作", 400, "UNKNOWN_ACTION");
     const member = await identify(req);
-    await limitAction(member.user_id, action);
+    if (action !== "hit" && action !== "stand") {
+      await limitAction(member.user_id, action);
+    }
 
     if (action === "bootstrap" && !body.code) return reply(req, { member });
 
@@ -294,8 +290,6 @@ Deno.serve(async (req: Request) => {
 
     const roomId = String(body.room_id || "");
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(roomId)) fail("房间标识无效");
-    await player(roomId, member.user_id);
-
     if (action === "state") {
       return reply(req, { state: await state(roomId, member.user_id) });
     }
@@ -318,7 +312,7 @@ Deno.serve(async (req: Request) => {
     if (action === "hit" || action === "stand") {
       const token = String(body.expected_token || "");
       if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(token)) fail("操作状态无效，请刷新后重试");
-      const next = await gameRpc("blackjack_action_service", {
+      const next = await gameRpc("blackjack_action_gateway_service", {
         p_room_id: roomId,
         p_user_id: member.user_id,
         p_action: action,
@@ -351,6 +345,7 @@ Deno.serve(async (req: Request) => {
       return reply(req, { state: next });
     }
     if (action === "close_room") {
+      await player(roomId, member.user_id);
       const room = await roomById(roomId);
       if (room.host_user_id !== member.user_id) fail("只有房主可以结束房间", 403);
       await admin
@@ -367,6 +362,7 @@ Deno.serve(async (req: Request) => {
       return reply(req, { closed: true });
     }
     if (action === "leave_room") {
+      await player(roomId, member.user_id);
       const room = await roomById(roomId);
       const now = new Date().toISOString();
       if (room.host_user_id === member.user_id) {
