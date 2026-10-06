@@ -9,7 +9,7 @@
   <title>朋友21点｜钊的工具箱</title>
   <link rel="stylesheet" href="../shared/toolbox-ui.css">
   <link rel="stylesheet" href="../shared/toolbox-motion.css">
-  <link rel="stylesheet" href="./style.css?v=20260929-1">
+  <link rel="stylesheet" href="./style.css?v=20261006-2">
 </head>
 <body>
   <main class="app">
@@ -69,6 +69,20 @@
           <button type="submit">加入房间</button>
         </form>
       </div>
+
+      <section class="panel history-panel" id="historyPanel">
+        <div class="history-head">
+          <div>
+            <small>只显示你参与过的牌局</small>
+            <h2>最近对局</h2>
+          </div>
+          <button class="ghost" id="historyRefreshBtn" type="button">刷新</button>
+        </div>
+        <div class="history-list" id="historyList" aria-live="polite"></div>
+        <p class="history-empty" id="historyEmpty">暂无已结束的对局记录。</p>
+        <p class="history-retention">对局记录保留 180 天；已结束的临时房间数据在 24 小时后自动清理。</p>
+      </section>
+
       <p class="privacy">🔒 仅工具箱现有成员可进入；牌堆与庄家暗牌只保存在服务端。</p>
     </section>
 
@@ -140,6 +154,6 @@
   <div class="emoji-float" id="emojiFloat" aria-hidden="true"></div>
 
   <script src="../shared/toolbox-auth.js?v=20260923-1"></script>
-  <script src="./app.js?v=20260929-1"></script>
+  <script src="./app.js?v=20261006-2"></script>
 </body>
 </html>
