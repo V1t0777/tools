@@ -144,6 +144,30 @@
   function pulseHaptic(pattern = 10) {
     try { if (navigator.vibrate) navigator.vibrate(pattern); } catch {}
   }
+  function animateChipFlight(button) {
+    if (!button || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    if (document.querySelectorAll('.chip-flight').length >= 5) return;
+    const target = $('pendingBet');
+    if (!target) return;
+    const from = button.getBoundingClientRect();
+    const to = target.getBoundingClientRect();
+    const clone = button.cloneNode(true);
+    clone.classList.add('chip-flight');
+    clone.disabled = true;
+    clone.style.left = `${from.left}px`;
+    clone.style.top = `${from.top}px`;
+    clone.style.width = `${from.width}px`;
+    clone.style.height = `${from.height}px`;
+    document.body.append(clone);
+    const dx = to.left + to.width/2 - (from.left + from.width/2);
+    const dy = to.top + to.height/2 - (from.top + from.height/2);
+    const animation = clone.animate([
+      {transform:'translate3d(0,0,0) scale(1)',opacity:1},
+      {transform:`translate3d(${dx*.72}px,${dy*.72-14}px,0) scale(.82)`,opacity:.94,offset:.72},
+      {transform:`translate3d(${dx}px,${dy}px,0) scale(.56)`,opacity:0},
+    ],{duration:280,easing:'cubic-bezier(.18,.78,.22,1)',fill:'forwards'});
+    animation.finished.finally(() => clone.remove()).catch(() => clone.remove());
+  }
 
   function isHost() {
     return Boolean(state && me && String(state.room.host_member_id) === String(me.id));
@@ -318,6 +342,7 @@
       }
       pendingBet += chip;
       pulseHaptic(7);
+      animateChipFlight(button);
       renderBetting();
     });
     $('clearBetBtn').onclick = () => {
@@ -587,7 +612,7 @@
       const value = Number(item?.value);
       chip.textContent = Number.isFinite(value) ? `${label} · ${value}` : label;
       chip.title = item?.hand_status === 'blackjack' ? 'Blackjack' :
-        item?.hand_status === 'bust' ? '爆牌' : `积分 ${Number(item?.delta || 0) >= 0 ? '+' : ''}${Number(item?.delta || 0)}`;
+        item?.hand_status === 'bust' ? '爆牌' : `筹码 ${Number(item?.delta || 0) >= 0 ? '+' : ''}${Number(item?.delta || 0)}`;
       strip.append(chip);
     }
   }
