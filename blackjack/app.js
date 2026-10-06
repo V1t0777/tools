@@ -5,7 +5,7 @@
   const $ = (id) => document.getElementById(id);
   const SCREENS = ['authScreen','recoveryScreen','homeScreen','roomScreen','gameScreen','finishScreen'];
   const SUITS = {S:'♠',H:'♥',D:'♦',C:'♣'};
-  const STATUS_TEXT = {active:'思考中',stand:'已停牌',bust:'爆牌',blackjack:'Blackjack',none:'等待开局'};
+  const STATUS_TEXT = {active:'思考中',stand:'已停牌',bust:'爆牌',blackjack:'黑杰克',none:'等待开局'};
   const HEALTHY_POLL_MS = 12000;
   const DEGRADED_POLL_MS = 1200;
   const PING_MS = 6000;
@@ -540,7 +540,7 @@
     const handText = hands.length
       ? hands.map((hand) => {
           const cards = Array.isArray(hand.cards) ? hand.cards.map(prettyCard).join(' ') : '';
-          const tag = hand.status === 'blackjack' ? 'BJ' : hand.status === 'surrender' ? 'SURRENDER' : hand.status === 'bust' ? 'BUST' : '';
+          const tag = hand.status === 'blackjack' ? '黑杰克' : hand.status === 'surrender' ? '投降' : hand.status === 'bust' ? '爆牌' : '';
           return `${cards}${hand.value == null ? '' : ` ${hand.value}`}${tag ? ` ${tag}` : ''}`;
         }).join(' / ')
       : '';
@@ -611,7 +611,7 @@
       const label = result === 'win' ? '胜' : result === 'push' ? '和' : '负';
       const value = Number(item?.value);
       chip.textContent = Number.isFinite(value) ? `${label} · ${value}` : label;
-      chip.title = item?.hand_status === 'blackjack' ? 'Blackjack' :
+      chip.title = item?.hand_status === 'blackjack' ? '黑杰克' :
         item?.hand_status === 'bust' ? '爆牌' : `筹码 ${Number(item?.delta || 0) >= 0 ? '+' : ''}${Number(item?.delta || 0)}`;
       strip.append(chip);
     }
@@ -714,7 +714,7 @@
   function renderRoom() {
     $('roomCode').textContent = state.room.code;
     $('playerCount').textContent = `${state.players.length} / 3`;
-    $('rulesText').textContent = `${state.room.round_limit} 局 · 初始 1000 筹码 · Blackjack 3:2 · S17 · Double / Split / Insurance / Late Surrender`;
+    $('rulesText').textContent = `${state.room.round_limit} 局 · 初始 1000 筹码 · 黑杰克 3:2 · 庄家 17 点停牌 · 加倍 / 分牌 / 保险 / 后期投降`;
     const list = $('players');
     list.replaceChildren();
     for (const player of state.players) {
@@ -794,16 +794,16 @@
       }
       const active = hand.status === 'active' && hand.action_token;
       handNode.wrap.className = 'mini-hand' + (active ? ' active' : '') + (hand.from_split ? ' split' : '');
-      handNode.label.textContent = hands.length > 1 ? `HAND ${hand.hand_no}` : 'HAND';
-      handNode.bet.textContent = `BET ${formatChips(hand.bet)}`;
-      const tag = hand.status === 'blackjack' ? 'BLACKJACK' :
-        hand.status === 'bust' ? 'BUST' :
-        hand.status === 'surrender' ? 'SURRENDER' :
-        hand.status === 'stand' ? 'STAND' :
-        hand.doubled ? 'DOUBLE' : '';
+      handNode.label.textContent = hands.length > 1 ? `第 ${hand.hand_no} 手牌` : '当前手牌';
+      handNode.bet.textContent = `下注 ${formatChips(hand.bet)}`;
+      const tag = hand.status === 'blackjack' ? '黑杰克' :
+        hand.status === 'bust' ? '爆牌' :
+        hand.status === 'surrender' ? '投降' :
+        hand.status === 'stand' ? '已停牌' :
+        hand.doubled ? '已加倍' : '';
       const net = state?.room.phase === 'settlement' ? Number(hand.net_delta || 0) : null;
       handNode.footer.textContent = state?.room.phase === 'settlement'
-        ? `${tag || 'SETTLED'} · ${net > 0 ? '+' : ''}${formatChips(net)}`
+        ? `${tag || '已结算'} · ${net > 0 ? '+' : ''}${formatChips(net)}`
         : `${hand.value == null ? '--' : hand.value}${tag ? ` · ${tag}` : ''}`;
       renderHand(handNode.cards,hand.cards || []);
       node.hands.append(handNode.wrap);
@@ -840,13 +840,13 @@
     const renderStartedAt = performance.now();
     const phase = state.room.phase;
     const phaseText = {
-      betting:'PLACE YOUR BETS',
-      insurance:'INSURANCE',
-      player_action:'PLAYER ACTION',
-      settlement:'PAYOUT',
+      betting:'请下注',
+      insurance:'保险选择',
+      player_action:'玩家操作',
+      settlement:'本局结算',
     };
     $('roundLabel').textContent = `第 ${state.room.current_round} / ${state.room.round_limit} 局`;
-    $('phaseLabel').textContent = phaseText[phase] || 'CASINO TABLE';
+    $('phaseLabel').textContent = phaseText[phase] || '21 点牌桌';
     renderHand($('dealerHand'),state.dealer.cards || []);
     $('dealerValue').textContent = state.dealer.value == null ? '?' : String(state.dealer.value);
 
@@ -862,21 +862,21 @@
       }
       node.seat.className = 'player-seat' + (key === String(me?.id) ? ' me' : '');
       node.name.textContent = player.nickname || '好友';
-      node.score.textContent = `${formatChips(player.stack)} CHIPS`;
+      node.score.textContent = `${formatChips(player.stack)} 筹码`;
       if (phase === 'betting') {
         node.status.textContent = Number(player.stack || 0) < Number(state.room.min_bet || 10)
           ? '筹码不足 · 观战'
-          : player.bet_locked ? `BET ${formatChips(player.current_bet)} · 已确认` : '正在下注';
+          : player.bet_locked ? `下注 ${formatChips(player.current_bet)} · 已确认` : '正在下注';
       } else if (phase === 'insurance') {
         node.status.textContent = player.insurance_decided
-          ? (Number(player.insurance_bet || 0) > 0 ? `INSURANCE ${formatChips(player.insurance_bet)}` : 'NO INSURANCE')
+          ? (Number(player.insurance_bet || 0) > 0 ? `保险 ${formatChips(player.insurance_bet)}` : '未购买保险')
           : '考虑保险';
       } else if (phase === 'settlement') {
         const net = Number(player.stack || 0)-Number(player.round_start_stack || 0);
-        node.status.textContent = `${player.result === 'win' ? 'WIN' : player.result === 'loss' ? 'LOSS' : 'PUSH'} · ${net > 0 ? '+' : ''}${formatChips(net)}`;
+        node.status.textContent = `${player.result === 'win' ? '胜' : player.result === 'loss' ? '负' : '和'} · ${net > 0 ? '+' : ''}${formatChips(net)}`;
       } else {
         const hand = activeHand(player);
-        node.status.textContent = hand ? `HAND ${hand.hand_no} · ${hand.value ?? '--'}` : '等待其他玩家';
+        node.status.textContent = hand ? `第 ${hand.hand_no} 手牌 · ${hand.value ?? '--'} 点` : '等待其他玩家';
       }
       renderPlayerHands(node,player);
       table.append(node.seat);
@@ -907,21 +907,21 @@
     if (deviceControl === 'PASSIVE' && phase === 'player_action') {
       $('tableMessage').textContent = '此牌局正在另一台设备操作';
     } else if (pendingGameAction) {
-      const labels = {hit:'正在发牌…',stand:'正在停牌…',double:'DOUBLE DOWN…',split:'正在分牌…',surrender:'正在投降…'};
+      const labels = {hit:'正在发牌…',stand:'正在停牌…',double:'正在加倍…',split:'正在分牌…',surrender:'正在投降…'};
       $('tableMessage').textContent = labels[pendingGameAction] || '正在确认…';
     } else if (phase === 'betting') {
-      $('tableMessage').textContent = mine?.bet_locked ? '下注已锁定 · 等待牌桌开局' : 'PLACE YOUR BETS';
+      $('tableMessage').textContent = mine?.bet_locked ? '下注已锁定 · 等待牌桌开局' : '请下注';
     } else if (phase === 'insurance') {
       $('tableMessage').textContent = mine?.insurance_decided ? '保险选择已确认 · 等待其他玩家' : '庄家明牌 A · 是否购买保险？';
     } else if (phase === 'settlement') {
       const dealerText = state.dealer.status === 'bust' ? `庄家 ${state.dealer.value} 点爆牌` :
-        state.dealer.status === 'blackjack' ? '庄家 BLACKJACK' : `庄家 ${state.dealer.value} 点`;
+        state.dealer.status === 'blackjack' ? '庄家黑杰克' : `庄家 ${state.dealer.value} 点`;
       const net = mine ? Number(mine.stack || 0)-Number(mine.round_start_stack || 0) : 0;
       $('tableMessage').textContent = `${dealerText} · 本局 ${net > 0 ? '+' : ''}${formatChips(net)}`;
     } else if (!hand) {
       $('tableMessage').textContent = '等待其他玩家完成操作';
     } else {
-      $('tableMessage').textContent = hand.from_split ? `HAND ${hand.hand_no} · 请选择操作` : '请选择操作';
+      $('tableMessage').textContent = hand.from_split ? `第 ${hand.hand_no} 手牌 · 请选择操作` : '请选择操作';
     }
 
     updateActions();
