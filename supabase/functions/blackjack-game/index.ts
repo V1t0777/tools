@@ -28,6 +28,7 @@ const ACTION_LIMITS: Record<string, number> = {
   create_room: 8,
   join_room: 30,
   state: 180,
+  history: 30,
   toggle_ready: 60,
   start_game: 20,
   hit: 120,
@@ -288,6 +289,15 @@ Deno.serve(async (req: Request) => {
       return reply(req, { member, state: await state(found.data.id, member.user_id, false) });
     }
 
+    if (action === "history") {
+      const limit = Math.max(1, Math.min(20, Number(body.limit || 12)));
+      const history = await gameRpc("blackjack_history_service", {
+        p_user_id: member.user_id,
+        p_limit: limit,
+      });
+      return reply(req, { history: Array.isArray(history) ? history : [] });
+    }
+
     const roomId = String(body.room_id || "");
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(roomId)) fail("房间标识无效");
     if (action === "state") {
@@ -359,6 +369,10 @@ Deno.serve(async (req: Request) => {
           last_activity_at: new Date().toISOString(),
         })
         .eq("id", roomId);
+      await gameRpc("blackjack_finalize_match_service", {
+        p_room_id: roomId,
+        p_status: room.status === "playing" ? "closed" : "finished",
+      });
       return reply(req, { closed: true });
     }
     if (action === "leave_room") {
@@ -377,6 +391,10 @@ Deno.serve(async (req: Request) => {
             last_activity_at: now,
           })
           .eq("id", roomId);
+        await gameRpc("blackjack_finalize_match_service", {
+          p_room_id: roomId,
+          p_status: room.status === "playing" ? "abandoned" : "closed",
+        });
         return reply(req, { left: true, room_status: "closed" });
       }
       if (room.status === "lobby" || room.status === "finished") {
@@ -411,6 +429,10 @@ Deno.serve(async (req: Request) => {
           last_activity_at: now,
         })
         .eq("id", roomId);
+      await gameRpc("blackjack_finalize_match_service", {
+        p_room_id: roomId,
+        p_status: "abandoned",
+      });
       return reply(req, { left: true, room_status: "abandoned" });
     }
 
