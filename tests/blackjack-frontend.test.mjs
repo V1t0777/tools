@@ -25,8 +25,9 @@ test('blackjack hot table avoids full DOM rebuilds and uses adaptive clock ticks
   assert.doesNotMatch(app,/playerTable'\)\.replaceChildren\(\);\n    for \(const player of state\.players\)/);
 });
 
-test('blackjack player actions use per-player one-time token rather than global room version',()=>{
-  assert.match(app,/expected_token:myPlayer\(\)\?\.action_token/);
+test('blackjack player actions use per-hand one-time token rather than global room version',()=>{
+  assert.match(app,/expected_token:hand\.action_token/);
+  assert.match(app,/hand_id:hand\.id/);
   assert.doesNotMatch(app,/expected_version/);
   assert.match(app,/action_id:makeId\(\)/);
 });
