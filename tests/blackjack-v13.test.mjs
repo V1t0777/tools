@@ -56,5 +56,5 @@ test('blackjack V1.3 UI presents trends as non-competitive personal feedback',()
   assert.match(html,/近 180 天 · 仅你本人可见/);
   assert.match(html,/轻量统计/);
   assert.match(app,/完成一局后，这里会显示最近表现/);
-  assert.match(app,/胜 .*和 .*负 .*净积分/);
+  assert.match(app,/胜 .*和 .*负 .*净筹码/);
 });

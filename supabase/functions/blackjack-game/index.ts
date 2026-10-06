@@ -33,8 +33,13 @@ const ACTION_LIMITS: Record<string, number> = {
   claim_device: 30,
   toggle_ready: 60,
   start_game: 20,
+  bet: 60,
+  insurance: 60,
   hit: 120,
   stand: 120,
+  double: 60,
+  split: 60,
+  surrender: 60,
   timeout: 120,
   advance_round: 60,
   play_again: 20,
@@ -198,7 +203,7 @@ Deno.serve(async (req: Request) => {
     const action = String(body.action || "");
     if (!Object.hasOwn(ACTION_LIMITS, action)) fail("未知操作", 400, "UNKNOWN_ACTION");
     const member = await identify(req);
-    if (action !== "hit" && action !== "stand") {
+    if (!["hit", "stand", "double", "split", "surrender"].includes(action)) {
       await limitAction(member.user_id, action);
     }
 
@@ -351,12 +356,36 @@ Deno.serve(async (req: Request) => {
       });
       return reply(req, { state: next });
     }
-    if (action === "hit" || action === "stand") {
-      const token = String(body.expected_token || "");
-      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(token)) fail("操作状态无效，请刷新后重试");
-      const next = await gameRpc("blackjack_action_gateway_service", {
+    if (action === "bet") {
+      const amount = Number(body.amount);
+      if (!Number.isFinite(amount)) fail("下注金额无效");
+      const next = await gameRpc("blackjack_bet_service", {
         p_room_id: roomId,
         p_user_id: member.user_id,
+        p_amount: amount,
+        p_deck: shuffledDeck(),
+        p_action_id: cleanActionId(body.action_id),
+      });
+      return reply(req, { state: next });
+    }
+    if (action === "insurance") {
+      const next = await gameRpc("blackjack_insurance_service", {
+        p_room_id: roomId,
+        p_user_id: member.user_id,
+        p_take: body.take === true,
+        p_action_id: cleanActionId(body.action_id),
+      });
+      return reply(req, { state: next });
+    }
+    if (["hit", "stand", "double", "split", "surrender"].includes(action)) {
+      const token = String(body.expected_token || "");
+      const handId = String(body.hand_id || "");
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(token)) fail("操作状态无效，请刷新后重试");
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(handId)) fail("手牌标识无效，请刷新后重试");
+      const next = await gameRpc("blackjack_casino_action_gateway_service", {
+        p_room_id: roomId,
+        p_user_id: member.user_id,
+        p_hand_id: handId,
         p_action: action,
         p_expected_token: token,
         p_action_id: cleanActionId(body.action_id),
