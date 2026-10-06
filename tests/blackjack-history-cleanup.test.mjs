@@ -11,7 +11,7 @@ test('blackjack home exposes recent match history without unsafe HTML rendering'
   assert.match(html,/id="historyPanel"/);
   assert.match(html,/id="historyList"/);
   assert.match(html,/对局记录保留 180 天/);
-  assert.match(app,/api\('history',\{limit:12\}\)/);
+  assert.match(app,/api\('dashboard',\{limit:12\}\)/);
   assert.match(app,/function renderHistory\(records\)/);
   assert.doesNotMatch(app,/innerHTML\s*=/);
 });

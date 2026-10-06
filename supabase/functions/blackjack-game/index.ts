@@ -29,6 +29,7 @@ const ACTION_LIMITS: Record<string, number> = {
   join_room: 30,
   state: 180,
   history: 30,
+  dashboard: 30,
   claim_device: 30,
   toggle_ready: 60,
   start_game: 20,
@@ -306,6 +307,18 @@ Deno.serve(async (req: Request) => {
         p_limit: limit,
       });
       return reply(req, { history: Array.isArray(history) ? history : [] });
+    }
+
+    if (action === "dashboard") {
+      const limit = Math.max(1, Math.min(20, Number(body.limit || 12)));
+      const dashboard = await gameRpc("blackjack_dashboard_service", {
+        p_user_id: member.user_id,
+        p_limit: limit,
+      });
+      return reply(req, {
+        history: Array.isArray(dashboard?.history) ? dashboard.history : [],
+        stats: dashboard?.stats && typeof dashboard.stats === "object" ? dashboard.stats : {},
+      });
     }
 
     const roomId = String(body.room_id || "");
