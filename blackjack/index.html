@@ -9,7 +9,7 @@
   <title>朋友21点｜钊的工具箱</title>
   <link rel="stylesheet" href="../shared/toolbox-ui.css">
   <link rel="stylesheet" href="../shared/toolbox-motion.css">
-  <link rel="stylesheet" href="./style.css?v=20261006-3">
+  <link rel="stylesheet" href="./style.css?v=20261006-4">
 </head>
 <body>
   <main class="app">
@@ -69,6 +69,30 @@
           <button type="submit">加入房间</button>
         </form>
       </div>
+
+      <section class="panel stats-panel" id="statsPanel">
+        <div class="stats-head">
+          <div>
+            <small>近 180 天 · 仅你本人可见</small>
+            <h2>我的战绩</h2>
+          </div>
+          <span class="stats-window">轻量统计</span>
+        </div>
+        <div class="stats-grid" aria-live="polite">
+          <article><span>完整对局</span><strong id="statMatches">0</strong></article>
+          <article><span>总局数</span><strong id="statRounds">0</strong></article>
+          <article><span>胜局率</span><strong id="statWinRate">0%</strong></article>
+          <article><span>Blackjack</span><strong id="statBlackjacks">0</strong></article>
+          <article><span>爆牌率</span><strong id="statBustRate">0%</strong></article>
+          <article><span>平均停牌</span><strong id="statAvgStand">--</strong></article>
+          <article><span>最长连胜</span><strong id="statStreak">0</strong></article>
+          <article><span>单场最高</span><strong id="statBestScore">--</strong></article>
+        </div>
+        <div class="form-strip">
+          <div class="form-title"><small>最近 10 局</small><span id="statsMeta">暂无统计数据</span></div>
+          <div class="form-chips" id="recentForm"></div>
+        </div>
+      </section>
 
       <section class="panel history-panel" id="historyPanel">
         <div class="history-head">
@@ -155,6 +179,6 @@
   <div class="emoji-float" id="emojiFloat" aria-hidden="true"></div>
 
   <script src="../shared/toolbox-auth.js?v=20260923-1"></script>
-  <script src="./app.js?v=20261006-3"></script>
+  <script src="./app.js?v=20261006-4"></script>
 </body>
 </html>
