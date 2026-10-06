@@ -37,6 +37,7 @@
   const playerSeatNodes = new Map();
   let lastActionRtt = null;
   let lastRenderCost = null;
+  let historyLoading = false;
 
   function show(id) {
     SCREENS.forEach((name) => $(name).classList.toggle('active', name === id));
@@ -156,6 +157,7 @@
       me = data.member;
       $('welcomeName').textContent = me.nickname;
       show('homeScreen');
+      loadHistory().catch(() => {});
       if (data.state) await enterRoom(data.state);
     } catch (err) {
       if (['AUTH_REQUIRED','SESSION_REVOKED'].includes(err.code)) {
@@ -204,6 +206,7 @@
       session = me = null;
       show('authScreen');
     };
+    $('historyRefreshBtn').onclick = () => loadHistory(true);
     $('createBtn').onclick = async () => {
       if (busy) return;
       busy = true;
@@ -294,6 +297,7 @@
   function exitToHome(message = '') {
     clearRoom();
     show('homeScreen');
+    loadHistory().catch(() => {});
     if (message) toast(message);
   }
 
@@ -333,6 +337,123 @@
     } finally {
       busy = false;
       updateActions();
+    }
+  }
+
+  function historyStatusText(status) {
+    if (status === 'finished') return '已完成';
+    if (status === 'abandoned') return '中断';
+    return '提前结束';
+  }
+
+  function formatHistoryTime(value) {
+    const date = new Date(value || 0);
+    if (!Number.isFinite(date.getTime())) return '--';
+    return new Intl.DateTimeFormat('zh-CN',{
+      month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false,
+    }).format(date);
+  }
+
+  function prettyCard(code) {
+    const text = String(code || '');
+    const suitCode = text.slice(-1);
+    const rank = text.slice(0,-1);
+    return `${rank}${SUITS[suitCode] || ''}`;
+  }
+
+  function playerSummaryText(player) {
+    const result = player.result === 'win' ? '胜' : player.result === 'push' ? '和' : player.result === 'loss' ? '负' : '';
+    const delta = Number(player.round_delta || 0);
+    const deltaText = result ? ` ${result} ${delta > 0 ? '+' : ''}${delta}` : '';
+    const cards = Array.isArray(player.hand_cards) ? player.hand_cards.map(prettyCard).join(' ') : '';
+    const value = player.hand_value == null ? '' : ` · ${player.hand_value}点`;
+    return `${player.nickname || '好友'}：${cards}${value}${deltaText}`;
+  }
+
+  async function loadHistory(showToast = false) {
+    if (historyLoading || !me) return;
+    historyLoading = true;
+    $('historyRefreshBtn').disabled = true;
+    try {
+      const data = await api('history',{limit:12});
+      renderHistory(Array.isArray(data.history) ? data.history : []);
+      if (showToast) toast('对局记录已刷新');
+    } catch (err) {
+      if (showToast) toast(err.message || '对局记录加载失败');
+    } finally {
+      historyLoading = false;
+      $('historyRefreshBtn').disabled = false;
+    }
+  }
+
+  function renderHistory(records) {
+    const list = $('historyList');
+    list.replaceChildren();
+    $('historyEmpty').classList.toggle('hidden',records.length > 0);
+
+    for (const record of records) {
+      const details = document.createElement('details');
+      details.className = 'history-item';
+
+      const summary = document.createElement('summary');
+      const top = document.createElement('div');
+      top.className = 'history-summary-top';
+      const time = document.createElement('strong');
+      time.textContent = formatHistoryTime(record.finished_at || record.started_at);
+      const badge = document.createElement('span');
+      badge.className = `history-status ${record.status || 'closed'}`;
+      badge.textContent = historyStatusText(record.status);
+      top.append(time,badge);
+
+      const players = Array.isArray(record.players) ? [...record.players] : [];
+      players.sort((a,b) => Number(b.score || 0)-Number(a.score || 0) || Number(a.seat || 0)-Number(b.seat || 0));
+      const scoreline = document.createElement('div');
+      scoreline.className = 'history-scoreline';
+      scoreline.textContent = players.length
+        ? players.map((p) => `${p.nickname || '好友'} ${Number(p.score || 0)}`).join(' · ')
+        : `${Number(record.round_limit || 0)} 局`;
+
+      summary.append(top,scoreline);
+      details.append(summary);
+
+      const body = document.createElement('div');
+      body.className = 'history-rounds';
+      const rounds = Array.isArray(record.rounds) ? record.rounds : [];
+
+      if (!rounds.length) {
+        const empty = document.createElement('p');
+        empty.className = 'history-round-empty';
+        empty.textContent = record.status === 'finished' ? '暂无逐局数据。' : '本场在完成一局前结束。';
+        body.append(empty);
+      }
+
+      for (const round of rounds) {
+        const row = document.createElement('section');
+        row.className = 'history-round';
+        const title = document.createElement('div');
+        title.className = 'history-round-title';
+        const dealer = round?.dealer || {};
+        const dealerCards = Array.isArray(dealer.cards) ? dealer.cards.map(prettyCard).join(' ') : '';
+        title.textContent = `第 ${Number(round.round || 0)} 局 · 庄家 ${dealerCards}${dealer.value == null ? '' : ` · ${dealer.value}点`}`;
+        row.append(title);
+
+        const roundPlayers = Array.isArray(round.players) ? round.players : [];
+        for (const player of roundPlayers) {
+          const line = document.createElement('div');
+          line.className = 'history-player-line';
+          line.textContent = playerSummaryText(player);
+          row.append(line);
+        }
+        body.append(row);
+      }
+
+      const meta = document.createElement('div');
+      meta.className = 'history-meta';
+      meta.textContent = `${Number(record.round_limit || 0)} 局制 · 房间 ${String(record.room_code || '------')}`;
+      body.append(meta);
+
+      details.append(body);
+      list.append(details);
     }
   }
 
