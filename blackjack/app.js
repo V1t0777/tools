@@ -45,6 +45,7 @@
   let resyncing = false;
   let stateRefreshPromise = null;
   let refreshQueued = false;
+  let pendingBet = 0;
 
   function show(id) {
     SCREENS.forEach((name) => $(name).classList.toggle('active', name === id));
@@ -128,6 +129,22 @@
     const id = String(me.id);
     return state.players.find((p) => String(p.member_id) === id) || null;
   }
+  function activeHand(player = myPlayer()) {
+    if (!player || !Array.isArray(player.hands)) return null;
+    if (player.active_hand_id) {
+      const byId = player.hands.find((hand) => String(hand.id) === String(player.active_hand_id));
+      if (byId) return byId;
+    }
+    return player.hands.find((hand) => hand.status === 'active') || null;
+  }
+  function formatChips(value) {
+    const n = Number(value || 0);
+    return Number.isInteger(n) ? String(n) : n.toFixed(1).replace(/\.0$/,'');
+  }
+  function pulseHaptic(pattern = 10) {
+    try { if (navigator.vibrate) navigator.vibrate(pattern); } catch {}
+  }
+
   function isHost() {
     return Boolean(state && me && String(state.room.host_member_id) === String(me.id));
   }
@@ -281,9 +298,35 @@
     });
     $('readyBtn').onclick = () => mutate('toggle_ready');
     $('startBtn').onclick = () => mutate('start_game',{action_id:makeId()});
-    $('hitBtn').onclick = () => mutate('hit',{expected_token:myPlayer()?.action_token,action_id:makeId()});
-    $('standBtn').onclick = () => mutate('stand',{expected_token:myPlayer()?.action_token,action_id:makeId()});
+    $('hitBtn').onclick = () => casinoAction('hit');
+    $('standBtn').onclick = () => casinoAction('stand');
+    $('doubleBtn').onclick = () => casinoAction('double');
+    $('splitBtn').onclick = () => casinoAction('split');
+    $('surrenderBtn').onclick = () => casinoAction('surrender');
     $('takeoverBtn').onclick = takeoverDevice;
+    $('chipRack').addEventListener('click',(event) => {
+      const button = event.target.closest('[data-chip]');
+      if (!button || !state || busy) return;
+      const mine = myPlayer();
+      if (!mine || mine.bet_locked) return;
+      const chip = Number(button.dataset.chip || 0);
+      const max = Math.min(Number(state.room.max_bet || 500),Number(mine.stack || 0));
+      if (pendingBet + chip > max) {
+        pulseHaptic([8,30,8]);
+        toast('已达到本局可下注上限');
+        return;
+      }
+      pendingBet += chip;
+      pulseHaptic(7);
+      renderBetting();
+    });
+    $('clearBetBtn').onclick = () => {
+      pendingBet = 0;
+      renderBetting();
+    };
+    $('confirmBetBtn').onclick = () => confirmBet();
+    $('takeInsuranceBtn').onclick = () => mutate('insurance',{take:true,action_id:makeId()});
+    $('declineInsuranceBtn').onclick = () => mutate('insurance',{take:false,action_id:makeId()});
     $('againBtn').onclick = () => mutate('play_again');
     $('shareBtn').onclick = shareRoom;
     $('leaveBtn').onclick = leaveRoom;
@@ -382,9 +425,32 @@
     finally { busy = false; }
   }
 
+  async function casinoAction(action) {
+    const hand = activeHand();
+    if (!hand) return;
+    return mutate(action,{
+      hand_id:hand.id,
+      expected_token:hand.action_token,
+      action_id:makeId(),
+    });
+  }
+
+  async function confirmBet() {
+    const mine = myPlayer();
+    if (!state || !mine || busy || state.room.phase !== 'betting' || mine.bet_locked) return;
+    const min = Number(state.room.min_bet || 10);
+    if (pendingBet < min) {
+      toast(`最低下注 ${formatChips(min)}`);
+      return;
+    }
+    const amount = pendingBet;
+    pulseHaptic(12);
+    await mutate('bet',{amount,action_id:makeId()});
+  }
+
   async function mutate(action,payload = {}) {
     if (!state || busy) return;
-    const gameplayAction = action === 'hit' || action === 'stand';
+    const gameplayAction = ['hit','stand','double','split','surrender'].includes(action);
     if (gameplayAction && deviceControl === 'PASSIVE') {
       toast('当前由另一台设备操作，可点击“接管操作”切换');
       return;
@@ -400,6 +466,7 @@
       const data = await api(action,{room_id:roomId,...payload,...extra});
       lastActionRtt = Math.round(performance.now()-startedAt);
       pendingGameAction = null;
+      if (action === 'bet') pendingBet = 0;
       if (data.state) adoptState(data.state);
     } catch (err) {
       pendingGameAction = null;
@@ -476,7 +543,7 @@
     const losses = Math.max(0,Number(stats.losses || 0));
     const blackjacks = Math.max(0,Number(stats.blackjacks || 0));
     const streak = Math.max(0,Number(stats.longest_win_streak || 0));
-    const totalDelta = Number(stats.total_delta || 0);
+    const totalDelta = Number(stats.net_chips ?? stats.total_delta ?? 0);
     const winRate = Number(stats.win_rate_pct || 0);
     const bustRate = Number(stats.bust_rate_pct || 0);
     const avgStand = Number(stats.avg_stand_value || 0);
@@ -493,7 +560,7 @@
 
     const signed = totalDelta > 0 ? `+${totalDelta}` : String(totalDelta);
     $('statsMeta').textContent = rounds
-      ? `胜 ${wins} · 和 ${pushes} · 负 ${losses} · 净积分 ${signed}${interrupted ? ` · 中断 ${interrupted} 场` : ''}`
+      ? `胜 ${wins} · 和 ${pushes} · 负 ${losses} · 净筹码 ${signed}${interrupted ? ` · 中断 ${interrupted} 场` : ''}`
       : '暂无统计数据';
 
     const strip = $('recentForm');
