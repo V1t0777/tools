@@ -394,6 +394,7 @@
     resyncing = false;
     stateRefreshPromise = null;
     refreshQueued = false;
+    pendingBet = 0;
     playerSeatNodes.clear();
     $('playerTable').replaceChildren();
     presenceMembers.clear();
@@ -509,12 +510,16 @@
   }
 
   function playerSummaryText(player) {
-    const result = player.result === 'win' ? '胜' : player.result === 'push' ? '和' : player.result === 'loss' ? '负' : '';
-    const delta = Number(player.round_delta || 0);
-    const deltaText = result ? ` ${result} ${delta > 0 ? '+' : ''}${delta}` : '';
-    const cards = Array.isArray(player.hand_cards) ? player.hand_cards.map(prettyCard).join(' ') : '';
-    const value = player.hand_value == null ? '' : ` · ${player.hand_value}点`;
-    return `${player.nickname || '好友'}：${cards}${value}${deltaText}`;
+    const net = Number(player.net_chips ?? (Number(player.stack || 0)-Number(player.round_start_stack || 0)) || 0);
+    const hands = Array.isArray(player.hands) ? player.hands : [];
+    const handText = hands.length
+      ? hands.map((hand) => {
+          const cards = Array.isArray(hand.cards) ? hand.cards.map(prettyCard).join(' ') : '';
+          const tag = hand.status === 'blackjack' ? 'BJ' : hand.status === 'surrender' ? 'SURRENDER' : hand.status === 'bust' ? 'BUST' : '';
+          return `${cards}${hand.value == null ? '' : ` ${hand.value}`}${tag ? ` ${tag}` : ''}`;
+        }).join(' / ')
+      : '';
+    return `${player.nickname || '好友'}：${handText || '—'} · ${net > 0 ? '+' : ''}${formatChips(net)}`;
   }
 
   async function loadDashboard(showToast = false) {
@@ -607,11 +612,15 @@
       top.append(time,badge);
 
       const players = Array.isArray(record.players) ? [...record.players] : [];
-      players.sort((a,b) => Number(b.score || 0)-Number(a.score || 0) || Number(a.seat || 0)-Number(b.seat || 0));
+      players.sort((a,b) => Number(b.stack ?? b.score ?? 0)-Number(a.stack ?? a.score ?? 0) || Number(a.seat || 0)-Number(b.seat || 0));
       const scoreline = document.createElement('div');
       scoreline.className = 'history-scoreline';
       scoreline.textContent = players.length
-        ? players.map((p) => `${p.nickname || '好友'} ${Number(p.score || 0)}`).join(' · ')
+        ? players.map((p) => {
+            const stack = Number(p.stack ?? p.score ?? 0);
+            const delta = stack-1000;
+            return `${p.nickname || '好友'} ${formatChips(stack)} (${delta > 0 ? '+' : ''}${formatChips(delta)})`;
+          }).join(' · ')
         : `${Number(record.round_limit || 0)} 局`;
 
       summary.append(top,scoreline);
@@ -1000,8 +1009,9 @@
     if (!state) return;
     const now = Date.now() + clockOffset;
     const mine = myPlayer();
-    if (state.room.phase === 'player_action' && mine?.hand_status === 'active' && mine.decision_deadline) {
-      const ms = Date.parse(mine.decision_deadline) - now;
+    const hand = activeHand(mine);
+    if (state.room.phase === 'player_action' && hand?.status === 'active' && hand.decision_deadline) {
+      const ms = Date.parse(hand.decision_deadline) - now;
       const seconds = Math.max(0,Math.ceil(ms/1000));
       $('countdown').textContent = String(seconds);
       $('countdown').classList.toggle('critical',seconds <= 5);
@@ -1032,8 +1042,9 @@
       if (!state || suspended) return;
       const now = Date.now() + clockOffset;
       const mine = myPlayer();
-      const decisionMs = state.room.phase === 'player_action' && mine?.hand_status === 'active' && mine.decision_deadline
-        ? Date.parse(mine.decision_deadline)-now
+      const hand = activeHand(mine);
+      const decisionMs = state.room.phase === 'player_action' && hand?.status === 'active' && hand.decision_deadline
+        ? Date.parse(hand.decision_deadline)-now
         : Infinity;
       const summaryMs = state.room.phase === 'settlement' && state.room.summary_until
         ? Date.parse(state.room.summary_until)-now
