@@ -510,7 +510,7 @@
   }
 
   function playerSummaryText(player) {
-    const net = Number(player.net_chips ?? (Number(player.stack || 0)-Number(player.round_start_stack || 0)) || 0);
+    const net = Number((player.net_chips ?? (Number(player.stack || 0)-Number(player.round_start_stack || 0))) || 0);
     const hands = Array.isArray(player.hands) ? player.hands : [];
     const handText = hands.length
       ? hands.map((hand) => {
