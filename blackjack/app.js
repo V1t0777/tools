@@ -647,7 +647,13 @@
 
     const mine = myPlayer();
     $('myValue').textContent = mine?.hand_value == null ? '--' : String(mine.hand_value);
-    if (state.room.phase === 'settlement') {
+    if (deviceControl === 'PASSIVE' && state.room.phase === 'player_action') {
+      $('tableMessage').textContent = '此牌局正在另一台设备操作';
+    } else if (pendingGameAction === 'hit') {
+      $('tableMessage').textContent = '正在发牌…';
+    } else if (pendingGameAction === 'stand') {
+      $('tableMessage').textContent = '正在停牌…';
+    } else if (state.room.phase === 'settlement') {
       const dealerText = state.dealer.status === 'bust' ? `庄家 ${state.dealer.value} 点爆牌` :
         state.dealer.status === 'blackjack' ? '庄家 Blackjack' : `庄家 ${state.dealer.value} 点`;
       $('tableMessage').textContent = `${dealerText} · 下一局即将开始`;
@@ -693,9 +699,19 @@
 
   function updateActions() {
     const mine = myPlayer();
-    const active = Boolean(state && state.room.phase === 'player_action' && mine?.hand_status === 'active' && !busy);
+    const ownsDevice = deviceControl !== 'PASSIVE';
+    const active = Boolean(
+      state &&
+      state.room.phase === 'player_action' &&
+      mine?.hand_status === 'active' &&
+      !busy &&
+      ownsDevice
+    );
     $('hitBtn').disabled = !active;
     $('standBtn').disabled = !active;
+    $('hitBtn').textContent = pendingGameAction === 'hit' ? '发牌中…' : '要牌';
+    $('standBtn').textContent = pendingGameAction === 'stand' ? '停牌中…' : '停牌';
+    $('takeoverBtn').classList.toggle('hidden',deviceControl !== 'PASSIVE' || state?.room.phase !== 'player_action');
     if ($('readyBtn')) $('readyBtn').disabled = busy;
   }
 
@@ -717,6 +733,7 @@
       const current = container.children[i];
       if (current?.dataset.code === desired[i]) continue;
       const card = createCard(desired[i]);
+      if (container.isConnected) card.classList.add('dealt');
       if (current) current.replaceWith(card);
       else container.append(card);
     }
@@ -810,22 +827,57 @@
     pollTimer = setInterval(refreshState,ms);
   }
 
-  function requestState(delay = 80) {
+  function requestState(delay = 80,markResync = false) {
     if (!state || suspended || navigator.onLine === false) return;
+    if (markResync) {
+      resyncing = true;
+      updateConnection();
+    }
     clearTimeout(refreshTimer);
-    refreshTimer = setTimeout(refreshState,delay);
+    refreshTimer = setTimeout(() => refreshState(markResync),delay);
   }
 
-  async function refreshState() {
-    if (!state || busy || suspended || navigator.onLine === false) return;
+  async function refreshState(markResync = false) {
+    if (!state || suspended || navigator.onLine === false) return;
+    if (stateRefreshPromise) {
+      refreshQueued = true;
+      if (markResync) {
+        resyncing = true;
+        updateConnection();
+      }
+      return stateRefreshPromise;
+    }
+
     const roomId = state.room.id;
+    if (markResync) {
+      resyncing = true;
+      updateConnection();
+    }
+
+    stateRefreshPromise = (async () => {
+      try {
+        const data = await api('state',{room_id:roomId});
+        if (state?.room.id === roomId && data.state) adoptState(data.state);
+      } catch (err) {
+        if (err.cancelled) return;
+        if ([403,404,410].includes(err.status) || /房间.*(结束|不存在)|不在这个房间/.test(err.message || '')) {
+          exitToHome(err.message || '房间已结束');
+        }
+      } finally {
+        resyncing = false;
+        updateConnection();
+      }
+    })();
+
     try {
-      const data = await api('state',{room_id:roomId});
-      if (state?.room.id === roomId && data.state) adoptState(data.state);
-    } catch (err) {
-      if (err.cancelled) return;
-      if ([403,404,410].includes(err.status) || /房间.*(结束|不存在)|不在这个房间/.test(err.message || '')) {
-        exitToHome(err.message || '房间已结束');
+      await stateRefreshPromise;
+    } finally {
+      stateRefreshPromise = null;
+      if (refreshQueued && state && !suspended) {
+        refreshQueued = false;
+        requestState(0,false);
+      } else {
+        refreshQueued = false;
       }
     }
   }
