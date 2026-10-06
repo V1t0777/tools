@@ -991,12 +991,10 @@ begin
 
   select * into v_room
   from public.blackjack_rooms
-  where id=p_room_id
-  for update;
+  where id=p_room_id;
   if not found or v_room.status<>'playing' or v_room.phase<>'player_action' then
     raise exception '当前不能操作';
   end if;
-  v_from:=v_room.version;
 
   select * into v_player
   from public.blackjack_players
@@ -1034,6 +1032,7 @@ begin
     where room_id=p_room_id
     for update;
     if not found or v_secret.draw_index>52 then raise exception '牌堆状态异常'; end if;
+    if p_action='split' and v_secret.draw_index>51 then raise exception '牌堆剩余牌不足以分牌'; end if;
   end if;
 
   if p_action='stand' then
@@ -1164,7 +1163,9 @@ begin
 
   update public.blackjack_rooms
   set version=version+1,last_activity_at=clock_timestamp(),updated_at=clock_timestamp()
-  where id=p_room_id;
+  where id=p_room_id and status='playing' and phase='player_action'
+  returning version-1 into v_from;
+  if v_from is null then raise exception '当前不能操作'; end if;
 
   if not exists(
     select 1 from private.blackjack_hands
