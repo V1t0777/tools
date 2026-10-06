@@ -142,7 +142,7 @@ stable
 security definer
 set search_path = ''
 as $$
-  select coalesce(jsonb_agg(to_jsonb(h) order by coalesce(h.finished_at,h.updated_at) desc),'[]'::jsonb)
+  select coalesce(jsonb_agg(to_jsonb(h) order by coalesce(h.finished_at,h.started_at) desc),'[]'::jsonb)
   from (
     select
       id,room_code,round_limit,status,players,rounds,started_at,finished_at
