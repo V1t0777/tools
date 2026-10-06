@@ -9,7 +9,7 @@
   <title>朋友21点｜钊的工具箱</title>
   <link rel="stylesheet" href="../shared/toolbox-ui.css">
   <link rel="stylesheet" href="../shared/toolbox-motion.css">
-  <link rel="stylesheet" href="./style.css?v=20261007-2">
+  <link rel="stylesheet" href="./style.css?v=20261007-3">
 </head>
 <body>
   <main class="app">
@@ -26,7 +26,7 @@
       <div class="hero-card">
         <div class="hero-suits">♠ ♥ ♣ ♦</div>
         <h1>三人朋友局</h1>
-        <p>2–3 人同时对战系统庄家。无下注、纯积分、低延迟实时同步。</p>
+        <p>2–3 人同时对战系统庄家。每场独立筹码、低延迟实时同步。</p>
       </div>
       <form class="panel form" id="loginForm">
         <h2>登录工具箱</h2>
@@ -82,11 +82,11 @@
           <article><span>完整对局</span><strong id="statMatches">0</strong></article>
           <article><span>总局数</span><strong id="statRounds">0</strong></article>
           <article><span>胜局率</span><strong id="statWinRate">0%</strong></article>
-          <article><span>Blackjack</span><strong id="statBlackjacks">0</strong></article>
+          <article><span>黑杰克</span><strong id="statBlackjacks">0</strong></article>
           <article><span>爆牌率</span><strong id="statBustRate">0%</strong></article>
           <article><span>平均停牌</span><strong id="statAvgStand">--</strong></article>
           <article><span>最长连胜</span><strong id="statStreak">0</strong></article>
-          <article><span>单场最高</span><strong id="statBestScore">--</strong></article>
+          <article><span>单场最高筹码</span><strong id="statBestScore">--</strong></article>
         </div>
         <div class="form-strip">
           <div class="form-title"><small>最近 10 局</small><span id="statsMeta">暂无统计数据</span></div>
@@ -126,7 +126,7 @@
       </div>
       <div class="panel rules">
         <b>本场规则</b>
-        <p id="rulesText">5 局 · 初始 1000 筹码 · Blackjack 3:2 · S17 · Double / Split / Insurance / Late Surrender</p>
+        <p id="rulesText">5 局 · 初始 1000 筹码 · 黑杰克 3:2 · 庄家 17 点停牌 · 加倍 / 分牌 / 保险 / 后期投降</p>
       </div>
     </section>
 
@@ -165,7 +165,7 @@
       </section>
 
       <section class="insurance-dock panel hidden" id="insuranceDock">
-        <div class="insurance-title"><span>INSURANCE?</span><small>庄家明牌 A · 保险赔付 2:1</small></div>
+        <div class="insurance-title"><span>是否购买保险？</span><small>庄家明牌 A · 保险赔付 2:1</small></div>
         <div class="insurance-actions">
           <button class="secondary" id="declineInsuranceBtn" type="button">不买保险</button>
           <button class="primary gold" id="takeInsuranceBtn" type="button">购买保险 <span id="insuranceCost"></span></button>
@@ -175,7 +175,7 @@
       <section class="action-dock panel" id="actionDock">
         <div class="decision">
           <div><small>当前手牌</small><strong id="myValue">--</strong></div>
-          <div class="wager-readout"><small>BET</small><strong id="activeBet">--</strong></div>
+          <div class="wager-readout"><small>本手下注</small><strong id="activeBet">--</strong></div>
           <div class="countdown" id="countdown">20</div>
         </div>
         <div class="action-buttons">
@@ -183,9 +183,9 @@
           <button class="stand" id="standBtn" type="button">停牌</button>
         </div>
         <div class="casino-actions">
-          <button class="ghost" id="doubleBtn" type="button">DOUBLE</button>
-          <button class="ghost" id="splitBtn" type="button">SPLIT</button>
-          <button class="ghost danger" id="surrenderBtn" type="button">SURRENDER</button>
+          <button class="ghost" id="doubleBtn" type="button">加倍</button>
+          <button class="ghost" id="splitBtn" type="button">分牌</button>
+          <button class="ghost danger" id="surrenderBtn" type="button">投降</button>
         </div>
         <button class="ghost takeover hidden" id="takeoverBtn" type="button">在此设备接管操作</button>
         <div class="emoji-row" aria-label="快捷表情">
@@ -200,7 +200,7 @@
 
     <section class="screen" id="finishScreen">
       <div class="finish-hero">
-        <div>♠</div><h1>TABLE CLOSED</h1><p id="finishSubtitle">最终筹码</p>
+        <div>♠</div><h1>本场结束</h1><p id="finishSubtitle">最终筹码</p>
       </div>
       <div class="panel ranking" id="ranking"></div>
       <button class="primary hidden" id="againBtn" type="button">再来一场</button>
@@ -212,6 +212,6 @@
   <div class="emoji-float" id="emojiFloat" aria-hidden="true"></div>
 
   <script src="../shared/toolbox-auth.js?v=20260923-1"></script>
-  <script src="./app.js?v=20261007-2"></script>
+  <script src="./app.js?v=20261007-3"></script>
 </body>
 </html>
