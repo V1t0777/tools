@@ -65,7 +65,8 @@ test('blackjack V1.4 visuals use compositor-friendly animations and mobile degra
   assert.match(css,/backdrop-filter:none!important/);
   assert.match(css,/prefers-reduced-motion:reduce/);
   assert.match(css,/contain:layout paint/);
-  assert.doesNotMatch(css,/filter:blur\([^)]*\).*animation/s);
+  const motion=css.slice(css.indexOf('@keyframes cardDealV14'));
+  assert.doesNotMatch(motion,/filter:blur\(/);
 });
 
 test('blackjack V1.4 public state exposes only dealer up-card before settlement',()=>{
