@@ -50,3 +50,14 @@ button,input,select{font:inherit}.app{width:min(880px,100%);margin:auto}.hidden{
 .history-meta{padding-top:10px}
 .history-retention{margin:10px 0 0}
 .history-empty{text-align:center;margin:16px 0}
+
+
+/* Blackjack V1.2 realtime/interaction feedback */
+.status-pill.warn{background:rgba(232,199,124,.1);color:#efdca8}
+.takeover{width:100%;margin-top:9px;color:#f0ddaa;border-color:rgba(232,199,124,.22)}
+.card.dealt{animation:cardDeal .22s cubic-bezier(.2,.8,.2,1) both}
+@keyframes cardDeal{
+  from{opacity:.2;transform:translate3d(16px,-10px,0) scale(.94)}
+  to{opacity:1;transform:translate3d(0,0,0) scale(1)}
+}
+@media(prefers-reduced-motion:reduce){.card.dealt{animation:none}}

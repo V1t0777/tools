@@ -9,6 +9,7 @@
   const HEALTHY_POLL_MS = 12000;
   const DEGRADED_POLL_MS = 1200;
   const PING_MS = 6000;
+  const DEVICE_KEY = 'toolbox_blackjack_device_v12';
 
   let session = null;
   let sdkPromise = null;
@@ -38,6 +39,12 @@
   let lastActionRtt = null;
   let lastRenderCost = null;
   let historyLoading = false;
+  let deviceId = null;
+  let deviceControl = 'UNKNOWN';
+  let pendingGameAction = null;
+  let resyncing = false;
+  let stateRefreshPromise = null;
+  let refreshQueued = false;
 
   function show(id) {
     SCREENS.forEach((name) => $(name).classList.toggle('active', name === id));
@@ -58,6 +65,55 @@
     const h = [...b].map((x) => x.toString(16).padStart(2,'0')).join('');
     return `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`;
   }
+  function getDeviceId() {
+    if (deviceId) return deviceId;
+    try {
+      const saved = localStorage.getItem(DEVICE_KEY);
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(saved || '')) {
+        deviceId = saved;
+        return deviceId;
+      }
+    } catch {}
+    deviceId = makeId();
+    try { localStorage.setItem(DEVICE_KEY,deviceId); } catch {}
+    return deviceId;
+  }
+
+  async function claimDevice(takeover = false) {
+    if (!state) return false;
+    try {
+      const data = await api('claim_device',{
+        room_id:state.room.id,
+        device_id:getDeviceId(),
+        takeover,
+      });
+      deviceControl = data.device?.granted ? 'OWNED' : 'PASSIVE';
+      updateActions();
+      if (state?.room.status === 'playing') renderGame();
+      return deviceControl === 'OWNED';
+    } catch (err) {
+      if (err.code === 'DEVICE_CONFLICT') {
+        deviceControl = 'PASSIVE';
+        updateActions();
+        if (state?.room.status === 'playing') renderGame();
+        return false;
+      }
+      throw err;
+    }
+  }
+
+  async function takeoverDevice() {
+    if (!state || busy) return;
+    const ok = await claimDevice(true).catch((err) => {
+      toast(err.message || '接管失败');
+      return false;
+    });
+    if (ok) {
+      toast('已切换为当前设备操作');
+      requestState(0,true);
+    }
+  }
+
   function codeFromURL() {
     return (new URLSearchParams(location.search).get('room') || '')
       .toUpperCase().replace(/[^A-Z2-9]/g,'').slice(0,6);
@@ -227,6 +283,7 @@
     $('startBtn').onclick = () => mutate('start_game',{action_id:makeId()});
     $('hitBtn').onclick = () => mutate('hit',{expected_token:myPlayer()?.action_token,action_id:makeId()});
     $('standBtn').onclick = () => mutate('stand',{expected_token:myPlayer()?.action_token,action_id:makeId()});
+    $('takeoverBtn').onclick = takeoverDevice;
     $('againBtn').onclick = () => mutate('play_again');
     $('shareBtn').onclick = shareRoom;
     $('leaveBtn').onclick = leaveRoom;
@@ -270,11 +327,14 @@
     leaveRealtime();
     state = null;
     suspended = false;
+    deviceControl = 'UNKNOWN';
     adoptState(next);
     setURL(next.room.code);
     $('shareBtn').classList.remove('hidden');
     $('leaveBtn').classList.remove('hidden');
-    try { await connectRealtime(); } catch { scheduleReconnect(400); }
+    const claim = claimDevice(false).catch(() => false);
+    const realtimeConnect = connectRealtime().catch(() => { scheduleReconnect(400); return false; });
+    await Promise.allSettled([claim,realtimeConnect]);
   }
 
   function clearRoom() {
@@ -286,6 +346,11 @@
     pollTimer = clockTimer = refreshTimer = null;
     pollMs = 0;
     state = null;
+    deviceControl = 'UNKNOWN';
+    pendingGameAction = null;
+    resyncing = false;
+    stateRefreshPromise = null;
+    refreshQueued = false;
     playerSeatNodes.clear();
     $('playerTable').replaceChildren();
     presenceMembers.clear();
@@ -319,24 +384,39 @@
 
   async function mutate(action,payload = {}) {
     if (!state || busy) return;
+    const gameplayAction = action === 'hit' || action === 'stand';
+    if (gameplayAction && deviceControl === 'PASSIVE') {
+      toast('当前由另一台设备操作，可点击“接管操作”切换');
+      return;
+    }
     busy = true;
+    pendingGameAction = gameplayAction ? action : null;
     updateActions();
+    if (state?.room.status === 'playing') renderGame();
     const roomId = state.room.id;
     const startedAt = performance.now();
     try {
-      const data = await api(action,{room_id:roomId,...payload});
+      const extra = gameplayAction ? {device_id:getDeviceId()} : {};
+      const data = await api(action,{room_id:roomId,...payload,...extra});
       lastActionRtt = Math.round(performance.now()-startedAt);
+      pendingGameAction = null;
       if (data.state) adoptState(data.state);
     } catch (err) {
-      if (err.status === 409 || err.code === 'STALE_ACTION') {
+      pendingGameAction = null;
+      if (err.code === 'DEVICE_CONFLICT') {
+        deviceControl = 'PASSIVE';
+        toast('此牌局正在另一台设备操作');
+        requestState(0,true);
+      } else if (err.status === 409 || err.code === 'STALE_ACTION') {
         toast('牌局刚刚更新，已重新同步');
-        requestState(0);
+        requestState(0,true);
       } else if (!err.cancelled) {
         toast(err.message || '操作失败');
       }
     } finally {
       busy = false;
       updateActions();
+      if (state?.room.status === 'playing') renderGame();
     }
   }
 
@@ -567,7 +647,13 @@
 
     const mine = myPlayer();
     $('myValue').textContent = mine?.hand_value == null ? '--' : String(mine.hand_value);
-    if (state.room.phase === 'settlement') {
+    if (deviceControl === 'PASSIVE' && state.room.phase === 'player_action') {
+      $('tableMessage').textContent = '此牌局正在另一台设备操作';
+    } else if (pendingGameAction === 'hit') {
+      $('tableMessage').textContent = '正在发牌…';
+    } else if (pendingGameAction === 'stand') {
+      $('tableMessage').textContent = '正在停牌…';
+    } else if (state.room.phase === 'settlement') {
       const dealerText = state.dealer.status === 'bust' ? `庄家 ${state.dealer.value} 点爆牌` :
         state.dealer.status === 'blackjack' ? '庄家 Blackjack' : `庄家 ${state.dealer.value} 点`;
       $('tableMessage').textContent = `${dealerText} · 下一局即将开始`;
@@ -613,9 +699,19 @@
 
   function updateActions() {
     const mine = myPlayer();
-    const active = Boolean(state && state.room.phase === 'player_action' && mine?.hand_status === 'active' && !busy);
+    const ownsDevice = deviceControl !== 'PASSIVE';
+    const active = Boolean(
+      state &&
+      state.room.phase === 'player_action' &&
+      mine?.hand_status === 'active' &&
+      !busy &&
+      ownsDevice
+    );
     $('hitBtn').disabled = !active;
     $('standBtn').disabled = !active;
+    $('hitBtn').textContent = pendingGameAction === 'hit' ? '发牌中…' : '要牌';
+    $('standBtn').textContent = pendingGameAction === 'stand' ? '停牌中…' : '停牌';
+    $('takeoverBtn').classList.toggle('hidden',deviceControl !== 'PASSIVE' || state?.room.phase !== 'player_action');
     if ($('readyBtn')) $('readyBtn').disabled = busy;
   }
 
@@ -637,6 +733,7 @@
       const current = container.children[i];
       if (current?.dataset.code === desired[i]) continue;
       const card = createCard(desired[i]);
+      if (container.isConnected) card.classList.add('dealt');
       if (current) current.replaceWith(card);
       else container.append(card);
     }
@@ -730,24 +827,102 @@
     pollTimer = setInterval(refreshState,ms);
   }
 
-  function requestState(delay = 80) {
+  function requestState(delay = 80,markResync = false) {
     if (!state || suspended || navigator.onLine === false) return;
+    if (markResync) {
+      resyncing = true;
+      updateConnection();
+    }
     clearTimeout(refreshTimer);
-    refreshTimer = setTimeout(refreshState,delay);
+    refreshTimer = setTimeout(() => refreshState(markResync),delay);
   }
 
-  async function refreshState() {
-    if (!state || busy || suspended || navigator.onLine === false) return;
+  async function refreshState(markResync = false) {
+    if (!state || suspended || navigator.onLine === false) return;
+    if (stateRefreshPromise) {
+      refreshQueued = true;
+      if (markResync) {
+        resyncing = true;
+        updateConnection();
+      }
+      return stateRefreshPromise;
+    }
+
     const roomId = state.room.id;
+    if (markResync) {
+      resyncing = true;
+      updateConnection();
+    }
+
+    stateRefreshPromise = (async () => {
+      try {
+        const data = await api('state',{room_id:roomId});
+        if (state?.room.id === roomId && data.state) adoptState(data.state);
+      } catch (err) {
+        if (err.cancelled) return;
+        if ([403,404,410].includes(err.status) || /房间.*(结束|不存在)|不在这个房间/.test(err.message || '')) {
+          exitToHome(err.message || '房间已结束');
+        }
+      } finally {
+        resyncing = false;
+        updateConnection();
+      }
+    })();
+
     try {
-      const data = await api('state',{room_id:roomId});
-      if (state?.room.id === roomId && data.state) adoptState(data.state);
-    } catch (err) {
-      if (err.cancelled) return;
-      if ([403,404,410].includes(err.status) || /房间.*(结束|不存在)|不在这个房间/.test(err.message || '')) {
-        exitToHome(err.message || '房间已结束');
+      await stateRefreshPromise;
+    } finally {
+      stateRefreshPromise = null;
+      if (refreshQueued && state && !suspended) {
+        refreshQueued = false;
+        requestState(0,false);
+      } else {
+        refreshQueued = false;
       }
     }
+  }
+
+  function applyGameEvent(event) {
+    if (!state || !event || event.room_id !== state.room.id) return;
+    const currentVersion = Number(state.room.version);
+    const fromVersion = Number(event.from_version);
+    const nextVersion = Number(event.version);
+
+    if (!Number.isFinite(fromVersion) || !Number.isFinite(nextVersion)) {
+      requestState(0,true);
+      return;
+    }
+    if (nextVersion <= currentVersion) return;
+    if (fromVersion !== currentVersion) {
+      requestState(0,true);
+      return;
+    }
+
+    const next = {
+      ...state,
+      server_now:event.server_time || state.server_now,
+      room:{...state.room,...(event.room || {}),version:nextVersion},
+      dealer:{...state.dealer},
+      players:[...state.players],
+    };
+
+    if (Array.isArray(event.players)) {
+      next.players = event.players;
+    } else if (event.player?.member_id) {
+      const key = String(event.player.member_id);
+      const index = next.players.findIndex((p) => String(p.member_id) === key);
+      if (index < 0) {
+        requestState(0,true);
+        return;
+      }
+      next.players[index] = event.player;
+    }
+
+    if (event.dealer && typeof event.dealer === 'object') {
+      next.dealer = {...state.dealer,...event.dealer};
+    }
+
+    adoptState(next);
   }
 
   function ensureRealtimeSDK() {
@@ -780,6 +955,7 @@
     const auth = await ToolboxAuth.getSession();
     if (!auth || epoch !== roomEpoch) return;
     realtimeStatus = 'CONNECTING';
+    updateConnection();
     realtime = window.supabase.createClient(ToolboxAuth.url,ToolboxAuth.key,{
       auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},
       realtime:{heartbeatCallback:(status) => {
@@ -805,9 +981,14 @@
     });
     channel.on('broadcast',{event:'state_snapshot'},({payload}) => {
       if (epoch !== roomEpoch || !validSnapshot(payload) || payload.room.id !== roomId) return;
+      resyncing = false;
       adoptState(payload);
     });
-    channel.on('broadcast',{event:'state_changed'},() => requestState(30));
+    channel.on('broadcast',{event:'game_event'},({payload}) => {
+      if (epoch !== roomEpoch || payload?.room_id !== roomId) return;
+      applyGameEvent(payload);
+    });
+    channel.on('broadcast',{event:'state_changed'},() => requestState(30,false));
     channel.on('broadcast',{event:'emoji'},({payload}) => {
       if (payload?.emoji && typeof payload.emoji === 'string') showEmoji(payload.emoji);
     });
@@ -837,7 +1018,7 @@
         reconnectAttempt = 0;
         try { await channel.track({member_id:String(me.id),nickname:me.nickname,online_at:new Date().toISOString()}); } catch {}
         startPing();
-        requestState(0);
+        requestState(0,false);
       } else if (['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(status)) {
         scheduleReconnect(1500);
       }
@@ -854,12 +1035,30 @@
     setPollInterval(healthy ? HEALTHY_POLL_MS : DEGRADED_POLL_MS);
     const network = Number.isFinite(realtimeRtt) ? `${Math.round(realtimeRtt)}ms` : null;
     const action = Number.isFinite(lastActionRtt) ? `操作 ${lastActionRtt}ms` : null;
-    const label = healthy ? ['实时在线',network,action].filter(Boolean).join(' · ') : '同步恢复中';
+    let label = '降级同步中';
+    let mode = 'degraded';
+
+    if (navigator.onLine === false) {
+      label = '网络已断开';
+      mode = 'offline';
+    } else if (resyncing) {
+      label = '正在同步牌局…';
+      mode = 'resyncing';
+    } else if (healthy) {
+      label = ['实时在线',network,action].filter(Boolean).join(' · ');
+      mode = 'online';
+    } else if (realtimeStatus === 'CONNECTING' || reconnectTimer) {
+      label = '正在重新连接…';
+      mode = 'reconnecting';
+    }
+
     for (const id of ['connectionStatus','gameConnectionStatus']) {
       const el = $(id);
       if (!el) continue;
       el.textContent = label;
-      el.classList.toggle('online',healthy);
+      el.dataset.mode = mode;
+      el.classList.toggle('online',mode === 'online');
+      el.classList.toggle('warn',mode !== 'online');
     }
   }
 
@@ -898,6 +1097,7 @@
   function scheduleReconnect(base = 0) {
     if (reconnectTimer || suspended || !state || navigator.onLine === false) return;
     const epoch = roomEpoch;
+    updateConnection();
     const jitter = 250 + Math.random()*Math.min(9000,500*2**Math.min(4,reconnectAttempt++));
     reconnectTimer = setTimeout(async () => {
       reconnectTimer = null;
@@ -931,7 +1131,8 @@
     if (!state || document.hidden || navigator.onLine === false) return;
     suspended = false;
     startTimers();
-    requestState(0);
+    claimDevice(false).catch(() => false);
+    requestState(0,true);
     if (!isRealtimeHealthy()) connectRealtime().catch(() => scheduleReconnect(500));
   }
 

@@ -29,6 +29,7 @@ const ACTION_LIMITS: Record<string, number> = {
   join_room: 30,
   state: 180,
   history: 30,
+  claim_device: 30,
   toggle_ready: 60,
   start_game: 20,
   hit: 120,
@@ -89,6 +90,13 @@ function cleanActionId(value: unknown) {
   const id = String(value || "");
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
     fail("操作标识无效，请重试", 400, "INVALID_ACTION_ID");
+  }
+  return id;
+}
+function cleanDeviceId(value: unknown) {
+  const id = String(value || "");
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+    fail("设备标识无效，请刷新后重试", 400, "INVALID_DEVICE_ID");
   }
   return id;
 }
@@ -172,6 +180,8 @@ async function gameRpc(name: string, args: Record<string, unknown>) {
   const out = await admin.rpc(name, args);
   if (!out.error) return out.data;
   if (out.error.code === "40001") fail("操作状态已更新，请重试", 409, "STALE_ACTION");
+  if (out.error.code === "P4091") fail("此牌局正在另一台设备操作", 409, "DEVICE_CONFLICT");
+  if (out.error.code === "P4092") fail("设备标识无效，请刷新后重试", 409, "INVALID_DEVICE_ID");
   if (out.error.code === "P4290") fail("请求过于频繁，请稍后再试", 429, "RATE_LIMITED");
   fail(out.error.message || "操作失败", 400, out.error.code);
 }
@@ -300,6 +310,15 @@ Deno.serve(async (req: Request) => {
 
     const roomId = String(body.room_id || "");
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(roomId)) fail("房间标识无效");
+    if (action === "claim_device") {
+      const device = await gameRpc("blackjack_claim_device_service", {
+        p_room_id: roomId,
+        p_user_id: member.user_id,
+        p_device_id: cleanDeviceId(body.device_id),
+        p_takeover: body.takeover === true,
+      });
+      return reply(req, { device });
+    }
     if (action === "state") {
       return reply(req, { state: await state(roomId, member.user_id) });
     }
@@ -328,6 +347,7 @@ Deno.serve(async (req: Request) => {
         p_action: action,
         p_expected_token: token,
         p_action_id: cleanActionId(body.action_id),
+        p_device_id: cleanDeviceId(body.device_id),
       });
       return reply(req, { state: next });
     }
