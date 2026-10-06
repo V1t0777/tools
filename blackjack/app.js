@@ -213,7 +213,7 @@
       me = data.member;
       $('welcomeName').textContent = me.nickname;
       show('homeScreen');
-      loadHistory().catch(() => {});
+      loadDashboard().catch(() => {});
       if (data.state) await enterRoom(data.state);
     } catch (err) {
       if (['AUTH_REQUIRED','SESSION_REVOKED'].includes(err.code)) {
@@ -262,7 +262,7 @@
       session = me = null;
       show('authScreen');
     };
-    $('historyRefreshBtn').onclick = () => loadHistory(true);
+    $('historyRefreshBtn').onclick = () => loadDashboard(true);
     $('createBtn').onclick = async () => {
       if (busy) return;
       busy = true;
@@ -362,7 +362,7 @@
   function exitToHome(message = '') {
     clearRoom();
     show('homeScreen');
-    loadHistory().catch(() => {});
+    loadDashboard().catch(() => {});
     if (message) toast(message);
   }
 
@@ -450,19 +450,73 @@
     return `${player.nickname || '好友'}：${cards}${value}${deltaText}`;
   }
 
-  async function loadHistory(showToast = false) {
+  async function loadDashboard(showToast = false) {
     if (historyLoading || !me) return;
     historyLoading = true;
     $('historyRefreshBtn').disabled = true;
     try {
-      const data = await api('history',{limit:12});
+      const data = await api('dashboard',{limit:12});
+      renderStats(data.stats && typeof data.stats === 'object' ? data.stats : {});
       renderHistory(Array.isArray(data.history) ? data.history : []);
-      if (showToast) toast('对局记录已刷新');
+      if (showToast) toast('战绩与对局记录已刷新');
     } catch (err) {
-      if (showToast) toast(err.message || '对局记录加载失败');
+      if (showToast) toast(err.message || '战绩加载失败');
     } finally {
       historyLoading = false;
       $('historyRefreshBtn').disabled = false;
+    }
+  }
+
+  function renderStats(stats) {
+    const rounds = Math.max(0,Number(stats.rounds || 0));
+    const completed = Math.max(0,Number(stats.completed_matches || 0));
+    const interrupted = Math.max(0,Number(stats.interrupted_matches || 0));
+    const wins = Math.max(0,Number(stats.wins || 0));
+    const pushes = Math.max(0,Number(stats.pushes || 0));
+    const losses = Math.max(0,Number(stats.losses || 0));
+    const blackjacks = Math.max(0,Number(stats.blackjacks || 0));
+    const streak = Math.max(0,Number(stats.longest_win_streak || 0));
+    const totalDelta = Number(stats.total_delta || 0);
+    const winRate = Number(stats.win_rate_pct || 0);
+    const bustRate = Number(stats.bust_rate_pct || 0);
+    const avgStand = Number(stats.avg_stand_value || 0);
+    const bestScore = Number(stats.best_match_score || 0);
+
+    $('statMatches').textContent = String(completed);
+    $('statRounds').textContent = String(rounds);
+    $('statWinRate').textContent = `${winRate.toFixed(1).replace(/\.0$/,'')}%`;
+    $('statBlackjacks').textContent = String(blackjacks);
+    $('statBustRate').textContent = `${bustRate.toFixed(1).replace(/\.0$/,'')}%`;
+    $('statAvgStand').textContent = avgStand > 0 ? avgStand.toFixed(1).replace(/\.0$/,'') : '--';
+    $('statStreak').textContent = String(streak);
+    $('statBestScore').textContent = completed > 0 ? String(bestScore) : '--';
+
+    const signed = totalDelta > 0 ? `+${totalDelta}` : String(totalDelta);
+    $('statsMeta').textContent = rounds
+      ? `胜 ${wins} · 和 ${pushes} · 负 ${losses} · 净积分 ${signed}${interrupted ? ` · 中断 ${interrupted} 场` : ''}`
+      : '暂无统计数据';
+
+    const strip = $('recentForm');
+    strip.replaceChildren();
+    const recent = Array.isArray(stats.recent_rounds) ? stats.recent_rounds : [];
+    if (!recent.length) {
+      const empty = document.createElement('span');
+      empty.className = 'form-empty';
+      empty.textContent = '完成一局后，这里会显示最近表现';
+      strip.append(empty);
+      return;
+    }
+
+    for (const item of recent) {
+      const chip = document.createElement('span');
+      const result = item?.result === 'win' ? 'win' : item?.result === 'push' ? 'push' : 'loss';
+      chip.className = `form-chip ${result}`;
+      const label = result === 'win' ? '胜' : result === 'push' ? '和' : '负';
+      const value = Number(item?.value);
+      chip.textContent = Number.isFinite(value) ? `${label} · ${value}` : label;
+      chip.title = item?.hand_status === 'blackjack' ? 'Blackjack' :
+        item?.hand_status === 'bust' ? '爆牌' : `积分 ${Number(item?.delta || 0) >= 0 ? '+' : ''}${Number(item?.delta || 0)}`;
+      strip.append(chip);
     }
   }
 
