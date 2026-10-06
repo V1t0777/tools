@@ -882,6 +882,49 @@
     }
   }
 
+  function applyGameEvent(event) {
+    if (!state || !event || event.room_id !== state.room.id) return;
+    const currentVersion = Number(state.room.version);
+    const fromVersion = Number(event.from_version);
+    const nextVersion = Number(event.version);
+
+    if (!Number.isFinite(fromVersion) || !Number.isFinite(nextVersion)) {
+      requestState(0,true);
+      return;
+    }
+    if (nextVersion <= currentVersion) return;
+    if (fromVersion !== currentVersion) {
+      requestState(0,true);
+      return;
+    }
+
+    const next = {
+      ...state,
+      server_now:event.server_time || state.server_now,
+      room:{...state.room,...(event.room || {}),version:nextVersion},
+      dealer:{...state.dealer},
+      players:[...state.players],
+    };
+
+    if (Array.isArray(event.players)) {
+      next.players = event.players;
+    } else if (event.player?.member_id) {
+      const key = String(event.player.member_id);
+      const index = next.players.findIndex((p) => String(p.member_id) === key);
+      if (index < 0) {
+        requestState(0,true);
+        return;
+      }
+      next.players[index] = event.player;
+    }
+
+    if (event.dealer && typeof event.dealer === 'object') {
+      next.dealer = {...state.dealer,...event.dealer};
+    }
+
+    adoptState(next);
+  }
+
   function ensureRealtimeSDK() {
     if (window.supabase?.createClient) return Promise.resolve();
     if (sdkPromise) return sdkPromise;
@@ -912,6 +955,7 @@
     const auth = await ToolboxAuth.getSession();
     if (!auth || epoch !== roomEpoch) return;
     realtimeStatus = 'CONNECTING';
+    updateConnection();
     realtime = window.supabase.createClient(ToolboxAuth.url,ToolboxAuth.key,{
       auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},
       realtime:{heartbeatCallback:(status) => {
@@ -937,9 +981,14 @@
     });
     channel.on('broadcast',{event:'state_snapshot'},({payload}) => {
       if (epoch !== roomEpoch || !validSnapshot(payload) || payload.room.id !== roomId) return;
+      resyncing = false;
       adoptState(payload);
     });
-    channel.on('broadcast',{event:'state_changed'},() => requestState(30));
+    channel.on('broadcast',{event:'game_event'},({payload}) => {
+      if (epoch !== roomEpoch || payload?.room_id !== roomId) return;
+      applyGameEvent(payload);
+    });
+    channel.on('broadcast',{event:'state_changed'},() => requestState(30,false));
     channel.on('broadcast',{event:'emoji'},({payload}) => {
       if (payload?.emoji && typeof payload.emoji === 'string') showEmoji(payload.emoji);
     });
@@ -969,7 +1018,7 @@
         reconnectAttempt = 0;
         try { await channel.track({member_id:String(me.id),nickname:me.nickname,online_at:new Date().toISOString()}); } catch {}
         startPing();
-        requestState(0);
+        requestState(0,false);
       } else if (['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(status)) {
         scheduleReconnect(1500);
       }
@@ -986,12 +1035,30 @@
     setPollInterval(healthy ? HEALTHY_POLL_MS : DEGRADED_POLL_MS);
     const network = Number.isFinite(realtimeRtt) ? `${Math.round(realtimeRtt)}ms` : null;
     const action = Number.isFinite(lastActionRtt) ? `操作 ${lastActionRtt}ms` : null;
-    const label = healthy ? ['实时在线',network,action].filter(Boolean).join(' · ') : '同步恢复中';
+    let label = '降级同步中';
+    let mode = 'degraded';
+
+    if (navigator.onLine === false) {
+      label = '网络已断开';
+      mode = 'offline';
+    } else if (resyncing) {
+      label = '正在同步牌局…';
+      mode = 'resyncing';
+    } else if (healthy) {
+      label = ['实时在线',network,action].filter(Boolean).join(' · ');
+      mode = 'online';
+    } else if (realtimeStatus === 'CONNECTING' || reconnectTimer) {
+      label = '正在重新连接…';
+      mode = 'reconnecting';
+    }
+
     for (const id of ['connectionStatus','gameConnectionStatus']) {
       const el = $(id);
       if (!el) continue;
       el.textContent = label;
-      el.classList.toggle('online',healthy);
+      el.dataset.mode = mode;
+      el.classList.toggle('online',mode === 'online');
+      el.classList.toggle('warn',mode !== 'online');
     }
   }
 
@@ -1030,6 +1097,7 @@
   function scheduleReconnect(base = 0) {
     if (reconnectTimer || suspended || !state || navigator.onLine === false) return;
     const epoch = roomEpoch;
+    updateConnection();
     const jitter = 250 + Math.random()*Math.min(9000,500*2**Math.min(4,reconnectAttempt++));
     reconnectTimer = setTimeout(async () => {
       reconnectTimer = null;
@@ -1063,7 +1131,8 @@
     if (!state || document.hidden || navigator.onLine === false) return;
     suspended = false;
     startTimers();
-    requestState(0);
+    claimDevice(false).catch(() => false);
+    requestState(0,true);
     if (!isRealtimeHealthy()) connectRealtime().catch(() => scheduleReconnect(500));
   }
 
