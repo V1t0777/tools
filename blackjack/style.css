@@ -403,3 +403,15 @@ button,input,select{font:inherit}.app{width:min(880px,100%);margin:auto}.hidden{
   .card.dealt{animation:none}
   .mini-hand,.casino-chip{transition:none}
 }
+
+
+/* V1.4 transient chip flight: fixed overlay, transform/opacity only. */
+.chip-flight{
+  position:fixed!important;
+  z-index:80!important;
+  margin:0!important;
+  pointer-events:none!important;
+  will-change:transform,opacity;
+  contain:strict;
+}
+@media(prefers-reduced-motion:reduce){.chip-flight{display:none!important}}
