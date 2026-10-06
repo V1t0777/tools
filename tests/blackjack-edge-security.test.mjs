@@ -16,8 +16,8 @@ test('blackjack deck generation is server side and cryptographically sourced',()
 test('blackjack edge uses one session context lookup and a rate-limited hot-path gateway',()=>{
   assert.match(source,/blackjack_session_context/);
   assert.doesNotMatch(source,/toolbox_session_status/);
-  assert.match(source,/blackjack_action_gateway_service/);
-  assert.match(source,/action !== "hit" && action !== "stand"/);
+  assert.match(source,/blackjack_casino_action_gateway_service/);
+  assert.match(source,/\["hit", "stand", "double", "split", "surrender"\]/);
   assert.match(perf,/flappy_rate_limit_check/);
   assert.match(perf,/blackjack:\'\|\|p_action/);
 });
