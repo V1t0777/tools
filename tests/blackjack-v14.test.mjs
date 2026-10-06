@@ -14,9 +14,9 @@ test('blackjack V1.4 exposes casino betting and advanced rule controls',()=>{
     'bettingDock','chipRack','confirmBetBtn','insuranceDock',
     'doubleBtn','splitBtn','surrenderBtn','activeBet'
   ]) assert.match(html,new RegExp(`id="${id}"`));
-  assert.match(html,/Blackjack 3:2/);
-  assert.match(html,/S17/);
-  assert.match(html,/Late Surrender/);
+  assert.match(html,/黑杰克 3:2/);
+  assert.match(html,/庄家软 17 停牌/);
+  assert.match(html,/延迟投降/);
 });
 
 test('blackjack V1.4 keeps chips match-local and server authoritative',()=>{
@@ -91,4 +91,25 @@ test('blackjack V1.4 polish restores streak stats and keeps chip flight composit
   assert.match(app,/translate3d/);
   assert.match(css,/\.chip-flight/);
   assert.match(css,/will-change:transform,opacity/);
+});
+
+
+test('blackjack player-facing V1.4 casino copy is fully localized to Simplified Chinese',()=>{
+  for(const legacy of [
+    'PLACE YOUR BETS','TABLE CLOSED','CASINO TABLE','PLAYER ACTION','PAYOUT',
+    'INSURANCE?','NO INSURANCE','DOUBLE DOWN…','BLACKJACK PAYS 3:2',
+    '>DOUBLE<','>SPLIT<','>SURRENDER<','<small>BET</small>'
+  ]) {
+    assert.equal(html.includes(legacy) || app.includes(legacy) || css.includes(legacy),false,`player-facing English remains: ${legacy}`);
+  }
+  assert.match(html,/每场独立筹码/);
+  assert.match(html,/是否购买保险？/);
+  assert.match(html,/>加倍</);
+  assert.match(html,/>分牌</);
+  assert.match(html,/>投降</);
+  assert.match(app,/betting:'请下注'/);
+  assert.match(app,/insurance:'保险选择'/);
+  assert.match(app,/player_action:'玩家操作'/);
+  assert.match(app,/settlement:'本局结算'/);
+  assert.match(css,/黑杰克赔付 3:2/);
 });
