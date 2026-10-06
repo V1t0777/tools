@@ -126,7 +126,7 @@ button,input,select{font:inherit}.app{width:min(880px,100%);margin:auto}.hidden{
     0 28px 70px rgba(0,0,0,.36);
 }
 #gameScreen::after{
-  content:"BLACKJACK PAYS 3:2   ·   DEALER STANDS ON 17";
+  content:"黑杰克赔付 3:2   ·   庄家 17 点停牌";
   position:absolute;
   top:168px;
   left:50%;
