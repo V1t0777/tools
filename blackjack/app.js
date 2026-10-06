@@ -714,7 +714,7 @@
   function renderRoom() {
     $('roomCode').textContent = state.room.code;
     $('playerCount').textContent = `${state.players.length} / 3`;
-    $('rulesText').textContent = `${state.room.round_limit} 局 · 初始 1000 筹码 · 黑杰克 3:2 · 庄家 17 点停牌 · 加倍 / 分牌 / 保险 / 后期投降`;
+    $('rulesText').textContent = `${state.room.round_limit} 局 · 初始 1000 筹码 · 黑杰克 3:2 · 庄家软 17 停牌 · 加倍 / 分牌 / 保险 / 延迟投降`;
     const list = $('players');
     list.replaceChildren();
     for (const player of state.players) {
