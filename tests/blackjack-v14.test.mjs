@@ -81,3 +81,14 @@ test('blackjack V1.4 dashboard derives chip outcomes from private history',()=>{
   assert.match(sql,/'surrenders'/);
   assert.doesNotMatch(sql,/create table if not exists public\.blackjack/i);
 });
+
+
+test('blackjack V1.4 polish restores streak stats and keeps chip flight compositor-only',()=>{
+  const polish=readFileSync(new URL('../supabase/migrations/20261007005500_blackjack_v14_stats_polish.sql',import.meta.url),'utf8');
+  assert.match(polish,/blackjack_longest_win_streak/);
+  assert.match(polish,/'longest_win_streak'/);
+  assert.match(app,/function animateChipFlight\(button\)/);
+  assert.match(app,/translate3d/);
+  assert.match(css,/\.chip-flight/);
+  assert.match(css,/will-change:transform,opacity/);
+});
