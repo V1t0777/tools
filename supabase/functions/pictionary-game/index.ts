@@ -39,11 +39,11 @@ async function players(roomId:string){
   const map=new Map(members.map(m=>[m.user_id,m]));
   return (data||[]).map(p=>({member_id:map.get(p.user_id)?.id||p.user_id,user_id:p.user_id,nickname:map.get(p.user_id)?.nickname||p.display_name,color:map.get(p.user_id)?.color||"#8EC5FF",turn_order:p.seat-1,score:p.score,ready:p.ready,joined_at:p.joined_at}));
 }
-async function makeRound(r:any,ps:any[]){
-  const drawer=ps[(r.current_round_no-1)%ps.length];if(!drawer)fail("没有可用画手");
-  const {data:exists}=await admin.from("pictionary_rounds").select("id").eq("room_id",r.id).eq("round_no",r.current_round_no).maybeSingle();if(exists)return;
+async function makeRound(r:any,ps:any[],roundNo=Number(r.current_round_no)){
+  const drawer=ps[(roundNo-1)%ps.length];if(!drawer)fail("没有可用画手");
+  const {data:exists}=await admin.from("pictionary_rounds").select("id").eq("room_id",r.id).eq("round_no",roundNo).maybeSingle();if(exists)return;
   const {data:pool,error}=await admin.from("pictionary_words").select("id,word,category,difficulty,use_count,last_used_at").eq("active",true).order("use_count").order("last_used_at",{ascending:true,nullsFirst:true}).limit(42);if(error||!pool||pool.length<3)fail("词库暂时不可用",503);
-  const chosen=shuffle(pool).slice(0,3);const {error:insertError}=await admin.from("pictionary_rounds").insert({room_id:r.id,round_no:r.current_round_no,drawer_user_id:drawer.user_id,status:"choosing",option_word_ids:chosen.map(x=>x.id)});if(insertError)throw insertError;
+  const chosen=shuffle(pool).slice(0,3);const {error:insertError}=await admin.from("pictionary_rounds").insert({room_id:r.id,round_no:roundNo,drawer_user_id:drawer.user_id,status:"choosing",option_word_ids:chosen.map(x=>x.id)});if(insertError)throw insertError;
   const now=new Date().toISOString();await Promise.all(chosen.map(w=>admin.from("pictionary_words").update({use_count:w.use_count+1,last_used_at:now}).eq("id",w.id)));
 }
 
@@ -75,7 +75,7 @@ async function repairRoomState(input:any){
     if(r.status==="playing"&&r.ends_at&&new Date(r.ends_at).getTime()<=now){
       const iso=new Date().toISOString();
       await admin.from("pictionary_rounds").update({status:"ended",ended_at:iso}).eq("room_id",r.id).eq("round_no",r.current_round_no).neq("status","ended");
-      await admin.from("pictionary_rooms").update({status:"summary",ends_at:null,summary_until:new Date(Date.now()+6000).toISOString(),updated_at:iso}).eq("id",r.id).eq("status","playing");
+      await admin.from("pictionary_rooms").update({status:"summary",ends_at:null,summary_until:new Date(Date.now()+3200).toISOString(),updated_at:iso}).eq("id",r.id).eq("status","playing");
       r=await room(r.id);continue;
     }
 
@@ -94,7 +94,7 @@ async function repairRoomState(input:any){
         status:"choosing",current_round_no:next,current_drawer_user_id:drawer.user_id,
         ends_at:null,summary_until:null,updated_at:new Date().toISOString()
       }).eq("id",r.id).eq("status","summary").select("*").maybeSingle();
-      if(updated)await makeRound(updated,ps);
+      if(updated)await makeRound(updated,ps,next);
       r=await room(r.id);continue;
     }
     return r;
@@ -123,6 +123,35 @@ async function state(roomId:string,member:any){
   const scoreSnapshot=await admin.rpc("pictionary_score_state_service",{p_room_id:roomId});
   if(scoreSnapshot.error)throw scoreSnapshot.error;
   return {room:{id:r.id,code:r.room_code,host_member_id:byUser.get(r.host_user_id)?.member_id||r.host_user_id,status:r.status,round_no:r.current_round_no,rounds_per_player:r.rounds_per_player,total_rounds:r.total_rounds,current_drawer_member_id:byUser.get(r.current_drawer_user_id)?.member_id||r.current_drawer_user_id,ends_at:r.ends_at,summary_until:r.summary_until},players:ps.map(({user_id,...p})=>p),round:roundData,answer,revealed_answer,options,guesses,solved_members,score_state:scoreSnapshot.data};
+}
+function realtimeState(snapshot:any){
+  const round=snapshot.round?{
+    id:snapshot.round.id,round_number:snapshot.round.round_number,drawer_member_id:snapshot.round.drawer_member_id,
+    drawer_nickname:snapshot.round.drawer_nickname,difficulty:snapshot.round.difficulty,char_count:snapshot.round.char_count,
+    started_at:snapshot.round.started_at,ends_at:snapshot.round.ends_at
+  }:null;
+  return {
+    room_id:snapshot.room.id,room:snapshot.room,players:snapshot.players,round,
+    revealed_answer:["summary","finished"].includes(snapshot.room.status)?snapshot.revealed_answer:null,
+    solved_members:snapshot.solved_members||[],score_state:snapshot.score_state
+  };
+}
+function background(task:Promise<unknown>){
+  const handled=task.catch(err=>console.error("background task failed",err));
+  const runtime=(globalThis as any).EdgeRuntime;
+  if(runtime?.waitUntil)runtime.waitUntil(handled);
+}
+function emitState(snapshot:any){
+  background(admin.rpc("pictionary_emit_event_service",{
+    p_room_id:snapshot.room.id,p_event:"state_sync",p_payload:realtimeState(snapshot)
+  }).then(({error})=>{if(error)throw error;}));
+}
+async function stateAndEmit(roomId:string,member:any){
+  const snapshot=await state(roomId,member);emitState(snapshot);return snapshot;
+}
+function warmNextRound(r:any){
+  if(!["playing","summary"].includes(r.status)||r.current_round_no>=r.total_rounds)return;
+  background((async()=>{const ps=await players(r.id);await makeRound(r,ps,Number(r.current_round_no)+1);})());
 }
 
 const ACTION_LIMITS:Record<string,number>={me:60,bootstrap:30,create_room:6,join_room:30,guess:120,state:240,close_room:20,leave_room:30,canvas:240,save_canvas:120,toggle_ready:60,start_game:20,choose_word:30,finish_round:60,next_round:60,play_again:20};
@@ -253,22 +282,22 @@ Deno.serve(async(req:Request)=>{
       if(out.error)fail(out.error.message);
       return reply(req,out.data);
     }
-    if(action==="toggle_ready"){if(r.status!=="lobby")fail("当前不能修改准备状态");if(r.host_user_id===member.user_id)fail("房主默认已准备");const p=await player(id,member.user_id);await admin.from("pictionary_players").update({ready:!p.ready,updated_at:new Date().toISOString()}).eq("room_id",id).eq("user_id",member.user_id);await touchRoom(id);return reply(req,{state:await state(id,member)});}
+    if(action==="toggle_ready"){if(r.status!=="lobby")fail("当前不能修改准备状态");if(r.host_user_id===member.user_id)fail("房主默认已准备");const p=await player(id,member.user_id);await admin.from("pictionary_players").update({ready:!p.ready,updated_at:new Date().toISOString()}).eq("room_id",id).eq("user_id",member.user_id);await touchRoom(id);return reply(req,{state:await stateAndEmit(id,member)});}
     if(action==="start_game"){
-      if(r.host_user_id!==member.user_id)fail("只有房主可以开始");if(r.status!=="lobby")fail("游戏已经开始");const ps=await players(id);if(ps.length<2)fail("至少需要 2 人");if(ps.some(p=>p.user_id!==r.host_user_id&&!p.ready))fail("还有玩家未准备");await admin.from("pictionary_rounds").delete().eq("room_id",id);await admin.from("pictionary_players").update({score:0}).eq("room_id",id);const total=ps.length*r.rounds_per_player;await admin.from("pictionary_rooms").update({status:"choosing",current_round_no:1,total_rounds:total,current_drawer_user_id:ps[0].user_id,ends_at:null,summary_until:null,finished_at:null,closed_reason:null,last_activity_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",id);const fresh=await room(id);await makeRound(fresh,ps);return reply(req,{state:await state(id,member)});
+      if(r.host_user_id!==member.user_id)fail("只有房主可以开始");if(r.status!=="lobby")fail("游戏已经开始");const ps=await players(id);if(ps.length<2)fail("至少需要 2 人");if(ps.some(p=>p.user_id!==r.host_user_id&&!p.ready))fail("还有玩家未准备");await admin.from("pictionary_rounds").delete().eq("room_id",id);await admin.from("pictionary_players").update({score:0}).eq("room_id",id);const total=ps.length*r.rounds_per_player;await admin.from("pictionary_rooms").update({status:"choosing",current_round_no:1,total_rounds:total,current_drawer_user_id:ps[0].user_id,ends_at:null,summary_until:null,finished_at:null,closed_reason:null,last_activity_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",id);const fresh=await room(id);await makeRound(fresh,ps);return reply(req,{state:await stateAndEmit(id,member)});
     }
     if(["finish_round","next_round","choose_word"].includes(action)&&b.round_id){
       const expected=await admin.from("pictionary_rounds").select("id").eq("room_id",id).eq("round_no",r.current_round_no).maybeSingle();
       if(expected.data?.id!==b.round_id)fail("轮次已切换",409);
     }
     if(action==="choose_word"){
-      if(r.status!=="choosing"||r.current_drawer_user_id!==member.user_id)fail("现在不是你的选题阶段");const {data:rd}=await admin.from("pictionary_rounds").select("*").eq("room_id",id).eq("round_no",r.current_round_no).single();const wordId=Number(b.option_id);if(!(rd.option_word_ids||[]).map(Number).includes(wordId))fail("题目选项无效");const {data:w}=await admin.from("pictionary_words").select("*").eq("id",wordId).single();const ends=new Date(Date.now()+60000).toISOString();await admin.from("pictionary_rounds").update({word_id:w.id,answer:w.word,category:w.category,difficulty:w.difficulty,word_length:Array.from(w.word).length,hint:`它属于「${w.category}」类`,status:"drawing",started_at:new Date().toISOString(),ends_at:ends,canvas_state:[],canvas_version:0,canvas_updated_at:null}).eq("id",rd.id);await admin.from("pictionary_rooms").update({status:"playing",ends_at:ends,summary_until:null,last_activity_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",id);return reply(req,{state:await state(id,member)});
+      if(r.status!=="choosing"||r.current_drawer_user_id!==member.user_id)fail("现在不是你的选题阶段");const {data:rd}=await admin.from("pictionary_rounds").select("*").eq("room_id",id).eq("round_no",r.current_round_no).single();const wordId=Number(b.option_id);if(!(rd.option_word_ids||[]).map(Number).includes(wordId))fail("题目选项无效");const {data:w}=await admin.from("pictionary_words").select("*").eq("id",wordId).single();const ends=new Date(Date.now()+60000).toISOString();await admin.from("pictionary_rounds").update({word_id:w.id,answer:w.word,category:w.category,difficulty:w.difficulty,word_length:Array.from(w.word).length,hint:`它属于「${w.category}」类`,status:"drawing",started_at:new Date().toISOString(),ends_at:ends,canvas_state:[],canvas_version:0,canvas_updated_at:null}).eq("id",rd.id);await admin.from("pictionary_rooms").update({status:"playing",ends_at:ends,summary_until:null,last_activity_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",id);const live=await room(id);warmNextRound(live);return reply(req,{state:await stateAndEmit(id,member)});
     }
-    if(action==="finish_round"){if(r.status==="playing"){if(r.ends_at&&new Date(r.ends_at).getTime()>Date.now()+700)fail("本轮仍在进行");await admin.from("pictionary_rooms").update({status:"summary",ends_at:null,summary_until:new Date(Date.now()+6000).toISOString(),updated_at:new Date().toISOString()}).eq("id",id).eq("status","playing");await admin.from("pictionary_rounds").update({status:"ended",ended_at:new Date().toISOString()}).eq("room_id",id).eq("round_no",r.current_round_no);}return reply(req,{state:await state(id,member)});}
+    if(action==="finish_round"){if(r.status==="playing"){if(r.ends_at&&new Date(r.ends_at).getTime()>Date.now()+700)fail("本轮仍在进行");await admin.from("pictionary_rooms").update({status:"summary",ends_at:null,summary_until:new Date(Date.now()+3200).toISOString(),updated_at:new Date().toISOString()}).eq("id",id).eq("status","playing");await admin.from("pictionary_rounds").update({status:"ended",ended_at:new Date().toISOString()}).eq("room_id",id).eq("round_no",r.current_round_no);}const fresh=await room(id);warmNextRound(fresh);return reply(req,{state:await stateAndEmit(id,member)});}
     if(action==="next_round"){
-      const fresh=await room(id);if(fresh.status!=="summary")return reply(req,{state:await state(id,member)});if(fresh.summary_until&&new Date(fresh.summary_until).getTime()>Date.now()+700)fail("本轮结果仍在展示");const ps=await players(id);if(fresh.current_round_no>=fresh.total_rounds)await admin.from("pictionary_rooms").update({status:"finished",current_drawer_user_id:null,summary_until:null,finished_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",id).eq("status","summary");else{const next=fresh.current_round_no+1,drawer=ps[(next-1)%ps.length];const {data:updated}=await admin.from("pictionary_rooms").update({status:"choosing",current_round_no:next,current_drawer_user_id:drawer.user_id,ends_at:null,summary_until:null,updated_at:new Date().toISOString()}).eq("id",id).eq("status","summary").select("*").maybeSingle();if(updated)await makeRound(updated,ps);}return reply(req,{state:await state(id,member)});
+      const fresh=await room(id);if(fresh.status!=="summary")return reply(req,{state:await stateAndEmit(id,member)});if(fresh.summary_until&&new Date(fresh.summary_until).getTime()>Date.now()+700)fail("本轮结果仍在展示");const ps=await players(id);if(fresh.current_round_no>=fresh.total_rounds)await admin.from("pictionary_rooms").update({status:"finished",current_drawer_user_id:null,summary_until:null,finished_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",id).eq("status","summary");else{const next=fresh.current_round_no+1,drawer=ps[(next-1)%ps.length];const {data:updated}=await admin.from("pictionary_rooms").update({status:"choosing",current_round_no:next,current_drawer_user_id:drawer.user_id,ends_at:null,summary_until:null,updated_at:new Date().toISOString()}).eq("id",id).eq("status","summary").select("*").maybeSingle();if(updated)await makeRound(updated,ps,next);}return reply(req,{state:await stateAndEmit(id,member)});
     }
-    if(action==="play_again"){if(r.host_user_id!==member.user_id)fail("只有房主可以再开一局");if(r.status!=="finished")fail("本局尚未结束");await admin.from("pictionary_rounds").delete().eq("room_id",id);await admin.from("pictionary_players").update({score:0,ready:false,updated_at:new Date().toISOString()}).eq("room_id",id);await admin.from("pictionary_players").update({ready:true}).eq("room_id",id).eq("user_id",member.user_id);await admin.from("pictionary_rooms").update({status:"lobby",current_round_no:0,total_rounds:0,current_drawer_user_id:null,ends_at:null,summary_until:null,finished_at:null,closed_reason:null,last_activity_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",id);return reply(req,{state:await state(id,member)});}
+    if(action==="play_again"){if(r.host_user_id!==member.user_id)fail("只有房主可以再开一局");if(r.status!=="finished")fail("本局尚未结束");await admin.from("pictionary_rounds").delete().eq("room_id",id);await admin.from("pictionary_players").update({score:0,ready:false,updated_at:new Date().toISOString()}).eq("room_id",id);await admin.from("pictionary_players").update({ready:true}).eq("room_id",id).eq("user_id",member.user_id);await admin.from("pictionary_rooms").update({status:"lobby",current_round_no:0,total_rounds:0,current_drawer_user_id:null,ends_at:null,summary_until:null,finished_at:null,closed_reason:null,last_activity_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",id);return reply(req,{state:await stateAndEmit(id,member)});}
     fail("未知操作");
   }catch(e){console.error(e);return reply(req,{error:(e as Error)?.message||"服务器暂时不可用",code:(e as any)?.code},(e as any)?.status||400);}
 });

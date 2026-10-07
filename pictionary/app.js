@@ -16,6 +16,7 @@
   let canvasRevision=0, canvasDirty=false, lastCanvasCheck=0, lastSnapshotRequest=0, canvasNeedsSync=false;
   let sdkPromise=null,initializing=null,startupEpoch=0,loginBusy=false,connectPromise=null,connectDeadline=null,serverHeartbeatAt=0,transportFailed=false;
   let scoreRevision=-1, scoreTotals=new Map(), hintRequested=false, suspended=false;
+  let transitionRetryAt=0;
 
   function show(id){ screens.forEach(x => $(x).classList.toggle('active',x===id)); }
   function toast(message){ const el=$('toast'); el.textContent=message; el.classList.add('show'); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),2300); }
@@ -58,7 +59,7 @@
     roomEpoch++;stateGeneration++;
     for(const c of requests)c.abort(Object.assign(new Error('会话已切换'),{cancelled:true}));
     requests.clear();guessRequests.clear();liveGuesses.clear();appliedGuessResults.clear();
-    busy=false;transitionBusy=false;refreshQueued=false;
+    busy=false;transitionBusy=false;refreshQueued=false;transitionRetryAt=0;
     clearTimeout(refreshTimer);refreshTimer=null;
     scoreRevision=-1;scoreTotals.clear();
   }
@@ -69,7 +70,10 @@
     for(const p of state?.players||[])if(scoreTotals.has(p.member_id))p.score=scoreTotals.get(p.member_id);
   }
   function adoptState(next){
-    state=next;applyScores(next.score_state);
+    const previousStatus=state?.room?.status,previousRound=state?.round?.id||null;
+    state=next;
+    if(previousStatus!==next?.room?.status||previousRound!==(next?.round?.id||null))transitionRetryAt=0;
+    applyScores(next.score_state);
     for(const p of state?.players||[])if(scoreTotals.has(p.member_id))p.score=scoreTotals.get(p.member_id);
     renderState();
   }
@@ -210,7 +214,7 @@
     busy=true;const generation=++stateGeneration,epoch=roomEpoch;
     try{
       const data=await api(action,{room_id:state.room.id,round_id:currentRoundId,...payload});
-      if(data.state&&epoch===roomEpoch&&generation===stateGeneration){adoptState(data.state);sendEvent('state_changed',{at:Date.now()});}
+      if(data.state&&epoch===roomEpoch&&generation===stateGeneration){adoptState(data.state);sendEvent('state_changed',{at:Date.now(),sync:true});}
       return data;
     }finally{if(epoch===roomEpoch){busy=false;if(refreshQueued){refreshQueued=false;requestState();}}}
   }
@@ -280,7 +284,7 @@
     on('stroke',receiveStroke);on('snapshot',receiveSnapshot);
     on('clear',p=>receiveCanvasControl('clear',p));on('undo',p=>receiveCanvasControl('undo',p));
     on('sync_request',p=>{if(isDrawer()&&p?.round_id===currentRoundId)sendSnapshot();});
-    on('guess_result',receiveGuessResult);on('state_changed',()=>requestState());
+    on('guess_pending',receiveGuessPending);on('guess_result',receiveGuessResult);on('state_sync',receiveStateSync);on('state_changed',p=>{if(!p?.sync)requestState();});
     on('ping',handlePing);on('pong',handlePong);
     ch.on('presence',{event:'sync'},()=>{if(!current())return;presenceMembers=new Set(Object.values(ch.presenceState()).flat().map(x=>x.member_id));renderPlayers();});
     ch.subscribe(async status=>{
@@ -362,6 +366,33 @@
       return Promise.resolve(channel.send({type:'broadcast',event,payload})).then(status=>{if(epoch===connectionEpoch&&status&&status!=='ok')scheduleReconnect();return status;}).catch(()=>{if(epoch===connectionEpoch)scheduleReconnect();return 'error';});
     }catch{scheduleReconnect();return Promise.resolve('error');}
   }
+  function transitionLeaderId(){
+    if(!state?.players?.length)return null;
+    const ids=[state.room.current_drawer_member_id,state.room.host_member_id,...state.players.map(p=>p.member_id)].filter(Boolean);
+    if(!presenceMembers.size)return ids[0]||null;
+    return ids.find(id=>id===me?.id||presenceMembers.has(id))||ids[0]||null;
+  }
+  function attemptTransition(action){
+    if(!state||busy||transitionBusy||Date.now()<transitionRetryAt||transitionLeaderId()!==me?.id)return;
+    transitionRetryAt=Date.now()+1200;
+    mutate(action).catch(()=>{});
+  }
+  function receiveStateSync(p){
+    if(!state||!p||p.room_id!==state.room.id||!p.room)return;
+    const oldStatus=state.room.status,oldRound=currentRoundId,nextRound=p.round||null,roundChanged=(nextRound?.id||null)!==(state.round?.id||null);
+    state.room={...state.room,...p.room};
+    if(Array.isArray(p.players))state.players=p.players;
+    if(roundChanged){
+      state.round=nextRound;state.answer=null;state.options=null;state.guesses=[];state.solved_members=[];state.revealed_answer=null;
+    }else if(nextRound)state.round={...(state.round||{}),...nextRound};
+    else state.round=null;
+    if(Object.prototype.hasOwnProperty.call(p,'revealed_answer'))state.revealed_answer=p.revealed_answer;
+    if(Array.isArray(p.solved_members))state.solved_members=p.solved_members;
+    applyScores(p.score_state);
+    if(oldStatus!==state.room.status||oldRound!==(nextRound?.id||null))transitionRetryAt=0;
+    renderState();
+    if(state.room.status==='choosing'&&state.room.current_drawer_member_id===me?.id&&!state.options?.length)requestState(20);
+  }
 
   function renderState(){
     if(!state)return;
@@ -412,6 +443,20 @@
     $('guessFeed').innerHTML=rows.map(g=>`<p class="${g.is_correct?'correct':''}${g.pending?' pending':''}"><b>${escapeHTML(g.nickname||'好友')}</b>：${g.is_correct?'猜中了！':escapeHTML(g.text||'')}${g.pending?'<span class="pending-dot"> ···</span>':g.failed?`<button class="retry-guess" data-retry="${escapeHTML(g.client_id)}">尚未确认 · 重试</button>`:''}</p>`).join('')||'<p class="system">画面就绪，开始猜吧。</p>';
     $('guessFeed').scrollTop=$('guessFeed').scrollHeight;
   }
+  function receiveGuessPending(p){
+    if(!state||!p||p.round_id!==currentRoundId||p.member_id===me?.id||typeof p.client_id!=='string'||typeof p.text!=='string')return;
+    if(state.guesses?.some(g=>g.client_id===p.client_id)||liveGuesses.has(p.client_id))return;
+    const member=state.players.find(x=>x.member_id===p.member_id),text=p.text.trim();
+    if(!member||member.member_id===state.room.current_drawer_member_id||!text||Array.from(text).length>40)return;
+    liveGuesses.set(p.client_id,{client_id:p.client_id,round_id:p.round_id,member_id:member.member_id,nickname:member.nickname,text,is_correct:false,created_at:p.created_at||new Date().toISOString(),pending:true,failed:false,optimistic:true});
+    renderGuessFeed();
+    const epoch=roomEpoch,roundId=currentRoundId,id=p.client_id;
+    setTimeout(()=>{
+      if(epoch!==roomEpoch||roundId!==currentRoundId)return;
+      const current=liveGuesses.get(id);
+      if(current?.optimistic&&current.pending){liveGuesses.delete(id);renderGuessFeed();}
+    },2500);
+  }
   function receiveGuessResult(p){
     if(!state||!p||p.round_id!==currentRoundId||!p.client_id)return;
     const prev=liveGuesses.get(p.client_id)||{};
@@ -432,10 +477,10 @@
       if(remaining<=30&&!state.round?.hint&&!hintRequested){hintRequested=true;requestState(0);}
       if(remaining<=30&&state.round?.hint){$('hintBar').textContent=`范围提示：${state.round.hint}`;$('hintBar').classList.add('revealed');}
       else{$('hintBar').textContent='范围提示将在剩余 30 秒时出现';$('hintBar').classList.remove('revealed');}
-      if(remaining<=0&&!transitionBusy)mutate('finish_round').catch(()=>{});
+      if(remaining<=0)attemptTransition('finish_round');
     }else if(state.room.status==='summary'){
       $('hintBar').textContent=`正确答案：${state.revealed_answer||'—'}`;$('hintBar').classList.add('revealed');
-      if(remaining<=0&&!transitionBusy)mutate('next_round').catch(()=>{});
+      if(remaining<=0)attemptTransition('next_round');
     }else{$('hintBar').textContent='画手选词后开始 60 秒倒计时';$('hintBar').classList.remove('revealed');}
   }
   async function submitGuess(e){
@@ -449,6 +494,10 @@
     if(!state||item.room_id!==state.room.id||item.round_id!==currentRoundId||guessRequests.has(item.client_id)||guessRequests.size>=4)return;
     const epoch=roomEpoch,id=item.client_id;
     liveGuesses.set(id,{...item,pending:true,failed:false});renderGuessFeed();
+    if(!item.broadcasted){
+      item.broadcasted=true;
+      sendEvent('guess_pending',{client_id:id,round_id:item.round_id,member_id:me.id,text:item.text,created_at:item.created_at});
+    }
     const request=api('guess',{room_id:item.room_id,round_id:item.round_id,text:item.text,client_id:id});guessRequests.set(id,request);
     try{
       const data=await request;
@@ -492,7 +541,7 @@
   }
   function encodePoints(points){return points.map(p=>[Math.round(p[0]*4095),Math.round(p[1]*4095)]);}
   function decodePoints(points,q){return q===1?points.map(p=>[Number(p[0])/4095,Number(p[1])/4095]):points;}
-  function scheduleSend(){if(sendTimer)return;sendTimer=setTimeout(()=>flushStroke(false),28);}
+  function scheduleSend(){if(sendTimer)return;sendTimer=setTimeout(()=>flushStroke(false),14);}
   function nextCanvasRevision(){const base=canvasRevision;canvasRevision=Math.max(canvasRevision+1,Date.now()*1000);canvasDirty=true;return base;}
   function flushStroke(done){
     clearTimeout(sendTimer);sendTimer=null;if(!activeStroke||(!done&&sendPoints.length<1))return;
