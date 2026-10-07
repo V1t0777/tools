@@ -585,3 +585,19 @@ button,input,select{font:inherit}.app{width:min(880px,100%);margin:auto}.hidden{
   .presentation-card{animation:none!important}
   .payout-chip{display:none!important}
 }
+
+#gameScreen button,.topbar button{
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+}
+#gameScreen{
+  overscroll-behavior:contain;
+}
+@media(max-width:620px) and (pointer:coarse){
+  .casino-chip,.emoji-row button,.casino-actions button,.action-buttons button{
+    touch-action:manipulation;
+  }
+  .player-seat,.mini-hand{
+    contain:layout paint style;
+  }
+}
