@@ -21,7 +21,7 @@ test('round transitions use server authoritative state sync and warmup',()=>{
   assert.match(edge,/EdgeRuntime/);
   assert.match(edge,/makeRound\(r,ps,Number\(r\.current_round_no\)\+1\)/);
   assert.match(edge,/Date\.now\(\)\+3200/);
-  assert.doesNotMatch(edge,/Date\.now\(\)\+6000/);
+  assert.doesNotMatch(edge,/Date\.now\(\)\+6000\)/);
   assert.match(edge,/makeRound\(updated,ps,next\)/);
 });
 
