@@ -6,6 +6,7 @@ const app=readFileSync(new URL('../pictionary/app.js',import.meta.url),'utf8');
 const edge=readFileSync(new URL('../supabase/functions/pictionary-game/index.ts',import.meta.url),'utf8');
 const migration=readFileSync(new URL('../supabase/migrations/20261007214000_pictionary_latency_v2.sql',import.meta.url),'utf8');
 const hardening=readFileSync(new URL('../supabase/migrations/20261007221500_pictionary_latency_v2_hardening.sql',import.meta.url),'utf8');
+const summaryRegionMigration=readFileSync(new URL('../supabase/migrations/20261007161101_pictionary_summary_and_region.sql',import.meta.url),'utf8');
 
 test('pictionary v2 keeps high-frequency paths realtime and bounded',()=>{
   assert.match(app,/setTimeout\(\(\)=>flushStroke\(false\),14\)/);
@@ -33,4 +34,10 @@ test('authenticated peers can send optimistic guesses but cannot send state_sync
   assert.match(hardening,/is_pictionary_guess_sender/);
   assert.match(hardening,/m\.id::text=p_payload->>'member_id'/);
   assert.match(hardening,/rd\.id::text=p_payload->>'round_id'/);
+});
+
+test('pictionary pins database-heavy edge calls to Singapore and uses one summary duration',()=>{
+  assert.match(app,/forceFunctionRegion=ap-southeast-1/);
+  assert.match(summaryRegionMigration,/interval '3\.2 seconds'/);
+  assert.doesNotMatch(summaryRegionMigration,/interval '6 seconds'/);
 });
