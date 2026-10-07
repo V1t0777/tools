@@ -75,7 +75,7 @@ async function repairRoomState(input:any){
     if(r.status==="playing"&&r.ends_at&&new Date(r.ends_at).getTime()<=now){
       const iso=new Date().toISOString();
       await admin.from("pictionary_rounds").update({status:"ended",ended_at:iso}).eq("room_id",r.id).eq("round_no",r.current_round_no).neq("status","ended");
-      await admin.from("pictionary_rooms").update({status:"summary",ends_at:null,summary_until:new Date(Date.now()+6000).toISOString(),updated_at:iso}).eq("id",r.id).eq("status","playing");
+      await admin.from("pictionary_rooms").update({status:"summary",ends_at:null,summary_until:new Date(Date.now()+3200).toISOString(),updated_at:iso}).eq("id",r.id).eq("status","playing");
       r=await room(r.id);continue;
     }
 

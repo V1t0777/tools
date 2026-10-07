@@ -87,3 +87,5 @@ multi-device mobile network testing or measure production login percentiles.
 - Summary display is reduced from six seconds to 3.2 seconds.
 - While a round is being played, the Edge Function warms the next round in a background task using `EdgeRuntime.waitUntil`. The next-round mutation reuses the prepared row and only falls back to synchronous preparation if needed.
 - Full `state` polling remains as a three-second reconciliation path and is still used for reconnects, drawer-only word options, and recovery.
+
+- The follow-up Realtime policy validates optimistic guess payloads against the authenticated member and current round, so a room member cannot label a temporary guess as another player.
