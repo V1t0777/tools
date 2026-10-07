@@ -415,3 +415,145 @@ button,input,select{font:inherit}.app{width:min(880px,100%);margin:auto}.hidden{
   contain:strict;
 }
 @media(prefers-reduced-motion:reduce){.chip-flight{display:none!important}}
+
+
+/* ===== Blackjack V1.5.1–V1.5.6 ===== */
+.sound-toggle{
+  min-width:42px;
+  padding-inline:10px;
+  font-size:15px;
+}
+.quick-bet{
+  display:grid;
+  grid-template-columns:1.35fr .8fr .8fr;
+  gap:8px;
+  margin:0 0 9px;
+}
+.quick-bet button{
+  min-height:38px;
+  border-radius:12px;
+  font-size:11px;
+  font-weight:900;
+}
+.table-feed{
+  min-height:20px;
+  margin:-2px auto 4px;
+  padding:0 12px;
+  color:rgba(238,224,181,.82);
+  font-size:10px;
+  font-weight:850;
+  letter-spacing:.04em;
+  text-align:center;
+  opacity:0;
+  transform:translate3d(0,4px,0);
+  transition:opacity .16s ease,transform .16s ease;
+  pointer-events:none;
+}
+.table-feed.show{
+  opacity:1;
+  transform:translate3d(0,0,0);
+}
+.reaction-layer{
+  position:fixed;
+  inset:0;
+  z-index:90;
+  pointer-events:none;
+  overflow:hidden;
+  contain:strict;
+}
+.table-reaction{
+  position:absolute;
+  display:block;
+  width:42px;
+  height:42px;
+  margin:-21px 0 0 -21px;
+  font-size:30px;
+  line-height:42px;
+  text-align:center;
+  filter:drop-shadow(0 5px 8px rgba(0,0,0,.24));
+  will-change:transform,opacity;
+  animation:tableReactionV15 1.25s cubic-bezier(.18,.72,.22,1) both;
+}
+@keyframes tableReactionV15{
+  0%{opacity:0;transform:translate3d(0,12px,0) scale(.72)}
+  18%{opacity:1;transform:translate3d(0,-3px,0) scale(1.08)}
+  70%{opacity:1;transform:translate3d(0,-30px,0) scale(1)}
+  100%{opacity:0;transform:translate3d(0,-58px,0) scale(.92)}
+}
+.presentation-deal .dealer-zone,
+.presentation-deal .player-table{
+  animation:tableDealPulseV15 .22s ease-out both;
+}
+@keyframes tableDealPulseV15{
+  0%{opacity:.82;transform:translate3d(0,-2px,0)}
+  100%{opacity:1;transform:translate3d(0,0,0)}
+}
+.dealer-hand.dealer-reveal .card:last-child{
+  animation:dealerRevealV15 .3s cubic-bezier(.2,.72,.2,1) both;
+  transform-origin:center;
+}
+@keyframes dealerRevealV15{
+  0%{transform:perspective(500px) rotateY(72deg) scale(.96);opacity:.45}
+  58%{transform:perspective(500px) rotateY(-7deg) scale(1.02);opacity:1}
+  100%{transform:perspective(500px) rotateY(0) scale(1);opacity:1}
+}
+.player-seat.split-pulse{
+  animation:splitPulseV15 .3s ease-out both;
+}
+@keyframes splitPulseV15{
+  0%{transform:translate3d(0,0,0)}
+  45%{transform:translate3d(0,-3px,0)}
+  100%{transform:translate3d(0,0,0)}
+}
+.player-seat.double-pulse{
+  animation:doublePulseV15 .3s ease-out both;
+}
+@keyframes doublePulseV15{
+  0%{box-shadow:0 0 0 0 rgba(230,207,147,.32)}
+  100%{box-shadow:0 0 0 12px rgba(230,207,147,0)}
+}
+.player-seat.blackjack-pulse{
+  animation:blackjackPulseV15 .42s ease-out both;
+}
+@keyframes blackjackPulseV15{
+  0%{box-shadow:0 0 0 0 rgba(236,205,116,.5)}
+  45%{box-shadow:0 0 0 5px rgba(236,205,116,.18)}
+  100%{box-shadow:0 0 0 11px rgba(236,205,116,0)}
+}
+#gameScreen.settle-pulse::before{
+  animation:settleFeltV15 .32s ease-out both;
+}
+@keyframes settleFeltV15{
+  0%{filter:brightness(1)}
+  48%{filter:brightness(1.08)}
+  100%{filter:brightness(1)}
+}
+.mini-hand.doubled .card:last-child{
+  transform:rotate(90deg) translate3d(4px,-2px,0);
+  transform-origin:center;
+  margin-left:10px;
+}
+.stats-panel,.history-panel{
+  content-visibility:auto;
+  contain-intrinsic-size:auto 420px;
+}
+.player-seat,.mini-hand,.dealer-zone,.betting-dock,.insurance-dock,.action-dock{
+  contain:layout paint;
+}
+@media(max-width:620px){
+  .quick-bet{gap:6px}
+  .quick-bet button{min-height:36px;padding-inline:7px}
+  .table-feed{font-size:9px}
+  .table-reaction{filter:none}
+  #gameScreen.settle-pulse::before{animation:none}
+  .player-seat.double-pulse,.player-seat.blackjack-pulse{animation:none}
+  .mini-hand.doubled .card:last-child{margin-left:6px}
+}
+@media(prefers-reduced-motion:reduce){
+  .table-feed{transition:none}
+  .table-reaction,.presentation-deal .dealer-zone,.presentation-deal .player-table,
+  .dealer-hand.dealer-reveal .card:last-child,.player-seat.split-pulse,
+  .player-seat.double-pulse,.player-seat.blackjack-pulse,#gameScreen.settle-pulse::before{
+    animation:none!important;
+  }
+}
