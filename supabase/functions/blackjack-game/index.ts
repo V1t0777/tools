@@ -53,6 +53,7 @@ const headers = (req: Request) => ({
     : "https://v1t0777.github.io",
   "Access-Control-Allow-Headers": "authorization, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Max-Age": "86400",
   "Content-Type": "application/json; charset=utf-8",
   "Cache-Control": "no-store",
   "Vary": "Origin",

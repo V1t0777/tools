@@ -1,14 +1,14 @@
 (() => {
   'use strict';
 
-  const FUNCTION_URL = `${ToolboxAuth.url}/functions/v1/blackjack-game`;
+  const FUNCTION_URL = `${ToolboxAuth.url}/functions/v1/blackjack-game?forceFunctionRegion=ap-southeast-1`;
   const $ = (id) => document.getElementById(id);
   const SCREENS = ['authScreen','recoveryScreen','homeScreen','roomScreen','gameScreen','finishScreen'];
   const SUITS = {S:'♠',H:'♥',D:'♦',C:'♣'};
   const STATUS_TEXT = {active:'思考中',stand:'已停牌',bust:'爆牌',blackjack:'黑杰克',none:'等待开局'};
-  const HEALTHY_POLL_MS = 12000;
-  const DEGRADED_POLL_MS = 1200;
-  const PING_MS = 6000;
+  const HEALTHY_POLL_MS = 20000;
+  const DEGRADED_POLL_STEPS = [[5000,1500],[15000,2500],[Infinity,4000]];
+  const RECONNECT_GRACE_MS = 5000;
   const DEVICE_KEY = 'toolbox_blackjack_device_v12';
   const SOUND_KEY = 'toolbox_blackjack_sound_v15';
   const PRESENTATION_MAX = 8;
@@ -25,8 +25,9 @@
   let channel = null;
   let realtimeStatus = 'CLOSED';
   let realtimeRtt = null;
+  let heartbeatSentAt = 0;
   let serverHeartbeatAt = 0;
-  let pingTimer = null;
+  let degradedSince = 0;
   let pollTimer = null, pollMs = 0;
   let clockTimer = null;
   let reconnectTimer = null;
@@ -616,8 +617,16 @@
     });
     window.addEventListener('online',resumeRoom);
     window.addEventListener('offline',updateConnection);
-    window.addEventListener('pageshow',resumeRoom);
-    window.addEventListener('pagehide',() => { suspended = true; leaveRealtime(); });
+    window.addEventListener('pageshow',(event) => {
+      suspended = false;
+      if (event.persisted) requestState(0,true);
+      resumeRoom();
+    });
+    window.addEventListener('pagehide',(event) => {
+      suspended = true;
+      cancelPresentation();
+      if (!event.persisted) leaveRealtime();
+    });
     ToolboxAuth.onAuthStateChange((event,next) => {
       if (event === 'SIGNED_OUT' || (session?.user?.id && next?.user?.id && session.user.id !== next.user.id)) {
         clearRoom();
@@ -1355,7 +1364,17 @@
   function startTimers() {
     if (!state || suspended) return;
     scheduleClockTick(0);
-    setPollInterval(isRealtimeHealthy() ? HEALTHY_POLL_MS : DEGRADED_POLL_MS);
+    setPollInterval(desiredPollMs());
+  }
+
+  function desiredPollMs() {
+    if (isRealtimeHealthy()) {
+      degradedSince = 0;
+      return HEALTHY_POLL_MS;
+    }
+    if (!degradedSince) degradedSince = Date.now();
+    const elapsed = Date.now()-degradedSince;
+    return DEGRADED_POLL_STEPS.find(([until]) => elapsed < until)?.[1] || 4000;
   }
 
   function setPollInterval(ms) {
@@ -1496,20 +1515,31 @@
     updateConnection();
     realtime = window.supabase.createClient(ToolboxAuth.url,ToolboxAuth.key,{
       auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},
-      realtime:{heartbeatCallback:(status) => {
-        if (epoch !== roomEpoch) return;
-        if (status === 'ok') {
-          serverHeartbeatAt = Date.now();
-          if (realtimeStatus === 'SUBSCRIBED') {
-            reconnectAttempt = 0;
-            clearTimeout(reconnectTimer);
-            reconnectTimer = null;
+      realtime:{
+        worker:true,
+        heartbeatIntervalMs:15000,
+        heartbeatCallback:(status) => {
+          if (epoch !== roomEpoch) return;
+          if (status === 'sent') {
+            heartbeatSentAt = performance.now();
+          } else if (status === 'ok') {
+            if (heartbeatSentAt) realtimeRtt = Math.max(0,Math.round(performance.now()-heartbeatSentAt));
+            heartbeatSentAt = 0;
+            serverHeartbeatAt = Date.now();
+            if (realtimeStatus === 'SUBSCRIBED') {
+              reconnectAttempt = 0;
+              clearTimeout(reconnectTimer);
+              reconnectTimer = null;
+            }
+          } else if (status === 'disconnected') {
+            try { realtime?.realtime?.connect(); } catch {}
+            scheduleReconnect(RECONNECT_GRACE_MS);
+          } else if (['timeout','error'].includes(status)) {
+            scheduleReconnect(RECONNECT_GRACE_MS);
           }
-        } else if (['timeout','error','disconnected'].includes(status)) {
-          scheduleReconnect(1200);
-        }
-        updateConnection();
-      }},
+          updateConnection();
+        },
+      },
     });
     await realtime.realtime.setAuth(auth.access_token);
     if (epoch !== roomEpoch || !state || state.room.id !== roomId) return;
@@ -1532,17 +1562,6 @@
         showReaction(payload.emoji,payload.member_id);
       }
     });
-    channel.on('broadcast',{event:'ping'},({payload}) => {
-      if (!payload?.id || payload.member_id === String(me?.id)) return;
-      sendEvent('pong',{id:payload.id,target:payload.member_id,member_id:String(me?.id)});
-    });
-    channel.on('broadcast',{event:'pong'},({payload}) => {
-      const sent = pendingPings.get(payload?.id);
-      if (!sent || payload.target !== String(me?.id)) return;
-      pendingPings.delete(payload.id);
-      realtimeRtt = Math.max(0,Date.now()-sent);
-      updateConnection();
-    });
     channel.on('presence',{event:'sync'},() => {
       if (epoch !== roomEpoch || !channel) return;
       presenceMembers = new Set(Object.values(channel.presenceState()).flat().map((x) => String(x.member_id)));
@@ -1557,10 +1576,9 @@
         serverHeartbeatAt = Date.now();
         reconnectAttempt = 0;
         try { await channel.track({member_id:String(me.id),nickname:me.nickname,online_at:new Date().toISOString()}); } catch {}
-        startPing();
         requestState(0,false);
       } else if (['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(status)) {
-        scheduleReconnect(1500);
+        scheduleReconnect(RECONNECT_GRACE_MS);
       }
       updateConnection();
     });
@@ -1572,8 +1590,8 @@
 
   function updateConnection() {
     const healthy = isRealtimeHealthy();
-    setPollInterval(healthy ? HEALTHY_POLL_MS : DEGRADED_POLL_MS);
-    const network = Number.isFinite(realtimeRtt) ? `${Math.round(realtimeRtt)}ms` : null;
+    setPollInterval(desiredPollMs());
+    const network = Number.isFinite(realtimeRtt) ? `实时 ${Math.round(realtimeRtt)}ms` : null;
     const action = Number.isFinite(lastActionRtt) ? `操作 ${lastActionRtt}ms` : null;
     let label = '降级同步中';
     let mode = 'degraded';
@@ -1600,20 +1618,6 @@
       el.classList.toggle('online',mode === 'online');
       el.classList.toggle('warn',mode !== 'online');
     }
-  }
-
-  function startPing() {
-    clearInterval(pingTimer);
-    sendPing();
-    pingTimer = setInterval(sendPing,PING_MS);
-  }
-
-  function sendPing() {
-    if (!channel || realtimeStatus !== 'SUBSCRIBED' || document.hidden) return;
-    const id = makeId();
-    pendingPings.set(id,Date.now());
-    for (const [key,at] of pendingPings) if (Date.now()-at > 10000) pendingPings.delete(key);
-    sendEvent('ping',{id,member_id:String(me?.id)});
   }
 
   function sendEvent(event,payload) {
@@ -1652,26 +1656,41 @@
     setTimeout(() => bubble.remove(),1600);
   }
 
-  function scheduleReconnect(base = 0) {
+  function scheduleReconnect(base = RECONNECT_GRACE_MS) {
     if (reconnectTimer || suspended || !state || navigator.onLine === false) return;
+    if (['closed','abandoned'].includes(state.room.status)) {
+      exitToHome('房间已结束');
+      return;
+    }
     const epoch = roomEpoch;
     updateConnection();
-    const jitter = 250 + Math.random()*Math.min(9000,500*2**Math.min(4,reconnectAttempt++));
+    const delay = base + Math.min(1200,250*reconnectAttempt);
     reconnectTimer = setTimeout(async () => {
       reconnectTimer = null;
-      if (epoch !== roomEpoch) return;
-      try { await connectRealtime(); } catch { scheduleReconnect(1200); }
-    },base+jitter);
+      if (epoch !== roomEpoch || !state || isRealtimeHealthy()) return;
+      if (['closed','abandoned'].includes(state.room.status)) {
+        exitToHome('房间已结束');
+        return;
+      }
+      if (reconnectAttempt === 0 && realtime?.realtime) {
+        reconnectAttempt = 1;
+        try { realtime.realtime.connect(); } catch {}
+        scheduleReconnect(3500);
+        return;
+      }
+      reconnectAttempt = Math.min(6,reconnectAttempt+1);
+      try { await connectRealtime(); } catch { scheduleReconnect(RECONNECT_GRACE_MS); }
+    },delay);
   }
 
   function leaveRealtime(stopPoll = true) {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
-    clearInterval(pingTimer);
-    pingTimer = null;
     pendingPings.clear();
     realtimeRtt = null;
+    heartbeatSentAt = 0;
     serverHeartbeatAt = 0;
+    degradedSince = 0;
     realtimeStatus = 'CLOSED';
     const old = realtime;
     channel = realtime = null;

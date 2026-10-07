@@ -13,9 +13,10 @@ test('blackjack frontend uses private realtime snapshots with database fallback'
   assert.match(app,/channel\(`blackjack:\$\{roomId\}`/);
   assert.match(app,/private:true/);
   assert.match(app,/event:'state_snapshot'/);
-  assert.match(app,/HEALTHY_POLL_MS = 12000/);
-  assert.match(app,/DEGRADED_POLL_MS = 1200/);
-  assert.match(app,/PING_MS = 6000/);
+  assert.match(app,/HEALTHY_POLL_MS = 20000/);
+  assert.match(app,/DEGRADED_POLL_STEPS = \[\[5000,1500\],\[15000,2500\],\[Infinity,4000\]\]/);
+  assert.match(app,/heartbeatIntervalMs:15000/);
+  assert.match(app,/worker:true/);
 });
 
 test('blackjack hot table avoids full DOM rebuilds and uses adaptive clock ticks',()=>{
