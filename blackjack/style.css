@@ -557,3 +557,31 @@ button,input,select{font:inherit}.app{width:min(880px,100%);margin:auto}.hidden{
     animation:none!important;
   }
 }
+
+.presentation-card{
+  animation:presentationCardV15 .15s ease-out both!important;
+}
+@keyframes presentationCardV15{
+  0%{opacity:.2;transform:translate3d(18px,-12px,0) scale(.94)}
+  100%{opacity:1;transform:translate3d(0,0,0) scale(1)}
+}
+.payout-chip{
+  position:fixed;
+  z-index:88;
+  width:22px;
+  height:22px;
+  margin:-11px 0 0 -11px;
+  border-radius:50%;
+  color:#d7b45f;
+  font-size:24px;
+  line-height:18px;
+  text-align:center;
+  text-shadow:0 2px 4px rgba(0,0,0,.3);
+  pointer-events:none;
+  will-change:transform,opacity;
+  contain:strict;
+}
+@media(prefers-reduced-motion:reduce){
+  .presentation-card{animation:none!important}
+  .payout-chip{display:none!important}
+}
