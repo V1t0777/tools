@@ -1219,7 +1219,10 @@
       const current = container.children[i];
       if (current?.dataset.code === desired[i]) continue;
       const card = createCard(desired[i]);
-      if (container.isConnected) card.classList.add('dealt');
+      if (container.isConnected && !prefersReducedMotion?.matches) {
+        card.classList.add('dealt');
+        card.addEventListener('animationend',() => card.classList.remove('dealt'),{once:true});
+      }
       if (current) current.replaceWith(card);
       else container.append(card);
     }
