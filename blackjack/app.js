@@ -10,6 +10,9 @@
   const DEGRADED_POLL_MS = 1200;
   const PING_MS = 6000;
   const DEVICE_KEY = 'toolbox_blackjack_device_v12';
+  const SOUND_KEY = 'toolbox_blackjack_sound_v15';
+  const PRESENTATION_MAX = 8;
+  const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
 
   let session = null;
   let sdkPromise = null;
@@ -46,9 +49,17 @@
   let stateRefreshPromise = null;
   let refreshQueued = false;
   let pendingBet = 0;
+  let lastConfirmedBet = 0;
+  let soundEnabled = true;
+  let audioContext = null;
+  let presentationQueue = [];
+  let presentationBusy = false;
+  let presentationGeneration = 0;
+  let lastReactionAt = 0;
 
   function show(id) {
     SCREENS.forEach((name) => $(name).classList.toggle('active', name === id));
+    $('soundBtn')?.classList.toggle('hidden',!['roomScreen','gameScreen','finishScreen'].includes(id));
   }
   function toast(message) {
     const el = $('toast');
@@ -169,6 +180,218 @@
     animation.finished.finally(() => clone.remove()).catch(() => clone.remove());
   }
 
+  function loadPreferences() {
+    try { soundEnabled = localStorage.getItem(SOUND_KEY) !== '0'; } catch { soundEnabled = true; }
+    updateSoundButton();
+  }
+  function updateSoundButton() {
+    const button = $('soundBtn');
+    if (!button) return;
+    button.textContent = soundEnabled ? '🔊' : '🔇';
+    button.setAttribute('aria-pressed',soundEnabled ? 'false' : 'true');
+    button.title = soundEnabled ? '关闭牌桌音效' : '开启牌桌音效';
+  }
+  function toggleSound() {
+    soundEnabled = !soundEnabled;
+    try { localStorage.setItem(SOUND_KEY,soundEnabled ? '1' : '0'); } catch {}
+    updateSoundButton();
+    if (soundEnabled) {
+      ensureAudio();
+      playSound('chip');
+    }
+  }
+  function ensureAudio() {
+    if (!soundEnabled) return null;
+    const AudioCtor = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtor) return null;
+    if (!audioContext) audioContext = new AudioCtor();
+    if (audioContext.state === 'suspended') audioContext.resume().catch(() => {});
+    return audioContext;
+  }
+  function playSound(kind) {
+    if (!soundEnabled || document.hidden) return;
+    const ctx = ensureAudio();
+    if (!ctx) return;
+    const map = {
+      chip:[180,.035,'triangle',.025],
+      card:[520,.045,'sine',.018],
+      flip:[310,.075,'triangle',.022],
+      blackjack:[740,.13,'sine',.028],
+      win:[620,.11,'sine',.026],
+      loss:[150,.09,'triangle',.018],
+    };
+    const spec = map[kind] || map.card;
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+    oscillator.type = spec[2];
+    oscillator.frequency.setValueAtTime(spec[0],ctx.currentTime);
+    if (kind === 'blackjack' || kind === 'win') oscillator.frequency.exponentialRampToValueAtTime(spec[0]*1.32,ctx.currentTime+spec[1]);
+    gain.gain.setValueAtTime(spec[3],ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+spec[1]);
+    oscillator.connect(gain);
+    gain.connect(ctx.destination);
+    oscillator.start();
+    oscillator.stop(ctx.currentTime+spec[1]+.01);
+  }
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve,ms));
+  }
+  function handMap(player) {
+    return new Map((Array.isArray(player?.hands) ? player.hands : []).map((hand) => [String(hand.id),hand]));
+  }
+  function derivePresentation(previous,next) {
+    if (!previous || previous.room?.id !== next.room?.id || document.hidden || resyncing || prefersReducedMotion?.matches) return [];
+    const events = [];
+    const previousPlayers = new Map(previous.players.map((player) => [String(player.member_id),player]));
+    for (const player of next.players) {
+      const before = previousPlayers.get(String(player.member_id));
+      if (!before) continue;
+      const oldHands = handMap(before);
+      const newHands = handMap(player);
+      if (newHands.size > oldHands.size) events.push({type:'split',member_id:String(player.member_id),name:player.nickname});
+      for (const [id,hand] of newHands) {
+        const old = oldHands.get(id);
+        if (!old) continue;
+        if (!old.doubled && hand.doubled) events.push({type:'double',member_id:String(player.member_id),name:player.nickname});
+        if ((hand.cards?.length || 0) > (old.cards?.length || 0)) events.push({type:'card',member_id:String(player.member_id)});
+        if (old.status !== 'blackjack' && hand.status === 'blackjack') events.push({type:'blackjack',member_id:String(player.member_id),name:player.nickname});
+        if (old.status !== 'bust' && hand.status === 'bust') events.push({type:'bust',member_id:String(player.member_id),name:player.nickname});
+        if (old.status !== 'surrender' && hand.status === 'surrender') events.push({type:'surrender',member_id:String(player.member_id),name:player.nickname});
+      }
+    }
+    const oldDealer = previous.dealer?.cards || [];
+    const newDealer = next.dealer?.cards || [];
+    if (oldDealer.includes('BACK') && !newDealer.includes('BACK') && newDealer.length) events.push({type:'reveal'});
+    if (newDealer.length > oldDealer.length) {
+      for (let index=oldDealer.length;index<newDealer.length;index++) events.push({type:'dealer_card',index});
+    }
+    if (previous.room?.phase === 'betting' && next.room?.phase !== 'betting') events.unshift({type:'deal'});
+    if (previous.room?.phase !== 'settlement' && next.room?.phase === 'settlement') events.push({type:'settle'});
+    return events.slice(0,PRESENTATION_MAX);
+  }
+  function announce(message) {
+    const el = $('tableFeed');
+    if (!el || !message) return;
+    el.textContent = message;
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
+    clearTimeout(el._timer);
+    el._timer = setTimeout(() => el.classList.remove('show'),1800);
+  }
+  function presentationTarget(memberId) {
+    return memberId ? playerSeatNodes.get(String(memberId))?.seat : null;
+  }
+  function animatePayout(net) {
+    if (!net || prefersReducedMotion?.matches || document.hidden) return;
+    const target = presentationTarget(String(me?.id || ''));
+    const dealer = $('dealerHand');
+    if (!target || !dealer) return;
+    const fromRect = (net > 0 ? dealer : target).getBoundingClientRect();
+    const toRect = (net > 0 ? target : dealer).getBoundingClientRect();
+    const chip = document.createElement('span');
+    chip.className = 'payout-chip';
+    chip.textContent = '●';
+    chip.style.left = `${fromRect.left+fromRect.width/2}px`;
+    chip.style.top = `${fromRect.top+fromRect.height/2}px`;
+    document.body.append(chip);
+    const dx = toRect.left+toRect.width/2-(fromRect.left+fromRect.width/2);
+    const dy = toRect.top+toRect.height/2-(fromRect.top+fromRect.height/2);
+    const animation = chip.animate([
+      {transform:'translate3d(0,0,0) scale(.8)',opacity:0},
+      {transform:'translate3d(0,0,0) scale(1)',opacity:1,offset:.12},
+      {transform:`translate3d(${dx}px,${dy}px,0) scale(.72)`,opacity:.9,offset:.82},
+      {transform:`translate3d(${dx}px,${dy}px,0) scale(.58)`,opacity:0},
+    ],{duration:360,easing:'cubic-bezier(.18,.76,.2,1)',fill:'forwards'});
+    animation.finished.finally(() => chip.remove()).catch(() => chip.remove());
+  }
+
+  async function playPresentation(item,generation) {
+    if (generation !== presentationGeneration || document.hidden || !state) return;
+    const target = presentationTarget(item.member_id);
+    const pulse = async (element,className,duration=260) => {
+      if (!element) return;
+      element.classList.remove(className);
+      void element.offsetWidth;
+      element.classList.add(className);
+      await sleep(duration);
+      element.classList.remove(className);
+    };
+    if (item.type === 'deal') {
+      playSound('card');
+      announce('发牌');
+      await pulse($('gameScreen'),'presentation-deal',220);
+    } else if (item.type === 'card') {
+      playSound('card');
+      await sleep(90);
+    } else if (item.type === 'reveal') {
+      playSound('flip');
+      announce('庄家翻开暗牌');
+      await pulse($('dealerHand'),'dealer-reveal',300);
+    } else if (item.type === 'dealer_card') {
+      playSound('card');
+      const card = $('dealerHand')?.children?.[item.index];
+      await pulse(card,'presentation-card',150);
+    } else if (item.type === 'split') {
+      playSound('card');
+      pulseHaptic(10);
+      announce(`${item.name || '玩家'}进行了分牌`);
+      await pulse(target,'split-pulse',300);
+    } else if (item.type === 'double') {
+      playSound('chip');
+      pulseHaptic([8,25,8]);
+      announce(`${item.name || '玩家'}选择加倍`);
+      await pulse(target,'double-pulse',300);
+    } else if (item.type === 'blackjack') {
+      playSound('blackjack');
+      pulseHaptic([10,35,16]);
+      announce(`${item.name || '玩家'}拿到黑杰克`);
+      await pulse(target,'blackjack-pulse',420);
+    } else if (item.type === 'bust') {
+      playSound('loss');
+      announce(`${item.name || '玩家'}爆牌`);
+      await pulse(target,'split-pulse',220);
+    } else if (item.type === 'surrender') {
+      playSound('chip');
+      announce(`${item.name || '玩家'}选择投降`);
+      await pulse(target,'split-pulse',220);
+    } else if (item.type === 'settle') {
+      const mine = nextPlayerForPresentation();
+      const net = mine ? Number(mine.stack || 0)-Number(mine.round_start_stack || 0) : 0;
+      playSound(net > 0 ? 'win' : net < 0 ? 'loss' : 'chip');
+      animatePayout(net);
+      await pulse($('gameScreen'),'settle-pulse',320);
+    }
+  }
+  function nextPlayerForPresentation() {
+    return myPlayer();
+  }
+  function enqueuePresentation(items) {
+    if (!items?.length || document.hidden || prefersReducedMotion?.matches) return;
+    presentationQueue.push(...items);
+    if (presentationQueue.length > PRESENTATION_MAX) presentationQueue = presentationQueue.slice(-PRESENTATION_MAX);
+    if (presentationBusy) return;
+    presentationBusy = true;
+    const generation = presentationGeneration;
+    (async () => {
+      try {
+        while (presentationQueue.length && generation === presentationGeneration && !document.hidden) {
+          await playPresentation(presentationQueue.shift(),generation);
+        }
+      } finally {
+        presentationBusy = false;
+        if (generation !== presentationGeneration && presentationQueue.length && !document.hidden) {
+          const pending = presentationQueue.splice(0,PRESENTATION_MAX);
+          enqueuePresentation(pending);
+        }
+      }
+    })();
+  }
+  function cancelPresentation() {
+    presentationGeneration += 1;
+    presentationQueue.length = 0;
+  }
+
   function isHost() {
     return Boolean(state && me && String(state.room.host_member_id) === String(me.id));
   }
@@ -222,6 +445,9 @@
   function adoptState(next) {
     if (!validSnapshot(next)) return;
     if (state && next.room.id === state.room.id && Number(next.room.version) < Number(state.room.version)) return;
+    const previous = state;
+    const presentation = derivePresentation(previous,next);
+    if (previous?.room?.status === 'finished' && next.room?.status === 'lobby') lastConfirmedBet = 0;
     state = next;
     const serverNow = Date.parse(next.server_now || '');
     if (Number.isFinite(serverNow)) clockOffset = serverNow - Date.now();
@@ -229,6 +455,7 @@
     if (next.room.phase !== 'settlement') advanceRequested = false;
     renderState();
     startTimers();
+    enqueuePresentation(presentation);
   }
 
   async function initialize() {
@@ -269,6 +496,24 @@
     }
   }
 
+  function betLimit() {
+    const mine = myPlayer();
+    return mine ? Math.min(Number(state?.room?.max_bet || 500),Number(mine.stack || 0)) : 0;
+  }
+  function setPendingBet(value,feedback = true) {
+    const min = Number(state?.room?.min_bet || 10);
+    const max = betLimit();
+    if (!max) return;
+    let next = Math.floor(Number(value || 0)/min)*min;
+    next = Math.max(0,Math.min(next,max));
+    pendingBet = next;
+    if (feedback) {
+      pulseHaptic(7);
+      playSound('chip');
+    }
+    renderBetting();
+  }
+
   function bind() {
     $('loginForm').addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -304,6 +549,8 @@
       show('authScreen');
     };
     $('historyRefreshBtn').onclick = () => loadDashboard(true);
+    $('soundBtn').onclick = toggleSound;
+    document.addEventListener('pointerdown',() => { if (soundEnabled) ensureAudio(); },{once:true,passive:true});
     $('createBtn').onclick = async () => {
       if (busy) return;
       busy = true;
@@ -340,15 +587,18 @@
         toast('已达到本局可下注上限');
         return;
       }
-      pendingBet += chip;
+      setPendingBet(pendingBet + chip,false);
       pulseHaptic(7);
+      playSound('chip');
       animateChipFlight(button);
-      renderBetting();
     });
-    $('clearBetBtn').onclick = () => {
-      pendingBet = 0;
-      renderBetting();
+    $('clearBetBtn').onclick = () => setPendingBet(0);
+    $('repeatBetBtn').onclick = () => {
+      if (!lastConfirmedBet) { toast('还没有上一局下注'); return; }
+      setPendingBet(lastConfirmedBet);
     };
+    $('halfBetBtn').onclick = () => setPendingBet(pendingBet/2);
+    $('doubleBetBtn').onclick = () => setPendingBet(pendingBet*2);
     $('confirmBetBtn').onclick = () => confirmBet();
     $('takeInsuranceBtn').onclick = () => mutate('insurance',{take:true,action_id:makeId()});
     $('declineInsuranceBtn').onclick = () => mutate('insurance',{take:false,action_id:makeId()});
@@ -361,7 +611,8 @@
     });
     document.addEventListener('visibilitychange',() => {
       suspended = document.hidden;
-      if (!suspended) resumeRoom();
+      if (suspended) cancelPresentation();
+      else resumeRoom();
     });
     window.addEventListener('online',resumeRoom);
     window.addEventListener('offline',updateConnection);
@@ -420,6 +671,8 @@
     stateRefreshPromise = null;
     refreshQueued = false;
     pendingBet = 0;
+    lastConfirmedBet = 0;
+    cancelPresentation();
     playerSeatNodes.clear();
     $('playerTable').replaceChildren();
     presenceMembers.clear();
@@ -471,7 +724,9 @@
     }
     const amount = pendingBet;
     pulseHaptic(12);
-    await mutate('bet',{amount,action_id:makeId()});
+    playSound('chip');
+    const ok = await mutate('bet',{amount,action_id:makeId()});
+    if (ok) lastConfirmedBet = amount;
   }
 
   async function mutate(action,payload = {}) {
@@ -487,6 +742,7 @@
     if (state?.room.status === 'playing') renderGame();
     const roomId = state.room.id;
     const startedAt = performance.now();
+    let succeeded = false;
     try {
       const extra = gameplayAction ? {device_id:getDeviceId()} : {};
       const data = await api(action,{room_id:roomId,...payload,...extra});
@@ -494,6 +750,7 @@
       pendingGameAction = null;
       if (action === 'bet') pendingBet = 0;
       if (data.state) adoptState(data.state);
+      succeeded = true;
     } catch (err) {
       pendingGameAction = null;
       if (err.code === 'DEVICE_CONFLICT') {
@@ -511,6 +768,7 @@
       updateActions();
       if (state?.room.status === 'playing') renderGame();
     }
+    return succeeded;
   }
 
   function historyStatusText(status) {
@@ -793,7 +1051,7 @@
         node.handNodes.set(key,handNode);
       }
       const active = hand.status === 'active' && hand.action_token;
-      handNode.wrap.className = 'mini-hand' + (active ? ' active' : '') + (hand.from_split ? ' split' : '');
+      handNode.wrap.className = 'mini-hand' + (active ? ' active' : '') + (hand.from_split ? ' split' : '') + (hand.doubled ? ' doubled' : '');
       handNode.label.textContent = hands.length > 1 ? `第 ${hand.hand_no} 手牌` : '当前手牌';
       handNode.bet.textContent = `下注 ${formatChips(hand.bet)}`;
       const tag = hand.status === 'blackjack' ? '黑杰克' :
@@ -825,6 +1083,9 @@
     $('pendingBet').textContent = mine.bet_locked ? formatChips(mine.current_bet) : formatChips(pendingBet);
     $('confirmBetBtn').disabled = busy || mine.bet_locked || pendingBet < Number(state.room.min_bet || 10);
     $('clearBetBtn').disabled = busy || mine.bet_locked || pendingBet === 0;
+    $('repeatBetBtn').disabled = busy || mine.bet_locked || !lastConfirmedBet || lastConfirmedBet > max;
+    $('halfBetBtn').disabled = busy || mine.bet_locked || pendingBet <= 0;
+    $('doubleBetBtn').disabled = busy || mine.bet_locked || pendingBet <= 0 || pendingBet >= max;
     for (const button of $('chipRack').querySelectorAll('[data-chip]')) {
       const chip = Number(button.dataset.chip || 0);
       button.disabled = busy || mine.bet_locked || pendingBet + chip > max;
@@ -896,7 +1157,14 @@
 
     if (phase === 'insurance' && mine) {
       const cost = Number(mine.current_bet || 0)/2;
-      $('insuranceCost').textContent = cost > 0 ? `· ${formatChips(cost)}` : '';
+      const naturalBlackjack = (mine.hands || []).some((candidate) => candidate.status === 'blackjack' && !candidate.from_split);
+      $('insuranceTitle').textContent = naturalBlackjack ? '锁定等额收益？' : '是否购买保险？';
+      $('insuranceHint').textContent = naturalBlackjack
+        ? '你已拿到黑杰克 · 接受后本局确保净赢 1:1'
+        : '庄家明牌 A · 保险赔付 2:1';
+      $('insuranceActionText').textContent = naturalBlackjack ? '接受等额收益' : '购买保险';
+      $('declineInsuranceBtn').textContent = naturalBlackjack ? '继续等待 3:2' : '不买保险';
+      $('insuranceCost').textContent = naturalBlackjack ? `+${formatChips(mine.current_bet)}` : (cost > 0 ? `· ${formatChips(cost)}` : '');
       $('takeInsuranceBtn').disabled = busy || mine.insurance_decided || Number(mine.stack || 0) < cost;
       $('declineInsuranceBtn').disabled = busy || mine.insurance_decided;
     }
@@ -912,7 +1180,10 @@
     } else if (phase === 'betting') {
       $('tableMessage').textContent = mine?.bet_locked ? '下注已锁定 · 等待牌桌开局' : '请下注';
     } else if (phase === 'insurance') {
-      $('tableMessage').textContent = mine?.insurance_decided ? '保险选择已确认 · 等待其他玩家' : '庄家明牌 A · 是否购买保险？';
+      const naturalBlackjack = (mine?.hands || []).some((candidate) => candidate.status === 'blackjack' && !candidate.from_split);
+      $('tableMessage').textContent = mine?.insurance_decided
+        ? '保险选择已确认 · 等待其他玩家'
+        : naturalBlackjack ? '黑杰克 · 可锁定 1:1 等额收益' : '庄家明牌 A · 是否购买保险？';
     } else if (phase === 'settlement') {
       const dealerText = state.dealer.status === 'bust' ? `庄家 ${state.dealer.value} 点爆牌` :
         state.dealer.status === 'blackjack' ? '庄家黑杰克' : `庄家 ${state.dealer.value} 点`;
@@ -995,7 +1266,10 @@
       const current = container.children[i];
       if (current?.dataset.code === desired[i]) continue;
       const card = createCard(desired[i]);
-      if (container.isConnected) card.classList.add('dealt');
+      if (container.isConnected && !prefersReducedMotion?.matches) {
+        card.classList.add('dealt');
+        card.addEventListener('animationend',() => card.classList.remove('dealt'),{once:true});
+      }
       if (current) current.replaceWith(card);
       else container.append(card);
     }
@@ -1254,7 +1528,9 @@
     });
     channel.on('broadcast',{event:'state_changed'},() => requestState(30,false));
     channel.on('broadcast',{event:'emoji'},({payload}) => {
-      if (payload?.emoji && typeof payload.emoji === 'string') showEmoji(payload.emoji);
+      if (payload?.emoji && typeof payload.emoji === 'string') {
+        showReaction(payload.emoji,payload.member_id);
+      }
     });
     channel.on('broadcast',{event:'ping'},({payload}) => {
       if (!payload?.id || payload.member_id === String(me?.id)) return;
@@ -1346,16 +1622,34 @@
   }
 
   function sendEmoji(emoji) {
-    showEmoji(emoji);
-    sendEvent('emoji',{emoji:String(emoji).slice(0,4),member_id:String(me?.id)});
+    const now = Date.now();
+    if (now-lastReactionAt < 650) return;
+    lastReactionAt = now;
+    const memberId = String(me?.id || '');
+    showReaction(emoji,memberId);
+    pulseHaptic(6);
+    sendEvent('emoji',{emoji:String(emoji).slice(0,4),member_id:memberId});
   }
 
-  function showEmoji(emoji) {
-    const el = $('emojiFloat');
-    el.textContent = String(emoji).slice(0,4);
-    el.classList.remove('show');
-    void el.offsetWidth;
-    el.classList.add('show');
+  function showReaction(emoji,memberId) {
+    const layer = $('reactionLayer');
+    if (!layer) return;
+    if (layer.childElementCount >= 6) layer.firstElementChild?.remove();
+    const bubble = document.createElement('span');
+    bubble.className = 'table-reaction';
+    bubble.textContent = String(emoji).slice(0,4);
+    const target = presentationTarget(memberId);
+    const rect = target?.getBoundingClientRect();
+    if (rect) {
+      bubble.style.left = `${Math.max(20,Math.min(innerWidth-40,rect.left+rect.width*.5))}px`;
+      bubble.style.top = `${Math.max(80,rect.top+20)}px`;
+    } else {
+      bubble.style.left = '50%';
+      bubble.style.top = '58%';
+    }
+    layer.append(bubble);
+    bubble.addEventListener('animationend',() => bubble.remove(),{once:true});
+    setTimeout(() => bubble.remove(),1600);
   }
 
   function scheduleReconnect(base = 0) {
@@ -1416,6 +1710,7 @@
     }
   }
 
+  loadPreferences();
   bind();
   initialize();
 })();

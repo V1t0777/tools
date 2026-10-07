@@ -53,7 +53,7 @@ test('blackjack V1.4 uses per-hand rotating action tokens and device control',()
 });
 
 test('blackjack V1.4 frontend composes bets locally and confirms once',()=>{
-  assert.match(app,/pendingBet \+= chip/);
+  assert.match(app,/setPendingBet\(pendingBet \+ chip,false\)/);
   assert.match(app,/mutate\('bet',\{amount,action_id:makeId\(\)\}\)/);
   assert.match(app,/mine\.bet_locked/);
   assert.doesNotMatch(app,/api\('bet'.*data-chip/s);
