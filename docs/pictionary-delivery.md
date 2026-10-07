@@ -89,3 +89,10 @@ multi-device mobile network testing or measure production login percentiles.
 - Full `state` polling remains as a three-second reconciliation path and is still used for reconnects, drawer-only word options, and recovery.
 
 - The follow-up Realtime policy validates optimistic guess payloads against the authenticated member and current round, so a room member cannot label a temporary guess as another player.
+
+
+## Regional invocation alignment — 2026-10-08
+
+- All `pictionary-game` browser requests use Supabase's documented `forceFunctionRegion=ap-southeast-1` parameter, keeping the database-heavy Edge Function execution in Singapore alongside the project's Postgres region.
+- Early round completion from `pictionary_submit_guess_v2` now uses the same 3.2 second summary window as timer-driven round completion.
+- Explicit regional routing trades automatic region failover for predictable database proximity; the existing client timeout/retry and state reconciliation remain in place.
