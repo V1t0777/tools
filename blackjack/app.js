@@ -380,14 +380,16 @@
         }
       } finally {
         presentationBusy = false;
-        if (generation !== presentationGeneration) presentationQueue.length = 0;
+        if (generation !== presentationGeneration && presentationQueue.length && !document.hidden) {
+          const pending = presentationQueue.splice(0,PRESENTATION_MAX);
+          enqueuePresentation(pending);
+        }
       }
     })();
   }
   function cancelPresentation() {
     presentationGeneration += 1;
     presentationQueue.length = 0;
-    presentationBusy = false;
   }
 
   function isHost() {
