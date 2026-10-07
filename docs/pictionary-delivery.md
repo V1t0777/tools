@@ -76,3 +76,16 @@ Validation: `node --test scripts/toolbox-auth.test.cjs scripts/pictionary-sync.t
 Deno typecheck, repository security/build checks, and served asset comparison.
 Tests simulate network failures and lifecycle transitions; they do not replace
 multi-device mobile network testing or measure production login percentiles.
+
+
+## Low-latency round pipeline — 2026-10-07
+
+- Drawing deltas are batched at roughly one 60 Hz frame (14 ms instead of 28 ms).
+- Guess text is broadcast optimistically to room members and expires after 2.5 seconds unless the existing authoritative guess receipt confirms it. Correctness, scoring, and deduplication remain server-authoritative.
+- Normal state transitions now receive a server-emitted `state_sync` Broadcast. Authenticated clients are not granted permission to send that event; the Edge service emits it through a service-role-only wrapper.
+- End-of-round and next-round mutation requests are leader-gated in the client to avoid every device racing the same HTTP transition. Existing idempotent server checks and polling remain as recovery.
+- Summary display is reduced from six seconds to 3.2 seconds.
+- While a round is being played, the Edge Function warms the next round in a background task using `EdgeRuntime.waitUntil`. The next-round mutation reuses the prepared row and only falls back to synchronous preparation if needed.
+- Full `state` polling remains as a three-second reconciliation path and is still used for reconnects, drawer-only word options, and recovery.
+
+- The follow-up Realtime policy validates optimistic guess payloads against the authenticated member and current round, so a room member cannot label a temporary guess as another player.
