@@ -259,6 +259,9 @@
     const oldDealer = previous.dealer?.cards || [];
     const newDealer = next.dealer?.cards || [];
     if (oldDealer.includes('BACK') && !newDealer.includes('BACK') && newDealer.length) events.push({type:'reveal'});
+    if (newDealer.length > oldDealer.length) {
+      for (let index=oldDealer.length;index<newDealer.length;index++) events.push({type:'dealer_card',index});
+    }
     if (previous.room?.phase === 'betting' && next.room?.phase !== 'betting') events.unshift({type:'deal'});
     if (previous.room?.phase !== 'settlement' && next.room?.phase === 'settlement') events.push({type:'settle'});
     return events.slice(0,PRESENTATION_MAX);
@@ -276,6 +279,30 @@
   function presentationTarget(memberId) {
     return memberId ? playerSeatNodes.get(String(memberId))?.seat : null;
   }
+  function animatePayout(net) {
+    if (!net || prefersReducedMotion?.matches || document.hidden) return;
+    const target = presentationTarget(String(me?.id || ''));
+    const dealer = $('dealerHand');
+    if (!target || !dealer) return;
+    const fromRect = (net > 0 ? dealer : target).getBoundingClientRect();
+    const toRect = (net > 0 ? target : dealer).getBoundingClientRect();
+    const chip = document.createElement('span');
+    chip.className = 'payout-chip';
+    chip.textContent = '●';
+    chip.style.left = `${fromRect.left+fromRect.width/2}px`;
+    chip.style.top = `${fromRect.top+fromRect.height/2}px`;
+    document.body.append(chip);
+    const dx = toRect.left+toRect.width/2-(fromRect.left+fromRect.width/2);
+    const dy = toRect.top+toRect.height/2-(fromRect.top+fromRect.height/2);
+    const animation = chip.animate([
+      {transform:'translate3d(0,0,0) scale(.8)',opacity:0},
+      {transform:'translate3d(0,0,0) scale(1)',opacity:1,offset:.12},
+      {transform:`translate3d(${dx}px,${dy}px,0) scale(.72)`,opacity:.9,offset:.82},
+      {transform:`translate3d(${dx}px,${dy}px,0) scale(.58)`,opacity:0},
+    ],{duration:360,easing:'cubic-bezier(.18,.76,.2,1)',fill:'forwards'});
+    animation.finished.finally(() => chip.remove()).catch(() => chip.remove());
+  }
+
   async function playPresentation(item,generation) {
     if (generation !== presentationGeneration || document.hidden || !state) return;
     const target = presentationTarget(item.member_id);
@@ -298,6 +325,10 @@
       playSound('flip');
       announce('庄家翻开暗牌');
       await pulse($('dealerHand'),'dealer-reveal',300);
+    } else if (item.type === 'dealer_card') {
+      playSound('card');
+      const card = $('dealerHand')?.children?.[item.index];
+      await pulse(card,'presentation-card',150);
     } else if (item.type === 'split') {
       playSound('card');
       pulseHaptic(10);
@@ -317,6 +348,7 @@
       const mine = nextPlayerForPresentation();
       const net = mine ? Number(mine.stack || 0)-Number(mine.round_start_stack || 0) : 0;
       playSound(net > 0 ? 'win' : net < 0 ? 'loss' : 'chip');
+      animatePayout(net);
       await pulse($('gameScreen'),'settle-pulse',320);
     }
   }
