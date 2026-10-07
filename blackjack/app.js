@@ -402,6 +402,7 @@
     if (state && next.room.id === state.room.id && Number(next.room.version) < Number(state.room.version)) return;
     const previous = state;
     const presentation = derivePresentation(previous,next);
+    if (previous?.room?.status === 'finished' && next.room?.status === 'lobby') lastConfirmedBet = 0;
     state = next;
     const serverNow = Date.parse(next.server_now || '');
     if (Number.isFinite(serverNow)) clockOffset = serverNow - Date.now();
@@ -458,7 +459,7 @@
     const min = Number(state?.room?.min_bet || 10);
     const max = betLimit();
     if (!max) return;
-    let next = Math.round(Number(value || 0)/min)*min;
+    let next = Math.floor(Number(value || 0)/min)*min;
     next = Math.max(0,Math.min(next,max));
     pendingBet = next;
     if (feedback) {
@@ -504,6 +505,7 @@
     };
     $('historyRefreshBtn').onclick = () => loadDashboard(true);
     $('soundBtn').onclick = toggleSound;
+    document.addEventListener('pointerdown',() => { if (soundEnabled) ensureAudio(); },{once:true,passive:true});
     $('createBtn').onclick = async () => {
       if (busy) return;
       busy = true;
