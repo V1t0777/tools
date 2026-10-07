@@ -10,6 +10,9 @@
   const DEGRADED_POLL_MS = 1200;
   const PING_MS = 6000;
   const DEVICE_KEY = 'toolbox_blackjack_device_v12';
+  const SOUND_KEY = 'toolbox_blackjack_sound_v15';
+  const PRESENTATION_MAX = 8;
+  const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
 
   let session = null;
   let sdkPromise = null;
@@ -46,6 +49,12 @@
   let stateRefreshPromise = null;
   let refreshQueued = false;
   let pendingBet = 0;
+  let lastConfirmedBet = 0;
+  let soundEnabled = true;
+  let audioContext = null;
+  let presentationQueue = [];
+  let presentationBusy = false;
+  let presentationGeneration = 0;
 
   function show(id) {
     SCREENS.forEach((name) => $(name).classList.toggle('active', name === id));
@@ -169,6 +178,174 @@
     animation.finished.finally(() => clone.remove()).catch(() => clone.remove());
   }
 
+  function loadPreferences() {
+    try { soundEnabled = localStorage.getItem(SOUND_KEY) !== '0'; } catch { soundEnabled = true; }
+    updateSoundButton();
+  }
+  function updateSoundButton() {
+    const button = $('soundBtn');
+    if (!button) return;
+    button.textContent = soundEnabled ? '🔊' : '🔇';
+    button.setAttribute('aria-pressed',soundEnabled ? 'false' : 'true');
+    button.title = soundEnabled ? '关闭牌桌音效' : '开启牌桌音效';
+  }
+  function toggleSound() {
+    soundEnabled = !soundEnabled;
+    try { localStorage.setItem(SOUND_KEY,soundEnabled ? '1' : '0'); } catch {}
+    updateSoundButton();
+    if (soundEnabled) {
+      ensureAudio();
+      playSound('chip');
+    }
+  }
+  function ensureAudio() {
+    if (!soundEnabled) return null;
+    const AudioCtor = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtor) return null;
+    if (!audioContext) audioContext = new AudioCtor();
+    if (audioContext.state === 'suspended') audioContext.resume().catch(() => {});
+    return audioContext;
+  }
+  function playSound(kind) {
+    if (!soundEnabled || document.hidden) return;
+    const ctx = ensureAudio();
+    if (!ctx) return;
+    const map = {
+      chip:[180,.035,'triangle',.025],
+      card:[520,.045,'sine',.018],
+      flip:[310,.075,'triangle',.022],
+      blackjack:[740,.13,'sine',.028],
+      win:[620,.11,'sine',.026],
+      loss:[150,.09,'triangle',.018],
+    };
+    const spec = map[kind] || map.card;
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+    oscillator.type = spec[2];
+    oscillator.frequency.setValueAtTime(spec[0],ctx.currentTime);
+    if (kind === 'blackjack' || kind === 'win') oscillator.frequency.exponentialRampToValueAtTime(spec[0]*1.32,ctx.currentTime+spec[1]);
+    gain.gain.setValueAtTime(spec[3],ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+spec[1]);
+    oscillator.connect(gain);
+    gain.connect(ctx.destination);
+    oscillator.start();
+    oscillator.stop(ctx.currentTime+spec[1]+.01);
+  }
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve,ms));
+  }
+  function handMap(player) {
+    return new Map((Array.isArray(player?.hands) ? player.hands : []).map((hand) => [String(hand.id),hand]));
+  }
+  function derivePresentation(previous,next) {
+    if (!previous || previous.room?.id !== next.room?.id || document.hidden || resyncing || prefersReducedMotion?.matches) return [];
+    const events = [];
+    const previousPlayers = new Map(previous.players.map((player) => [String(player.member_id),player]));
+    for (const player of next.players) {
+      const before = previousPlayers.get(String(player.member_id));
+      if (!before) continue;
+      const oldHands = handMap(before);
+      const newHands = handMap(player);
+      if (newHands.size > oldHands.size) events.push({type:'split',member_id:String(player.member_id),name:player.nickname});
+      for (const [id,hand] of newHands) {
+        const old = oldHands.get(id);
+        if (!old) continue;
+        if (!old.doubled && hand.doubled) events.push({type:'double',member_id:String(player.member_id),name:player.nickname});
+        if ((hand.cards?.length || 0) > (old.cards?.length || 0)) events.push({type:'card',member_id:String(player.member_id)});
+        if (old.status !== 'blackjack' && hand.status === 'blackjack') events.push({type:'blackjack',member_id:String(player.member_id),name:player.nickname});
+      }
+    }
+    const oldDealer = previous.dealer?.cards || [];
+    const newDealer = next.dealer?.cards || [];
+    if (oldDealer.includes('BACK') && !newDealer.includes('BACK') && newDealer.length) events.push({type:'reveal'});
+    if (previous.room?.phase === 'betting' && next.room?.phase !== 'betting') events.unshift({type:'deal'});
+    if (previous.room?.phase !== 'settlement' && next.room?.phase === 'settlement') events.push({type:'settle'});
+    return events.slice(0,PRESENTATION_MAX);
+  }
+  function announce(message) {
+    const el = $('tableFeed');
+    if (!el || !message) return;
+    el.textContent = message;
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
+    clearTimeout(el._timer);
+    el._timer = setTimeout(() => el.classList.remove('show'),1800);
+  }
+  function presentationTarget(memberId) {
+    return memberId ? playerSeatNodes.get(String(memberId))?.seat : null;
+  }
+  async function playPresentation(item,generation) {
+    if (generation !== presentationGeneration || document.hidden || !state) return;
+    const target = presentationTarget(item.member_id);
+    const pulse = async (element,className,duration=260) => {
+      if (!element) return;
+      element.classList.remove(className);
+      void element.offsetWidth;
+      element.classList.add(className);
+      await sleep(duration);
+      element.classList.remove(className);
+    };
+    if (item.type === 'deal') {
+      playSound('card');
+      announce('发牌');
+      await pulse($('gameScreen'),'presentation-deal',220);
+    } else if (item.type === 'card') {
+      playSound('card');
+      await sleep(90);
+    } else if (item.type === 'reveal') {
+      playSound('flip');
+      announce('庄家翻开暗牌');
+      await pulse($('dealerHand'),'dealer-reveal',300);
+    } else if (item.type === 'split') {
+      playSound('card');
+      pulseHaptic(10);
+      announce(`${item.name || '玩家'}进行了分牌`);
+      await pulse(target,'split-pulse',300);
+    } else if (item.type === 'double') {
+      playSound('chip');
+      pulseHaptic([8,25,8]);
+      announce(`${item.name || '玩家'}选择加倍`);
+      await pulse(target,'double-pulse',300);
+    } else if (item.type === 'blackjack') {
+      playSound('blackjack');
+      pulseHaptic([10,35,16]);
+      announce(`${item.name || '玩家'}拿到黑杰克`);
+      await pulse(target,'blackjack-pulse',420);
+    } else if (item.type === 'settle') {
+      const mine = nextPlayerForPresentation();
+      const net = mine ? Number(mine.stack || 0)-Number(mine.round_start_stack || 0) : 0;
+      playSound(net > 0 ? 'win' : net < 0 ? 'loss' : 'chip');
+      await pulse($('gameScreen'),'settle-pulse',320);
+    }
+  }
+  function nextPlayerForPresentation() {
+    return myPlayer();
+  }
+  function enqueuePresentation(items) {
+    if (!items?.length || document.hidden || prefersReducedMotion?.matches) return;
+    presentationQueue.push(...items);
+    if (presentationQueue.length > PRESENTATION_MAX) presentationQueue = presentationQueue.slice(-PRESENTATION_MAX);
+    if (presentationBusy) return;
+    presentationBusy = true;
+    const generation = presentationGeneration;
+    (async () => {
+      try {
+        while (presentationQueue.length && generation === presentationGeneration && !document.hidden) {
+          await playPresentation(presentationQueue.shift(),generation);
+        }
+      } finally {
+        presentationBusy = false;
+        if (generation !== presentationGeneration) presentationQueue.length = 0;
+      }
+    })();
+  }
+  function cancelPresentation() {
+    presentationGeneration += 1;
+    presentationQueue.length = 0;
+    presentationBusy = false;
+  }
+
   function isHost() {
     return Boolean(state && me && String(state.room.host_member_id) === String(me.id));
   }
@@ -222,6 +399,8 @@
   function adoptState(next) {
     if (!validSnapshot(next)) return;
     if (state && next.room.id === state.room.id && Number(next.room.version) < Number(state.room.version)) return;
+    const previous = state;
+    const presentation = derivePresentation(previous,next);
     state = next;
     const serverNow = Date.parse(next.server_now || '');
     if (Number.isFinite(serverNow)) clockOffset = serverNow - Date.now();
@@ -229,6 +408,7 @@
     if (next.room.phase !== 'settlement') advanceRequested = false;
     renderState();
     startTimers();
+    enqueuePresentation(presentation);
   }
 
   async function initialize() {
