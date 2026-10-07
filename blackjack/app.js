@@ -1035,6 +1035,9 @@
     $('pendingBet').textContent = mine.bet_locked ? formatChips(mine.current_bet) : formatChips(pendingBet);
     $('confirmBetBtn').disabled = busy || mine.bet_locked || pendingBet < Number(state.room.min_bet || 10);
     $('clearBetBtn').disabled = busy || mine.bet_locked || pendingBet === 0;
+    $('repeatBetBtn').disabled = busy || mine.bet_locked || !lastConfirmedBet || lastConfirmedBet > max;
+    $('halfBetBtn').disabled = busy || mine.bet_locked || pendingBet <= 0;
+    $('doubleBetBtn').disabled = busy || mine.bet_locked || pendingBet <= 0 || pendingBet >= max;
     for (const button of $('chipRack').querySelectorAll('[data-chip]')) {
       const chip = Number(button.dataset.chip || 0);
       button.disabled = busy || mine.bet_locked || pendingBet + chip > max;
@@ -1106,7 +1109,14 @@
 
     if (phase === 'insurance' && mine) {
       const cost = Number(mine.current_bet || 0)/2;
-      $('insuranceCost').textContent = cost > 0 ? `· ${formatChips(cost)}` : '';
+      const naturalBlackjack = (mine.hands || []).some((candidate) => candidate.status === 'blackjack' && !candidate.from_split);
+      $('insuranceTitle').textContent = naturalBlackjack ? '锁定等额收益？' : '是否购买保险？';
+      $('insuranceHint').textContent = naturalBlackjack
+        ? '你已拿到黑杰克 · 接受后本局确保净赢 1:1'
+        : '庄家明牌 A · 保险赔付 2:1';
+      $('insuranceActionText').textContent = naturalBlackjack ? '接受等额收益' : '购买保险';
+      $('declineInsuranceBtn').textContent = naturalBlackjack ? '继续等待 3:2' : '不买保险';
+      $('insuranceCost').textContent = naturalBlackjack ? `+${formatChips(mine.current_bet)}` : (cost > 0 ? `· ${formatChips(cost)}` : '');
       $('takeInsuranceBtn').disabled = busy || mine.insurance_decided || Number(mine.stack || 0) < cost;
       $('declineInsuranceBtn').disabled = busy || mine.insurance_decided;
     }
@@ -1122,7 +1132,10 @@
     } else if (phase === 'betting') {
       $('tableMessage').textContent = mine?.bet_locked ? '下注已锁定 · 等待牌桌开局' : '请下注';
     } else if (phase === 'insurance') {
-      $('tableMessage').textContent = mine?.insurance_decided ? '保险选择已确认 · 等待其他玩家' : '庄家明牌 A · 是否购买保险？';
+      const naturalBlackjack = (mine?.hands || []).some((candidate) => candidate.status === 'blackjack' && !candidate.from_split);
+      $('tableMessage').textContent = mine?.insurance_decided
+        ? '保险选择已确认 · 等待其他玩家'
+        : naturalBlackjack ? '黑杰克 · 可锁定 1:1 等额收益' : '庄家明牌 A · 是否购买保险？';
     } else if (phase === 'settlement') {
       const dealerText = state.dealer.status === 'bust' ? `庄家 ${state.dealer.value} 点爆牌` :
         state.dealer.status === 'blackjack' ? '庄家黑杰克' : `庄家 ${state.dealer.value} 点`;
