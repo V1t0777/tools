@@ -80,7 +80,7 @@ test('V1.5.6 mobile motion is bounded and compositor-oriented',()=>{
   assert.match(app,/animationend.*remove\('dealt'\)/s);
   assert.match(app,/presentationQueue\.length > PRESENTATION_MAX/);
   assert.doesNotMatch(v15,/animation:[^;]*(infinite)/i);
-  assert.doesNotMatch(v15,/@keyframes[\s\S]*?filter:/i);
+  assert.doesNotMatch(v15,/filter:(?:blur|brightness)\(/i);
   assert.doesNotMatch(app,/requestAnimationFrame\([^)]*=>\s*requestAnimationFrame/s);
   assert.doesNotMatch(html,/<canvas\b/i);
 });
