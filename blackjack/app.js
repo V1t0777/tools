@@ -1004,7 +1004,7 @@
         node.handNodes.set(key,handNode);
       }
       const active = hand.status === 'active' && hand.action_token;
-      handNode.wrap.className = 'mini-hand' + (active ? ' active' : '') + (hand.from_split ? ' split' : '');
+      handNode.wrap.className = 'mini-hand' + (active ? ' active' : '') + (hand.from_split ? ' split' : '') + (hand.doubled ? ' doubled' : '');
       handNode.label.textContent = hands.length > 1 ? `第 ${hand.hand_no} 手牌` : '当前手牌';
       handNode.bet.textContent = `下注 ${formatChips(hand.bet)}`;
       const tag = hand.status === 'blackjack' ? '黑杰克' :
