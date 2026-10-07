@@ -255,6 +255,8 @@
         if (!old.doubled && hand.doubled) events.push({type:'double',member_id:String(player.member_id),name:player.nickname});
         if ((hand.cards?.length || 0) > (old.cards?.length || 0)) events.push({type:'card',member_id:String(player.member_id)});
         if (old.status !== 'blackjack' && hand.status === 'blackjack') events.push({type:'blackjack',member_id:String(player.member_id),name:player.nickname});
+        if (old.status !== 'bust' && hand.status === 'bust') events.push({type:'bust',member_id:String(player.member_id),name:player.nickname});
+        if (old.status !== 'surrender' && hand.status === 'surrender') events.push({type:'surrender',member_id:String(player.member_id),name:player.nickname});
       }
     }
     const oldDealer = previous.dealer?.cards || [];
@@ -345,6 +347,14 @@
       pulseHaptic([10,35,16]);
       announce(`${item.name || '玩家'}拿到黑杰克`);
       await pulse(target,'blackjack-pulse',420);
+    } else if (item.type === 'bust') {
+      playSound('loss');
+      announce(`${item.name || '玩家'}爆牌`);
+      await pulse(target,'split-pulse',220);
+    } else if (item.type === 'surrender') {
+      playSound('chip');
+      announce(`${item.name || '玩家'}选择投降`);
+      await pulse(target,'split-pulse',220);
     } else if (item.type === 'settle') {
       const mine = nextPlayerForPresentation();
       const net = mine ? Number(mine.stack || 0)-Number(mine.round_start_stack || 0) : 0;
