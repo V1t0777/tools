@@ -449,6 +449,24 @@
     }
   }
 
+  function betLimit() {
+    const mine = myPlayer();
+    return mine ? Math.min(Number(state?.room?.max_bet || 500),Number(mine.stack || 0)) : 0;
+  }
+  function setPendingBet(value,feedback = true) {
+    const min = Number(state?.room?.min_bet || 10);
+    const max = betLimit();
+    if (!max) return;
+    let next = Math.round(Number(value || 0)/min)*min;
+    next = Math.max(0,Math.min(next,max));
+    pendingBet = next;
+    if (feedback) {
+      pulseHaptic(7);
+      playSound('chip');
+    }
+    renderBetting();
+  }
+
   function bind() {
     $('loginForm').addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -484,6 +502,7 @@
       show('authScreen');
     };
     $('historyRefreshBtn').onclick = () => loadDashboard(true);
+    $('soundBtn').onclick = toggleSound;
     $('createBtn').onclick = async () => {
       if (busy) return;
       busy = true;
@@ -520,15 +539,18 @@
         toast('已达到本局可下注上限');
         return;
       }
-      pendingBet += chip;
+      setPendingBet(pendingBet + chip,false);
       pulseHaptic(7);
+      playSound('chip');
       animateChipFlight(button);
-      renderBetting();
     });
-    $('clearBetBtn').onclick = () => {
-      pendingBet = 0;
-      renderBetting();
+    $('clearBetBtn').onclick = () => setPendingBet(0);
+    $('repeatBetBtn').onclick = () => {
+      if (!lastConfirmedBet) { toast('还没有上一局下注'); return; }
+      setPendingBet(lastConfirmedBet);
     };
+    $('halfBetBtn').onclick = () => setPendingBet(pendingBet/2);
+    $('doubleBetBtn').onclick = () => setPendingBet(pendingBet*2);
     $('confirmBetBtn').onclick = () => confirmBet();
     $('takeInsuranceBtn').onclick = () => mutate('insurance',{take:true,action_id:makeId()});
     $('declineInsuranceBtn').onclick = () => mutate('insurance',{take:false,action_id:makeId()});
@@ -541,7 +563,8 @@
     });
     document.addEventListener('visibilitychange',() => {
       suspended = document.hidden;
-      if (!suspended) resumeRoom();
+      if (suspended) cancelPresentation();
+      else resumeRoom();
     });
     window.addEventListener('online',resumeRoom);
     window.addEventListener('offline',updateConnection);
@@ -600,6 +623,8 @@
     stateRefreshPromise = null;
     refreshQueued = false;
     pendingBet = 0;
+    lastConfirmedBet = 0;
+    cancelPresentation();
     playerSeatNodes.clear();
     $('playerTable').replaceChildren();
     presenceMembers.clear();
@@ -651,7 +676,9 @@
     }
     const amount = pendingBet;
     pulseHaptic(12);
-    await mutate('bet',{amount,action_id:makeId()});
+    playSound('chip');
+    const ok = await mutate('bet',{amount,action_id:makeId()});
+    if (ok) lastConfirmedBet = amount;
   }
 
   async function mutate(action,payload = {}) {
@@ -667,6 +694,7 @@
     if (state?.room.status === 'playing') renderGame();
     const roomId = state.room.id;
     const startedAt = performance.now();
+    let succeeded = false;
     try {
       const extra = gameplayAction ? {device_id:getDeviceId()} : {};
       const data = await api(action,{room_id:roomId,...payload,...extra});
@@ -674,6 +702,7 @@
       pendingGameAction = null;
       if (action === 'bet') pendingBet = 0;
       if (data.state) adoptState(data.state);
+      succeeded = true;
     } catch (err) {
       pendingGameAction = null;
       if (err.code === 'DEVICE_CONFLICT') {
@@ -691,6 +720,7 @@
       updateActions();
       if (state?.room.status === 'playing') renderGame();
     }
+    return succeeded;
   }
 
   function historyStatusText(status) {
@@ -1596,6 +1626,7 @@
     }
   }
 
+  loadPreferences();
   bind();
   initialize();
 })();
