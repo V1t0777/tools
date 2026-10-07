@@ -509,24 +509,25 @@ button,input,select{font:inherit}.app{width:min(880px,100%);margin:auto}.hidden{
   animation:doublePulseV15 .3s ease-out both;
 }
 @keyframes doublePulseV15{
-  0%{box-shadow:0 0 0 0 rgba(230,207,147,.32)}
-  100%{box-shadow:0 0 0 12px rgba(230,207,147,0)}
+  0%{transform:translate3d(0,0,0) scale(1)}
+  45%{transform:translate3d(0,-2px,0) scale(1.012)}
+  100%{transform:translate3d(0,0,0) scale(1)}
 }
 .player-seat.blackjack-pulse{
   animation:blackjackPulseV15 .42s ease-out both;
 }
 @keyframes blackjackPulseV15{
-  0%{box-shadow:0 0 0 0 rgba(236,205,116,.5)}
-  45%{box-shadow:0 0 0 5px rgba(236,205,116,.18)}
-  100%{box-shadow:0 0 0 11px rgba(236,205,116,0)}
+  0%{opacity:.82;transform:translate3d(0,0,0) scale(.99)}
+  45%{opacity:1;transform:translate3d(0,-3px,0) scale(1.015)}
+  100%{opacity:1;transform:translate3d(0,0,0) scale(1)}
 }
-#gameScreen.settle-pulse::before{
-  animation:settleFeltV15 .32s ease-out both;
+#gameScreen.settle-pulse .table-message{
+  animation:settleMessageV15 .32s ease-out both;
 }
-@keyframes settleFeltV15{
-  0%{filter:brightness(1)}
-  48%{filter:brightness(1.08)}
-  100%{filter:brightness(1)}
+@keyframes settleMessageV15{
+  0%{opacity:.7;transform:translate3d(0,4px,0)}
+  55%{opacity:1;transform:translate3d(0,-2px,0)}
+  100%{opacity:1;transform:translate3d(0,0,0)}
 }
 .mini-hand.doubled .card:last-child{
   transform:rotate(90deg) translate3d(4px,-2px,0);
@@ -545,7 +546,6 @@ button,input,select{font:inherit}.app{width:min(880px,100%);margin:auto}.hidden{
   .quick-bet button{min-height:36px;padding-inline:7px}
   .table-feed{font-size:9px}
   .table-reaction{filter:none}
-  #gameScreen.settle-pulse::before{animation:none}
   .player-seat.double-pulse,.player-seat.blackjack-pulse{animation:none}
   .mini-hand.doubled .card:last-child{margin-left:6px}
 }
@@ -553,7 +553,7 @@ button,input,select{font:inherit}.app{width:min(880px,100%);margin:auto}.hidden{
   .table-feed{transition:none}
   .table-reaction,.presentation-deal .dealer-zone,.presentation-deal .player-table,
   .dealer-hand.dealer-reveal .card:last-child,.player-seat.split-pulse,
-  .player-seat.double-pulse,.player-seat.blackjack-pulse,#gameScreen.settle-pulse::before{
+  .player-seat.double-pulse,.player-seat.blackjack-pulse,#gameScreen.settle-pulse .table-message{
     animation:none!important;
   }
 }
