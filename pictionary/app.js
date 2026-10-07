@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  const FUNCTION_URL = `${ToolboxAuth.url}/functions/v1/pictionary-game`;
+  const FUNCTION_URL = `${ToolboxAuth.url}/functions/v1/pictionary-game?forceFunctionRegion=ap-southeast-1`;
   const COLORS = ['#111827','#ef4444','#f59e0b','#22c55e','#3b82f6','#8b5cf6','#ec4899','#ffffff'];
   const $ = id => document.getElementById(id);
   const screens = ['authScreen','homeScreen','roomScreen','gameScreen','finishScreen','recoveryScreen'];
