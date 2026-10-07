@@ -59,6 +59,7 @@
 
   function show(id) {
     SCREENS.forEach((name) => $(name).classList.toggle('active', name === id));
+    $('soundBtn')?.classList.toggle('hidden',!['roomScreen','gameScreen','finishScreen'].includes(id));
   }
   function toast(message) {
     const el = $('toast');
