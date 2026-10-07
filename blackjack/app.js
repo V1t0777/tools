@@ -55,6 +55,7 @@
   let presentationQueue = [];
   let presentationBusy = false;
   let presentationGeneration = 0;
+  let lastReactionAt = 0;
 
   function show(id) {
     SCREENS.forEach((name) => $(name).classList.toggle('active', name === id));
@@ -1477,7 +1478,9 @@
     });
     channel.on('broadcast',{event:'state_changed'},() => requestState(30,false));
     channel.on('broadcast',{event:'emoji'},({payload}) => {
-      if (payload?.emoji && typeof payload.emoji === 'string') showEmoji(payload.emoji);
+      if (payload?.emoji && typeof payload.emoji === 'string') {
+        showReaction(payload.emoji,payload.member_id);
+      }
     });
     channel.on('broadcast',{event:'ping'},({payload}) => {
       if (!payload?.id || payload.member_id === String(me?.id)) return;
@@ -1569,16 +1572,34 @@
   }
 
   function sendEmoji(emoji) {
-    showEmoji(emoji);
-    sendEvent('emoji',{emoji:String(emoji).slice(0,4),member_id:String(me?.id)});
+    const now = Date.now();
+    if (now-lastReactionAt < 650) return;
+    lastReactionAt = now;
+    const memberId = String(me?.id || '');
+    showReaction(emoji,memberId);
+    pulseHaptic(6);
+    sendEvent('emoji',{emoji:String(emoji).slice(0,4),member_id:memberId});
   }
 
-  function showEmoji(emoji) {
-    const el = $('emojiFloat');
-    el.textContent = String(emoji).slice(0,4);
-    el.classList.remove('show');
-    void el.offsetWidth;
-    el.classList.add('show');
+  function showReaction(emoji,memberId) {
+    const layer = $('reactionLayer');
+    if (!layer) return;
+    if (layer.childElementCount >= 6) layer.firstElementChild?.remove();
+    const bubble = document.createElement('span');
+    bubble.className = 'table-reaction';
+    bubble.textContent = String(emoji).slice(0,4);
+    const target = presentationTarget(memberId);
+    const rect = target?.getBoundingClientRect();
+    if (rect) {
+      bubble.style.left = `${Math.max(20,Math.min(innerWidth-40,rect.left+rect.width*.5))}px`;
+      bubble.style.top = `${Math.max(80,rect.top+20)}px`;
+    } else {
+      bubble.style.left = '50%';
+      bubble.style.top = '58%';
+    }
+    layer.append(bubble);
+    bubble.addEventListener('animationend',() => bubble.remove(),{once:true});
+    setTimeout(() => bubble.remove(),1600);
   }
 
   function scheduleReconnect(base = 0) {
