@@ -258,7 +258,7 @@
     }catch(err){
       if(epoch!==roomEpoch||err.cancelled)return;
       if(/不在.*房间|房间不存在|房间已由房主结束|房间因长时间无人活动已过期|房间已过期|房间已结束/.test(err.message))exitToHome(err.message);
-      else console.warn(err.message);
+      else console.warn(err?.code||'ACTION_FAILED');
     }finally{
       if(epoch===roomEpoch){transitionBusy=false;if(refreshQueued){refreshQueued=false;requestState();}}
     }

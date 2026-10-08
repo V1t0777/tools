@@ -362,7 +362,7 @@
       .eq("shift_type","夜班")
       .gte("shift_date",toYMD(first)).lte("shift_date",toYMD(last))
       .order("shift_date",{ascending:true});
-    if(error){console.error(error);return;}
+    if(error){console.warn('night-shift request failed', error?.code||'OPERATION_ERROR');return;}
     shifts=data||[];
     await renderCalendar();
     await renderShiftList();
@@ -486,7 +486,7 @@
       const saved=parseLocalDate(date);calendarDate=new Date(saved.getFullYear(),saved.getMonth(),1);
       await Promise.all([loadMonth(),loadNextMyShift()]);
     }catch(err){
-      console.error(err);
+      console.warn('night-shift request failed', err?.code||'OPERATION_ERROR');
       showError($("sheetError"),err.code==="23505"?"这一天已经存在相同班次。":"保存失败，请稍后再试。");
     }finally{$("saveShiftBtn").disabled=false;$("saveShiftBtn").textContent="保存";}
   });
@@ -502,7 +502,7 @@
   async function loadNextMyShift(){
     const today=toYMD(new Date());
     const {data,error}=await db.from("night_shifts").select("id,shift_date,shift_type,note").eq("member_id",myMemberId).eq("shift_type","夜班").gte("shift_date",today).order("shift_date",{ascending:true}).limit(1);
-    if(error){console.error(error);return;}
+    if(error){console.warn('night-shift request failed', error?.code||'OPERATION_ERROR');return;}
     nextShift=data?.[0]||null;
     const holidayEl=$("nextHoliday");holidayEl.textContent="";holidayEl.className="next-holiday";
     if(!nextShift){

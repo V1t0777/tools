@@ -124,7 +124,7 @@
       els.invScope.querySelector('option[value="group"]').disabled=!group;
       if(!group && els.invScope.value==='group') els.invScope.value='personal';
     }catch(err){
-      console.warn(err);
+      console.warn('bead operation failed', err?.code||'OPERATION_ERROR');
       els.invIdentity.textContent='共享组加载失败';
     }
   }
@@ -975,7 +975,7 @@
       renderPreview(true);renderResults();updateDiagnostics();
       setStatus(els.imageStatus,'V2 分析完成：已执行网格相位、源色空间合并、连通背景、Top-3 MARD 候选与拒识判断。请检查“精度诊断”。');
     }catch(err){
-      console.error(err);setStatus(els.imageStatus,'分析失败：'+err.message,'error');
+      console.warn('bead image analysis failed', err?.code||'IMAGE_ERROR');setStatus(els.imageStatus,'分析失败，请检查图片格式或稍后重试。','error');
     }finally{
       els.analyze.disabled=false;els.analyze.textContent='开始精确分析';document.body.classList.remove('analysis-busy');
     }
@@ -1209,7 +1209,7 @@
         const line=create('div','event');const left=create('div');left.append(create('strong','',r.palette_name+' · '+r.color_code),create('span','', ' · '+formatTime(r.created_at)+' · '+r.reason));
         const d=create('b',r.delta>=0?'plus':'minus',(r.delta>=0?'+':'')+r.delta+' → '+r.resulting_quantity);line.append(left,d);els.eventList.append(line);
       }
-    }catch(err){console.warn(err);}
+    }catch(err){console.warn('bead operation failed', err?.code||'OPERATION_ERROR');}
   }
 
   // ---------- Projects ----------
