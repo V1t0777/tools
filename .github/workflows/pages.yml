@@ -22,10 +22,23 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up verification runtime
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.19.0'
+          package-manager-cache: false
 
       - name: Run security checks
         shell: bash
         run: bash scripts/security-check.sh
+
+      - name: Run full regression suite before deploying
+        run: node --test tests/*.test.mjs scripts/*.test.cjs
+
+      - name: Scan full Git history for credentials before deploying
+        run: node scripts/secret-history.mjs
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
