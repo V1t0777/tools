@@ -5,10 +5,15 @@ const fs=require('node:fs');
 const source=fs.readFileSync(require('node:path').join(__dirname,'../shared/toolbox-auth.js'),'utf8');
 const STORE='toolboxSupabaseAuth.v1';
 const response=(status,body)=>({ok:status<400,status,text:async()=>JSON.stringify(body)});
-function setup(seconds=30){
+function setup(seconds=30,channelMessages=null){
   const saved={access_token:'old',refresh_token:'refresh-old',expires_at:Date.now()/1000+seconds};
   const storage=new Map([[STORE,JSON.stringify(saved)]]),timers=new Map(),intervals=new Map(),events=new Map();let serial=0;
   const sandbox={localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},fetch:async()=>response(503,{message:'offline'}),AbortController,console:{warn(){}},navigator:{},document:{hidden:false,addEventListener:(k,v)=>events.set('document:'+k,v)},addEventListener:(k,v)=>events.set(k,v),setTimeout:(fn,ms)=>{const id=++serial;timers.set(id,{fn,ms});return id;},clearTimeout:id=>timers.delete(id),setInterval:fn=>{const id=++serial;intervals.set(id,fn);return id;},clearInterval:id=>intervals.delete(id)};
+  if(channelMessages)sandbox.BroadcastChannel=class {
+    constructor(name){this.name=name;}
+    postMessage(message){channelMessages.push(message);}
+    addEventListener(kind,handler){if(kind==='message')events.set('broadcast',handler);}
+  };
   sandbox.window=sandbox;vm.createContext(sandbox);vm.runInContext(source,sandbox);
   return {a:sandbox.ToolboxAuth,sandbox,storage,timers,intervals,events,saved};
 }
@@ -71,4 +76,21 @@ test('401 REST retries share the refresh operation',async()=>{
     return opts.headers.Authorization==='Bearer old'?response(401,{}):response(200,[]);
   };
   await Promise.all([a.rest('x'),a.rest('x')]);assert.equal(refreshCalls,1);
+});
+
+test('cross-tab BroadcastChannel sends only event metadata, never session credentials',async()=>{
+  const messages=[];
+  const {a,sandbox,storage,events}=setup(3600,messages);
+  sandbox.fetch=async()=>response(200,{access_token:'new-jwt',refresh_token:'new-refresh',expires_at:Date.now()/1000+3600});
+  await a.signIn('example','example');
+  assert.equal(messages.length,1);
+  assert.deepEqual(Object.keys(messages[0]).sort(),['event','source']);
+  assert.equal(messages[0].event,'SIGNED_IN');
+  assert.ok(!JSON.stringify(messages).includes('new-refresh'));
+  events.get('broadcast')({data:{source:'other',event:'SIGNED_IN',session:{access_token:'injected',refresh_token:'injected'}}});
+  assert.equal(a.peekSession().access_token,'new-jwt','message payload must be ignored');
+  assert.equal(storage.get(STORE).includes('injected'),false);
+  await a.signOut();
+  assert.equal(messages[1].event,'SIGNED_OUT');
+  assert.deepEqual(Object.keys(messages[1]).sort(),['event','source']);
 });
