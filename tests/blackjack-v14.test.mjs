@@ -53,10 +53,17 @@ test('blackjack V1.4 uses per-hand rotating action tokens and device control',()
 });
 
 test('blackjack V1.4 frontend composes bets locally and confirms once',()=>{
-  assert.match(app,/setPendingBet\(pendingBet \+ chip,false\)/);
-  assert.match(app,/mutate\('bet',\{amount,action_id:makeId\(\)\}\)/);
+  // Inspect the chip-click handler rather than matching one implementation line
+  // or accidentally matching a remote call elsewhere in the application.
+  const chipHandler = app.match(
+    /\$\('chipRack'\)\.addEventListener\(\s*'click'\s*,\s*\(event\)\s*=>\s*\{([\s\S]*?)^\s*\}\);/m
+  )?.[1];
+  assert.ok(chipHandler, 'chip-click handler must exist');
+  assert.match(chipHandler,/setPendingBet\s*\(\s*pendingBet\s*\+\s*chip\s*,\s*false\s*\)/);
+  assert.doesNotMatch(chipHandler,/\b(?:api|mutate)\s*\(/,
+    'chip selection must not make a server request');
+  assert.match(app,/mutate\(\s*'bet'\s*,\s*\{\s*amount\s*,\s*action_id\s*:\s*makeId\(\)\s*\}\s*\)/);
   assert.match(app,/mine\.bet_locked/);
-  assert.doesNotMatch(app,/api\('bet'.*data-chip/s);
 });
 
 test('blackjack V1.4 visuals use compositor-friendly animations and mobile degradation',()=>{
