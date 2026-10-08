@@ -57,11 +57,11 @@ For this toolbox:
 
 ## Schema-history reconciliation and fresh recovery limits
 
-As of 2026-10-08, all **42 applied production migration versions** have source files in `supabase/migrations/`; see `docs/migration-reconciliation.md` and `supabase/migrations-history.manifest.json`. The 39 non-sensitive versions match the original executed statements at byte level. Three files deliberately omit or mask private personnel/account seeds; restore those records privately, not from GitHub.
+As of 2026-10-08, all **43 applied production migration versions** have source files in `supabase/migrations/`; see `docs/migration-reconciliation.md` and `supabase/migrations-history.manifest.json`. The 40 non-sensitive versions match the original executed statements at byte level. Three files deliberately omit or mask private personnel/account seeds; restore those records privately, not from GitHub.
 
 A separate schema catalog and two recovery-only companions under `supabase/schema/` cover tables and helpers created outside the formal migration history. These are not applied migrations and must not be run against production.
 
-**Full fresh-clone replay has not yet been verified.** For an actual incident, take a protected data backup, test prebootstrap → 42 migrations → post-reconciliation against an isolated new Supabase environment, then check data/role restoration and application workflows. Neither Git history nor these schema files restore users, passwords, private account allowlists, or live data.
+**Full fresh-clone replay has not yet been verified.** For an actual incident, take a protected data backup, test prebootstrap → 43 migrations → post-reconciliation against an isolated new Supabase environment, then check data/role restoration and application workflows. Neither Git history nor these schema files restore users, passwords, private account allowlists, or live data.
 
 ## Recovery verification checklist
 

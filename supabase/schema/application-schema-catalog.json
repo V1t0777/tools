@@ -11,7 +11,7 @@
     "policies": 47,
     "triggers": 15,
     "functions": 85,
-    "grants": 51
+    "grants": 50
   },
   "tables": [
     {
@@ -7392,12 +7392,6 @@
     {
       "schema": "public",
       "table_name": "members",
-      "grantee": "authenticated",
-      "privileges": "SELECT"
-    },
-    {
-      "schema": "public",
-      "table_name": "members",
       "grantee": "service_role",
       "privileges": "REFERENCES,SELECT,TRIGGER,TRUNCATE"
     },
@@ -7484,6 +7478,19 @@
       "table_name": "staff",
       "grantee": "service_role",
       "privileges": "REFERENCES,TRIGGER,TRUNCATE"
+    }
+  ],
+  "restricted_column_grants": [
+    {
+      "schema": "public",
+      "table_name": "members",
+      "grantee": "authenticated",
+      "privilege": "SELECT",
+      "columns": [
+        "id",
+        "nickname",
+        "color"
+      ]
     }
   ]
 }

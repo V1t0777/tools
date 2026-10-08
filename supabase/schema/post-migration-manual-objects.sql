@@ -635,7 +635,7 @@ END;
 $reconcile$;
 ALTER TABLE public."members" ENABLE ROW LEVEL SECURITY;
 REVOKE ALL PRIVILEGES ON TABLE public."members" FROM anon, authenticated;
-GRANT SELECT ON TABLE public."members" TO authenticated;
+GRANT SELECT (id,nickname,color) ON TABLE public."members" TO authenticated;
 ALTER TABLE public."night_shifts" ENABLE ROW LEVEL SECURITY;
 REVOKE ALL PRIVILEGES ON TABLE public."night_shifts" FROM anon, authenticated;
 GRANT DELETE,INSERT,SELECT,UPDATE ON TABLE public."night_shifts" TO authenticated;

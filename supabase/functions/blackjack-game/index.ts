@@ -65,6 +65,7 @@ function fail(message: string, status = 400, code?: string): never {
   const error = new Error(message) as Error & { status?: number; code?: string };
   error.status = status;
   error.code = code;
+  (error as any).safeToExpose = true;
   throw error;
 }
 
@@ -180,7 +181,7 @@ async function player(roomId: string, userId: string) {
 async function state(roomId: string, userId: string, enforceTimeout = true) {
   const fn = enforceTimeout ? "blackjack_timeout_service" : "blackjack_state_service";
   const out = await admin.rpc(fn, { p_room_id: roomId, p_user_id: userId });
-  if (out.error) fail(out.error.message || "牌局状态读取失败", 400, out.error.code);
+  if (out.error) fail("牌局状态暂时不可用，请重试", 503, "STATE_UNAVAILABLE");
   return out.data;
 }
 async function gameRpc(name: string, args: Record<string, unknown>) {
@@ -190,7 +191,7 @@ async function gameRpc(name: string, args: Record<string, unknown>) {
   if (out.error.code === "P4091") fail("此牌局正在另一台设备操作", 409, "DEVICE_CONFLICT");
   if (out.error.code === "P4092") fail("设备标识无效，请刷新后重试", 409, "INVALID_DEVICE_ID");
   if (out.error.code === "P4290") fail("请求过于频繁，请稍后再试", 429, "RATE_LIMITED");
-  fail(out.error.message || "操作失败", 400, out.error.code);
+  fail("操作未完成，请稍后重试", 409, "ACTION_FAILED");
 }
 
 Deno.serve(async (req: Request) => {
@@ -501,8 +502,9 @@ Deno.serve(async (req: Request) => {
 
     fail("未知操作", 400, "UNKNOWN_ACTION");
   } catch (error) {
-    console.error("blackjack-game", error);
-    const e = error as Error & { status?: number; code?: string };
-    return reply(req, { error: e.message || "服务器暂时不可用", code: e.code }, e.status || 500);
+    const e = error as Error & { status?: number; code?: string; safeToExpose?: boolean };
+    const safe=e?.safeToExpose===true;
+    console.error("blackjack-game",{code:e?.code||"UNEXPECTED",status:safe?e.status:500});
+    return reply(req, { error: safe?e.message:"服务器暂时不可用", code: safe?(e.code||"ACTION_REJECTED"):"INTERNAL_ERROR" }, safe?(e.status||400):500);
   }
 });
