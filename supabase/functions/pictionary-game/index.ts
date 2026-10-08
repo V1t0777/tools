@@ -17,7 +17,7 @@ const admin=createClient(URL,ADMIN_KEY,{auth:{persistSession:false,autoRefreshTo
 const ORIGINS=new Set(["https://v1t0777.github.io","https://zhao-toolbox-secure.pages.dev","http://localhost:8000","http://127.0.0.1:8000"]);
 const headers=(req:Request)=>({"Access-Control-Allow-Origin":ORIGINS.has(req.headers.get("origin")||"")?(req.headers.get("origin")||""):"https://v1t0777.github.io","Access-Control-Allow-Headers":"authorization, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store","Vary":"Origin"});
 const reply=(req:Request,body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:headers(req)});
-function fail(message:string,status=400,code?:string):never{const e=new Error(message) as Error&{status?:number,code?:string};e.status=status;e.code=code;throw e;}
+function fail(message:string,status=400,code?:string):never{const e=new Error(message) as Error&{status?:number,code?:string};e.status=status;e.code=code;(e as any).safeToExpose=true;throw e;}
 function code(){const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789",a=new Uint8Array(6);crypto.getRandomValues(a);return [...a].map(x=>chars[x%chars.length]).join("");}
 function shuffle<T>(items:T[]){const a=[...items];for(let i=a.length-1;i;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 
@@ -27,7 +27,7 @@ async function identify(req:Request){
   const client=createClient(URL,key,{global:{headers:{Authorization:authorization}},auth:{persistSession:false,autoRefreshToken:false}});
   const {data,error}=await client.rpc("toolbox_session_status");if(error)fail("登录状态暂时无法验证，请重试",503);if(!data?.active||!data?.member_id)fail("当前账号不在工具箱成员名单中或会话已失效",403,"SESSION_REVOKED");
   const {data:member,error:memberError}=await admin.from("members").select("id,user_id,nickname,color").eq("id",data.member_id).maybeSingle();
-  if(memberError){console.error("members lookup failed",memberError);fail("成员资料读取失败，请稍后重试",503);}
+  if(memberError){console.error("members lookup failed",{code:memberError.code||"DB_ERROR"});fail("成员资料读取失败，请稍后重试",503);}
   if(!member)fail("成员资料不存在",403);return member;
 }
 async function room(id:string){const {data}=await admin.from("pictionary_rooms").select("*").eq("id",id).maybeSingle();if(!data)fail("房间不存在",404);return data;}
@@ -35,7 +35,7 @@ async function player(roomId:string,userId:string){const {data}=await admin.from
 async function players(roomId:string){
   const {data,error}=await admin.from("pictionary_players").select("user_id,display_name,seat,score,ready,active,joined_at").eq("room_id",roomId).eq("active",true).order("seat");if(error)throw error;
   const ids=(data||[]).map(x=>x.user_id);let members:any[]=[];
-  if(ids.length){const out=await admin.from("members").select("id,user_id,nickname,color").in("user_id",ids);if(out.error){console.error("room members lookup failed",out.error);fail("成员资料读取失败，请稍后重试",503);}members=out.data||[];}
+  if(ids.length){const out=await admin.from("members").select("id,user_id,nickname,color").in("user_id",ids);if(out.error){console.error("room members lookup failed",{code:out.error.code||"DB_ERROR"});fail("成员资料读取失败，请稍后重试",503);}members=out.data||[];}
   const map=new Map(members.map(m=>[m.user_id,m]));
   return (data||[]).map(p=>({member_id:map.get(p.user_id)?.id||p.user_id,user_id:p.user_id,nickname:map.get(p.user_id)?.nickname||p.display_name,color:map.get(p.user_id)?.color||"#8EC5FF",turn_order:p.seat-1,score:p.score,ready:p.ready,joined_at:p.joined_at}));
 }
@@ -137,7 +137,7 @@ function realtimeState(snapshot:any){
   };
 }
 function background(task:Promise<unknown>){
-  const handled=task.catch(err=>console.error("background task failed",err));
+  const handled=task.catch(err=>console.error("background task failed",{code:(err as any)?.code||"BACKGROUND_ERROR"}));
   const runtime=(globalThis as any).EdgeRuntime;
   if(runtime?.waitUntil)runtime.waitUntil(handled);
 }
@@ -221,7 +221,7 @@ Deno.serve(async(req:Request)=>{
         p_client_id:clientId,
         p_round_id:String(b.round_id||"")||null
       });
-      if(error)fail(error.message);
+      if(error)fail("猜词提交失败，请重试",503,"GUESS_FAILED");
       return reply(req,data||{});
     }
 
@@ -279,7 +279,7 @@ Deno.serve(async(req:Request)=>{
       });
       if(JSON.stringify(strokes).length>900000)fail("画布数据过大，请适当简化线条",413);
       const out=await admin.rpc("pictionary_save_canvas_service",{p_room_id:id,p_round_id:roundId,p_user_id:member.user_id,p_revision:revision,p_strokes:strokes});
-      if(out.error)fail(out.error.message);
+      if(out.error)fail("画布保存失败，请重试",503,"CANVAS_FAILED");
       return reply(req,out.data);
     }
     if(action==="toggle_ready"){if(r.status!=="lobby")fail("当前不能修改准备状态");if(r.host_user_id===member.user_id)fail("房主默认已准备");const p=await player(id,member.user_id);await admin.from("pictionary_players").update({ready:!p.ready,updated_at:new Date().toISOString()}).eq("room_id",id).eq("user_id",member.user_id);await touchRoom(id);return reply(req,{state:await stateAndEmit(id,member)});}
@@ -299,6 +299,6 @@ Deno.serve(async(req:Request)=>{
     }
     if(action==="play_again"){if(r.host_user_id!==member.user_id)fail("只有房主可以再开一局");if(r.status!=="finished")fail("本局尚未结束");await admin.from("pictionary_rounds").delete().eq("room_id",id);await admin.from("pictionary_players").update({score:0,ready:false,updated_at:new Date().toISOString()}).eq("room_id",id);await admin.from("pictionary_players").update({ready:true}).eq("room_id",id).eq("user_id",member.user_id);await admin.from("pictionary_rooms").update({status:"lobby",current_round_no:0,total_rounds:0,current_drawer_user_id:null,ends_at:null,summary_until:null,finished_at:null,closed_reason:null,last_activity_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",id);return reply(req,{state:await stateAndEmit(id,member)});}
     fail("未知操作");
-  }catch(e){console.error(e);return reply(req,{error:(e as Error)?.message||"服务器暂时不可用",code:(e as any)?.code},(e as any)?.status||400);}
+  }catch(e){const safe=(e as any)?.safeToExpose===true;console.error("pictionary-game",{code:(e as any)?.code||"UNEXPECTED",status:safe?(e as any).status:500});return reply(req,{error:safe?(e as Error).message:"服务器暂时不可用",code:safe?((e as any)?.code||"ACTION_REJECTED"):"INTERNAL_ERROR"},safe?((e as any)?.status||400):500);}
 });
 

@@ -14,8 +14,9 @@ const all=pre+'\n'+historical+'\n'+post;
 test('application catalog captures every business schema object without private data rows',()=>{
   assert.equal(catalog.contains_user_rows,false);
   assert.deepEqual(catalog.counts,{
-    tables:40,constraints:253,indexes:122,policies:47,triggers:15,functions:85,grants:51
+    tables:40,constraints:253,indexes:122,policies:47,triggers:15,functions:85,grants:50
   });
+  assert.deepEqual(catalog.restricted_column_grants.find(x=>x.table_name==='members').columns,['id','nickname','color']);
   for(const [key,count] of Object.entries(catalog.counts))
     assert.equal(catalog[key].length,count,key+' count drift');
   assert.doesNotMatch(JSON.stringify(catalog),/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/);
