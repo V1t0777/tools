@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 const html=readFileSync(new URL('../blackjack/index.html',import.meta.url),'utf8');
 const app=readFileSync(new URL('../blackjack/app.js',import.meta.url),'utf8');
 const css=readFileSync(new URL('../blackjack/style.css',import.meta.url),'utf8');
-const sql=readFileSync(new URL('../supabase/migrations/20261007003000_blackjack_v14_casino.sql',import.meta.url),'utf8');
+const sql=readFileSync(new URL('../supabase/migrations/20261006160940_blackjack_v14_casino.sql',import.meta.url),'utf8');
 
 test('V1.5.1 quick bets stay client-side until one confirmed wager',()=>{
   assert.match(html,/id="repeatBetBtn"/);
