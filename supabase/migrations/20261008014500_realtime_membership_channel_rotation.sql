@@ -326,3 +326,422 @@ REVOKE ALL ON FUNCTION private.rekey_rooms_on_session_revocation() FROM PUBLIC, 
 CREATE TRIGGER auth_sessions_rekey_on_revoke
 AFTER DELETE ON auth.sessions
 FOR EACH ROW EXECUTE FUNCTION private.rekey_rooms_on_session_revocation();
+
+-- Authoritative guess receipts, blackjack snapshots and game events are also nonce-scoped.
+CREATE OR REPLACE FUNCTION private.blackjack_broadcast_state(p_room_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_payload jsonb;
+begin
+  v_payload := private.blackjack_public_state(p_room_id);
+  if v_payload is not null then
+    perform realtime.send(v_payload,'state_snapshot','blackjack:'||p_room_id::text||':'||(select realtime_token::text from public.blackjack_rooms where id=p_room_id),true);
+  end if;
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION private.blackjack_emit_event(p_room_id uuid, p_event_type text, p_from_version bigint, p_actor_user_id uuid DEFAULT NULL::uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_state jsonb;
+  v_payload jsonb;
+  v_player jsonb;
+  v_actor_member_id text;
+  v_version bigint;
+  v_event_id uuid:=gen_random_uuid();
+begin
+  if p_event_type not in (
+    'lobby_changed','round_started','player_changed','players_changed',
+    'round_settled','game_finished'
+  ) then
+    raise exception 'invalid blackjack event type';
+  end if;
+
+  v_state:=private.blackjack_public_state(p_room_id);
+  if v_state is null then return null; end if;
+
+  v_version:=coalesce((v_state#>>'{room,version}')::bigint,-1);
+  if v_version<=p_from_version then return null; end if;
+
+  v_payload:=jsonb_build_object(
+    'event_id',v_event_id,
+    'type',p_event_type,
+    'room_id',p_room_id,
+    'from_version',p_from_version,
+    'version',v_version,
+    'server_time',v_state->'server_now',
+    'room',v_state->'room'
+  );
+
+  if p_event_type in ('lobby_changed','round_started','players_changed','round_settled','game_finished') then
+    v_payload:=v_payload||jsonb_build_object('players',v_state->'players');
+  end if;
+
+  if p_event_type in ('round_started','round_settled','game_finished') then
+    v_payload:=v_payload||jsonb_build_object('dealer',v_state->'dealer');
+  end if;
+
+  if p_event_type='player_changed' then
+    if p_actor_user_id is null then raise exception 'actor required for player_changed'; end if;
+    select coalesce(m.id::text,p.user_id::text)
+    into v_actor_member_id
+    from public.blackjack_players p
+    left join public.members m on m.user_id=p.user_id
+    where p.room_id=p_room_id and p.user_id=p_actor_user_id
+    limit 1;
+
+    select e.value into v_player
+    from jsonb_array_elements(v_state->'players') e(value)
+    where e.value->>'member_id'=v_actor_member_id
+    limit 1;
+
+    if v_player is null then raise exception 'event actor missing from room'; end if;
+    v_payload:=v_payload||jsonb_build_object('player',v_player);
+  end if;
+
+  insert into private.blackjack_events(event_id,room_id,event_type,from_version,version,payload)
+  values(v_event_id,p_room_id,p_event_type,p_from_version,v_version,v_payload);
+
+  perform realtime.send(v_payload,'game_event','blackjack:'||p_room_id::text||':'||(select realtime_token::text from public.blackjack_rooms where id=p_room_id),true);
+  return v_payload;
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.pictionary_submit_guess_service(p_room_id uuid, p_user_id uuid, p_guess text, p_client_id uuid DEFAULT NULL::uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_room public.pictionary_rooms%rowtype;
+  v_round public.pictionary_rounds%rowtype;
+  v_guess text;
+  v_answer text;
+  v_correct boolean := false;
+  v_first boolean := false;
+  v_points integer := 0;
+  v_rank integer := 0;
+  v_guessers integer := 0;
+  v_member_id uuid;
+  v_drawer_member_id uuid;
+  v_nickname text;
+  v_guess_id uuid;
+  v_created_at timestamptz;
+  v_round_complete boolean := false;
+begin
+  if p_guess is null or char_length(trim(p_guess)) < 1 or char_length(p_guess) > 40 then
+    raise exception '请输入 1–40 个字符的答案';
+  end if;
+
+  select * into v_room
+  from public.pictionary_rooms
+  where id = p_room_id
+  for update;
+
+  if not found then raise exception '房间不存在'; end if;
+  if v_room.status <> 'playing' or v_room.ends_at <= now() then raise exception '本轮已结束'; end if;
+  if v_room.current_drawer_user_id = p_user_id then raise exception '画手不能参与猜题'; end if;
+
+  select m.id, coalesce(m.nickname, pp.display_name)
+    into v_member_id, v_nickname
+  from public.pictionary_players pp
+  left join public.members m on m.user_id = pp.user_id
+  where pp.room_id = p_room_id
+    and pp.user_id = p_user_id
+    and pp.active;
+
+  if not found then raise exception '你不在这个房间'; end if;
+
+  select m.id into v_drawer_member_id
+  from public.members m
+  where m.user_id = v_room.current_drawer_user_id;
+
+  select * into v_round
+  from public.pictionary_rounds
+  where room_id = p_room_id
+    and round_no = v_room.current_round_no;
+
+  v_guess := lower(regexp_replace(
+    translate(trim(p_guess),'，。！？、；：“”‘’（）《》·',''),
+    '[[:space:][:punct:]]','','g'
+  ));
+  v_answer := lower(regexp_replace(
+    translate(trim(v_round.answer),'，。！？、；：“”‘’（）《》·',''),
+    '[[:space:][:punct:]]','','g'
+  ));
+  v_correct := v_guess = v_answer;
+
+  if v_correct and exists(
+    select 1 from public.pictionary_round_results
+    where round_id = v_round.id and user_id = p_user_id
+  ) then
+    return jsonb_build_object(
+      'correct',true,'points',0,'already_correct',true,
+      'round_complete',false,'client_id',p_client_id
+    );
+  end if;
+
+  if v_correct then
+    select count(*) + 1 into v_rank
+    from public.pictionary_round_results
+    where round_id = v_round.id;
+
+    v_first := v_rank = 1;
+    v_points := 100
+      + greatest(0,least(100,floor(extract(epoch from (v_room.ends_at-now()))*100/60)::integer))
+      + case when v_first then 30 else 0 end;
+  end if;
+
+  insert into public.pictionary_guesses(
+    room_id,round_id,user_id,guess_text,is_correct,score_awarded,client_id
+  )
+  values(
+    p_room_id,v_round.id,p_user_id,trim(p_guess),v_correct,v_points,p_client_id
+  )
+  returning id,created_at into v_guess_id,v_created_at;
+
+  if v_correct then
+    insert into public.pictionary_round_results(round_id,user_id,rank,points)
+    values(v_round.id,p_user_id,v_rank,v_points);
+
+    update public.pictionary_players
+    set score=score+v_points,updated_at=now()
+    where room_id=p_room_id and user_id=p_user_id;
+
+    update public.pictionary_players
+    set score=score+50,updated_at=now()
+    where room_id=p_room_id and user_id=v_room.current_drawer_user_id;
+
+    select greatest(count(*)-1,0) into v_guessers
+    from public.pictionary_players
+    where room_id=p_room_id and active;
+
+    v_round_complete := v_rank>=v_guessers and v_guessers>0;
+
+    if v_round_complete then
+      update public.pictionary_rooms
+      set status='summary',
+          ends_at=null,
+          summary_until=now()+interval '6 seconds',
+          last_activity_at=now(),
+          updated_at=now()
+      where id=p_room_id;
+
+      update public.pictionary_rounds
+      set status='ended',ended_at=now()
+      where id=v_round.id;
+    else
+      update public.pictionary_rooms
+      set last_activity_at=now()
+      where id=p_room_id;
+    end if;
+  else
+    update public.pictionary_rooms
+    set last_activity_at=now()
+    where id=p_room_id;
+  end if;
+
+  perform realtime.send(
+    jsonb_build_object(
+      'guess_id',v_guess_id,
+      'client_id',p_client_id,
+      'round_id',v_round.id,
+      'member_id',v_member_id,
+      'drawer_member_id',v_drawer_member_id,
+      'nickname',v_nickname,
+      'text',case when v_correct then '' else trim(p_guess) end,
+      'correct',v_correct,
+      'points',v_points,
+      'first',v_first,
+      'round_complete',v_round_complete,
+      'created_at',v_created_at
+    ),
+    'guess_result',
+    'pictionary:' || p_room_id::text||':'||(select realtime_token::text from public.pictionary_rooms where id=p_room_id),
+    true
+  );
+
+  return jsonb_build_object(
+    'guess_id',v_guess_id,
+    'client_id',p_client_id,
+    'created_at',v_created_at,
+    'correct',v_correct,
+    'points',v_points,
+    'first',v_first,
+    'round_complete',v_round_complete
+  );
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.pictionary_submit_guess_v2(p_room_id uuid, p_user_id uuid, p_guess text, p_client_id uuid, p_round_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+declare
+  v_room public.pictionary_rooms%rowtype;
+  v_existing public.pictionary_guesses%rowtype;
+  v_receipt jsonb;
+  v_round public.pictionary_rounds%rowtype;
+  v_guess text;
+  v_answer text;
+  v_correct boolean := false;
+  v_first boolean := false;
+  v_points integer := 0;
+  v_rank integer := 0;
+  v_guessers integer := 0;
+  v_member_id uuid;
+  v_drawer_member_id uuid;
+  v_nickname text;
+  v_guess_id uuid;
+  v_created_at timestamptz;
+  v_round_complete boolean := false;
+begin
+  if p_guess is null or char_length(trim(p_guess)) < 1 or char_length(p_guess) > 40 then
+    raise exception '请输入 1–40 个字符的答案';
+  end if;
+
+  select * into v_room
+  from public.pictionary_rooms
+  where id = p_room_id
+  for update;
+
+  if not found then raise exception '房间不存在'; end if;
+  if p_client_id is null or p_round_id is null then raise exception '页面已更新，请刷新后继续'; end if;
+  if not exists(select 1 from public.pictionary_players where room_id=p_room_id and user_id=p_user_id and active)
+    then raise exception '你不在这个房间'; end if;
+  select * into v_existing from public.pictionary_guesses
+    where room_id=p_room_id and round_id=p_round_id and user_id=p_user_id and client_id=p_client_id;
+  if found then
+    if v_existing.guess_text<>trim(p_guess) then raise exception '消息编号重复，请重新输入'; end if;
+    if v_existing.delivery_receipt is not null then return v_existing.delivery_receipt; end if;
+    return jsonb_build_object('guess_id',v_existing.id,'client_id',p_client_id,'round_id',p_round_id,
+      'correct',v_existing.is_correct,'points',v_existing.score_awarded,'text',case when v_existing.is_correct then '' else v_existing.guess_text end,
+      'created_at',v_existing.created_at,'score_state',public.pictionary_score_state_service(p_room_id));
+  end if;
+  if not exists(select 1 from public.pictionary_rounds where id=p_round_id and room_id=p_room_id and round_no=v_room.current_round_no)
+    then raise exception '轮次已切换，请重新输入'; end if;
+  if v_room.status <> 'playing' or v_room.ends_at <= clock_timestamp() then raise exception '本轮已结束'; end if;
+  if v_room.current_drawer_user_id = p_user_id then raise exception '画手不能参与猜题'; end if;
+
+  select m.id, coalesce(m.nickname, pp.display_name)
+    into v_member_id, v_nickname
+  from public.pictionary_players pp
+  left join public.members m on m.user_id = pp.user_id
+  where pp.room_id = p_room_id
+    and pp.user_id = p_user_id
+    and pp.active;
+
+  if not found then raise exception '你不在这个房间'; end if;
+
+  select m.id into v_drawer_member_id
+  from public.members m
+  where m.user_id = v_room.current_drawer_user_id;
+
+  select * into v_round
+  from public.pictionary_rounds
+  where room_id = p_room_id
+    and round_no = v_room.current_round_no;
+
+  v_guess := lower(regexp_replace(
+    translate(trim(p_guess),'，。！？、；：“”‘’（）《》·',''),
+    '[[:space:][:punct:]]','','g'
+  ));
+  v_answer := lower(regexp_replace(
+    translate(trim(v_round.answer),'，。！？、；：“”‘’（）《》·',''),
+    '[[:space:][:punct:]]','','g'
+  ));
+  v_correct := v_guess = v_answer;
+
+  if v_correct and exists(
+    select 1 from public.pictionary_round_results
+    where round_id = v_round.id and user_id = p_user_id
+  ) then
+    select * into v_existing from public.pictionary_guesses where round_id=v_round.id and user_id=p_user_id and is_correct limit 1;
+    return coalesce(v_existing.delivery_receipt,jsonb_build_object(
+      'guess_id',v_existing.id,'client_id',v_existing.client_id,'round_id',v_round.id,'member_id',v_member_id,
+      'correct',true,'points',0,'round_complete',false,'score_state',public.pictionary_score_state_service(p_room_id)
+    ))||jsonb_build_object('already_correct',true);
+  end if;
+
+  if v_correct then
+    select count(*) + 1 into v_rank
+    from public.pictionary_round_results
+    where round_id = v_round.id;
+
+    v_first := v_rank = 1;
+    v_points := 100
+      + greatest(0,least(100,floor(extract(epoch from (v_room.ends_at-clock_timestamp()))*100/60)::integer))
+      + case when v_first then 30 else 0 end;
+  end if;
+
+  insert into public.pictionary_guesses(
+    room_id,round_id,user_id,guess_text,is_correct,score_awarded,client_id
+  )
+  values(
+    p_room_id,v_round.id,p_user_id,trim(p_guess),v_correct,v_points,p_client_id
+  )
+  returning id,created_at into v_guess_id,v_created_at;
+
+  if v_correct then
+    insert into public.pictionary_round_results(round_id,user_id,rank,points)
+    values(v_round.id,p_user_id,v_rank,v_points);
+
+    update public.pictionary_players
+    set score=score+v_points,updated_at=now()
+    where room_id=p_room_id and user_id=p_user_id;
+
+    update public.pictionary_players
+    set score=score+50,updated_at=now()
+    where room_id=p_room_id and user_id=v_room.current_drawer_user_id;
+
+    select greatest(count(*)-1,0) into v_guessers
+    from public.pictionary_players
+    where room_id=p_room_id and active;
+
+    v_round_complete := v_rank>=v_guessers and v_guessers>0;
+
+    if v_round_complete then
+      update public.pictionary_rooms
+      set status='summary',
+          ends_at=null,
+          summary_until=now()+interval '3.2 seconds',
+          last_activity_at=now(),
+          updated_at=now()
+      where id=p_room_id;
+
+      update public.pictionary_rounds
+      set status='ended',ended_at=now()
+      where id=v_round.id;
+    else
+      update public.pictionary_rooms
+      set last_activity_at=now()
+      where id=p_room_id;
+    end if;
+  else
+    update public.pictionary_rooms
+    set last_activity_at=now()
+    where id=p_room_id;
+  end if;
+
+  v_receipt := jsonb_build_object(
+    'guess_id',v_guess_id,'client_id',p_client_id,'round_id',v_round.id,
+    'member_id',v_member_id,'drawer_member_id',v_drawer_member_id,'nickname',v_nickname,
+    'text',case when v_correct then '' else trim(p_guess) end,
+    'correct',v_correct,'points',v_points,'first',v_first,'round_complete',v_round_complete,
+    'created_at',v_created_at,'score_state',public.pictionary_score_state_service(p_room_id)
+  );
+  update public.pictionary_guesses set delivery_receipt=v_receipt where id=v_guess_id;
+  perform realtime.send(v_receipt,'guess_result','pictionary:'||p_room_id::text||':'||(select realtime_token::text from public.pictionary_rooms where id=p_room_id),true);
+  return v_receipt;
+end;
+$function$;
