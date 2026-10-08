@@ -1,5 +1,7 @@
 /*
   X-Content-Type-Options: nosniff
+  Cross-Origin-Resource-Policy: same-origin
+  X-Permitted-Cross-Domain-Policies: none
   X-Frame-Options: DENY
   X-Robots-Tag: noindex, nofollow, noarchive
   Referrer-Policy: no-referrer
