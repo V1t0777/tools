@@ -23,6 +23,7 @@
   let loginBusy = false;
   let realtime = null;
   let channel = null;
+  let realtimeConnectEpoch = 0;
   let realtimeStatus = 'CLOSED';
   let realtimeRtt = null;
   let heartbeatSentAt = 0;
@@ -447,9 +448,14 @@
     if (!validSnapshot(next)) return;
     if (state && next.room.id === state.room.id && Number(next.room.version) < Number(state.room.version)) return;
     const previous = state;
+    if(previous?.room?.id===next.room.id && Number(next.room.realtime_generation||0)<Number(previous.room.realtime_generation||0))return;
     const presentation = derivePresentation(previous,next);
     if (previous?.room?.status === 'finished' && next.room?.status === 'lobby') lastConfirmedBet = 0;
     state = next;
+    if(previous?.room?.id===next.room.id && previous.room.realtime_token!==next.room.realtime_token && !suspended){
+      leaveRealtime(false);
+      connectRealtime().catch(()=>scheduleReconnect(RECONNECT_GRACE_MS));
+    }
     const serverNow = Date.parse(next.server_now || '');
     if (Number.isFinite(serverNow)) clockOffset = serverNow - Date.now();
     timeoutRequested = false;
@@ -1508,9 +1514,10 @@
     if (!state || suspended || navigator.onLine === false) return;
     leaveRealtime(false);
     const epoch = roomEpoch;
+    const generation = realtimeConnectEpoch;
     const roomId = state.room.id;
     const auth = await ToolboxAuth.getSession();
-    if (!auth || epoch !== roomEpoch) return;
+    if (!auth || epoch !== roomEpoch || generation !== realtimeConnectEpoch) return;
     realtimeStatus = 'CONNECTING';
     updateConnection();
     realtime = window.supabase.createClient(ToolboxAuth.url,ToolboxAuth.key,{
@@ -1519,7 +1526,7 @@
         worker:true,
         heartbeatIntervalMs:15000,
         heartbeatCallback:(status) => {
-          if (epoch !== roomEpoch) return;
+          if (epoch !== roomEpoch || generation !== realtimeConnectEpoch) return;
           if (status === 'sent') {
             heartbeatSentAt = performance.now();
           } else if (status === 'ok') {
@@ -1542,9 +1549,11 @@
       },
     });
     await realtime.realtime.setAuth(auth.access_token);
-    if (epoch !== roomEpoch || !state || state.room.id !== roomId) return;
+    if (epoch !== roomEpoch || generation !== realtimeConnectEpoch || !state || state.room.id !== roomId) return;
 
-    channel = realtime.channel(`blackjack:${roomId}`,{
+    const nonce = state?.room?.realtime_token;
+    const topic = nonce ? `blackjack:${roomId}:${nonce}` : `blackjack:${roomId}`;
+    channel = realtime.channel(topic,{
       config:{private:true,presence:{key:auth.user.id},broadcast:{ack:false,self:false}},
     });
     channel.on('broadcast',{event:'state_snapshot'},({payload}) => {
@@ -1557,6 +1566,11 @@
       applyGameEvent(payload);
     });
     channel.on('broadcast',{event:'state_changed'},() => requestState(30,false));
+    // The replacement key is fetched via the authenticated state endpoint.
+    channel.on('broadcast',{event:'channel_rotated'},() => {
+      leaveRealtime(false);
+      requestState(0,true);
+    });
     channel.on('broadcast',{event:'emoji'},({payload}) => {
       if (payload?.emoji && typeof payload.emoji === 'string') {
         showReaction(payload.emoji,payload.member_id);
@@ -1570,7 +1584,7 @@
     channel.on('presence',{event:'join'},() => requestState(100));
     channel.on('presence',{event:'leave'},() => requestState(100));
     channel.subscribe(async (status) => {
-      if (epoch !== roomEpoch) return;
+      if (epoch !== roomEpoch || generation !== realtimeConnectEpoch) return;
       realtimeStatus = status;
       if (status === 'SUBSCRIBED') {
         serverHeartbeatAt = Date.now();
@@ -1684,6 +1698,7 @@
   }
 
   function leaveRealtime(stopPoll = true) {
+    realtimeConnectEpoch++;
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
     pendingPings.clear();

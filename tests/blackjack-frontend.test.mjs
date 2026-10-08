@@ -10,7 +10,9 @@ test('blackjack frontend source parses as JavaScript',()=>{
 });
 
 test('blackjack frontend uses private realtime snapshots with database fallback',()=>{
-  assert.match(app,/channel\(`blackjack:\$\{roomId\}`/);
+  assert.match(app,/channel\(topic,/);
+  assert.match(app,/const topic = nonce \?/);
+  assert.match(app,/blackjack:\$\{roomId\}:\$\{nonce\}/);
   assert.match(app,/private:\s*true/);
   assert.match(app,/event:\s*'state_snapshot'/);
 
