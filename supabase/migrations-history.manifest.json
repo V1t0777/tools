@@ -1,0 +1,266 @@
+{
+  "source": "supabase_migrations.schema_migrations",
+  "source_kind": "applied SQL statement history (not a data backup)",
+  "project_ref": "tmxpueakxibsaakdyusn",
+  "captured_on": "2026-10-08",
+  "count": 42,
+  "privacy_exceptions": {
+    "20260916134448": "Historical admin email and named staff seed rows omitted; restore via private provisioning and encrypted data backup.",
+    "20260923152254": "Historical test-account email replaced with non-functional example.invalid placeholder.",
+    "20260923165738": "Historical test-account email replaced with non-functional example.invalid placeholder."
+  },
+  "migrations": [
+    {
+      "version": "20260916134448",
+      "name": "create_department_roster_schema",
+      "original_sha256": "a8db78353f54ea7153e9b27b02073ef9c7890b09ba34015f1823540d83c7ac21",
+      "sanitized": true
+    },
+    {
+      "version": "20260916134550",
+      "name": "harden_rls_auto_enable_function",
+      "original_sha256": "f47d7048bc655040d313752ad35668a2f4bb1c42fe0b8fc20a288ab1a2598b14",
+      "sanitized": false
+    },
+    {
+      "version": "20260916142210",
+      "name": "add_atomic_day_schedule_editor",
+      "original_sha256": "f29de07665260b8c8dc2a35204a59553e1e27490979004b177b35d5c608e3484",
+      "sanitized": false
+    },
+    {
+      "version": "20260916161143",
+      "name": "add_per_app_access_control",
+      "original_sha256": "0dc2c0a0dd319b9c1d95cd3cd2cd379ddc41baeb6c1979d11ea2b0f21bbfc84c",
+      "sanitized": false
+    },
+    {
+      "version": "20260917021609",
+      "name": "create_shared_dinner_sync",
+      "original_sha256": "5f5dd832d1180069f04d435e4928ba1b2ee23d733c626fcabf99ee6f0fab636b",
+      "sanitized": false
+    },
+    {
+      "version": "20260917023018",
+      "name": "optimize_dinner_sync_policies_and_indexes",
+      "original_sha256": "3a17c27765ac514978bf7d62e1ca44e887536ef54f1bf9189943e8425738151b",
+      "sanitized": false
+    },
+    {
+      "version": "20260917053529",
+      "name": "harden_business_table_grants_phase1",
+      "original_sha256": "cc74fa8539821a88d0ec410c17606bc1b93a7fe8bcf65b5ef1781497a88babbb",
+      "sanitized": false
+    },
+    {
+      "version": "20260917065509",
+      "name": "move_rls_helpers_to_private_schema",
+      "original_sha256": "4084145cd08d2bcbdfba3c2fecd13529f9865627a39eafd98ed3e7a689cd980b",
+      "sanitized": false
+    },
+    {
+      "version": "20260917065640",
+      "name": "add_explicit_deny_policies_private_auth_tables",
+      "original_sha256": "7862482b13d08b45140763641202754d84cf8c5183f36074b14200b55e6e7ac6",
+      "sanitized": false
+    },
+    {
+      "version": "20260917072741",
+      "name": "phase3_session_and_access_audit_hardening",
+      "original_sha256": "839539625491a069b9de116cea4f1e56c7695e73dc831588613f235a72d0997b",
+      "sanitized": false
+    },
+    {
+      "version": "20260917073111",
+      "name": "phase3_postgres_default_privilege_hardening",
+      "original_sha256": "acbf2980be53cc578e1ff4c422139a4ad3fee4b4f0cd57ccb55627df19e03639",
+      "sanitized": false
+    },
+    {
+      "version": "20260917074251",
+      "name": "phase4_public_auth_session_rpcs",
+      "original_sha256": "acace81d772c86e4d5753b3544f2bffc0f2f3e07799b7dc87ed903162fa23c09",
+      "sanitized": false
+    },
+    {
+      "version": "20260917082528",
+      "name": "phase4_remove_unused_dinner_realtime",
+      "original_sha256": "0bd6517706ffc7193319b6abf9e369dc615eb605e111c35d200bd7f80a81b948",
+      "sanitized": false
+    },
+    {
+      "version": "20260917084901",
+      "name": "phase4_prepare_signup_allowlist_hook",
+      "original_sha256": "292d78854a9ac0118c7c948e5ea676328e6f91561c793d51cfbd66152e720634",
+      "sanitized": false
+    },
+    {
+      "version": "20260921073618",
+      "name": "complete_pictionary_v1",
+      "original_sha256": "2404ce3e2e491db69bbb26e58b8660d5a57dd5958156c3f21a3a549ddbca7434",
+      "sanitized": false
+    },
+    {
+      "version": "20260921132428",
+      "name": "pictionary_security_hardening",
+      "original_sha256": "3921b5138f721acbf74c46998be83ee01b23fbd60ce7f2d218a013b00620a348",
+      "sanitized": false
+    },
+    {
+      "version": "20260921141538",
+      "name": "add_pictionary_canvas_fallback",
+      "original_sha256": "904cd562c0d834f75bfb215a18121171f6cb05507f2e3e2076eb2f894e298c42",
+      "sanitized": false
+    },
+    {
+      "version": "20260921143627",
+      "name": "pictionary_room_lifecycle",
+      "original_sha256": "e1fd849078db65f73324f206abcd76ea67eb9b7bb08a86c083523a874406a27d",
+      "sanitized": false
+    },
+    {
+      "version": "20260921143734",
+      "name": "pictionary_room_lifecycle_hardening",
+      "original_sha256": "c9295da1688364f0ba41d4f038e5f156c9f4fbdb3814d7392c0cb264f61b71c3",
+      "sanitized": false
+    },
+    {
+      "version": "20260921145735",
+      "name": "pictionary_low_latency_guess_path",
+      "original_sha256": "f695574bdca1f7d795676c5b53d56725e76e2f62778a692ad1654a7776d1682d",
+      "sanitized": false
+    },
+    {
+      "version": "20260922234434",
+      "name": "pictionary_consistent_delivery",
+      "original_sha256": "ad0ebf8103ff296725f5979098add41e7ab1211b02a8d533d4eeb2f267652512",
+      "sanitized": false
+    },
+    {
+      "version": "20260923150500",
+      "name": "flappy_leaderboard",
+      "original_sha256": "2b80c43b43f8e9ad4e1cbfdd219c340f7796be450e94276826b5237d55e3e598",
+      "sanitized": false
+    },
+    {
+      "version": "20260923151005",
+      "name": "flappy_leaderboard_indexes",
+      "original_sha256": "68d67b5cd27463726f4d789362a062091688d1aa1ff34ae5dd87ddd1efed15f0",
+      "sanitized": false
+    },
+    {
+      "version": "20260923152254",
+      "name": "flappy_guardrails",
+      "original_sha256": "6a86c7def0fe64d2876a4b995be68034dc28062a517958b755bd793635c2e63c",
+      "sanitized": true
+    },
+    {
+      "version": "20260923165738",
+      "name": "harden_flappy_leaderboard_access_and_rate_limits",
+      "original_sha256": "e56d48dd9e06e59c3da6f90c40c6644ea88aeaea2b2cc9ca8a43455539cc195b",
+      "sanitized": true
+    },
+    {
+      "version": "20260924023916",
+      "name": "add_stack_game_leaderboard",
+      "original_sha256": "4a230ae31415f65c0b7bdca6fdb0396b6ade0051c0a664a45c41641cde8375c2",
+      "sanitized": false
+    },
+    {
+      "version": "20260924025257",
+      "name": "restore_service_role_members_read_for_game_edges",
+      "original_sha256": "ced0b1a3bd4b61832fb73fc444075d83e5b34e78cf2a124a47c2d4fd5b98660e",
+      "sanitized": false
+    },
+    {
+      "version": "20260929081614",
+      "name": "blackjack_v1_low_latency",
+      "original_sha256": "ab75dd7b2623d08676b2ef97ad64ca95993e58253bc3b39094f34c38935fa4f0",
+      "sanitized": false
+    },
+    {
+      "version": "20260929082102",
+      "name": "blackjack_v1_hardening",
+      "original_sha256": "fdccd00ed94cc2c642cd886eb94a0690101cccdf23845019f55915b5f64375b6",
+      "sanitized": false
+    },
+    {
+      "version": "20261005141627",
+      "name": "blackjack_performance_v11",
+      "original_sha256": "2ced9a87e2e2eb5a960da101ac5747682fa2861ba35589320c3904cbeed27033",
+      "sanitized": false
+    },
+    {
+      "version": "20261005141857",
+      "name": "blackjack_session_context_hardening",
+      "original_sha256": "9f65238436eac8bbeec23f6fb139652974b34c5809714ac370b29dff45407e02",
+      "sanitized": false
+    },
+    {
+      "version": "20261006121635",
+      "name": "blackjack_history_cleanup",
+      "original_sha256": "8aaa7344fab341bbf012f029ef8b4f8a52f2eebea22649c0bd6e4ced4c8a47b4",
+      "sanitized": false
+    },
+    {
+      "version": "20261006151034",
+      "name": "blackjack_v12",
+      "original_sha256": "b64d765b29e81c48b26e11eb58b09c0fa57b59fd4e95d4b67c9345ea5f6aeb86",
+      "sanitized": false
+    },
+    {
+      "version": "20261006152753",
+      "name": "blackjack_v13_stats",
+      "original_sha256": "9002bb552c4e843b699a821d815b0d3b82e307e650a2da0925431f205158d1d3",
+      "sanitized": false
+    },
+    {
+      "version": "20261006160940",
+      "name": "blackjack_v14_casino",
+      "original_sha256": "e4ea9b701affccf79f55f29bd70a5f9707cc77d25e882666d162530f33e5d500",
+      "sanitized": false
+    },
+    {
+      "version": "20261006161905",
+      "name": "blackjack_v14_stats_polish",
+      "original_sha256": "2bf578c8c4cf636faee19eb65bc7cd09f16dec5c6c0313e8a349044034775bcf",
+      "sanitized": false
+    },
+    {
+      "version": "20261007140439",
+      "name": "pictionary_latency_v2",
+      "original_sha256": "bd3a8cf4d26f042c82d13b9587a845949a1955d786f44ed8beb1b1061ba32528",
+      "sanitized": false
+    },
+    {
+      "version": "20261007140800",
+      "name": "pictionary_latency_v2_hardening",
+      "original_sha256": "82a61338f8177eeaa85c651d494258b5186af9af6c76aadb90824a357c274a04",
+      "sanitized": false
+    },
+    {
+      "version": "20261007161101",
+      "name": "pictionary_summary_and_region",
+      "original_sha256": "c1a8081f700b6ccd05e2451924c668b8c196f9ce256c3b4884442899ef5b1864",
+      "sanitized": false
+    },
+    {
+      "version": "20261008011529",
+      "name": "bead_event_ledger_and_guess_payload_hardening",
+      "original_sha256": "ba3e327804e6da3f78a2439540fc14892d971c7c2e8040bd23965c5692e8cd8b",
+      "sanitized": false
+    },
+    {
+      "version": "20261008011639",
+      "name": "bead_inventory_trigger_audit",
+      "original_sha256": "603e7128a87851cbe8dc90559044e1c89e056be083264dcabdb32b84e9434618",
+      "sanitized": false
+    },
+    {
+      "version": "20261008013653",
+      "name": "realtime_membership_channel_rotation",
+      "original_sha256": "2277c79336332b22996ce76356d0e32f26d38f790c28af36de1f1bd2e660aa21",
+      "sanitized": false
+    }
+  ]
+}

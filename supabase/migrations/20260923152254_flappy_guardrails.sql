@@ -5,7 +5,7 @@ begin
   if not exists (
     select 1 from public.members m join auth.users u on u.id=m.user_id
     where m.id=new.member_id and m.user_id=new.user_id
-      and lower(btrim(coalesce(u.email,''))) <> 'test@test.com'
+      and lower(btrim(coalesce(u.email,''))) <> 'test@example.invalid'
   ) then
     raise exception 'FLAPPY_MEMBER_INELIGIBLE' using errcode='42501';
   end if;

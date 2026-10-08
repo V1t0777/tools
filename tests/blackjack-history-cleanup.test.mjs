@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 const html=readFileSync(new URL('../blackjack/index.html',import.meta.url),'utf8');
 const app=readFileSync(new URL('../blackjack/app.js',import.meta.url),'utf8');
 const edge=readFileSync(new URL('../supabase/functions/blackjack-game/index.ts',import.meta.url),'utf8');
-const sql=readFileSync(new URL('../supabase/migrations/20261006201500_blackjack_history_cleanup.sql',import.meta.url),'utf8');
+const sql=readFileSync(new URL('../supabase/migrations/20261006121635_blackjack_history_cleanup.sql',import.meta.url),'utf8');
 
 test('blackjack home exposes recent match history without unsafe HTML rendering',()=>{
   assert.match(html,/id="historyPanel"/);

@@ -4,8 +4,8 @@ import assert from 'node:assert/strict';
 
 const app=readFileSync(new URL('../pictionary/app.js',import.meta.url),'utf8');
 const edge=readFileSync(new URL('../supabase/functions/pictionary-game/index.ts',import.meta.url),'utf8');
-const migration=readFileSync(new URL('../supabase/migrations/20261007214000_pictionary_latency_v2.sql',import.meta.url),'utf8');
-const hardening=readFileSync(new URL('../supabase/migrations/20261007221500_pictionary_latency_v2_hardening.sql',import.meta.url),'utf8');
+const migration=readFileSync(new URL('../supabase/migrations/20261007140439_pictionary_latency_v2.sql',import.meta.url),'utf8');
+const hardening=readFileSync(new URL('../supabase/migrations/20261007140800_pictionary_latency_v2_hardening.sql',import.meta.url),'utf8');
 const summaryRegionMigration=readFileSync(new URL('../supabase/migrations/20261007161101_pictionary_summary_and_region.sql',import.meta.url),'utf8');
 
 test('pictionary v2 keeps high-frequency paths realtime and bounded',()=>{

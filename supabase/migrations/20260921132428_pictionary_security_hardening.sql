@@ -1,7 +1,5 @@
 begin;
 
--- The Edge Function only needs these public profile fields. Keep the grant
--- column-scoped instead of opening the full members table to service_role.
 grant select (id,user_id,nickname,color) on public.members to service_role;
 
 create or replace function private.is_pictionary_topic_drawer(p_topic text)
