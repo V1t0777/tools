@@ -87,6 +87,7 @@ required_paths=(
   dist-secure/blackjack/index.html
   dist-secure/blackjack/app.js
   dist-secure/shared/toolbox-auth.js
+  dist-secure/shared/toolbox-mfa.js
   dist-secure/shared/vendor/supabase-2.57.4.min.js
   dist-secure/_headers
   dist-secure/robots.txt
@@ -147,6 +148,7 @@ public_forbidden_paths=(
   dist-public/supabase
   dist-public/tests
   dist-public/shared/toolbox-auth.js
+  dist-public/shared/toolbox-mfa.js
   dist-public/shared/vendor
 )
 for path in "${public_forbidden_paths[@]}"; do
