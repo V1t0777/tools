@@ -1,5 +1,4 @@
--- Current production policy: clients may change their RLS-authorized inventory rows,
--- but they cannot fabricate event records. Every insert/update/delete is audited in a trigger.
+-- The inventory RPC stays SECURITY INVOKER. The audit trigger alone owns privileged event inserts.
 CREATE OR REPLACE FUNCTION public.bead_set_inventory(p_scope text, p_group_id uuid, p_palette_name text, p_color_code text, p_color_name text, p_color_hex text, p_quantity integer, p_reason text DEFAULT 'manual'::text)
  RETURNS integer
  LANGUAGE plpgsql
@@ -71,13 +70,12 @@ end;
 $function$;
 ALTER FUNCTION public.bead_set_inventory(text,uuid,text,text,text,text,integer,text) SECURITY INVOKER;
 GRANT INSERT, UPDATE, DELETE ON TABLE public.bead_inventory TO authenticated;
-
 CREATE OR REPLACE FUNCTION private.audit_bead_inventory_change()
- RETURNS trigger
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO ''
-AS $function$
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $audit$
 DECLARE
   v_reason text := left(coalesce(nullif(trim(current_setting('app.bead_event_reason',true)),''),'manual'),120);
 BEGIN
@@ -99,7 +97,8 @@ BEGIN
   );
   RETURN NEW;
 END;
-$function$;
+$audit$;
+
 REVOKE ALL ON FUNCTION private.audit_bead_inventory_change() FROM PUBLIC, anon, authenticated;
 CREATE TRIGGER audit_bead_inventory_changes
 AFTER INSERT OR UPDATE OR DELETE ON public.bead_inventory

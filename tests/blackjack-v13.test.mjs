@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 const html=readFileSync(new URL('../blackjack/index.html',import.meta.url),'utf8');
 const app=readFileSync(new URL('../blackjack/app.js',import.meta.url),'utf8');
 const edge=readFileSync(new URL('../supabase/functions/blackjack-game/index.ts',import.meta.url),'utf8');
-const sql=readFileSync(new URL('../supabase/migrations/20261006233500_blackjack_v13_stats.sql',import.meta.url),'utf8');
+const sql=readFileSync(new URL('../supabase/migrations/20261006152753_blackjack_v13_stats.sql',import.meta.url),'utf8');
 
 test('blackjack V1.3 client parses and exposes personal statistics',()=>{
   assert.doesNotThrow(()=>new Function(app));

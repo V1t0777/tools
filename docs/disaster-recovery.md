@@ -55,11 +55,13 @@ For this toolbox:
 - Schedule any restore for a maintenance window because the project is unavailable during restoration.
 - After a restore, test authentication, RLS-protected reads/writes, shared dinner state, personal night-shift writes, and department-roster access before declaring recovery complete.
 
-## Schema-recovery gap
+## Schema-history reconciliation and fresh recovery limits
 
-The managed Supabase database currently has migration history, but the full SQL migration source is not yet versioned in this public repository. That means GitHub alone is **not** a complete database rebuild source.
+As of 2026-10-08, all **42 applied production migration versions** have source files in `supabase/migrations/`; see `docs/migration-reconciliation.md` and `supabase/migrations-history.manifest.json`. The 39 non-sensitive versions match the original executed statements at byte level. Three files deliberately omit or mask private personnel/account seeds; restore those records privately, not from GitHub.
 
-Do not solve this by committing a raw database dump: dumps can contain user data, allowlists, authentication data, or credentials. The safer follow-up is to maintain reviewed, data-free schema migrations and keep any data-bearing backups encrypted and off-repository.
+A separate schema catalog and two recovery-only companions under `supabase/schema/` cover tables and helpers created outside the formal migration history. These are not applied migrations and must not be run against production.
+
+**Full fresh-clone replay has not yet been verified.** For an actual incident, take a protected data backup, test prebootstrap → 42 migrations → post-reconciliation against an isolated new Supabase environment, then check data/role restoration and application workflows. Neither Git history nor these schema files restore users, passwords, private account allowlists, or live data.
 
 ## Recovery verification checklist
 

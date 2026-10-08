@@ -6,4 +6,3 @@ alter table public.pictionary_rounds
 
 comment on column public.pictionary_rounds.canvas_state is 'Server-side fallback snapshot for pictionary strokes; writes are restricted to the Edge Function.';
 comment on column public.pictionary_rounds.canvas_version is 'Monotonic-ish server timestamp version for canvas fallback synchronization.';
-

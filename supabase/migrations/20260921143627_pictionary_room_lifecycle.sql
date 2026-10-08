@@ -124,4 +124,3 @@ begin
     'select private.pictionary_room_maintenance();'
   );
 end $$;
-

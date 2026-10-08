@@ -6,7 +6,7 @@ const html=readFileSync(new URL('../blackjack/index.html',import.meta.url),'utf8
 const app=readFileSync(new URL('../blackjack/app.js',import.meta.url),'utf8');
 const edge=readFileSync(new URL('../supabase/functions/blackjack-game/index.ts',import.meta.url),'utf8');
 const css=readFileSync(new URL('../blackjack/style.css',import.meta.url),'utf8');
-const sql=readFileSync(new URL('../supabase/migrations/20261007003000_blackjack_v14_casino.sql',import.meta.url),'utf8');
+const sql=readFileSync(new URL('../supabase/migrations/20261006160940_blackjack_v14_casino.sql',import.meta.url),'utf8');
 
 test('blackjack V1.4 exposes casino betting and advanced rule controls',()=>{
   assert.doesNotThrow(()=>new Function(app));
@@ -91,7 +91,7 @@ test('blackjack V1.4 dashboard derives chip outcomes from private history',()=>{
 
 
 test('blackjack V1.4 polish restores streak stats and keeps chip flight compositor-only',()=>{
-  const polish=readFileSync(new URL('../supabase/migrations/20261007005500_blackjack_v14_stats_polish.sql',import.meta.url),'utf8');
+  const polish=readFileSync(new URL('../supabase/migrations/20261006161905_blackjack_v14_stats_polish.sql',import.meta.url),'utf8');
   assert.match(polish,/blackjack_longest_win_streak/);
   assert.match(polish,/'longest_win_streak'/);
   assert.match(app,/function animateChipFlight\(button\)/);

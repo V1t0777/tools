@@ -89,4 +89,3 @@ end;
 $$;
 
 revoke all on function private.pictionary_room_maintenance() from public, anon, authenticated;
-
