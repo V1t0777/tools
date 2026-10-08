@@ -784,6 +784,13 @@
     populateStaffFilter();
     renderSubToolbar();
     showApp();
+    // Display a privacy-minimized alert; no raw IP, device fingerprint or email is returned.
+    db.rpc('toolbox_login_security_alerts').then(({data,error})=>{
+      if(error||!Array.isArray(data)||!data.length)return;
+      const kinds=new Set(data.map(e=>e.type));
+      const labels=[kinds.has('NEW_NETWORK')?'新的网络环境':null,kinds.has('NEW_BROWSER')?'新的浏览器环境':null].filter(Boolean);
+      $('modeText').textContent+=' · 安全提醒：近期发现'+labels.join('及')+'登录。如非本人操作，请尽快更改密码并退出其他设备。';
+    }).catch(()=>{});
 
     await Promise.all([
       loadMonth(),
