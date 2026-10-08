@@ -729,7 +729,7 @@
     try {
       await enterApp();
     } catch (err) {
-      console.error(err);
+      console.warn('admin-night-shift request failed', err?.code||'OPERATION_ERROR');
       await db.auth.signOut();
       showLogin();
       $("loginError").textContent = "登录状态或授权检查失败，请重新登录。";
@@ -834,7 +834,7 @@
       .order("work_date",{ascending:true});
 
     if (error) {
-      console.error(error);
+      console.warn('admin-night-shift request failed', error?.code||'OPERATION_ERROR');
       assignments = [];
     } else {
       assignments = data || [];
@@ -1628,7 +1628,7 @@
         loadToday()
       ]);
     } catch (err) {
-      console.error(err);
+      console.warn('admin-night-shift request failed', err?.code||'OPERATION_ERROR');
       $("editError").textContent =
         "保存失败。请检查管理员权限、人员选择或网络连接。";
     } finally {
