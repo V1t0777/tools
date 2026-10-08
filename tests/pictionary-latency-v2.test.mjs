@@ -21,8 +21,17 @@ test('round transitions use server authoritative state sync and warmup',()=>{
   assert.match(edge,/p_event:"state_sync"/);
   assert.match(edge,/EdgeRuntime/);
   assert.match(edge,/makeRound\(r,ps,Number\(r\.current_round_no\)\+1\)/);
-  assert.match(edge,/Date\.now\(\)\+3200/);
-  assert.doesNotMatch(edge,/Date\.now\(\)\+6000\)/);
+  // Check the actual summary_until assignments. A 60000 ms drawing timer
+  // must not be mistaken for a 6000 ms summary by a prefix regex.
+  const summaryDurations = [...edge.matchAll(
+    /summary_until\s*:\s*new\s+Date\s*\(\s*Date\.now\(\)\s*\+\s*(\d+)\s*\)\s*\.toISOString\(\)/g
+  )].map((match) => Number(match[1]));
+  assert.deepEqual(summaryDurations,[3200,3200], 'both summary paths must last 3.2 seconds');
+
+  const drawingDuration = edge.match(
+    /const\s+ends\s*=\s*new\s+Date\s*\(\s*Date\.now\(\)\s*\+\s*(\d+)\s*\)/
+  );
+  assert.equal(Number(drawingDuration?.[1]),60000, 'the drawing round still lasts 60 seconds');
   assert.match(edge,/makeRound\(updated,ps,next\)/);
 });
 

@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   static-security:
-    name: Static security and build isolation
+    name: Security / Static scan and build isolation
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -26,7 +26,6 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          fetch-depth: 0
 
       - name: Set up test runtime
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
@@ -38,8 +37,41 @@ jobs:
         shell: bash
         run: bash scripts/security-check.sh
 
+  regression-tests:
+    name: Tests / Game and security regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up test runtime
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.19.0'
+          package-manager-cache: false
+
       - name: Run security and game regression tests
         run: node --test tests/*.test.mjs scripts/*.test.cjs
+
+  history-secrets:
+    name: Security / Full Git history secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout full Git history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up test runtime
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.19.0'
+          package-manager-cache: false
 
       - name: Scan reachable Git history for secret patterns
         run: node scripts/secret-history.mjs
