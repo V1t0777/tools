@@ -447,9 +447,14 @@
     if (!validSnapshot(next)) return;
     if (state && next.room.id === state.room.id && Number(next.room.version) < Number(state.room.version)) return;
     const previous = state;
+    if(previous?.room?.id===next.room.id && Number(next.room.realtime_generation||0)<Number(previous.room.realtime_generation||0))return;
     const presentation = derivePresentation(previous,next);
     if (previous?.room?.status === 'finished' && next.room?.status === 'lobby') lastConfirmedBet = 0;
     state = next;
+    if(previous?.room?.id===next.room.id && previous.room.realtime_token!==next.room.realtime_token && !suspended){
+      leaveRealtime(false);
+      connectRealtime().catch(()=>scheduleReconnect(RECONNECT_GRACE_MS));
+    }
     const serverNow = Date.parse(next.server_now || '');
     if (Number.isFinite(serverNow)) clockOffset = serverNow - Date.now();
     timeoutRequested = false;
@@ -1544,7 +1549,9 @@
     await realtime.realtime.setAuth(auth.access_token);
     if (epoch !== roomEpoch || !state || state.room.id !== roomId) return;
 
-    channel = realtime.channel(`blackjack:${roomId}`,{
+    const nonce = state?.room?.realtime_token;
+    const topic = nonce ? `blackjack:${roomId}:${nonce}` : `blackjack:${roomId}`;
+    channel = realtime.channel(topic,{
       config:{private:true,presence:{key:auth.user.id},broadcast:{ack:false,self:false}},
     });
     channel.on('broadcast',{event:'state_snapshot'},({payload}) => {
@@ -1557,6 +1564,11 @@
       applyGameEvent(payload);
     });
     channel.on('broadcast',{event:'state_changed'},() => requestState(30,false));
+    // The replacement key is fetched via the authenticated state endpoint.
+    channel.on('broadcast',{event:'channel_rotated'},() => {
+      leaveRealtime(false);
+      requestState(0,true);
+    });
     channel.on('broadcast',{event:'emoji'},({payload}) => {
       if (payload?.emoji && typeof payload.emoji === 'string') {
         showReaction(payload.emoji,payload.member_id);
