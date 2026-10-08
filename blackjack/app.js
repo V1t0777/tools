@@ -23,6 +23,7 @@
   let loginBusy = false;
   let realtime = null;
   let channel = null;
+  let realtimeConnectEpoch = 0;
   let realtimeStatus = 'CLOSED';
   let realtimeRtt = null;
   let heartbeatSentAt = 0;
@@ -1513,9 +1514,10 @@
     if (!state || suspended || navigator.onLine === false) return;
     leaveRealtime(false);
     const epoch = roomEpoch;
+    const generation = realtimeConnectEpoch;
     const roomId = state.room.id;
     const auth = await ToolboxAuth.getSession();
-    if (!auth || epoch !== roomEpoch) return;
+    if (!auth || epoch !== roomEpoch || generation !== realtimeConnectEpoch) return;
     realtimeStatus = 'CONNECTING';
     updateConnection();
     realtime = window.supabase.createClient(ToolboxAuth.url,ToolboxAuth.key,{
@@ -1524,7 +1526,7 @@
         worker:true,
         heartbeatIntervalMs:15000,
         heartbeatCallback:(status) => {
-          if (epoch !== roomEpoch) return;
+          if (epoch !== roomEpoch || generation !== realtimeConnectEpoch) return;
           if (status === 'sent') {
             heartbeatSentAt = performance.now();
           } else if (status === 'ok') {
@@ -1547,7 +1549,7 @@
       },
     });
     await realtime.realtime.setAuth(auth.access_token);
-    if (epoch !== roomEpoch || !state || state.room.id !== roomId) return;
+    if (epoch !== roomEpoch || generation !== realtimeConnectEpoch || !state || state.room.id !== roomId) return;
 
     const nonce = state?.room?.realtime_token;
     const topic = nonce ? `blackjack:${roomId}:${nonce}` : `blackjack:${roomId}`;
@@ -1582,7 +1584,7 @@
     channel.on('presence',{event:'join'},() => requestState(100));
     channel.on('presence',{event:'leave'},() => requestState(100));
     channel.subscribe(async (status) => {
-      if (epoch !== roomEpoch) return;
+      if (epoch !== roomEpoch || generation !== realtimeConnectEpoch) return;
       realtimeStatus = status;
       if (status === 'SUBSCRIBED') {
         serverHeartbeatAt = Date.now();
@@ -1696,6 +1698,7 @@
   }
 
   function leaveRealtime(stopPoll = true) {
+    realtimeConnectEpoch++;
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
     pendingPings.clear();
