@@ -579,7 +579,8 @@
   </section>
 </div>
 
-<script src="../shared/toolbox-auth.js?v=20260917-4"></script>
+<script src="../shared/toolbox-auth.js?v=20261008-mfa"></script>
+<script src="../shared/toolbox-mfa.js?v=20261008-mfa"></script>
 <script>
   const db = ToolboxAuth.createClient();
 
@@ -774,7 +775,7 @@
     $("who").textContent = me.nickname;
     $("modeTitle").textContent = isAdmin ? "管理员模式" : "只读模式";
     $("modeText").textContent = isAdmin
-      ? "可以维护值班与门诊的全部排班"
+      ? "编辑排班时需要绑定并重新验证身份验证器动态码"
       : "可以查看全员排班，不能修改";
     $("modeBadge").textContent = isAdmin ? "管理员" : "只读";
     $("modeBadge").className = `mode-badge ${isAdmin ? "admin" : ""}`;
@@ -1611,6 +1612,7 @@
     $("editError").textContent = "";
 
     try {
+      if(!await ToolboxMFA.ensureRecent())return;
       const {error} = await db.rpc("replace_day_schedule",{
         p_date:ds,
         p_items:items
