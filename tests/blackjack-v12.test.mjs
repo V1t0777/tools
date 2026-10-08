@@ -5,8 +5,8 @@ import assert from 'node:assert/strict';
 const app=readFileSync(new URL('../blackjack/app.js',import.meta.url),'utf8');
 const html=readFileSync(new URL('../blackjack/index.html',import.meta.url),'utf8');
 const edge=readFileSync(new URL('../supabase/functions/blackjack-game/index.ts',import.meta.url),'utf8');
-const sql=readFileSync(new URL('../supabase/migrations/20261006230000_blackjack_v12.sql',import.meta.url),'utf8');
-const base=readFileSync(new URL('../supabase/migrations/20260929160000_blackjack_v1.sql',import.meta.url),'utf8');
+const sql=readFileSync(new URL('../supabase/migrations/20261006151034_blackjack_v12.sql',import.meta.url),'utf8');
+const base=readFileSync(new URL('../supabase/migrations/20260929081614_blackjack_v1_low_latency.sql',import.meta.url),'utf8');
 
 test('blackjack V1.2 client parses and listens for authoritative game events',()=>{
   assert.doesNotThrow(()=>new Function(app));
