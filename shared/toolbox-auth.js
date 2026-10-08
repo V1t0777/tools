@@ -7,6 +7,7 @@
   const GUARD='toolboxLoginGuard.v1';
   const CHANNEL='toolbox-auth-v1';
   const PROBE_MS=60000;
+  const ROTATE_AFTER_SECONDS=600; // Rotate browser-held JWT approximately every 10 minutes while active.
   let session=null,refreshPromise=null,signInPromise=null,probePromise=null,lastProbe=0,refreshAfter=0,authGeneration=0;
   const listeners=new Set();
   const tabId=(global.crypto&&global.crypto.randomUUID)?global.crypto.randomUUID():Math.random().toString(36).slice(2);
@@ -114,13 +115,25 @@
       refreshAfter=Date.now()+5000;throw err;
     }
   }
+  function accessTokenAgeSeconds(s){
+    if(!s?.access_token||!global.atob)return 0;
+    try{
+      const payload=JSON.parse(global.atob(s.access_token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+      const issued=Number(payload.iat||0);
+      return issued>0?Math.max(0,Date.now()/1000-issued):0;
+    }catch{return 0;}
+  }
+  function shouldRotate(s){
+    if(!s)return false;
+    return Number(s.expires_at||0)-Date.now()/1000<120 || accessTokenAgeSeconds(s)>ROTATE_AFTER_SECONDS;
+  }
   async function refresh(force=false){
     if(refreshPromise)return refreshPromise;
     const previousToken=current()?.access_token;
     const run=async()=>{
       const latest=current();
       if(force&&latest?.access_token!==previousToken)return latest;
-      if(!force&&latest?.expires_at&&Number(latest.expires_at)-Date.now()/1000>120)return latest;
+      if(!force&&!shouldRotate(latest))return latest;
       return doRefresh();
     };
     refreshPromise=(global.navigator?.locks?.request
@@ -131,7 +144,7 @@
   async function ensure(){
     let s=current();if(!s)return null;
     const exp=Number(s.expires_at||0);
-    if(exp&&exp-Date.now()/1000<120){
+    if((exp&&exp-Date.now()/1000<120)||accessTokenAgeSeconds(s)>ROTATE_AFTER_SECONDS){
       if(exp>Date.now()/1000&&Date.now()<refreshAfter)return s;
       try{s=await refresh();}catch(err){
         const latest=current();
