@@ -4,8 +4,8 @@ import assert from 'node:assert/strict';
 
 const source=readFileSync(new URL('../supabase/functions/blackjack-game/index.ts',import.meta.url),'utf8');
 const sql=readFileSync(new URL('../supabase/migrations/20260929081614_blackjack_v1_low_latency.sql',import.meta.url),'utf8');
-const perf=readFileSync(new URL('../supabase/migrations/20261005220000_blackjack_performance_v11.sql',import.meta.url),'utf8');
-const hardening=readFileSync(new URL('../supabase/migrations/20261005221500_blackjack_session_context_hardening.sql',import.meta.url),'utf8');
+const perf=readFileSync(new URL('../supabase/migrations/20261005141627_blackjack_performance_v11.sql',import.meta.url),'utf8');
+const hardening=readFileSync(new URL('../supabase/migrations/20261005141857_blackjack_session_context_hardening.sql',import.meta.url),'utf8');
 
 test('blackjack deck generation is server side and cryptographically sourced',()=>{
   assert.match(source,/function shuffledDeck\(\)/);
