@@ -13,3 +13,9 @@ import_map = "./functions/stack-game/deno.json"
 verify_jwt = true
 entrypoint = "./functions/pictionary-game/index.ts"
 import_map = "./functions/pictionary-game/deno.json"
+
+# Private Blackjack uses gateway JWT validation and also checks active sessions in code.
+[functions.blackjack-game]
+verify_jwt = true
+entrypoint = "./functions/blackjack-game/index.ts"
+import_map = "./functions/blackjack-game/deno.json"
