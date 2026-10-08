@@ -8,7 +8,8 @@ const targets=[
   ...readdirSync(resolve(root,'supabase/schema')).filter(x=>/\.(sql|json)$/.test(x)).map(x=>'supabase/schema/'+x)
 ];
 const email=/\b[A-Za-z0-9._%+-]+@(?:[A-Za-z0-9.-]+\.)+[A-Za-z]{2,}\b/g;
-const phone=/(?<!\d)1[3-9]\d{9}(?!\d)/g;
+// Require a full literal, not an 11-digit substring of a SHA-256 hexadecimal digest.
+const phone=/(?<![0-9A-Fa-f])1[3-9]\d{9}(?![0-9A-Fa-f])/g;
 const namedSeed=/insert\s+into\s+public\.(?:staff|admin_users)\s*\(/gi;
 let violations=0;
 for(const path of targets){
