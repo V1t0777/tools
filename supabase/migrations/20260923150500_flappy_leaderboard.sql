@@ -172,3 +172,4 @@ comment on table public.flappy_runs is 'Server-issued Flappy runs. Browser roles
 comment on table public.flappy_best_scores is 'One authoritative all-time best score per eligible member.';
 comment on table public.flappy_weekly_bests is 'One current-week best score per eligible member; old weeks are removed daily.';
 
+
