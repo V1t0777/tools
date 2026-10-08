@@ -36,7 +36,13 @@ for pattern in "${patterns[@]}"; do
   fi
 done
 
-echo "== Personal-data literals in public migration/catalog source =="\nnode scripts/privacy-scan.mjs\n\necho "== Sensitive file-name scan =="
+echo "== Personal-data literals in public migration/catalog source =="
+node scripts/privacy-scan.mjs
+
+echo "== XSS and script-source audit =="
+node scripts/xss-audit.mjs
+
+echo "== Sensitive file-name scan =="
 while IFS= read -r path; do
   case "$path" in
     .env.example) ;;
@@ -81,6 +87,7 @@ required_paths=(
   dist-secure/blackjack/index.html
   dist-secure/blackjack/app.js
   dist-secure/shared/toolbox-auth.js
+  dist-secure/shared/toolbox-mfa.js
   dist-secure/shared/vendor/supabase-2.57.4.min.js
   dist-secure/_headers
   dist-secure/robots.txt
@@ -141,6 +148,7 @@ public_forbidden_paths=(
   dist-public/supabase
   dist-public/tests
   dist-public/shared/toolbox-auth.js
+  dist-public/shared/toolbox-mfa.js
   dist-public/shared/vendor
 )
 for path in "${public_forbidden_paths[@]}"; do

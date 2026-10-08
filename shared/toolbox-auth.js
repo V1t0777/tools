@@ -7,6 +7,7 @@
   const GUARD='toolboxLoginGuard.v1';
   const CHANNEL='toolbox-auth-v1';
   const PROBE_MS=60000;
+  const ROTATE_AFTER_SECONDS=600; // Rotate browser-held JWT approximately every 10 minutes while active.
   let session=null,refreshPromise=null,signInPromise=null,probePromise=null,lastProbe=0,refreshAfter=0,authGeneration=0;
   const listeners=new Set();
   const tabId=(global.crypto&&global.crypto.randomUUID)?global.crypto.randomUUID():Math.random().toString(36).slice(2);
@@ -114,13 +115,25 @@
       refreshAfter=Date.now()+5000;throw err;
     }
   }
+  function accessTokenAgeSeconds(s){
+    if(!s?.access_token||!global.atob)return 0;
+    try{
+      const payload=JSON.parse(global.atob(s.access_token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+      const issued=Number(payload.iat||0);
+      return issued>0?Math.max(0,Date.now()/1000-issued):0;
+    }catch{return 0;}
+  }
+  function shouldRotate(s){
+    if(!s)return false;
+    return Number(s.expires_at||0)-Date.now()/1000<120 || accessTokenAgeSeconds(s)>ROTATE_AFTER_SECONDS;
+  }
   async function refresh(force=false){
     if(refreshPromise)return refreshPromise;
     const previousToken=current()?.access_token;
     const run=async()=>{
       const latest=current();
       if(force&&latest?.access_token!==previousToken)return latest;
-      if(!force&&latest?.expires_at&&Number(latest.expires_at)-Date.now()/1000>120)return latest;
+      if(!force&&!shouldRotate(latest))return latest;
       return doRefresh();
     };
     refreshPromise=(global.navigator?.locks?.request
@@ -131,7 +144,7 @@
   async function ensure(){
     let s=current();if(!s)return null;
     const exp=Number(s.expires_at||0);
-    if(exp&&exp-Date.now()/1000<120){
+    if((exp&&exp-Date.now()/1000<120)||accessTokenAgeSeconds(s)>ROTATE_AFTER_SECONDS){
       if(exp>Date.now()/1000&&Date.now()<refreshAfter)return s;
       try{s=await refresh();}catch(err){
         const latest=current();
@@ -172,6 +185,25 @@
     // Local sign-out is immediate; a slow logout endpoint must not block the UI.
     if(s?.access_token)authRequest('/auth/v1/logout?scope=local',{authorization:s.access_token}).catch(()=>{});
     return true;
+  }
+  // Accept only an elevated session returned by a successful Supabase GoTrue MFA verification.
+  async function adoptVerifiedSession(value){
+    const before=current();
+    if(!before?.access_token||!value?.access_token||!value?.refresh_token)
+      throw new ToolboxAuthError('登录会话不完整','AUTH_REQUIRED',401);
+    const payload=token=>{
+      try{const segment=token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');return JSON.parse(global.atob(segment));}
+      catch{return null;}
+    };
+    const prior=payload(before.access_token),next=payload(value.access_token);
+    if(!prior?.sub||next?.sub!==prior.sub||next?.aal!=='aal2')
+      throw new ToolboxAuthError('安全验证未通过','MFA_REQUIRED',403);
+    if(before.user?.id&&next.sub!==before.user.id)
+      throw new ToolboxAuthError('登录身份已变化','MFA_IDENTITY_MISMATCH',403);
+    const expires_at=Number(value.expires_at)||Math.floor(Date.now()/1000)+Number(value.expires_in||3600);
+    const verified={...before,...value,expires_at};
+    authGeneration++;writeStored(verified);lastProbe=refreshAfter=0;
+    return verified;
   }
   function onAuthStateChange(callback){listeners.add(callback);return {data:{subscription:{unsubscribe:()=>listeners.delete(callback)}}};}
 
@@ -239,5 +271,5 @@
   global.addEventListener?.('pagehide',()=>{if(probeTimer)global.clearInterval?.(probeTimer);probeTimer=null;});
 
   session=readStored();
-  global.ToolboxAuth={url:URL,key:KEY,storeKey:STORE,createClient,signIn,signOut,refresh,onAuthStateChange,getSession:ensure,peekSession:current,rest,rpc,probe,authMessage,lockRemaining,ToolboxAuthError};
+  global.ToolboxAuth={url:URL,key:KEY,storeKey:STORE,createClient,signIn,signOut,refresh,onAuthStateChange,getSession:ensure,peekSession:current,rest,rpc,probe,adoptVerifiedSession,authMessage,lockRemaining,ToolboxAuthError};
 })(window);

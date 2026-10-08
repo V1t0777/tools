@@ -14,7 +14,7 @@ const all=pre+'\n'+historical+'\n'+post;
 test('application catalog captures every business schema object without private data rows',()=>{
   assert.equal(catalog.contains_user_rows,false);
   assert.deepEqual(catalog.counts,{
-    tables:40,constraints:253,indexes:122,policies:47,triggers:15,functions:85,grants:50
+    tables:41,constraints:255,indexes:123,policies:47,triggers:15,functions:88,grants:50
   });
   assert.deepEqual(catalog.restricted_column_grants.find(x=>x.table_name==='members').columns,['id','nickname','color']);
   for(const [key,count] of Object.entries(catalog.counts))
@@ -22,7 +22,7 @@ test('application catalog captures every business schema object without private 
   assert.doesNotMatch(JSON.stringify(catalog),/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/);
 });
 
-test('historical and companion sources name-cover 40 tables and 85 functions',()=>{
+test('historical and companion sources name-cover 41 tables and 88 functions',()=>{
   const tables=new Set([...all.matchAll(/create\s+table\s+(?:if\s+not\s+exists\s+)?(?:public|private)\.\s*"?([a-z_][a-z0-9_]*)/gi)].map(m=>m[1]));
   const functions=new Set([...all.matchAll(/create\s+(?:or\s+replace\s+)?function\s+(?:public|private)\.\s*"?([a-z_][a-z0-9_]*)/gi)].map(m=>m[1]));
   assert.deepEqual(catalog.tables.filter(t=>!tables.has(t.name)).map(t=>t.schema+'.'+t.name),[]);

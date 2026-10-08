@@ -5,12 +5,12 @@
   "contains_user_rows": false,
   "scope": "application schemas public and private only; excludes auth-managed/internal extension schemas",
   "counts": {
-    "tables": 40,
-    "constraints": 253,
-    "indexes": 122,
+    "tables": 41,
+    "constraints": 255,
+    "indexes": 123,
     "policies": 47,
     "triggers": 15,
-    "functions": 85,
+    "functions": 88,
     "grants": 50
   },
   "tables": [
@@ -846,95 +846,6 @@
     },
     {
       "schema": "public",
-      "name": "bead_inventory",
-      "relkind": "r",
-      "rls": true,
-      "force_rls": false,
-      "columns": [
-        {
-          "name": "id",
-          "type": "uuid",
-          "default": "gen_random_uuid()",
-          "identity": "",
-          "not_null": true,
-          "generated": ""
-        },
-        {
-          "name": "owner_user_id",
-          "type": "uuid",
-          "default": null,
-          "identity": "",
-          "not_null": false,
-          "generated": ""
-        },
-        {
-          "name": "group_id",
-          "type": "uuid",
-          "default": null,
-          "identity": "",
-          "not_null": false,
-          "generated": ""
-        },
-        {
-          "name": "palette_name",
-          "type": "text",
-          "default": "'自定义'::text",
-          "identity": "",
-          "not_null": true,
-          "generated": ""
-        },
-        {
-          "name": "color_code",
-          "type": "text",
-          "default": null,
-          "identity": "",
-          "not_null": true,
-          "generated": ""
-        },
-        {
-          "name": "color_name",
-          "type": "text",
-          "default": "''::text",
-          "identity": "",
-          "not_null": true,
-          "generated": ""
-        },
-        {
-          "name": "color_hex",
-          "type": "text",
-          "default": null,
-          "identity": "",
-          "not_null": true,
-          "generated": ""
-        },
-        {
-          "name": "quantity",
-          "type": "integer",
-          "default": "0",
-          "identity": "",
-          "not_null": true,
-          "generated": ""
-        },
-        {
-          "name": "updated_by",
-          "type": "uuid",
-          "default": null,
-          "identity": "",
-          "not_null": false,
-          "generated": ""
-        },
-        {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "default": "now()",
-          "identity": "",
-          "not_null": true,
-          "generated": ""
-        }
-      ]
-    },
-    {
-      "schema": "public",
       "name": "bead_inventory_events",
       "relkind": "r",
       "rls": true,
@@ -1022,6 +933,95 @@
         },
         {
           "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        }
+      ]
+    },
+    {
+      "schema": "public",
+      "name": "bead_inventory",
+      "relkind": "r",
+      "rls": true,
+      "force_rls": false,
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "owner_user_id",
+          "type": "uuid",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "group_id",
+          "type": "uuid",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "palette_name",
+          "type": "text",
+          "default": "'自定义'::text",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "color_code",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "color_name",
+          "type": "text",
+          "default": "''::text",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "color_hex",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "quantity",
+          "type": "integer",
+          "default": "0",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "updated_by",
+          "type": "uuid",
+          "default": null,
+          "identity": "",
+          "not_null": false,
+          "generated": ""
+        },
+        {
+          "name": "updated_at",
           "type": "timestamp with time zone",
           "default": "now()",
           "identity": "",
@@ -3253,9 +3253,64 @@
           "generated": ""
         }
       ]
+    },
+    {
+      "rls": true,
+      "name": "login_security_events",
+      "schema": "private",
+      "columns": [
+        {
+          "name": "session_id",
+          "type": "uuid",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "event_type",
+          "type": "text",
+          "default": null,
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        },
+        {
+          "name": "detected_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "identity": "",
+          "not_null": true,
+          "generated": ""
+        }
+      ],
+      "relkind": "r",
+      "force_rls": false
     }
   ],
   "constraints": [
+    {
+      "name": "login_security_events_event_type_check",
+      "type": "c",
+      "schema": "private",
+      "definition": "CHECK ((event_type = ANY (ARRAY['NEW_NETWORK'::text, 'NEW_BROWSER'::text])))",
+      "table_name": "login_security_events"
+    },
+    {
+      "name": "login_security_events_pkey",
+      "type": "p",
+      "schema": "private",
+      "definition": "PRIMARY KEY (session_id, event_type)",
+      "table_name": "login_security_events"
+    },
     {
       "schema": "private",
       "table_name": "access_audit_log",
@@ -3622,6 +3677,62 @@
     },
     {
       "schema": "public",
+      "table_name": "bead_inventory_events",
+      "name": "bead_inventory_events_changed_by_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (changed_by) REFERENCES auth.users(id)"
+    },
+    {
+      "schema": "public",
+      "table_name": "bead_inventory_events",
+      "name": "bead_inventory_events_check",
+      "type": "c",
+      "definition": "CHECK (((owner_user_id IS NOT NULL)::integer + (group_id IS NOT NULL)::integer) = 1)"
+    },
+    {
+      "schema": "public",
+      "table_name": "bead_inventory_events",
+      "name": "bead_inventory_events_group_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (group_id) REFERENCES bead_groups(id) ON DELETE CASCADE"
+    },
+    {
+      "schema": "public",
+      "table_name": "bead_inventory_events",
+      "name": "bead_inventory_events_owner_user_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (owner_user_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+    },
+    {
+      "schema": "public",
+      "table_name": "bead_inventory_events",
+      "name": "bead_inventory_events_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "schema": "public",
+      "table_name": "bead_inventory_events",
+      "name": "bead_inventory_events_project_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (project_id) REFERENCES bead_projects(id) ON DELETE SET NULL"
+    },
+    {
+      "schema": "public",
+      "table_name": "bead_inventory_events",
+      "name": "bead_inventory_events_reason_check",
+      "type": "c",
+      "definition": "CHECK (char_length(reason) >= 1 AND char_length(reason) <= 120)"
+    },
+    {
+      "schema": "public",
+      "table_name": "bead_inventory_events",
+      "name": "bead_inventory_events_resulting_quantity_check",
+      "type": "c",
+      "definition": "CHECK (resulting_quantity >= 0)"
+    },
+    {
+      "schema": "public",
       "table_name": "bead_inventory",
       "name": "bead_inventory_check",
       "type": "c",
@@ -3689,62 +3800,6 @@
       "name": "bead_inventory_updated_by_fkey",
       "type": "f",
       "definition": "FOREIGN KEY (updated_by) REFERENCES auth.users(id)"
-    },
-    {
-      "schema": "public",
-      "table_name": "bead_inventory_events",
-      "name": "bead_inventory_events_changed_by_fkey",
-      "type": "f",
-      "definition": "FOREIGN KEY (changed_by) REFERENCES auth.users(id)"
-    },
-    {
-      "schema": "public",
-      "table_name": "bead_inventory_events",
-      "name": "bead_inventory_events_check",
-      "type": "c",
-      "definition": "CHECK (((owner_user_id IS NOT NULL)::integer + (group_id IS NOT NULL)::integer) = 1)"
-    },
-    {
-      "schema": "public",
-      "table_name": "bead_inventory_events",
-      "name": "bead_inventory_events_group_id_fkey",
-      "type": "f",
-      "definition": "FOREIGN KEY (group_id) REFERENCES bead_groups(id) ON DELETE CASCADE"
-    },
-    {
-      "schema": "public",
-      "table_name": "bead_inventory_events",
-      "name": "bead_inventory_events_owner_user_id_fkey",
-      "type": "f",
-      "definition": "FOREIGN KEY (owner_user_id) REFERENCES auth.users(id) ON DELETE CASCADE"
-    },
-    {
-      "schema": "public",
-      "table_name": "bead_inventory_events",
-      "name": "bead_inventory_events_pkey",
-      "type": "p",
-      "definition": "PRIMARY KEY (id)"
-    },
-    {
-      "schema": "public",
-      "table_name": "bead_inventory_events",
-      "name": "bead_inventory_events_project_id_fkey",
-      "type": "f",
-      "definition": "FOREIGN KEY (project_id) REFERENCES bead_projects(id) ON DELETE SET NULL"
-    },
-    {
-      "schema": "public",
-      "table_name": "bead_inventory_events",
-      "name": "bead_inventory_events_reason_check",
-      "type": "c",
-      "definition": "CHECK (char_length(reason) >= 1 AND char_length(reason) <= 120)"
-    },
-    {
-      "schema": "public",
-      "table_name": "bead_inventory_events",
-      "name": "bead_inventory_events_resulting_quantity_check",
-      "type": "c",
-      "definition": "CHECK (resulting_quantity >= 0)"
     },
     {
       "schema": "public",
@@ -5030,6 +5085,12 @@
   ],
   "indexes": [
     {
+      "name": "login_security_events_pkey",
+      "schema": "private",
+      "definition": "CREATE UNIQUE INDEX login_security_events_pkey ON private.login_security_events USING btree (session_id, event_type)",
+      "table_name": "login_security_events"
+    },
+    {
       "schema": "private",
       "table_name": "access_audit_log",
       "name": "access_audit_log_pkey",
@@ -5175,6 +5236,24 @@
     },
     {
       "schema": "public",
+      "table_name": "bead_inventory_events",
+      "name": "bead_inventory_events_group_idx",
+      "definition": "CREATE INDEX bead_inventory_events_group_idx ON public.bead_inventory_events USING btree (group_id, created_at DESC)"
+    },
+    {
+      "schema": "public",
+      "table_name": "bead_inventory_events",
+      "name": "bead_inventory_events_owner_idx",
+      "definition": "CREATE INDEX bead_inventory_events_owner_idx ON public.bead_inventory_events USING btree (owner_user_id, created_at DESC)"
+    },
+    {
+      "schema": "public",
+      "table_name": "bead_inventory_events",
+      "name": "bead_inventory_events_pkey",
+      "definition": "CREATE UNIQUE INDEX bead_inventory_events_pkey ON public.bead_inventory_events USING btree (id)"
+    },
+    {
+      "schema": "public",
       "table_name": "bead_inventory",
       "name": "bead_inventory_group_idx",
       "definition": "CREATE INDEX bead_inventory_group_idx ON public.bead_inventory USING btree (group_id)"
@@ -5202,24 +5281,6 @@
       "table_name": "bead_inventory",
       "name": "bead_inventory_pkey",
       "definition": "CREATE UNIQUE INDEX bead_inventory_pkey ON public.bead_inventory USING btree (id)"
-    },
-    {
-      "schema": "public",
-      "table_name": "bead_inventory_events",
-      "name": "bead_inventory_events_group_idx",
-      "definition": "CREATE INDEX bead_inventory_events_group_idx ON public.bead_inventory_events USING btree (group_id, created_at DESC)"
-    },
-    {
-      "schema": "public",
-      "table_name": "bead_inventory_events",
-      "name": "bead_inventory_events_owner_idx",
-      "definition": "CREATE INDEX bead_inventory_events_owner_idx ON public.bead_inventory_events USING btree (owner_user_id, created_at DESC)"
-    },
-    {
-      "schema": "public",
-      "table_name": "bead_inventory_events",
-      "name": "bead_inventory_events_pkey",
-      "definition": "CREATE UNIQUE INDEX bead_inventory_events_pkey ON public.bead_inventory_events USING btree (id)"
     },
     {
       "schema": "public",
@@ -5764,6 +5825,66 @@
   ],
   "policies": [
     {
+      "cmd": "DELETE",
+      "name": "department_roster_admin_delete_duty_types",
+      "qual": "( SELECT private.roster_recent_mfa_stepup() AS roster_recent_mfa_stepup)",
+      "roles": "{authenticated}",
+      "schema": "public",
+      "permissive": "PERMISSIVE",
+      "table_name": "duty_types",
+      "with_check": null
+    },
+    {
+      "cmd": "DELETE",
+      "name": "department_roster_admin_delete_schedule",
+      "qual": "( SELECT private.roster_recent_mfa_stepup() AS roster_recent_mfa_stepup)",
+      "roles": "{authenticated}",
+      "schema": "public",
+      "permissive": "PERMISSIVE",
+      "table_name": "schedule_assignments",
+      "with_check": null
+    },
+    {
+      "cmd": "DELETE",
+      "name": "department_roster_admin_delete_staff",
+      "qual": "( SELECT private.roster_recent_mfa_stepup() AS roster_recent_mfa_stepup)",
+      "roles": "{authenticated}",
+      "schema": "public",
+      "permissive": "PERMISSIVE",
+      "table_name": "staff",
+      "with_check": null
+    },
+    {
+      "cmd": "INSERT",
+      "name": "department_roster_admin_insert_duty_types",
+      "qual": null,
+      "roles": "{authenticated}",
+      "schema": "public",
+      "permissive": "PERMISSIVE",
+      "table_name": "duty_types",
+      "with_check": "( SELECT private.roster_recent_mfa_stepup() AS roster_recent_mfa_stepup)"
+    },
+    {
+      "cmd": "INSERT",
+      "name": "department_roster_admin_insert_schedule",
+      "qual": null,
+      "roles": "{authenticated}",
+      "schema": "public",
+      "permissive": "PERMISSIVE",
+      "table_name": "schedule_assignments",
+      "with_check": "( SELECT private.roster_recent_mfa_stepup() AS roster_recent_mfa_stepup)"
+    },
+    {
+      "cmd": "INSERT",
+      "name": "department_roster_admin_insert_staff",
+      "qual": null,
+      "roles": "{authenticated}",
+      "schema": "public",
+      "permissive": "PERMISSIVE",
+      "table_name": "staff",
+      "with_check": "( SELECT private.roster_recent_mfa_stepup() AS roster_recent_mfa_stepup)"
+    },
+    {
       "schema": "private",
       "table_name": "access_audit_log",
       "name": "access_audit_log_no_client_access",
@@ -5825,6 +5946,16 @@
     },
     {
       "schema": "public",
+      "table_name": "bead_inventory_events",
+      "name": "bead_inventory_events_select",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "(private.has_active_session() AND ((owner_user_id = ( SELECT auth.uid() AS uid)) OR ((group_id IS NOT NULL) AND private.is_bead_group_member(group_id))))",
+      "with_check": null
+    },
+    {
+      "schema": "public",
       "table_name": "bead_inventory",
       "name": "bead_inventory_delete",
       "permissive": "PERMISSIVE",
@@ -5862,16 +5993,6 @@
       "cmd": "UPDATE",
       "qual": "(private.has_active_session() AND ((owner_user_id = ( SELECT auth.uid() AS uid)) OR ((group_id IS NOT NULL) AND private.can_edit_bead_group(group_id))))",
       "with_check": "(private.has_active_session() AND (updated_by = ( SELECT auth.uid() AS uid)) AND (((owner_user_id = ( SELECT auth.uid() AS uid)) AND (group_id IS NULL)) OR ((owner_user_id IS NULL) AND (group_id IS NOT NULL) AND private.can_edit_bead_group(group_id))))"
-    },
-    {
-      "schema": "public",
-      "table_name": "bead_inventory_events",
-      "name": "bead_inventory_events_select",
-      "permissive": "PERMISSIVE",
-      "roles": "{authenticated}",
-      "cmd": "SELECT",
-      "qual": "(private.has_active_session() AND ((owner_user_id = ( SELECT auth.uid() AS uid)) OR ((group_id IS NOT NULL) AND private.is_bead_group_member(group_id))))",
-      "with_check": null
     },
     {
       "schema": "public",
@@ -6056,36 +6177,6 @@
     {
       "schema": "public",
       "table_name": "duty_types",
-      "name": "department_roster_admin_delete_duty_types",
-      "permissive": "PERMISSIVE",
-      "roles": "{authenticated}",
-      "cmd": "DELETE",
-      "qual": "( SELECT private.has_app_role('department_roster'::text, ARRAY['admin'::text]) AS has_app_role)",
-      "with_check": null
-    },
-    {
-      "schema": "public",
-      "table_name": "duty_types",
-      "name": "department_roster_admin_insert_duty_types",
-      "permissive": "PERMISSIVE",
-      "roles": "{authenticated}",
-      "cmd": "INSERT",
-      "qual": null,
-      "with_check": "( SELECT private.has_app_role('department_roster'::text, ARRAY['admin'::text]) AS has_app_role)"
-    },
-    {
-      "schema": "public",
-      "table_name": "duty_types",
-      "name": "department_roster_admin_update_duty_types",
-      "permissive": "PERMISSIVE",
-      "roles": "{authenticated}",
-      "cmd": "UPDATE",
-      "qual": "( SELECT private.has_app_role('department_roster'::text, ARRAY['admin'::text]) AS has_app_role)",
-      "with_check": "( SELECT private.has_app_role('department_roster'::text, ARRAY['admin'::text]) AS has_app_role)"
-    },
-    {
-      "schema": "public",
-      "table_name": "duty_types",
       "name": "department_roster_read_duty_types",
       "permissive": "PERMISSIVE",
       "roles": "{authenticated}",
@@ -6156,36 +6247,6 @@
     {
       "schema": "public",
       "table_name": "schedule_assignments",
-      "name": "department_roster_admin_delete_schedule",
-      "permissive": "PERMISSIVE",
-      "roles": "{authenticated}",
-      "cmd": "DELETE",
-      "qual": "( SELECT private.has_app_role('department_roster'::text, ARRAY['admin'::text]) AS has_app_role)",
-      "with_check": null
-    },
-    {
-      "schema": "public",
-      "table_name": "schedule_assignments",
-      "name": "department_roster_admin_insert_schedule",
-      "permissive": "PERMISSIVE",
-      "roles": "{authenticated}",
-      "cmd": "INSERT",
-      "qual": null,
-      "with_check": "( SELECT private.has_app_role('department_roster'::text, ARRAY['admin'::text]) AS has_app_role)"
-    },
-    {
-      "schema": "public",
-      "table_name": "schedule_assignments",
-      "name": "department_roster_admin_update_schedule",
-      "permissive": "PERMISSIVE",
-      "roles": "{authenticated}",
-      "cmd": "UPDATE",
-      "qual": "( SELECT private.has_app_role('department_roster'::text, ARRAY['admin'::text]) AS has_app_role)",
-      "with_check": "( SELECT private.has_app_role('department_roster'::text, ARRAY['admin'::text]) AS has_app_role)"
-    },
-    {
-      "schema": "public",
-      "table_name": "schedule_assignments",
       "name": "department_roster_read_schedule",
       "permissive": "PERMISSIVE",
       "roles": "{authenticated}",
@@ -6196,42 +6257,42 @@
     {
       "schema": "public",
       "table_name": "staff",
-      "name": "department_roster_admin_delete_staff",
-      "permissive": "PERMISSIVE",
-      "roles": "{authenticated}",
-      "cmd": "DELETE",
-      "qual": "( SELECT private.has_app_role('department_roster'::text, ARRAY['admin'::text]) AS has_app_role)",
-      "with_check": null
-    },
-    {
-      "schema": "public",
-      "table_name": "staff",
-      "name": "department_roster_admin_insert_staff",
-      "permissive": "PERMISSIVE",
-      "roles": "{authenticated}",
-      "cmd": "INSERT",
-      "qual": null,
-      "with_check": "( SELECT private.has_app_role('department_roster'::text, ARRAY['admin'::text]) AS has_app_role)"
-    },
-    {
-      "schema": "public",
-      "table_name": "staff",
-      "name": "department_roster_admin_update_staff",
-      "permissive": "PERMISSIVE",
-      "roles": "{authenticated}",
-      "cmd": "UPDATE",
-      "qual": "( SELECT private.has_app_role('department_roster'::text, ARRAY['admin'::text]) AS has_app_role)",
-      "with_check": "( SELECT private.has_app_role('department_roster'::text, ARRAY['admin'::text]) AS has_app_role)"
-    },
-    {
-      "schema": "public",
-      "table_name": "staff",
       "name": "department_roster_read_staff",
       "permissive": "PERMISSIVE",
       "roles": "{authenticated}",
       "cmd": "SELECT",
       "qual": "( SELECT private.has_app_role('department_roster'::text, ARRAY['viewer'::text, 'editor'::text, 'admin'::text]) AS has_app_role)",
       "with_check": null
+    },
+    {
+      "cmd": "UPDATE",
+      "name": "department_roster_admin_update_duty_types",
+      "qual": "( SELECT private.roster_recent_mfa_stepup() AS roster_recent_mfa_stepup)",
+      "roles": "{authenticated}",
+      "schema": "public",
+      "permissive": "PERMISSIVE",
+      "table_name": "duty_types",
+      "with_check": "( SELECT private.roster_recent_mfa_stepup() AS roster_recent_mfa_stepup)"
+    },
+    {
+      "cmd": "UPDATE",
+      "name": "department_roster_admin_update_schedule",
+      "qual": "( SELECT private.roster_recent_mfa_stepup() AS roster_recent_mfa_stepup)",
+      "roles": "{authenticated}",
+      "schema": "public",
+      "permissive": "PERMISSIVE",
+      "table_name": "schedule_assignments",
+      "with_check": "( SELECT private.roster_recent_mfa_stepup() AS roster_recent_mfa_stepup)"
+    },
+    {
+      "cmd": "UPDATE",
+      "name": "department_roster_admin_update_staff",
+      "qual": "( SELECT private.roster_recent_mfa_stepup() AS roster_recent_mfa_stepup)",
+      "roles": "{authenticated}",
+      "schema": "public",
+      "permissive": "PERMISSIVE",
+      "table_name": "staff",
+      "with_check": "( SELECT private.roster_recent_mfa_stepup() AS roster_recent_mfa_stepup)"
     }
   ],
   "triggers": [
@@ -6327,6 +6388,16 @@
     }
   ],
   "functions": [
+    {
+      "name": "detect_new_login_environments",
+      "schema": "private",
+      "returns": "void",
+      "arguments": "",
+      "security_definer": true,
+      "definition_sha256": "4def408f1a0d1595b54580e44f0b5e50083bb10a59dda0aa75f616268462618f",
+      "anonymous_executable": false,
+      "authenticated_executable": false
+    },
     {
       "schema": "private",
       "name": "audit_bead_inventory_change",
@@ -6840,20 +6911,20 @@
     {
       "schema": "public",
       "name": "blackjack_action_gateway_service",
-      "arguments": "p_room_id uuid, p_user_id uuid, p_action text, p_expected_token uuid, p_action_id uuid",
+      "arguments": "p_room_id uuid, p_user_id uuid, p_action text, p_expected_token uuid, p_action_id uuid, p_device_id uuid",
       "returns": "jsonb",
       "security_definer": true,
-      "definition_sha256": "1f6e18b4f9e9691eccdb659bdefcc0dd5c625764588e841168ffe81c73567737",
+      "definition_sha256": "dfeee068e7ddfb9ba696ad19432da151c01ff99c278c0802d0af63c328ba6696",
       "authenticated_executable": false,
       "anonymous_executable": false
     },
     {
       "schema": "public",
       "name": "blackjack_action_gateway_service",
-      "arguments": "p_room_id uuid, p_user_id uuid, p_action text, p_expected_token uuid, p_action_id uuid, p_device_id uuid",
+      "arguments": "p_room_id uuid, p_user_id uuid, p_action text, p_expected_token uuid, p_action_id uuid",
       "returns": "jsonb",
       "security_definer": true,
-      "definition_sha256": "dfeee068e7ddfb9ba696ad19432da151c01ff99c278c0802d0af63c328ba6696",
+      "definition_sha256": "1f6e18b4f9e9691eccdb659bdefcc0dd5c625764588e841168ffe81c73567737",
       "authenticated_executable": false,
       "anonymous_executable": false
     },
@@ -7129,16 +7200,6 @@
     },
     {
       "schema": "public",
-      "name": "replace_day_schedule",
-      "arguments": "p_date date, p_items jsonb",
-      "returns": "void",
-      "security_definer": false,
-      "definition_sha256": "ce4b1fd2f73a45fd80578523fcf0bb060cfe596760af6c150abf5cedcb0a0ec0",
-      "authenticated_executable": true,
-      "anonymous_executable": false
-    },
-    {
-      "schema": "public",
       "name": "rls_auto_enable",
       "arguments": "",
       "returns": "event_trigger",
@@ -7176,6 +7237,36 @@
       "definition_sha256": "4d77b3c6c31fce3a7560d4420acf41a052e6cf267cdb7d2b434b44f9b1b0d8a9",
       "authenticated_executable": true,
       "anonymous_executable": false
+    },
+    {
+      "name": "replace_day_schedule",
+      "schema": "public",
+      "returns": "void",
+      "arguments": "p_date date, p_items jsonb",
+      "security_definer": false,
+      "definition_sha256": "50149a2fc8dd12e3f1937a37b2b1f453358f497569bfeeec6b1a0e004e125c13",
+      "anonymous_executable": false,
+      "authenticated_executable": true
+    },
+    {
+      "name": "roster_recent_mfa_stepup",
+      "schema": "private",
+      "returns": "boolean",
+      "arguments": "",
+      "security_definer": true,
+      "definition_sha256": "e55b036f5c15c2348fd0efc982925836e1cffbcf40431c9bfceb18ad8cec6284",
+      "anonymous_executable": false,
+      "authenticated_executable": true
+    },
+    {
+      "name": "toolbox_login_security_alerts",
+      "schema": "public",
+      "returns": "jsonb",
+      "arguments": "",
+      "security_definer": true,
+      "definition_sha256": "9f98a216e2b5e5636ab87de5d123b0aca27938e2318f6c460cebd788b1bf6b7c",
+      "anonymous_executable": false,
+      "authenticated_executable": true
     }
   ],
   "grants": [
@@ -7253,18 +7344,6 @@
     },
     {
       "schema": "public",
-      "table_name": "bead_inventory",
-      "grantee": "authenticated",
-      "privileges": "DELETE,INSERT,SELECT,UPDATE"
-    },
-    {
-      "schema": "public",
-      "table_name": "bead_inventory",
-      "grantee": "service_role",
-      "privileges": "REFERENCES,TRIGGER,TRUNCATE"
-    },
-    {
-      "schema": "public",
       "table_name": "bead_inventory_events",
       "grantee": "authenticated",
       "privileges": "SELECT"
@@ -7272,6 +7351,18 @@
     {
       "schema": "public",
       "table_name": "bead_inventory_events",
+      "grantee": "service_role",
+      "privileges": "REFERENCES,TRIGGER,TRUNCATE"
+    },
+    {
+      "schema": "public",
+      "table_name": "bead_inventory",
+      "grantee": "authenticated",
+      "privileges": "DELETE,INSERT,SELECT,UPDATE"
+    },
+    {
+      "schema": "public",
+      "table_name": "bead_inventory",
       "grantee": "service_role",
       "privileges": "REFERENCES,TRIGGER,TRUNCATE"
     },

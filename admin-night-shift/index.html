@@ -579,7 +579,8 @@
   </section>
 </div>
 
-<script src="../shared/toolbox-auth.js?v=20260917-4"></script>
+<script src="../shared/toolbox-auth.js?v=20261008-security"></script>
+<script src="../shared/toolbox-mfa.js?v=20261008-mfa"></script>
 <script>
   const db = ToolboxAuth.createClient();
 
@@ -774,7 +775,7 @@
     $("who").textContent = me.nickname;
     $("modeTitle").textContent = isAdmin ? "管理员模式" : "只读模式";
     $("modeText").textContent = isAdmin
-      ? "可以维护值班与门诊的全部排班"
+      ? "编辑排班时需要绑定并重新验证身份验证器动态码"
       : "可以查看全员排班，不能修改";
     $("modeBadge").textContent = isAdmin ? "管理员" : "只读";
     $("modeBadge").className = `mode-badge ${isAdmin ? "admin" : ""}`;
@@ -783,6 +784,13 @@
     populateStaffFilter();
     renderSubToolbar();
     showApp();
+    // Display a privacy-minimized alert; no raw IP, device fingerprint or email is returned.
+    db.rpc('toolbox_login_security_alerts').then(({data,error})=>{
+      if(error||!Array.isArray(data)||!data.length)return;
+      const kinds=new Set(data.map(e=>e.type));
+      const labels=[kinds.has('NEW_NETWORK')?'新的网络环境':null,kinds.has('NEW_BROWSER')?'新的浏览器环境':null].filter(Boolean);
+      $('modeText').textContent+=' · 安全提醒：近期发现'+labels.join('及')+'登录。如非本人操作，请尽快更改密码并退出其他设备。';
+    }).catch(()=>{});
 
     await Promise.all([
       loadMonth(),
@@ -1611,6 +1619,7 @@
     $("editError").textContent = "";
 
     try {
+      if(!await ToolboxMFA.ensureRecent())return;
       const {error} = await db.rpc("replace_day_schedule",{
         p_date:ds,
         p_items:items

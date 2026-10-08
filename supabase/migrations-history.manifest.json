@@ -3,7 +3,7 @@
   "source_kind": "applied SQL statement history (not a data backup)",
   "project_ref": "tmxpueakxibsaakdyusn",
   "captured_on": "2026-10-08",
-  "count": 43,
+  "count": 44,
   "privacy_exceptions": {
     "20260916134448": "Historical admin email and named staff seed rows omitted; restore via private provisioning and encrypted data backup.",
     "20260923152254": "Historical test-account email replaced with non-functional example.invalid placeholder.",
@@ -266,6 +266,12 @@
       "version": "20261008023746",
       "name": "privacy_member_access_and_audit_minimization",
       "original_sha256": "4a3895e811f9eea9c4764fae6251afdd687fadf22248870ce9a078d7f59e281e",
+      "sanitized": false
+    },
+    {
+      "version": "20261008030926",
+      "name": "roster_mfa_stepup_and_login_anomaly_watch",
+      "original_sha256": "6458a4b432e74177c70b7f89c1a7892a4e14ca3eda251c72553ab0cf9d74cf1b",
       "sanitized": false
     }
   ]
