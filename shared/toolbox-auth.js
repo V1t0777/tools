@@ -43,7 +43,8 @@
     if(notify){
       const event=session?'SIGNED_IN':'SIGNED_OUT';
       listeners.forEach(fn=>{try{fn(event,session)}catch{}});
-      try{bc?.postMessage({source:tabId,event,session})}catch{}
+      // Only broadcast a non-sensitive invalidation signal. Other tabs read their own session from same-origin storage.
+      try{bc?.postMessage({source:tabId,event})}catch{}
     }
   }
   function current(){session=readStored();return session;}
@@ -218,13 +219,14 @@
     if(e.key!==STORE)return;authGeneration++;session=readStored();const event=session?'SIGNED_IN':'SIGNED_OUT';listeners.forEach(fn=>{try{fn(event,session)}catch{}});
   });
   bc?.addEventListener('message',e=>{
-    if(e.data?.source===tabId)return;authGeneration++;session=readStored();const event=session?'SIGNED_IN':'SIGNED_OUT';listeners.forEach(fn=>{try{fn(event,session)}catch{}});
+    if(!e.data||e.data.source===tabId||!['SIGNED_IN','SIGNED_OUT'].includes(e.data.event))return;
+    authGeneration++;session=readStored();const event=session?'SIGNED_IN':'SIGNED_OUT';listeners.forEach(fn=>{try{fn(event,session)}catch{}});
   });
 
   async function foregroundProbe(){
     if(global.document?.hidden||global.navigator?.onLine===false||!current())return;
     try{await probe(false)}catch(err){
-      if(!['SESSION_REVOKED','AUTH_REQUIRED'].includes(err?.code))console.warn('toolbox session probe failed',err);
+      if(!['SESSION_REVOKED','AUTH_REQUIRED'].includes(err?.code))console.warn('toolbox session probe failed',err?.code||'UNAVAILABLE');
     }
   }
   let probeTimer=null;
