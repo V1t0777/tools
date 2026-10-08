@@ -62,3 +62,9 @@ test('every authoritative game broadcast leaves legacy topics behind',()=>{
   assert.match(sql,/game_event','blackjack:'[\s\S]{0,160}realtime_token::text/);
   assert.match(sql,/guess_result'[\s\S]{0,180}realtime_token::text/);
 });
+
+test('blackjack fences delayed connections after an access epoch changes',()=>{
+  assert.match(bj,/let realtimeConnectEpoch = 0/);
+  assert.match(bj,/generation !== realtimeConnectEpoch/);
+  assert.match(bj,/function leaveRealtime\(stopPoll = true\) \{\s*realtimeConnectEpoch\+\+/);
+});
