@@ -71,7 +71,13 @@
   }
   function adoptState(next){
     const previousStatus=state?.room?.status,previousRound=state?.round?.id||null;
+    const previousRoom=state?.room;
+    if(previousRoom?.id===next?.room?.id && Number(next.room.realtime_generation||0)<Number(previousRoom.realtime_generation||0))return;
     state=next;
+    if(previousRoom?.id===next?.room?.id && previousRoom.realtime_token!==next.room.realtime_token && !suspended){
+      leaveRealtime(false);
+      connectRealtime().catch(()=>scheduleReconnect());
+    }
     if(previousStatus!==next?.room?.status||previousRound!==(next?.round?.id||null))transitionRetryAt=0;
     applyScores(next.score_state);
     for(const p of state?.players||[])if(scoreTotals.has(p.member_id))p.score=scoreTotals.get(p.member_id);
@@ -278,7 +284,9 @@
       else if(['timeout','error','disconnected'].includes(status)){transportFailed=true;scheduleReconnect(8000);}
     }}});
     realtime=client;realtimeToken=auth.access_token;await client.realtime.setAuth(auth.access_token);if(!current()){client.realtime.disconnect();return;}
-    const ch=client.channel(`pictionary:${roomId}`,{config:{private:true,presence:{key:auth.user.id},broadcast:{ack:false,self:false}}});
+    const nonce=state?.room?.realtime_token;
+    const topic=nonce?`pictionary:${roomId}:${nonce}`:`pictionary:${roomId}`;
+    const ch=client.channel(topic,{config:{private:true,presence:{key:auth.user.id},broadcast:{ack:false,self:false}}});
     channel=ch;
     const on=(event,fn)=>ch.on('broadcast',{event},({payload})=>{if(current())fn(payload);});
     on('stroke',receiveStroke);on('snapshot',receiveSnapshot);
@@ -286,6 +294,8 @@
     on('sync_request',p=>{if(isDrawer()&&p?.round_id===currentRoundId)sendSnapshot();});
     on('guess_pending',receiveGuessPending);on('guess_result',receiveGuessResult);on('state_sync',receiveStateSync);on('state_changed',p=>{if(!p?.sync)requestState();});
     on('ping',handlePing);on('pong',handlePong);
+    // The old channel never carries the replacement token; fetch authorized state.
+    on('channel_rotated',()=>{leaveRealtime(false);requestState(0);});
     ch.on('presence',{event:'sync'},()=>{if(!current())return;presenceMembers=new Set(Object.values(ch.presenceState()).flat().map(x=>x.member_id));renderPlayers();});
     ch.subscribe(async status=>{
       if(!current())return;

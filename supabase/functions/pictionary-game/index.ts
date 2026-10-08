@@ -122,7 +122,7 @@ async function state(roomId:string,member:any){
   }
   const scoreSnapshot=await admin.rpc("pictionary_score_state_service",{p_room_id:roomId});
   if(scoreSnapshot.error)throw scoreSnapshot.error;
-  return {room:{id:r.id,code:r.room_code,host_member_id:byUser.get(r.host_user_id)?.member_id||r.host_user_id,status:r.status,round_no:r.current_round_no,rounds_per_player:r.rounds_per_player,total_rounds:r.total_rounds,current_drawer_member_id:byUser.get(r.current_drawer_user_id)?.member_id||r.current_drawer_user_id,ends_at:r.ends_at,summary_until:r.summary_until},players:ps.map(({user_id,...p})=>p),round:roundData,answer,revealed_answer,options,guesses,solved_members,score_state:scoreSnapshot.data};
+  return {room:{id:r.id,code:r.room_code,realtime_token:r.realtime_token,realtime_generation:r.realtime_generation,host_member_id:byUser.get(r.host_user_id)?.member_id||r.host_user_id,status:r.status,round_no:r.current_round_no,rounds_per_player:r.rounds_per_player,total_rounds:r.total_rounds,current_drawer_member_id:byUser.get(r.current_drawer_user_id)?.member_id||r.current_drawer_user_id,ends_at:r.ends_at,summary_until:r.summary_until},players:ps.map(({user_id,...p})=>p),round:roundData,answer,revealed_answer,options,guesses,solved_members,score_state:scoreSnapshot.data};
 }
 function realtimeState(snapshot:any){
   const round=snapshot.round?{
