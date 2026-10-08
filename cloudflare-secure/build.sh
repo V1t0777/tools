@@ -17,7 +17,7 @@ cp games/index.html "$OUT/games/"
 cp stack/index.html "$OUT/stack/"
 cp pictionary/index.html pictionary/app.js pictionary/style.css "$OUT/pictionary/"
 cp blackjack/index.html blackjack/app.js blackjack/style.css "$OUT/blackjack/"
-cp shared/toolbox-auth.js shared/toolbox-ui.css shared/toolbox-motion.css shared/toolbox-ui.js "$OUT/shared/"
+cp shared/toolbox-auth.js shared/toolbox-mfa.js shared/toolbox-ui.css shared/toolbox-motion.css shared/toolbox-ui.js "$OUT/shared/"
 cp shared/vendor/supabase-2.57.4.min.js shared/vendor/supabase-LICENSE "$OUT/shared/vendor/"
 cp holidays/*.json "$OUT/holidays/"
 
