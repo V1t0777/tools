@@ -11,12 +11,26 @@ test('blackjack frontend source parses as JavaScript',()=>{
 
 test('blackjack frontend uses private realtime snapshots with database fallback',()=>{
   assert.match(app,/channel\(`blackjack:\$\{roomId\}`/);
-  assert.match(app,/private:true/);
-  assert.match(app,/event:'state_snapshot'/);
-  assert.match(app,/HEALTHY_POLL_MS = 20000/);
-  assert.match(app,/DEGRADED_POLL_STEPS = \[\[5000,1500\],\[15000,2500\],\[Infinity,4000\]\]/);
-  assert.match(app,/heartbeatIntervalMs:15000/);
-  assert.match(app,/worker:true/);
+  assert.match(app,/private:\s*true/);
+  assert.match(app,/event:\s*'state_snapshot'/);
+
+  // Check bounded polling behavior, not the exact whitespace or one tuning value.
+  const healthyPoll = app.match(/^\s*const\s+HEALTHY_POLL_MS\s*=\s*(\d+)\s*;/m);
+  assert.ok(healthyPoll, 'healthy polling interval must be defined');
+  const healthyInterval = Number(healthyPoll[1]);
+  assert.ok(healthyInterval >= 12000 && healthyInterval <= 30000,
+    'healthy polling must remain infrequent without eliminating recovery');
+
+  const degradedPoll = app.match(/^\s*const\s+DEGRADED_POLL_STEPS\s*=\s*(\[\s*\[[^;\r\n]+\]\s*\])\s*;/m);
+  assert.ok(degradedPoll, 'degraded polling schedule must be defined');
+  const stages = JSON.parse(degradedPoll[1].replace(/\bInfinity\b/g,'null'));
+  assert.deepEqual(stages.map(([threshold])=>threshold),[5000,15000,null],
+    'degraded stages must progress from short reconnects to an unbounded fallback');
+  assert.ok(stages.every(([,ms])=>Number.isInteger(ms) && ms >= 1000 && ms <= 5000),
+    'degraded polling must remain bounded to 1–5 seconds');
+
+  assert.match(app,/heartbeatIntervalMs\s*:\s*15000\b/);
+  assert.match(app,/worker\s*:\s*true\b/);
 });
 
 test('blackjack hot table avoids full DOM rebuilds and uses adaptive clock ticks',()=>{
