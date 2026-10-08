@@ -36,7 +36,13 @@ for pattern in "${patterns[@]}"; do
   fi
 done
 
-echo "== Personal-data literals in public migration/catalog source =="\nnode scripts/privacy-scan.mjs\n\necho "== XSS and script-source audit =="\nnode scripts/xss-audit.mjs\n\necho "== Sensitive file-name scan =="
+echo "== Personal-data literals in public migration/catalog source =="
+node scripts/privacy-scan.mjs
+
+echo "== XSS and script-source audit =="
+node scripts/xss-audit.mjs
+
+echo "== Sensitive file-name scan =="
 while IFS= read -r path; do
   case "$path" in
     .env.example) ;;
