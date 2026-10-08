@@ -1,5 +1,6 @@
--- Recorded from the production hardening migration 20261008011529.
--- Replaced by trigger-backed invoker hardening in the immediately following migration.
+-- Keep the existing inventory RPC's explicit authenticated-user and group ownership checks.
+-- SECURITY DEFINER lets it write the authoritative inventory and history together,
+-- while PostgREST clients lose direct write access to both tables.
 ALTER FUNCTION public.bead_set_inventory(text,uuid,text,text,text,text,integer,text) SECURITY DEFINER;
 REVOKE ALL ON FUNCTION public.bead_set_inventory(text,uuid,text,text,text,text,integer,text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.bead_set_inventory(text,uuid,text,text,text,text,integer,text) TO authenticated;
@@ -7,6 +8,7 @@ REVOKE INSERT, UPDATE, DELETE ON TABLE public.bead_inventory FROM PUBLIC, anon, 
 REVOKE INSERT ON TABLE public.bead_inventory_events FROM PUBLIC, anon, authenticated;
 DROP POLICY IF EXISTS bead_inventory_events_insert ON public.bead_inventory_events;
 
+-- Limit client-originated optimistic guesses; no changes to stroke messages or Realtime timing.
 CREATE OR REPLACE FUNCTION private.is_pictionary_guess_sender(p_topic text, p_payload jsonb)
  RETURNS boolean
  LANGUAGE sql
