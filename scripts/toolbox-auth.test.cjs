@@ -94,3 +94,20 @@ test('cross-tab BroadcastChannel sends only event metadata, never session creden
   assert.equal(messages[1].event,'SIGNED_OUT');
   assert.deepEqual(Object.keys(messages[1]).sort(),['event','source']);
 });
+
+test('proactively rotates a browser-held JWT older than ten minutes',async()=>{
+  const {a,sandbox,storage}=setup(3600);
+  sandbox.atob=value=>Buffer.from(value,'base64').toString('utf8');
+  const older=JSON.parse(storage.get(STORE));
+  older.access_token='x.'+Buffer.from(JSON.stringify({iat:Math.floor(Date.now()/1000)-750,sub:'123',aal:'aal1'})).toString('base64url')+'.y';
+  storage.set(STORE,JSON.stringify(older));
+  let count=0;
+  sandbox.fetch=async url=>{
+    if(url.includes('grant_type=refresh_token')){count++;return response(200,{access_token:'rotated',refresh_token:'new-rotated-refresh',expires_at:Date.now()/1000+3600});}
+    return response(200,{active:true});
+  };
+  const session=await a.getSession();
+  assert.equal(count,1);
+  assert.equal(session.access_token,'rotated');
+  assert.equal(a.peekSession().refresh_token,'new-rotated-refresh');
+});
