@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {resolve,dirname,extname} from 'node:path';
 const root=resolve(import.meta.dirname,'..');
 const pages=['cloudflare-secure/index.html','admin-night-shift/index.html','night-shift/index.html','beads/index.html','dinner/index.html','pictionary/index.html','blackjack/index.html','flappy/index.html','stack/index.html','games/index.html'];
-const scripts=['shared/toolbox-ui.js','shared/toolbox-auth.js','shared/toolbox-mfa.js','beads/app.js','dinner/app.js','pictionary/app.js','blackjack/app.js'];
+const scripts=['shared/toolbox-ui.js','shared/toolbox-auth.js','shared/toolbox-mfa.js','beads/app.js','beads/mard-palette.js','dinner/app.js','pictionary/app.js','blackjack/app.js'];
 const allowedSinks=new Map([['beads/app.js',4],['pictionary/app.js',6],['flappy/index.html',6],['stack/index.html',9],['shared/toolbox-ui.js',1]]);
 let failed=false;
 function reject(path,message){process.stderr.write('::error file='+path+'::'+message+'\n');failed=true;}
