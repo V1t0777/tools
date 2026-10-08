@@ -41,7 +41,7 @@ const cors=(req:Request)=>({
 const reply=(req:Request,body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:cors(req)});
 function fail(message:string,status=400,code?:string):never{
   const error=new Error(message) as Error&{status?:number;code?:string};
-  error.status=status;error.code=code;throw error;
+  error.status=status;error.code=code;(error as any).safeToExpose=true;throw error;
 }
 
 type Member={id:string;user_id:string;nickname:string;color:string;excluded:boolean};
@@ -260,7 +260,8 @@ Deno.serve(async(req:Request)=>{
     if(action==="submit_run")return reply(req,await submitRun(req,body));
     fail("未知操作",400,"UNKNOWN_ACTION");
   }catch(error){
-    console.error(error);
-    return reply(req,{error:(error as Error)?.message||"服务器暂时不可用",code:(error as any)?.code},(error as any)?.status||400);
+    const safe=(error as any)?.safeToExpose===true;
+    console.error("flappy-game",{code:(error as any)?.code||"UNEXPECTED",status:safe?(error as any).status:500});
+    return reply(req,{error:safe?(error as Error).message:"服务器暂时不可用",code:safe?((error as any)?.code||"ACTION_REJECTED"):"INTERNAL_ERROR"},safe?((error as any)?.status||400):500);
   }
 });
