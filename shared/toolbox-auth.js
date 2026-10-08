@@ -212,7 +212,7 @@
     if(err.code==='NETWORK_TIMEOUT')return '连接超时，请重试，无需重复输入密码。';
     if(err.code==='NETWORK_ERROR')return '无法连接登录服务，请检查网络。';
     if(['invalid_credentials','email_not_confirmed'].includes(err.code)||[400,401].includes(err.status))return '邮箱或密码错误。';
-    return err.message||'登录失败，请稍后再试。';
+    return '操作暂时不可用，请稍后重试。';
   }
 
   global.addEventListener?.('storage',e=>{
