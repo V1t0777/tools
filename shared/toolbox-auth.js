@@ -173,6 +173,25 @@
     if(s?.access_token)authRequest('/auth/v1/logout?scope=local',{authorization:s.access_token}).catch(()=>{});
     return true;
   }
+  // Accept only an elevated session returned by a successful Supabase GoTrue MFA verification.
+  async function adoptVerifiedSession(value){
+    const before=current();
+    if(!before?.access_token||!value?.access_token||!value?.refresh_token)
+      throw new ToolboxAuthError('登录会话不完整','AUTH_REQUIRED',401);
+    const payload=token=>{
+      try{const segment=token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');return JSON.parse(global.atob(segment));}
+      catch{return null;}
+    };
+    const prior=payload(before.access_token),next=payload(value.access_token);
+    if(!prior?.sub||next?.sub!==prior.sub||next?.aal!=='aal2')
+      throw new ToolboxAuthError('安全验证未通过','MFA_REQUIRED',403);
+    if(before.user?.id&&next.sub!==before.user.id)
+      throw new ToolboxAuthError('登录身份已变化','MFA_IDENTITY_MISMATCH',403);
+    const expires_at=Number(value.expires_at)||Math.floor(Date.now()/1000)+Number(value.expires_in||3600);
+    const verified={...before,...value,expires_at};
+    authGeneration++;writeStored(verified);lastProbe=refreshAfter=0;
+    return verified;
+  }
   function onAuthStateChange(callback){listeners.add(callback);return {data:{subscription:{unsubscribe:()=>listeners.delete(callback)}}};}
 
   class QueryBuilder{
@@ -239,5 +258,5 @@
   global.addEventListener?.('pagehide',()=>{if(probeTimer)global.clearInterval?.(probeTimer);probeTimer=null;});
 
   session=readStored();
-  global.ToolboxAuth={url:URL,key:KEY,storeKey:STORE,createClient,signIn,signOut,refresh,onAuthStateChange,getSession:ensure,peekSession:current,rest,rpc,probe,authMessage,lockRemaining,ToolboxAuthError};
+  global.ToolboxAuth={url:URL,key:KEY,storeKey:STORE,createClient,signIn,signOut,refresh,onAuthStateChange,getSession:ensure,peekSession:current,rest,rpc,probe,adoptVerifiedSession,authMessage,lockRemaining,ToolboxAuthError};
 })(window);
