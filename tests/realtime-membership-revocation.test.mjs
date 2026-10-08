@@ -2,7 +2,7 @@ import {readFileSync} from 'node:fs';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 
-const sql=readFileSync(new URL('../supabase/migrations/20261008014500_realtime_membership_channel_rotation.sql',import.meta.url),'utf8');
+const sql=readFileSync(new URL('../supabase/migrations/20261008013653_realtime_membership_channel_rotation.sql',import.meta.url),'utf8');
 const pic=readFileSync(new URL('../pictionary/app.js',import.meta.url),'utf8');
 const bj=readFileSync(new URL('../blackjack/app.js',import.meta.url),'utf8');
 const picEdge=readFileSync(new URL('../supabase/functions/pictionary-game/index.ts',import.meta.url),'utf8');

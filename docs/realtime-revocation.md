@@ -23,7 +23,7 @@ Supabase Realtime authorizes Broadcast/Presence on channel join and caches permi
 
 1. Merge the frontend/Edge deployment to `main`; verify the secure Cloudflare build is current. The frontend falls back to legacy topics only until `realtime_token` exists.
 2. Deploy the new `pictionary-game` source explicitly, retaining `verify_jwt=true`.
-3. Apply `20261008014500_realtime_membership_channel_rotation.sql` and confirm both games' policies deny old topics. Do not run the migration before updated clients and Edge are ready.
+3. Apply `20261008013653_realtime_membership_channel_rotation.sql` and confirm both games' policies deny old topics. Do not run the migration before updated clients and Edge are ready.
 4. Exercise user leaves, session sign-out, joining after revocation, another member's reconnect, Pictionary canvas and guess text, Blackjack state and emoji messaging, and disconnection/reconnection.
 5. Check Supabase Security Advisor and CI. Realtime's actual multi-browser timing remains a live test to perform with two consenting accounts.
 
