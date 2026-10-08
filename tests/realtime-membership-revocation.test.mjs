@@ -46,3 +46,19 @@ test('clients rebind using an authorized state snapshot, not a broadcast token',
   assert.doesNotMatch(pic,/channel_rotated[^;]*new_token/);
   assert.doesNotMatch(bj,/channel_rotated[^;]*new_token/);
 });
+
+test('every authoritative game broadcast leaves legacy topics behind',()=>{
+  for(const fn of [
+    'private.blackjack_broadcast_state',
+    'private.blackjack_emit_event',
+    'public.pictionary_submit_guess_service',
+    'public.pictionary_submit_guess_v2',
+    'public.pictionary_emit_event_service'
+  ]){
+    const signature='CREATE OR REPLACE FUNCTION '+fn+'(';
+    assert.ok(sql.includes(signature),'missing nonce migration of '+fn);
+  }
+  assert.match(sql,/state_snapshot','blackjack:'[\s\S]{0,160}realtime_token::text/);
+  assert.match(sql,/game_event','blackjack:'[\s\S]{0,160}realtime_token::text/);
+  assert.match(sql,/guess_result'[\s\S]{0,180}realtime_token::text/);
+});
