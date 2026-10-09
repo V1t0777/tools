@@ -96,3 +96,14 @@ multi-device mobile network testing or measure production login percentiles.
 - All `pictionary-game` browser requests use Supabase's documented `forceFunctionRegion=ap-southeast-1` parameter, keeping the database-heavy Edge Function execution in Singapore alongside the project's Postgres region.
 - Early round completion from `pictionary_submit_guess_v2` now uses the same 3.2 second summary window as timer-driven round completion.
 - Explicit regional routing trades automatic region failover for predictable database proximity; the existing client timeout/retry and state reconciliation remain in place.
+
+
+## Client reliability hardening — 2026-10-09
+
+- Canvas buffers are resized only when the physical dimensions actually change. Ordinary state updates never wipe the backing buffer or redraw all strokes.
+- Realtime drawing accepts out-of-order deltas within a 140 ms window (max 32 buffered entries); only unresolved gaps trigger a snapshot/fallback. A complete snapshot clears stale queued deltas.
+- Full-canvas snapshots are sent only in response to recovery requests. Concurrent viewers' requests are coalesced into one room-wide snapshot with an 850 ms cooldown, instead of initiating a new snapshot for each viewer or every long stroke / undo.
+- Transport health and canvas sync status are separate. Missing drawer Pong alone does not mark a connected transport unhealthy, and database canvas fallback is rate-limited.
+- Confirmed channel failure retries quickly (subsecond initial delay with exponential backoff); retries still fence old socket callbacks by connection epoch.
+- Unverified guesses are optimistic only on the sender's screen. Other players receive `guess_result` only after server scoring, never potentially correct plaintext guesses. Migration `20261009143619_pictionary_no_unverified_guesses` removes permission to publish `guess_pending` while retaining the existing server-authoritative result and private-room controls.
+- This is a reliability update, not a claim that client-to-client p95 latency has been measured. Continue dual-device network profiling after release.

@@ -17,6 +17,8 @@
   let sdkPromise=null,initializing=null,startupEpoch=0,loginBusy=false,connectPromise=null,connectDeadline=null,serverHeartbeatAt=0,transportFailed=false;
   let scoreRevision=-1, scoreTotals=new Map(), hintRequested=false, suspended=false;
   let transitionRetryAt=0;
+  let pendingCanvasDeltas=new Map(),canvasGapTimer=null,snapshotBroadcastTimer=null,lastSnapshotBroadcastAt=0;
+  const CANVAS_REORDER_WAIT_MS=140, SNAPSHOT_COALESCE_MS=850;
 
   function show(id){ screens.forEach(x => $(x).classList.toggle('active',x===id)); }
   function toast(message){ const el=$('toast'); el.textContent=message; el.classList.add('show'); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),2300); }
@@ -62,6 +64,8 @@
     busy=false;transitionBusy=false;refreshQueued=false;transitionRetryAt=0;
     clearTimeout(refreshTimer);refreshTimer=null;
     scoreRevision=-1;scoreTotals.clear();
+    clearTimeout(canvasGapTimer);canvasGapTimer=null;pendingCanvasDeltas.clear();
+    clearTimeout(snapshotBroadcastTimer);snapshotBroadcastTimer=null;lastSnapshotBroadcastAt=0;
   }
   function applyScores(data){
     if(!data||!Number.isSafeInteger(Number(data.revision))||Number(data.revision)<scoreRevision||!Array.isArray(data.scores))return;
@@ -189,7 +193,7 @@
     $('eraserBtn').onclick=()=>{erasing=!erasing;$('eraserBtn').classList.toggle('active',erasing);};
     $('undoBtn').onclick=undoStroke; bindHoldClear();
     canvas.addEventListener('pointerdown',pointerDown);canvas.addEventListener('pointermove',pointerMove);canvas.addEventListener('pointerup',pointerUp);canvas.addEventListener('pointercancel',pointerUp);
-    window.addEventListener('resize',()=>{resizeCanvas();redraw();});
+    window.addEventListener('resize',resizeCanvas);
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)resumeRoom();else if(activeStroke)pointerUp({preventDefault(){}});});
     window.addEventListener('pagehide',()=>{if(activeStroke)pointerUp({preventDefault(){}});suspended=true;invalidateRoom();leaveRealtime();});
     window.addEventListener('pageshow',resumeRoom);
@@ -281,7 +285,7 @@
     const client=window.supabase.createClient(ToolboxAuth.url,ToolboxAuth.key,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},realtime:{heartbeatCallback:status=>{
       if(!current())return;
       if(status==='ok'){serverHeartbeatAt=Date.now();transportFailed=false;if(realtimeStatus==='SUBSCRIBED'){clearTimeout(reconnectTimer);reconnectTimer=null;}}
-      else if(['timeout','error','disconnected'].includes(status)){transportFailed=true;scheduleReconnect(8000);}
+      else if(['timeout','error','disconnected'].includes(status)){transportFailed=true;scheduleReconnect(750);}
     }}});
     realtime=client;realtimeToken=auth.access_token;await client.realtime.setAuth(auth.access_token);if(!current()){client.realtime.disconnect();return;}
     const nonce=state?.room?.realtime_token;
@@ -291,8 +295,9 @@
     const on=(event,fn)=>ch.on('broadcast',{event},({payload})=>{if(current())fn(payload);});
     on('stroke',receiveStroke);on('snapshot',receiveSnapshot);
     on('clear',p=>receiveCanvasControl('clear',p));on('undo',p=>receiveCanvasControl('undo',p));
-    on('sync_request',p=>{if(isDrawer()&&p?.round_id===currentRoundId)sendSnapshot();});
-    on('guess_pending',receiveGuessPending);on('guess_result',receiveGuessResult);on('state_sync',receiveStateSync);on('state_changed',p=>{if(!p?.sync)requestState();});
+    on('sync_request',p=>{if(isDrawer()&&p?.round_id===currentRoundId)queueSnapshotBroadcast();});
+    // A provisional guess stays local: broadcasting raw text before scoring can reveal an answer.
+    on('guess_result',receiveGuessResult);on('state_sync',receiveStateSync);on('state_changed',p=>{if(!p?.sync)requestState();});
     on('ping',handlePing);on('pong',handlePong);
     // The old channel never carries the replacement token; fetch authorized state.
     on('channel_rotated',()=>{leaveRealtime(false);requestState(0);});
@@ -307,7 +312,7 @@
         if(!current())return;
         clearInterval(snapshotTimer);snapshotTimer=setInterval(()=>{if(isDrawer()&&canvasDirty)persistCanvasFallback();},2000);
       }else if(['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(status)){
-        lastPongAt=lastDrawerAt=0;transportFailed=true;checkHealth();scheduleReconnect(8000);
+        lastPongAt=lastDrawerAt=0;transportFailed=true;checkHealth();scheduleReconnect(350);
       }
     });
   }
@@ -315,22 +320,24 @@
     return realtimeStatus==='SUBSCRIBED'&&!transportFailed&&Date.now()-serverHeartbeatAt<65000&&window.navigator?.onLine!==false;
   }
   function isCanvasHealthy(){
-    return realtimeStatus==='SUBSCRIBED'&&!canvasNeedsSync&&(isDrawer()?isRealtimeHealthy():Date.now()-lastDrawerAt<5500);
+    return isRealtimeHealthy()&&!canvasNeedsSync;
   }
   function updateRealtimeStatus(){
-    const healthy=isRealtimeHealthy()&&(state?.room.status!=='playing'||isCanvasHealthy());
+    const healthy=isRealtimeHealthy();
+    const canvasRecovering=healthy&&state?.room.status==='playing'&&!isCanvasHealthy();
     for(const id of ['connectionStatus','gameConnectionStatus']){
       const pill=$(id);if(!pill)continue;
-      pill.textContent=healthy?(Number.isFinite(realtimeRtt)?`实时在线 · ${Math.round(realtimeRtt)}ms`:'实时在线'):'同步恢复中';
+      pill.textContent=!healthy?'连接恢复中':canvasRecovering?'实时在线 · 画布同步中':(Number.isFinite(realtimeRtt)?`实时在线 · ${Math.round(realtimeRtt)}ms`:'实时在线');
       pill.classList.toggle('online',healthy);
     }
   }
   function checkHealth(){
     if(!state||suspended||document.hidden||window.navigator?.onLine===false)return;
     const healthy=isRealtimeHealthy();setStatePoll(healthy?3000:1200);updateRealtimeStatus();
-    if(!isCanvasHealthy())pullCanvasFallback(true);
+    if(canvasNeedsSync)pullCanvasFallback(false);
+    if(healthy&&!isDrawer()&&state.room.status==='playing'&&Date.now()-lastDrawerAt>10000)requestCanvas();
     if(healthy&&Date.now()-subscribedAt>20000)reconnectAttempt=0;
-    if(realtimeStatus==='SUBSCRIBED'&&!healthy)scheduleReconnect(8000);
+    if(realtimeStatus==='SUBSCRIBED'&&!healthy)scheduleReconnect(750);
   }
   function startPing(){clearInterval(pingTimer);sendPing();pingTimer=setInterval(sendPing,2000);}
   function sendPing(){
@@ -355,13 +362,14 @@
   }
   function scheduleReconnect(grace=0){
     if(reconnectTimer||document.hidden||suspended||!state||window.navigator?.onLine===false)return;
-    const epoch=roomEpoch,delay=grace+250+Math.random()*Math.min(15000,500*2**Math.min(5,reconnectAttempt++));
+    const epoch=roomEpoch,delay=grace+100+Math.random()*Math.min(12000,350*2**Math.min(5,reconnectAttempt++));
     reconnectTimer=setTimeout(async()=>{reconnectTimer=null;if(epoch!==roomEpoch)return;try{await connectRealtime();}catch{scheduleReconnect();}},delay);
   }
   function leaveRealtime(stopTimers=true){
     connectionEpoch++;connectPromise=null;clearTimeout(connectDeadline);connectDeadline=null;serverHeartbeatAt=0;transportFailed=false;
     clearTimeout(reconnectTimer);reconnectTimer=null;clearInterval(snapshotTimer);clearInterval(pingTimer);
     snapshotTimer=pingTimer=null;
+    clearTimeout(snapshotBroadcastTimer);snapshotBroadcastTimer=null;
     const old=realtime;channel=realtime=null;realtimeToken=null;realtimeStatus='CLOSED';lastPongAt=lastDrawerAt=0;realtimeRtt=null;pendingPings.clear();presenceMembers.clear();
     if(old){Promise.resolve(old.removeAllChannels()).finally(()=>old.realtime.disconnect()).catch(()=>{});}
     if(stopTimers){
@@ -413,7 +421,7 @@
     const status=state.room.status;
     if(status==='lobby'){show('roomScreen');renderLobby();$('wordModal').classList.add('hidden');}
     else if(status==='finished'){show('finishScreen');renderRanking();$('wordModal').classList.add('hidden');}
-    else{show('gameScreen');renderGame();requestAnimationFrame(()=>{resizeCanvas();redraw();});}
+    else{show('gameScreen');renderGame();requestAnimationFrame(()=>resizeCanvas());}
   }
   function renderPlayers(){if(!state)return;const host=state.room.host_member_id;$('players').innerHTML=state.players.map(p=>`<div class="player"><span class="avatar" style="background:${/^#[0-9a-f]{6}$/i.test(p.color)?p.color:'#8EC5FF'}">${escapeHTML(p.nickname.slice(0,1))}</span><b>${escapeHTML(p.nickname)}${p.member_id===host?' 👑':''}</b><small>${presenceMembers.has(p.member_id)?'🟢 在线':'⚪'} · ${p.ready?'已准备':'未准备'}</small></div>`).join('');}
   function renderLobby(){const mine=state.players.find(p=>p.member_id===me.id);const host=state.room.host_member_id===me.id;$('readyBtn').classList.toggle('hidden',host);$('startBtn').classList.toggle('hidden',!host);$('readyBtn').textContent=mine?.ready?'取消准备':'我准备好了';const ready=state.players.filter(p=>p.ready||p.member_id===state.room.host_member_id).length;$('lobbyHint').textContent=host?`已有 ${ready}/${state.players.length} 人准备，至少 2 人且全员准备后可开始。`:'准备好后，等待房主开始。';$('startBtn').disabled=state.players.length<2||ready!==state.players.length;}
@@ -453,20 +461,6 @@
     $('guessFeed').innerHTML=rows.map(g=>`<p class="${g.is_correct?'correct':''}${g.pending?' pending':''}"><b>${escapeHTML(g.nickname||'好友')}</b>：${g.is_correct?'猜中了！':escapeHTML(g.text||'')}${g.pending?'<span class="pending-dot"> ···</span>':g.failed?`<button class="retry-guess" data-retry="${escapeHTML(g.client_id)}">尚未确认 · 重试</button>`:''}</p>`).join('')||'<p class="system">画面就绪，开始猜吧。</p>';
     $('guessFeed').scrollTop=$('guessFeed').scrollHeight;
   }
-  function receiveGuessPending(p){
-    if(!state||!p||p.round_id!==currentRoundId||p.member_id===me?.id||typeof p.client_id!=='string'||typeof p.text!=='string')return;
-    if(state.guesses?.some(g=>g.client_id===p.client_id)||liveGuesses.has(p.client_id))return;
-    const member=state.players.find(x=>x.member_id===p.member_id),text=p.text.trim();
-    if(!member||member.member_id===state.room.current_drawer_member_id||!text||Array.from(text).length>40)return;
-    liveGuesses.set(p.client_id,{client_id:p.client_id,round_id:p.round_id,member_id:member.member_id,nickname:member.nickname,text,is_correct:false,created_at:p.created_at||new Date().toISOString(),pending:true,failed:false,optimistic:true});
-    renderGuessFeed();
-    const epoch=roomEpoch,roundId=currentRoundId,id=p.client_id;
-    setTimeout(()=>{
-      if(epoch!==roomEpoch||roundId!==currentRoundId)return;
-      const current=liveGuesses.get(id);
-      if(current?.optimistic&&current.pending){liveGuesses.delete(id);renderGuessFeed();}
-    },2500);
-  }
   function receiveGuessResult(p){
     if(!state||!p||p.round_id!==currentRoundId||!p.client_id)return;
     const prev=liveGuesses.get(p.client_id)||{};
@@ -504,10 +498,7 @@
     if(!state||item.room_id!==state.room.id||item.round_id!==currentRoundId||guessRequests.has(item.client_id)||guessRequests.size>=4)return;
     const epoch=roomEpoch,id=item.client_id;
     liveGuesses.set(id,{...item,pending:true,failed:false});renderGuessFeed();
-    if(!item.broadcasted){
-      item.broadcasted=true;
-      sendEvent('guess_pending',{client_id:id,round_id:item.round_id,member_id:me.id,text:item.text,created_at:item.created_at});
-    }
+    // Do not broadcast unverified text: a correct guess would disclose the answer.
     const request=api('guess',{room_id:item.room_id,round_id:item.round_id,text:item.text,client_id:id});guessRequests.set(id,request);
     try{
       const data=await request;
@@ -531,7 +522,17 @@
 
   async function shareRoom(){const url=new URL('../pictionary/',location.href);url.searchParams.set('room',state.room.code);const text=`来玩你画我猜！房间码 ${state.room.code}\n${url.href}`;try{if(navigator.share)await navigator.share({title:'你画我猜好友房',text,url:url.href});else{await navigator.clipboard.writeText(text);toast('邀请链接已复制');}}catch(err){if(err.name!=='AbortError')toast('复制失败，请手动分享房间码');}}
 
-  function resizeCanvas(){const rect=canvas.getBoundingClientRect();if(!rect.width)return;const dpr=Math.min(2,window.devicePixelRatio||1);logical={w:rect.width,h:rect.height};canvas.width=Math.round(rect.width*dpr);canvas.height=Math.round(rect.height*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);ctx.lineCap='round';ctx.lineJoin='round';redraw();}
+  function resizeCanvas(){
+    const rect=canvas.getBoundingClientRect();
+    if(!rect.width||!rect.height)return false;
+    const dpr=Math.min(2,window.devicePixelRatio||1);
+    const width=Math.round(rect.width*dpr),height=Math.round(rect.height*dpr);
+    if(canvas.width===width&&canvas.height===height)return false;
+    logical={w:rect.width,h:rect.height};
+    canvas.width=width;canvas.height=height;
+    ctx.setTransform(dpr,0,0,dpr,0,0);ctx.lineCap='round';ctx.lineJoin='round';
+    redraw();return true;
+  }
   function point(e){const r=canvas.getBoundingClientRect();return [Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)),Math.max(0,Math.min(1,(e.clientY-r.top)/r.height))];}
   function pointerDown(e){if(!isDrawer()||state.room.status!=='playing'||activeStroke)return;e.preventDefault();canvas.setPointerCapture(e.pointerId);const p=point(e);activeStroke={id:makeClientId(),color:erasing?'#ffffff':selectedColor,size:brushSize,points:[p]};sendPoints=[p];drawDot(activeStroke,p);flushStroke(false);scheduleServerCanvasSave();}
   function pointerMove(e){
@@ -560,38 +561,78 @@
     if(done){
       const replace=activeStroke.points.length<=600;
       sendEvent('stroke',{...payload,points:encodePoints(replace?activeStroke.points:sendPoints),done:true,replace});
-      sendPoints=[];if(!replace)sendSnapshot();return;
+      sendPoints=[];return;
     }
     sendEvent('stroke',{...payload,points:encodePoints(sendPoints),done:false});
     sendPoints=[];
   }
-  function acceptCanvasDelta(p){
-    if(!p||p.round_id!==currentRoundId||isDrawer()||!Number.isSafeInteger(p.revision)||p.revision<=canvasRevision)return false;
+  function applyCanvasDelta(kind,p){
     lastDrawerAt=Date.now();
-    if(p.base_revision!==canvasRevision){canvasNeedsSync=true;requestCanvas();return false;}
-    canvasRevision=p.revision;return true;
+    canvasRevision=p.revision;canvasNeedsSync=false;
+    if(kind==='stroke'){
+      const incoming=decodePoints(p.points,p.q);let s=strokes.find(x=>x.id===p.id);
+      if(p.replace){
+        const next={id:p.id,color:p.color||'#111827',size:Number(p.size)||7,points:incoming};
+        if(s)Object.assign(s,next);else strokes.push(next);
+        redraw();return;
+      }
+      if(!s){s={id:p.id,color:p.color||'#111827',size:Number(p.size)||7,points:[]};strokes.push(s);}
+      for(const pt of incoming){
+        const last=s.points.at(-1);
+        if(!last||last[0]!==pt[0]||last[1]!==pt[1]){
+          s.points.push(pt);if(last)drawSegment(s,last,pt);else drawDot(s,pt);
+        }
+      }
+    }else{
+      if(kind==='clear')strokes=[];
+      else strokes=strokes.filter(s=>s.id!==p.id);
+      activeStroke=null;snapshotAssemblies.clear();redraw();
+    }
   }
-  function receiveStroke(p){
-    if(!p?.id||!Array.isArray(p.points)||!acceptCanvasDelta(p))return;
-    const incoming=decodePoints(p.points,p.q);let s=strokes.find(x=>x.id===p.id);
-    if(p.replace){const next={id:p.id,color:p.color||'#111827',size:Number(p.size)||7,points:incoming};if(s)Object.assign(s,next);else strokes.push(next);redraw();return;}
-    if(!s){s={id:p.id,color:p.color||'#111827',size:Number(p.size)||7,points:[]};strokes.push(s);}
-    for(const pt of incoming){const last=s.points.at(-1);if(!last||last[0]!==pt[0]||last[1]!==pt[1]){s.points.push(pt);if(last)drawSegment(s,last,pt);else drawDot(s,pt);}}
+  function drainCanvasDeltas(){
+    while(pendingCanvasDeltas.has(canvasRevision)){
+      const item=pendingCanvasDeltas.get(canvasRevision);
+      pendingCanvasDeltas.delete(canvasRevision);
+      if(item.p.revision<=canvasRevision)continue;
+      applyCanvasDelta(item.kind,item.p);
+    }
+    for(const [base] of pendingCanvasDeltas)if(base<canvasRevision)pendingCanvasDeltas.delete(base);
+    if(!pendingCanvasDeltas.size){clearTimeout(canvasGapTimer);canvasGapTimer=null;}
   }
+  function queueCanvasDelta(kind,p){
+    if(!p||p.round_id!==currentRoundId||isDrawer()||
+       !Number.isSafeInteger(p.revision)||!Number.isSafeInteger(p.base_revision)||
+       p.revision<=canvasRevision||p.base_revision<canvasRevision||p.revision<=p.base_revision)return;
+    if(kind==='stroke'&&(!p.id||!Array.isArray(p.points)))return;
+    if(p.base_revision>canvasRevision){
+      if(pendingCanvasDeltas.size>=32&&!pendingCanvasDeltas.has(p.base_revision)){
+        pendingCanvasDeltas.clear();clearTimeout(canvasGapTimer);canvasGapTimer=null;
+        canvasNeedsSync=true;requestCanvas(true);return;
+      }
+      pendingCanvasDeltas.set(p.base_revision,{kind,p});
+      if(!canvasGapTimer)canvasGapTimer=setTimeout(()=>{
+        canvasGapTimer=null;
+        if(!pendingCanvasDeltas.size)return;
+        pendingCanvasDeltas.clear();canvasNeedsSync=true;
+        requestCanvas(true);pullCanvasFallback(false);
+      },CANVAS_REORDER_WAIT_MS);
+      return;
+    }
+    applyCanvasDelta(kind,p);drainCanvasDeltas();
+  }
+  function receiveStroke(p){queueCanvasDelta('stroke',p);}
   function receiveCanvasControl(event,p){
-    if(!acceptCanvasDelta(p))return;
-    if(event==='clear')strokes=[];else strokes=strokes.filter(s=>s.id!==p.id);
-    activeStroke=null;snapshotAssemblies.clear();redraw();
+    if(event==='clear'||event==='undo')queueCanvasDelta(event,p);
   }
 
   function drawDot(s,p){ctx.fillStyle=s.color;ctx.beginPath();ctx.arc(p[0]*logical.w,p[1]*logical.h,s.size/2,0,Math.PI*2);ctx.fill();}
   function drawSegment(s,a,b){ctx.strokeStyle=s.color;ctx.lineWidth=s.size;ctx.beginPath();ctx.moveTo(a[0]*logical.w,a[1]*logical.h);ctx.lineTo(b[0]*logical.w,b[1]*logical.h);ctx.stroke();}
   function redraw(){if(!logical.w)return;ctx.clearRect(0,0,logical.w,logical.h);ctx.fillStyle='#fff';ctx.fillRect(0,0,logical.w,logical.h);for(const s of strokes){if(s.points.length===1)drawDot(s,s.points[0]);for(let i=1;i<s.points.length;i++)drawSegment(s,s.points[i-1],s.points[i]);}if(activeStroke){if(activeStroke.points.length===1)drawDot(activeStroke,activeStroke.points[0]);for(let i=1;i<activeStroke.points.length;i++)drawSegment(activeStroke,activeStroke.points[i-1],activeStroke.points[i]);}}
-  function undoStroke(){if(!isDrawer()||!strokes.length)return;if(activeStroke)pointerUp({preventDefault(){}});const s=strokes.pop(),base=nextCanvasRevision();redraw();saveCanvas();sendEvent('undo',{round_id:currentRoundId,id:s.id,base_revision:base,revision:canvasRevision});sendSnapshot();persistCanvasFallback();}
+  function undoStroke(){if(!isDrawer()||!strokes.length)return;if(activeStroke)pointerUp({preventDefault(){}});const s=strokes.pop(),base=nextCanvasRevision();redraw();saveCanvas();sendEvent('undo',{round_id:currentRoundId,id:s.id,base_revision:base,revision:canvasRevision});persistCanvasFallback();}
   function bindHoldClear(){
     let t=null;const b=$('clearBtn');
     const cancel=()=>{clearTimeout(t);t=null;b.classList.remove('holding');};
-    b.addEventListener('pointerdown',e=>{if(!isDrawer())return;e.preventDefault();b.classList.add('holding');t=setTimeout(()=>{strokes=[];activeStroke=null;sendPoints=[];const base=nextCanvasRevision();redraw();saveCanvas();sendEvent('clear',{round_id:currentRoundId,revision:canvasRevision,base_revision:base});sendSnapshot();persistCanvasFallback();toast('画布已清空');cancel();},480);});
+    b.addEventListener('pointerdown',e=>{if(!isDrawer())return;e.preventDefault();b.classList.add('holding');t=setTimeout(()=>{strokes=[];activeStroke=null;sendPoints=[];const base=nextCanvasRevision();redraw();saveCanvas();sendEvent('clear',{round_id:currentRoundId,revision:canvasRevision,base_revision:base});persistCanvasFallback();toast('画布已清空');cancel();},480);});
     ['pointerup','pointercancel','pointerleave'].forEach(x=>b.addEventListener(x,cancel));
   }
   function storageKey(){return currentRoundId?`pictionary.canvas.${currentRoundId}`:'';}
@@ -599,6 +640,8 @@
   function switchRound(id){
     clearTimeout(sendTimer);clearTimeout(serverSaveTimer);sendTimer=serverSaveTimer=null;
     currentRoundId=id;strokes=[];activeStroke=null;sendPoints=[];snapshotAssemblies.clear();lastCanvasVersion=0;
+    pendingCanvasDeltas.clear();clearTimeout(canvasGapTimer);canvasGapTimer=null;
+    clearTimeout(snapshotBroadcastTimer);snapshotBroadcastTimer=null;lastSnapshotBroadcastAt=0;
     canvasRevision=0;canvasDirty=false;canvasNeedsSync=!!id;lastDrawerAt=0;lastCanvasCheck=lastSnapshotRequest=0;hintRequested=false;
     liveGuesses.clear();appliedGuessResults.clear();guessRequests.clear();
     if(id&&isDrawer()){
@@ -607,16 +650,28 @@
     }
     redraw();if(id){requestCanvas();pullCanvasFallback(true);}
   }
-  function requestCanvas(){
-    if(!currentRoundId||isDrawer()||Date.now()-lastSnapshotRequest<700)return;
-    lastSnapshotRequest=Date.now();sendEvent('sync_request',{member_id:me.id,round_id:currentRoundId});
+  function requestCanvas(urgent=false){
+    if(!currentRoundId||isDrawer()||!channel||realtimeStatus!=='SUBSCRIBED')return;
+    const now=Date.now(),minInterval=urgent?700:2500;
+    if(now-lastSnapshotRequest<minInterval)return;
+    lastSnapshotRequest=now;
+    sendEvent('sync_request',{member_id:me.id,round_id:currentRoundId});
+  }
+  function queueSnapshotBroadcast(){
+    if(!currentRoundId||!isDrawer()||snapshotBroadcastTimer)return;
+    // A single full-room snapshot answers all concurrent viewers' requests.
+    const delay=Math.max(70,SNAPSHOT_COALESCE_MS-(Date.now()-lastSnapshotBroadcastAt));
+    snapshotBroadcastTimer=setTimeout(()=>{
+      snapshotBroadcastTimer=null;sendSnapshot();
+    },delay);
   }
   function sendSnapshot(){
-    if(!currentRoundId||!isDrawer())return;
+    if(!currentRoundId||!isDrawer()||realtimeStatus!=='SUBSCRIBED')return;
     if(activeStroke&&sendPoints.length)flushStroke(false);
     const text=JSON.stringify(canvasPayload()),size=12000,total=Math.max(1,Math.ceil(text.length/size));
+    if(total>100){console.warn('画布快照过大，将使用数据库恢复');return;}
+    lastSnapshotBroadcastAt=Date.now();
     const id=makeClientId(),roundId=currentRoundId,revision=canvasRevision,epoch=connectionEpoch;
-    // Keep each UTF-8 payload bounded (the encoded canvas contains ASCII only).
     for(let i=0;i<total;i++){
       setTimeout(()=>{if(epoch===connectionEpoch&&roundId===currentRoundId)sendEvent('snapshot',{snapshot_id:id,round_id:roundId,revision,index:i,total,part:text.slice(i*size,(i+1)*size)});},i*8);
     }
@@ -626,7 +681,9 @@
     // Equal versions never replace already-applied drawing operations.
     if(revision===canvasRevision&&!canvasNeedsSync)return false;
     if(isDrawer()&&(activeStroke||canvasDirty))return false;
-    canvasRevision=revision;strokes=next;activeStroke=null;canvasNeedsSync=false;redraw();return true;
+    canvasRevision=revision;strokes=next;activeStroke=null;canvasNeedsSync=false;
+    pendingCanvasDeltas.clear();clearTimeout(canvasGapTimer);canvasGapTimer=null;
+    redraw();return true;
   }
   function receiveSnapshot(p){
     if(!p||p.round_id!==currentRoundId||isDrawer()||!p.snapshot_id||!Number.isSafeInteger(p.revision)||p.revision<canvasRevision)return;
@@ -670,7 +727,8 @@
     if(window.navigator?.onLine===false||canvasFetchBusy||!state||!currentRoundId||state.room.status!=='playing'||document.hidden||suspended)return;
     if(isDrawer()&&(activeStroke||canvasDirty))return;
     const now=Date.now();
-    if(!force&&now-lastCanvasCheck<(isCanvasHealthy()?5000:650))return;
+    if(!force&&!canvasNeedsSync)return;
+    if(now-lastCanvasCheck<(force?700:(isRealtimeHealthy()?5000:1500)))return;
     lastCanvasCheck=now;canvasFetchBusy=true;
     const epoch=roomEpoch,roundId=currentRoundId,roomId=state.room.id;
     try{
