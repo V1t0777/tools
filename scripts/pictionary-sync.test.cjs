@@ -5,8 +5,8 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 const path=require('node:path');
 const source=fs.readFileSync(path.join(__dirname,'../pictionary/app.js'),'utf8');
-const fields=['state','me','currentRoundId','strokes','canvasRevision','canvasDirty','canvasNeedsSync','lastDrawerAt','lastPongAt','realtimeStatus','suspended','scoreRevision','roomEpoch','connectionEpoch','clockTimer','canvasSyncTimer','heartbeatTimer','pollTimer','refreshQueued','transitionBusy','guessRequests','liveGuesses','pendingPings','reconnectTimer','subscribedAt','serverHeartbeatAt','transportFailed','reconnectAttempt'];
-const injected=source.replace('  boot();',`globalThis.audit={api,initializeSession,bind,enterRoom,connectRealtime,leaveRealtime,refreshState,requestState,exitToHome,adoptState,applyScores,receiveGuessResult,submitGuess,deliverGuess,hasGuessed,switchRound,receiveStroke,receiveCanvasControl,receiveSnapshot,applyCanvasSnapshot,pullCanvasFallback,persistCanvasFallback,sendSnapshot,sendPing,handlePong,isRealtimeHealthy,isCanvasHealthy,checkHealth,startRoomTimers,resumeRoom,
+const fields=['state','me','currentRoundId','strokes','canvasRevision','canvasDirty','canvasNeedsSync','lastDrawerAt','lastPongAt','realtimeStatus','suspended','scoreRevision','roomEpoch','connectionEpoch','clockTimer','canvasSyncTimer','heartbeatTimer','pollTimer','refreshQueued','transitionBusy','guessRequests','liveGuesses','pendingPings','reconnectTimer','subscribedAt','serverHeartbeatAt','transportFailed','reconnectAttempt','pendingCanvasDeltas','canvasGapTimer','snapshotBroadcastTimer'];
+const injected=source.replace('  boot();',`globalThis.audit={api,initializeSession,bind,enterRoom,connectRealtime,leaveRealtime,refreshState,requestState,exitToHome,adoptState,applyScores,receiveGuessResult,submitGuess,deliverGuess,hasGuessed,switchRound,receiveStroke,receiveCanvasControl,queueCanvasDelta,queueSnapshotBroadcast,resizeCanvas,receiveSnapshot,applyCanvasSnapshot,pullCanvasFallback,persistCanvasFallback,sendSnapshot,sendPing,handlePong,isRealtimeHealthy,isCanvasHealthy,checkHealth,startRoomTimers,resumeRoom,
 setApi(fn){api=fn;},set(v){${fields.map(f=>`if('${f}' in v)${f}=v.${f};`).join('')}} ,get(){return {${fields.join(',')}}}};`);
 function setup(){
  const elements=new Map(),timeouts=new Map(),intervals=new Map(),events=new Map(),channels=[];
@@ -44,10 +44,12 @@ test('HTTP canvas requested during outage cannot overwrite newer realtime state'
  resolve({version:11,strokes:[stroke('old')]});await pending;
  assert.equal(a.get().strokes[0].id,'new');
 });
-test('missing delta requests repair and complete snapshot converges',()=>{
- const {a}=setup();a.set({canvasRevision:10});
+test('missing delta buffers briefly before repair; authoritative snapshot converges',async()=>{
+ const {a,runTimers}=setup();a.set({canvasRevision:10});
  a.receiveStroke({id:'x',round_id:'r1',base_revision:11,revision:12,points:[[0,0]]});
- assert.equal(a.get().canvasNeedsSync,true);assert.equal(a.get().canvasRevision,10);
+ assert.equal(a.get().canvasNeedsSync,false);assert.equal(a.get().canvasRevision,10);
+ await runTimers(140);
+ assert.equal(a.get().canvasNeedsSync,true);
  a.receiveSnapshot({snapshot_id:'s',round_id:'r1',revision:12,total:1,index:0,part:JSON.stringify([stroke('x')])});
  assert.equal(a.get().canvasNeedsSync,false);assert.equal(a.get().canvasRevision,12);
 });
@@ -59,7 +61,7 @@ test('out of order snapshot chunks do not restore a pre-clear canvas',()=>{
  assert.equal(a.get().strokes.length,0);
 });
 test('non-drawer pong does not suppress canvas fallback',()=>{
- const {a}=setup();a.set({realtimeStatus:'SUBSCRIBED',serverHeartbeatAt:Date.now(),lastDrawerAt:0});a.get().pendingPings.set('p',Date.now()-20);
+ const {a}=setup();a.set({realtimeStatus:'SUBSCRIBED',serverHeartbeatAt:Date.now(),lastDrawerAt:0,canvasNeedsSync:true});a.get().pendingPings.set('p',Date.now()-20);
  a.handlePong({ping_id:'p',target_member_id:'me',responder_member_id:'other',round_id:'r1',canvas_revision:0});
  assert.equal(a.isRealtimeHealthy(),true);assert.equal(a.isCanvasHealthy(),false);
 });
@@ -119,7 +121,7 @@ test('silent peers do not force a healthy server connection to reconnect',()=>{
 });
 test('transport failure schedules one recovery with SDK grace',()=>{
  const {a,timeouts}=setup();a.set({realtimeStatus:'SUBSCRIBED',transportFailed:true,subscribedAt:Date.now(),reconnectAttempt:2});a.checkHealth();const timer=a.get().reconnectTimer;a.checkHealth();
- assert.equal(a.get().reconnectTimer,timer);assert.ok(timeouts.get(timer).ms>=8000);assert.equal(a.get().reconnectAttempt,3);
+ assert.equal(a.get().reconnectTimer,timer);assert.ok(timeouts.get(timer).ms>=750&&timeouts.get(timer).ms<3200);assert.equal(a.get().reconnectAttempt,3);
 });
 test('offline health checks issue no fallback requests or reconnections',()=>{
  const {a,sandbox}=setup();sandbox.window.navigator={onLine:false};let calls=0;a.setApi(async()=>{calls++;return {};});a.checkHealth();a.resumeRoom();assert.equal(calls,0);assert.equal(a.get().reconnectTimer,null);
@@ -159,4 +161,47 @@ test('cross-tab sign-out clears room, timers and fences old realtime callbacks',
  events.get('window:pageshow')();
  assert.equal(a.get().state,null);assert.equal(a.get().clockTimer,null);
  assert.equal(a.get().liveGuesses.size,0);
+});
+
+test('out-of-order canvas deltas are applied in order without a full snapshot',()=>{
+ const {a}=setup();a.set({canvasRevision:10,canvasNeedsSync:false});
+ a.receiveStroke({id:'a',round_id:'r1',base_revision:11,revision:12,points:[[.5,.5]]});
+ assert.equal(a.get().canvasRevision,10);
+ assert.equal(a.get().pendingCanvasDeltas.size,1);
+ a.receiveStroke({id:'a',round_id:'r1',base_revision:10,revision:11,points:[[.1,.1]]});
+ assert.equal(a.get().canvasRevision,12);
+ assert.equal(a.get().pendingCanvasDeltas.size,0);
+ assert.equal(a.get().canvasNeedsSync,false);
+ assert.equal(a.get().strokes[0].points.length,2);
+});
+test('queued stale canvas fragments cannot resurrect cleared drawings',()=>{
+ const {a}=setup();a.set({canvasRevision:10,strokes:[stroke('old')]});
+ a.receiveStroke({id:'old',round_id:'r1',base_revision:12,revision:13,points:[[.8,.8]]});
+ a.receiveCanvasControl('clear',{round_id:'r1',base_revision:10,revision:11});
+ a.receiveCanvasControl('undo',{round_id:'r1',base_revision:11,revision:12,id:'old'});
+ assert.equal(a.get().canvasRevision,13);
+ assert.equal(a.get().strokes.length,1);
+ // The delta with revision 13 is applied only after the clear and undo.
+});
+test('unchanged canvas dimensions do not reset backing buffer on state updates',()=>{
+ const {a,element}=setup(),canvas=element('canvas');
+ let resets=0;
+ Object.defineProperty(canvas,'width',{configurable:true,get(){return this._w;},set(v){this._w=v;resets++;}});
+ Object.defineProperty(canvas,'height',{configurable:true,get(){return this._h;},set(v){this._h=v;resets++;}});
+ assert.equal(a.resizeCanvas(),true);
+ assert.equal(a.resizeCanvas(),false);
+ assert.equal(resets,2);
+});
+test('viewer silence alone never marks a connected, synchronized canvas unhealthy',()=>{
+ const {a}=setup();
+ a.set({realtimeStatus:'SUBSCRIBED',serverHeartbeatAt:Date.now(),lastDrawerAt:0,canvasNeedsSync:false});
+ assert.equal(a.isCanvasHealthy(),true);
+});
+test('multiple simultaneous sync requests schedule only one room snapshot',async()=>{
+ const {a,timeouts,channels}=setup();
+ a.set({me:{id:'drawer',nickname:'drawer'}});
+ await a.connectRealtime();await channels[0].status('SUBSCRIBED');
+ const fn=channels[0].handlers.get('broadcast:sync_request');
+ fn({payload:{round_id:'r1'}});fn({payload:{round_id:'r1'}});fn({payload:{round_id:'r1'}});
+ assert.equal([...timeouts.values()].filter(t=>t.ms===70).length,1);
 });
