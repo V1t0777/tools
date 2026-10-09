@@ -11,7 +11,7 @@ const summaryRegionMigration=readFileSync(new URL('../supabase/migrations/202610
 test('pictionary v2 keeps high-frequency paths realtime and bounded',()=>{
   assert.match(app,/setTimeout\(\(\)=>flushStroke\(false\),14\)/);
   assert.doesNotMatch(app,/guess_pending/,'never share unverified guess text over room Realtime');
-  assert.match(app,/setTimeout\(\(\)=>\{[\s\S]*optimistic&&current\.pending[\s\S]*\},2500\)/);
+  assert.match(app,/liveGuesses\.set\(id,\{\.\.\.item,pending:true,failed:false\}\)/);
   assert.match(app,/attemptTransition\('finish_round'\)/);
   assert.match(app,/attemptTransition\('next_round'\)/);
 });
@@ -35,7 +35,7 @@ test('round transitions use server authoritative state sync and warmup',()=>{
   assert.match(edge,/makeRound\(updated,ps,next\)/);
 });
 
-test('authenticated peers can send optimistic guesses but cannot send state_sync',()=>{
+test('historical optimistic-guess authorization is superseded by current privacy hardening',()=>{
   assert.match(migration,/'guess_pending'::text/);
   assert.doesNotMatch(migration,/event = any\([^)]*state_sync/s);
   assert.match(migration,/p_event <> 'state_sync'/);
