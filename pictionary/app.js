@@ -19,6 +19,8 @@
   let scoreRevision=-1, scoreTotals=new Map(), hintRequested=false, suspended=false;
   let transitionRetryAt=0;
   let pendingCanvasDeltas=new Map(),canvasGapTimer=null,snapshotBroadcastTimer=null,lastSnapshotBroadcastAt=0;
+  let drawChannel=null,drawStatus='CLOSED',drawTopic=null,drawChannelEpoch=0,drawRetryTimer=null,drawRetryAttempt=0,drawConnectDeadline=null;
+  let lastPeerCanvasAckAt=0,drawInFlight=0;
   const CANVAS_REORDER_WAIT_MS=140, SNAPSHOT_COALESCE_MS=850;
 
   function updatePerfDiagnostics(){
@@ -40,6 +42,7 @@
       `Edge 身份/限流/业务：${fmt('edge.auth')} | ${fmt('edge.limit')} | ${fmt('edge.business')}`,
       `Realtime SDK 发送等待：${fmt('realtime.send_wait')}`,
       `发送进行中/峰值：${summary.send.pending}/${summary.send.maxPending}；失败：${summary.send.errors}`,
+      `画布私有频道：${drawStatus}，待确认发送：${drawInFlight}`,
       `画布全量重绘：${fmt('canvas.redraw')}`,
       `主线程长任务：${fmt('main.longtask')}`,
       '说明：RTT 含对端回声耗时；SDK 等待不等于远端确认；仅本地保存匿名指标。'
@@ -101,6 +104,7 @@
     scoreRevision=-1;scoreTotals.clear();
     clearTimeout(canvasGapTimer);canvasGapTimer=null;pendingCanvasDeltas.clear();
     clearTimeout(snapshotBroadcastTimer);snapshotBroadcastTimer=null;lastSnapshotBroadcastAt=0;
+    stopDrawingChannel();drawRetryAttempt=0;lastPeerCanvasAckAt=0;
   }
   function applyScores(data){
     if(!data||!Number.isSafeInteger(Number(data.revision))||Number(data.revision)<scoreRevision||!Array.isArray(data.scores))return;
@@ -123,6 +127,7 @@
     applyScores(next.score_state);
     for(const p of state?.players||[])if(scoreTotals.has(p.member_id))p.score=scoreTotals.get(p.member_id);
     renderState();
+    syncDrawingChannel();
   }
   function requestState(delay=80){
     if(!state||suspended||window.navigator?.onLine===false)return;
@@ -141,7 +146,7 @@
     if(!state||document.hidden||window.navigator?.onLine===false)return;
     suspended=false;startRoomTimers();requestState(0);
     if(!isRealtimeHealthy()&&realtimeStatus!=='CONNECTING')scheduleReconnect(0);
-    else {sendPing();requestCanvas();}
+    else {sendPing();syncDrawingChannel();requestCanvas();}
   }
 
   function ensureRealtimeSDK(){
@@ -330,8 +335,7 @@
     const ch=client.channel(topic,{config:{private:true,presence:{key:auth.user.id},broadcast:{ack:false,self:false}}});
     channel=ch;
     const on=(event,fn)=>ch.on('broadcast',{event},({payload})=>{if(current())fn(payload);});
-    on('stroke',receiveStroke);on('snapshot',receiveSnapshot);
-    on('clear',p=>receiveCanvasControl('clear',p));on('undo',p=>receiveCanvasControl('undo',p));
+    // Room channel carries only control events; stroke authorization is per-round.
     on('sync_request',p=>{if(isDrawer()&&p?.round_id===currentRoundId)queueSnapshotBroadcast();});
     // A provisional guess stays local: broadcasting raw text before scoring can reveal an answer.
     on('guess_result',receiveGuessResult);on('state_sync',receiveStateSync);on('room_transition',receiveRoomTransition);on('state_changed',p=>{if(!p?.sync)requestState();});
@@ -344,7 +348,7 @@
       realtimeStatus=status;updateRealtimeStatus();
       if(status==='SUBSCRIBED'){
         clearTimeout(reconnectTimer);reconnectTimer=null;clearTimeout(connectDeadline);connectDeadline=null;serverHeartbeatAt=Date.now();transportFailed=false;
-        lastPongAt=lastDrawerAt=0;subscribedAt=Date.now();requestState(0);requestCanvas();startPing();
+        lastPongAt=lastDrawerAt=0;subscribedAt=Date.now();requestState(0);syncDrawingChannel();requestCanvas();startPing();
         try{await ch.track({member_id:me.id,nickname:me.nickname,online_at:new Date().toISOString()});}catch{}
         if(!current())return;
         clearInterval(snapshotTimer);snapshotTimer=setInterval(()=>{if(isDrawer()&&canvasDirty)persistCanvasFallback();},2000);
@@ -353,25 +357,116 @@
       }
     });
   }
+  // A different private topic is joined in every playing round; Supabase caches
+  // authorization on subscription, so lobby/choosing permissions are not reused.
+  function desiredDrawTopic(){
+    if(!state||state.room.status!=='playing'||!state.round?.id||!state.room.realtime_token)return null;
+    return `pictionary-draw:${state.room.id}:${state.round.id}:${state.room.realtime_token}`;
+  }
+  function stopDrawingChannel(){
+    drawChannelEpoch++;
+    clearTimeout(drawRetryTimer);drawRetryTimer=null;
+    clearTimeout(drawConnectDeadline);drawConnectDeadline=null;
+    const old=drawChannel,client=realtime;
+    drawChannel=null;drawTopic=null;drawStatus='CLOSED';drawInFlight=0;
+    if(old&&client?.removeChannel)Promise.resolve(client.removeChannel(old)).catch(()=>{});
+  }
+  function scheduleDrawRetry(){
+    if(drawRetryTimer||!state||suspended||document.hidden||window.navigator?.onLine===false)return;
+    const epoch=roomEpoch,delay=300+Math.random()*Math.min(7000,350*2**Math.min(5,drawRetryAttempt++));
+    drawRetryTimer=setTimeout(()=>{
+      drawRetryTimer=null;
+      if(epoch!==roomEpoch||!state)return;
+      stopDrawingChannel();syncDrawingChannel();
+    },delay);
+  }
+  function syncDrawingChannel(){
+    const topic=desiredDrawTopic();
+    if(!topic||!realtime||realtimeStatus!=='SUBSCRIBED'||suspended){
+      if(drawChannel)stopDrawingChannel();
+      return;
+    }
+    if(drawChannel&&drawTopic===topic&&['CONNECTING','SUBSCRIBED'].includes(drawStatus))return;
+    stopDrawingChannel();
+    const epoch=drawChannelEpoch,room=roomEpoch,round=currentRoundId;
+    const client=realtime;
+    const ch=client.channel(topic,{config:{private:true,broadcast:{ack:true,self:false}}});
+    drawChannel=ch;drawTopic=topic;drawStatus='CONNECTING';
+    const current=()=>epoch===drawChannelEpoch&&room===roomEpoch&&round===currentRoundId&&drawChannel===ch&&desiredDrawTopic()===topic&&!suspended;
+    const on=(event,fn)=>ch.on('broadcast',{event},({payload})=>{if(current())fn(payload);});
+    on('stroke',receiveStroke);on('snapshot',receiveSnapshot);
+    on('clear',p=>receiveCanvasControl('clear',p));
+    on('undo',p=>receiveCanvasControl('undo',p));
+    drawConnectDeadline=setTimeout(()=>{
+      if(current()&&drawStatus==='CONNECTING'){
+        stopDrawingChannel();scheduleDrawRetry();
+      }
+    },10000);
+    ch.subscribe(status=>{
+      if(!current())return;
+      if(status!=='CONNECTING'){clearTimeout(drawConnectDeadline);drawConnectDeadline=null;}
+      drawStatus=status;updateRealtimeStatus();
+      if(status==='SUBSCRIBED'){
+        drawRetryAttempt=0;
+        clearTimeout(drawRetryTimer);drawRetryTimer=null;
+        if(isDrawer()){
+          if(canvasDirty)persistCanvasFallback();
+        }else{
+          canvasNeedsSync=true;
+          requestCanvas(true);
+          pullCanvasFallback(true);
+        }
+      }else if(['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(status)){
+        telemetry.noteRealtimeFailure();
+        if(isDrawer())scheduleServerCanvasSave();
+        else canvasNeedsSync=true;
+        scheduleDrawRetry();
+      }
+    });
+  }
+  function sendDrawEvent(event,payload){
+    if(!drawChannel||drawStatus!=='SUBSCRIBED'){
+      if(isDrawer())scheduleServerCanvasSave();
+      return Promise.resolve('not_connected');
+    }
+    const epoch=drawChannelEpoch,finish=telemetry.sendStart(event),ch=drawChannel;
+    drawInFlight++;
+    const done=status=>{
+      finish(status);
+      if(epoch!==drawChannelEpoch)return status;
+      drawInFlight=Math.max(0,drawInFlight-1);
+      if(status!=='ok'){
+        telemetry.noteRealtimeFailure();
+        if(isDrawer())persistCanvasFallback();
+        scheduleDrawRetry();
+      }
+      return status;
+    };
+    try{return Promise.resolve(ch.send({type:'broadcast',event,payload}))
+      .then(done).catch(()=>done('error'));}
+    catch{return Promise.resolve(done('error'));}
+  }
   function isRealtimeHealthy(){
     return realtimeStatus==='SUBSCRIBED'&&!transportFailed&&Date.now()-serverHeartbeatAt<65000&&window.navigator?.onLine!==false;
   }
   function isCanvasHealthy(){
-    return isRealtimeHealthy()&&!canvasNeedsSync;
+    return isRealtimeHealthy()&&drawStatus==='SUBSCRIBED'&&!canvasNeedsSync;
   }
   function updateRealtimeStatus(){
     const healthy=isRealtimeHealthy();
     const canvasRecovering=healthy&&state?.room.status==='playing'&&!isCanvasHealthy();
+    const drawOffline=healthy&&state?.room.status==='playing'&&drawStatus!=='SUBSCRIBED';
     for(const id of ['connectionStatus','gameConnectionStatus']){
       const pill=$(id);if(!pill)continue;
-      pill.textContent=!healthy?'连接恢复中':canvasRecovering?'实时在线 · 画布同步中':(Number.isFinite(realtimeRtt)?`实时在线 · ${Math.round(realtimeRtt)}ms`:'实时在线');
+      pill.textContent=!healthy?'连接恢复中':drawOffline?'画布通道连接中':canvasRecovering?'实时在线 · 画布同步中':(Number.isFinite(realtimeRtt)?`实时在线 · ${Math.round(realtimeRtt)}ms`:'实时在线');
       pill.classList.toggle('online',healthy);
     }
   }
   function checkHealth(){
     if(!state||suspended||document.hidden||window.navigator?.onLine===false)return;
     const healthy=isRealtimeHealthy();setStatePoll(healthy?18000:1800);updateRealtimeStatus();
-    if(canvasNeedsSync)pullCanvasFallback(false);
+    if(state.room.status==='playing'&&!isDrawer())pullCanvasFallback(false);
+    if(healthy&&state.room.status==='playing'&&drawStatus!=='SUBSCRIBED')syncDrawingChannel();
     if(healthy&&!isDrawer()&&state.room.status==='playing'&&Date.now()-lastDrawerAt>10000)requestCanvas();
     if(healthy&&Date.now()-subscribedAt>20000)reconnectAttempt=0;
     updatePerfDiagnostics();
@@ -392,6 +487,12 @@
     const sent=pendingPings.get(p?.ping_id);
     if(!sent||p.target_member_id!==me?.id||!state?.players.some(x=>x.member_id===p.responder_member_id))return;
     lastPongAt=Date.now();realtimeRtt=Math.max(0,lastPongAt-sent);telemetry.setPeerRtt(realtimeRtt);
+    if(isDrawer()&&p.round_id===currentRoundId&&
+       p.responder_member_id!==me.id&&Number.isSafeInteger(Number(p.canvas_revision))){
+      lastPeerCanvasAckAt=Date.now();
+      if(Number(p.canvas_revision)<canvasRevision&&drawStatus==='SUBSCRIBED'&&
+         Date.now()-lastSnapshotBroadcastAt>5000)queueSnapshotBroadcast();
+    }
     if(p.responder_member_id===state.room.current_drawer_member_id&&p.round_id===currentRoundId){
       lastDrawerAt=Date.now();
       if(Number(p.canvas_revision)>canvasRevision){canvasNeedsSync=true;requestCanvas();}
@@ -404,6 +505,7 @@
     reconnectTimer=setTimeout(async()=>{reconnectTimer=null;if(epoch!==roomEpoch)return;try{await connectRealtime();}catch{scheduleReconnect();}},delay);
   }
   function leaveRealtime(stopTimers=true){
+    stopDrawingChannel();drawRetryAttempt=0;
     connectionEpoch++;connectPromise=null;clearTimeout(connectDeadline);connectDeadline=null;serverHeartbeatAt=0;transportFailed=false;
     clearTimeout(reconnectTimer);reconnectTimer=null;clearInterval(snapshotTimer);clearInterval(pingTimer);
     snapshotTimer=pingTimer=null;
@@ -458,6 +560,7 @@
     applyScores(p.score_state);
     if(oldStatus!==state.room.status||oldRound!==(nextRound?.id||null))transitionRetryAt=0;
     renderState();
+    syncDrawingChannel();
     if(state.room.status==='choosing'&&state.room.current_drawer_member_id===me?.id&&!state.options?.length)requestState(20);
   }
   function receiveRoomTransition(p){
@@ -469,7 +572,7 @@
       state.revealed_answer=p.revealed_answer;
     applyScores(p.score_state);
     if(oldStatus!==state.room.status)transitionRetryAt=0;
-    renderState();
+    renderState();syncDrawingChannel();
     // Lost authoritative events are still reconciled by periodic HTTP snapshots.
   }
 
@@ -635,7 +738,7 @@
     }
     for(let i=0;i<chunks.length;i++){
       const base=nextCanvasRevision(),last=i===chunks.length-1;
-      sendEvent('stroke',{
+      sendDrawEvent('stroke',{
         round_id:currentRoundId,revision:canvasRevision,base_revision:base,
         id:activeStroke.id,color:activeStroke.color,size:activeStroke.size,q:1,
         points:encodePoints(chunks[i]),done:done&&last,replace:replace&&last
@@ -705,11 +808,11 @@
   function drawDot(s,p){ctx.fillStyle=s.color;ctx.beginPath();ctx.arc(p[0]*logical.w,p[1]*logical.h,s.size/2,0,Math.PI*2);ctx.fill();}
   function drawSegment(s,a,b){ctx.strokeStyle=s.color;ctx.lineWidth=s.size;ctx.beginPath();ctx.moveTo(a[0]*logical.w,a[1]*logical.h);ctx.lineTo(b[0]*logical.w,b[1]*logical.h);ctx.stroke();}
   function redraw(){if(!logical.w)return;const finish=telemetry.begin('canvas.redraw');try{ctx.clearRect(0,0,logical.w,logical.h);ctx.fillStyle='#fff';ctx.fillRect(0,0,logical.w,logical.h);for(const s of strokes){if(s.points.length===1)drawDot(s,s.points[0]);for(let i=1;i<s.points.length;i++)drawSegment(s,s.points[i-1],s.points[i]);}if(activeStroke){if(activeStroke.points.length===1)drawDot(activeStroke,activeStroke.points[0]);for(let i=1;i<activeStroke.points.length;i++)drawSegment(activeStroke,activeStroke.points[i-1],activeStroke.points[i]);}}finally{finish();}}
-  function undoStroke(){if(!isDrawer()||!strokes.length)return;if(activeStroke)pointerUp({preventDefault(){}});const s=strokes.pop(),base=nextCanvasRevision();redraw();saveCanvas();sendEvent('undo',{round_id:currentRoundId,id:s.id,base_revision:base,revision:canvasRevision});persistCanvasFallback();}
+  function undoStroke(){if(!isDrawer()||!strokes.length)return;if(activeStroke)pointerUp({preventDefault(){}});const s=strokes.pop(),base=nextCanvasRevision();redraw();saveCanvas();sendDrawEvent('undo',{round_id:currentRoundId,id:s.id,base_revision:base,revision:canvasRevision});persistCanvasFallback();}
   function bindHoldClear(){
     let t=null;const b=$('clearBtn');
     const cancel=()=>{clearTimeout(t);t=null;b.classList.remove('holding');};
-    b.addEventListener('pointerdown',e=>{if(!isDrawer())return;e.preventDefault();b.classList.add('holding');t=setTimeout(()=>{strokes=[];activeStroke=null;sendPoints=[];const base=nextCanvasRevision();redraw();saveCanvas();sendEvent('clear',{round_id:currentRoundId,revision:canvasRevision,base_revision:base});persistCanvasFallback();toast('画布已清空');cancel();},480);});
+    b.addEventListener('pointerdown',e=>{if(!isDrawer())return;e.preventDefault();b.classList.add('holding');t=setTimeout(()=>{strokes=[];activeStroke=null;sendPoints=[];const base=nextCanvasRevision();redraw();saveCanvas();sendDrawEvent('clear',{round_id:currentRoundId,revision:canvasRevision,base_revision:base});persistCanvasFallback();toast('画布已清空');cancel();},480);});
     ['pointerup','pointercancel','pointerleave'].forEach(x=>b.addEventListener(x,cancel));
   }
   function storageKey(){return currentRoundId?`pictionary.canvas.${currentRoundId}`:'';}
@@ -743,14 +846,14 @@
     },delay);
   }
   function sendSnapshot(){
-    if(!currentRoundId||!isDrawer()||realtimeStatus!=='SUBSCRIBED')return;
+    if(!currentRoundId||!isDrawer()||drawStatus!=='SUBSCRIBED')return;
     if(activeStroke&&sendPoints.length)flushStroke(false);
     const text=JSON.stringify(canvasPayload()),size=12000,total=Math.max(1,Math.ceil(text.length/size));
     if(total>100){console.warn('画布快照过大，将使用数据库恢复');return;}
     lastSnapshotBroadcastAt=Date.now();
     const id=makeClientId(),roundId=currentRoundId,revision=canvasRevision,epoch=connectionEpoch;
     for(let i=0;i<total;i++){
-      setTimeout(()=>{if(epoch===connectionEpoch&&roundId===currentRoundId)sendEvent('snapshot',{snapshot_id:id,round_id:roundId,revision,index:i,total,part:text.slice(i*size,(i+1)*size)});},i*telemetry.profile().chunkGapMs);
+      setTimeout(()=>{if(epoch===connectionEpoch&&roundId===currentRoundId)sendDrawEvent('snapshot',{snapshot_id:id,round_id:roundId,revision,index:i,total,part:text.slice(i*size,(i+1)*size)});},i*telemetry.profile().chunkGapMs);
     }
   }
   function applyCanvasSnapshot(roundId,revision,next){
@@ -804,8 +907,9 @@
     if(window.navigator?.onLine===false||canvasFetchBusy||!state||!currentRoundId||state.room.status!=='playing'||document.hidden||suspended)return;
     if(isDrawer()&&(activeStroke||canvasDirty))return;
     const now=Date.now();
-    if(!force&&!canvasNeedsSync)return;
-    if(now-lastCanvasCheck<(force?Math.max(700,Math.round(telemetry.profile().snapshotMs/3)):(isRealtimeHealthy()?telemetry.profile().recoveryMs:Math.max(1500,telemetry.profile().snapshotMs))))return;
+    // Cheap version-only server check also detects silent loss of the entire stream.
+    if(!force&&!canvasNeedsSync&&now-lastCanvasCheck<Math.max(6500,telemetry.profile().recoveryMs))return;
+    if(now-lastCanvasCheck<(force?Math.max(700,Math.round(telemetry.profile().snapshotMs/3)):(isRealtimeHealthy()?Math.max(6500,telemetry.profile().recoveryMs):Math.max(1500,telemetry.profile().snapshotMs))))return;
     lastCanvasCheck=now;canvasFetchBusy=true;
     const epoch=roomEpoch,roundId=currentRoundId,roomId=state.room.id;
     try{
@@ -813,7 +917,7 @@
       if(epoch!==roomEpoch||roundId!==currentRoundId)return;
       const version=Number(data.version)||0;
       if(Array.isArray(data.strokes))applyCanvasSnapshot(roundId,version,data.strokes);
-      if(data.unchanged&&version===0&&canvasRevision===0)canvasNeedsSync=false;
+      if(data.unchanged&&version===canvasRevision)canvasNeedsSync=false;
       lastCanvasVersion=Math.max(lastCanvasVersion,version);
     }catch(err){if(!err.cancelled)console.warn('画布同步尚未确认');}
     finally{canvasFetchBusy=false;}
