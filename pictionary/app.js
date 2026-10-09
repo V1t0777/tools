@@ -601,7 +601,7 @@
   function point(e){const r=canvas.getBoundingClientRect();return [Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)),Math.max(0,Math.min(1,(e.clientY-r.top)/r.height))];}
   function pointerDown(e){if(!isDrawer()||state.room.status!=='playing'||activeStroke)return;e.preventDefault();canvas.setPointerCapture(e.pointerId);const p=point(e);activeStroke={id:makeClientId(),color:erasing?'#ffffff':selectedColor,size:brushSize,points:[p]};sendPoints=[p];drawDot(activeStroke,p);flushStroke(false);scheduleServerCanvasSave();}
   function pointerMove(e){
-    if(!activeStroke)return;const finish=telemetry.begin('canvas.pointer_move');e.preventDefault();
+    if(!activeStroke)return;const finish=Math.random()<.1?telemetry.begin('canvas.pointer_move'):()=>{};e.preventDefault();
     const events=typeof e.getCoalescedEvents==='function'?(e.getCoalescedEvents()||[]):[];
     const samples=events.length?events:[e];let changed=false;
     for(const ev of samples){
