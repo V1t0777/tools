@@ -25,10 +25,10 @@ async function identify(req:Request){
   const authorization=req.headers.get("authorization")||"";if(!authorization.startsWith("Bearer "))fail("请先登录",401);
   const key=req.headers.get("apikey")||Deno.env.get("SUPABASE_ANON_KEY")||"";
   const client=createClient(URL,key,{global:{headers:{Authorization:authorization}},auth:{persistSession:false,autoRefreshToken:false}});
-  const {data,error}=await client.rpc("toolbox_session_status");if(error)fail("登录状态暂时无法验证，请重试",503);if(!data?.active||!data?.member_id)fail("当前账号不在工具箱成员名单中或会话已失效",403,"SESSION_REVOKED");
-  const {data:member,error:memberError}=await admin.from("members").select("id,user_id,nickname,color").eq("id",data.member_id).maybeSingle();
-  if(memberError){console.error("members lookup failed",{code:memberError.code||"DB_ERROR"});fail("成员资料读取失败，请稍后重试",503);}
-  if(!member)fail("成员资料不存在",403);return member;
+  const {data:member,error}=await client.rpc("pictionary_identity_v3");
+  if(error)fail("登录状态暂时无法验证，请重试",503);
+  if(!member?.id||!member?.user_id)fail("当前账号不在工具箱成员名单中或会话已失效",403,"SESSION_REVOKED");
+  return member;
 }
 async function room(id:string){const {data}=await admin.from("pictionary_rooms").select("*").eq("id",id).maybeSingle();if(!data)fail("房间不存在",404);return data;}
 async function player(roomId:string,userId:string){const {data}=await admin.from("pictionary_players").select("*").eq("room_id",roomId).eq("user_id",userId).eq("active",true).maybeSingle();if(!data)fail("你不在这个房间",403);return data;}
@@ -102,27 +102,28 @@ async function repairRoomState(input:any){
   return await room(r.id);
 }
 async function state(roomId:string,member:any){
-  await player(roomId,member.user_id);
-  const r=await repairRoomState(await room(roomId));
-  if(TERMINAL.has(r.status))fail(r.status==="closed"?"房间已由房主结束":"房间因长时间无人活动已过期",410);
-  await player(roomId,member.user_id);const ps=await players(roomId);const byUser=new Map(ps.map(p=>[p.user_id,p]));let roundData:any=null,answer=null,revealed_answer=null,options:any=null,guesses:any[]=[],solved_members:string[]=[];
-  if(r.current_round_no>0){
-    const {data:rd}=await admin.from("pictionary_rounds").select("id,round_no,drawer_user_id,category,difficulty,word_length,hint,started_at,ends_at,answer,option_word_ids,canvas_version").eq("room_id",roomId).eq("round_no",r.current_round_no).maybeSingle();
-    if(rd){
-      const privileged=member.user_id===rd.drawer_user_id||["summary","finished"].includes(r.status);
-      const hintUnlocked=privileged||(r.status==="playing"&&rd.ends_at&&new Date(rd.ends_at).getTime()-Date.now()<=30000);
-      roundData={id:rd.id,round_number:rd.round_no,drawer_member_id:byUser.get(rd.drawer_user_id)?.member_id||rd.drawer_user_id,drawer_nickname:byUser.get(rd.drawer_user_id)?.nickname||"好友",category:hintUnlocked?rd.category:null,difficulty:rd.difficulty,char_count:rd.word_length,hint:hintUnlocked?(rd.hint||`它属于「${rd.category||'常见事物'}」类`):null,started_at:rd.started_at,ends_at:rd.ends_at};
-      if(member.user_id===rd.drawer_user_id)answer=rd.answer;if(["summary","finished"].includes(r.status))revealed_answer=rd.answer;
-      const {data:gs}=await admin.from("pictionary_guesses").select("id,client_id,user_id,guess_text,is_correct,score_awarded,created_at").eq("round_id",rd.id).order("created_at",{ascending:false}).order("id",{ascending:false}).limit(100);guesses=(gs||[]).reverse().map(g=>({id:g.id,client_id:g.client_id,member_id:byUser.get(g.user_id)?.member_id||g.user_id,nickname:byUser.get(g.user_id)?.nickname||"好友",text:g.is_correct?"":g.guess_text,is_correct:g.is_correct,score_awarded:g.score_awarded,created_at:g.created_at}));
-      const solved=await admin.from("pictionary_round_results").select("user_id").eq("round_id",rd.id);
-      if(solved.error)throw solved.error;
-      solved_members=(solved.data||[]).map(g=>byUser.get(g.user_id)?.member_id||g.user_id);
-      if(r.status==="choosing"&&r.current_drawer_user_id===member.user_id){const {data:ws}=await admin.from("pictionary_words").select("id,word,category,difficulty").in("id",rd.option_word_ids||[]);options=(ws||[]).map(w=>({...w,id:String(w.id)}));}
+  // One service-only Postgres RPC replaces the former cross-table PostgREST chain.
+  const snapshot=async()=>{
+    const {data,error}=await admin.rpc("pictionary_state_snapshot_v3",{p_room_id:roomId,p_user_id:member.user_id});
+    if(error){
+      if(error.message?.includes("NOT_ROOM_MEMBER"))fail("你不在这个房间",403);
+      if(error.message?.includes("ROOM_NOT_FOUND"))fail("房间不存在",404);
+      throw error;
     }
+    if(!data?.room)fail("房间不存在",404);
+    return data;
+  };
+  let current=await snapshot();
+  if(TERMINAL.has(current.room.status))fail(current.room.status==="closed"?"房间已由房主结束":"房间因长时间无人活动已过期",410);
+  const now=Date.now(),status=current.room.status;
+  const ended=status==="playing"&&current.room.ends_at&&new Date(current.room.ends_at).getTime()<=now;
+  const settled=status==="summary"&&current.room.summary_until&&new Date(current.room.summary_until).getTime()<=now;
+  if(ended||settled){
+    // Recover rooms without an online transition leader; ordinary snapshots are read-only.
+    await repairRoomState(await room(roomId));
+    current=await snapshot();
   }
-  const scoreSnapshot=await admin.rpc("pictionary_score_state_service",{p_room_id:roomId});
-  if(scoreSnapshot.error)throw scoreSnapshot.error;
-  return {room:{id:r.id,code:r.room_code,realtime_token:r.realtime_token,realtime_generation:r.realtime_generation,host_member_id:byUser.get(r.host_user_id)?.member_id||r.host_user_id,status:r.status,round_no:r.current_round_no,rounds_per_player:r.rounds_per_player,total_rounds:r.total_rounds,current_drawer_member_id:byUser.get(r.current_drawer_user_id)?.member_id||r.current_drawer_user_id,ends_at:r.ends_at,summary_until:r.summary_until},players:ps.map(({user_id,...p})=>p),round:roundData,answer,revealed_answer,options,guesses,solved_members,score_state:scoreSnapshot.data};
+  return current;
 }
 function realtimeState(snapshot:any){
   const round=snapshot.round?{
@@ -211,6 +212,7 @@ Deno.serve(async(req:Request)=>{
       return reply(req,{member,state:await state(r.id,member)});
     }
     const id=String(b.room_id||"");
+    if(action==="state")return reply(req,{state:await state(id,member)});
     if(action==="guess"){
       const text=String(b.text||"").trim();
       const clientId=String(b.client_id||"").trim()||null;
@@ -228,8 +230,6 @@ Deno.serve(async(req:Request)=>{
     await player(id,member.user_id);
     let r=await repairRoomState(await room(id));
     if(TERMINAL.has(r.status))fail(r.status==="closed"?"房间已由房主结束":"房间因长时间无人活动已过期",410);
-    await player(id,member.user_id);
-    if(action==="state")return reply(req,{state:await state(id,member)});
     if(action==="close_room"){
       if(r.host_user_id!==member.user_id)fail("只有房主可以结束房间",403);
       await terminateRoom(id,"closed","host_closed");

@@ -76,7 +76,9 @@
   function adoptState(next){
     const previousStatus=state?.room?.status,previousRound=state?.round?.id||null;
     const previousRoom=state?.room;
-    if(previousRoom?.id===next?.room?.id && Number(next.room.realtime_generation||0)<Number(previousRoom.realtime_generation||0))return;
+    if(previousRoom?.id===next?.room?.id &&
+       (Number(next.room.realtime_generation||0)<Number(previousRoom.realtime_generation||0) ||
+        Number(next.room.state_revision||0)<Number(previousRoom.state_revision||0)))return;
     state=next;
     if(previousRoom?.id===next?.room?.id && previousRoom.realtime_token!==next.room.realtime_token && !suspended){
       leaveRealtime(false);
@@ -95,7 +97,7 @@
   }
   function startRoomTimers(){
     if(!state||suspended||window.navigator?.onLine===false)return;
-    setStatePoll(3000);
+    setStatePoll(isRealtimeHealthy()?18000:1800);
     clearInterval(clockTimer);clockTimer=setInterval(tick,250);
     clearInterval(canvasSyncTimer);canvasSyncTimer=setInterval(pullCanvasFallback,650);
     clearInterval(heartbeatTimer);heartbeatTimer=setInterval(checkHealth,1000);
@@ -297,7 +299,7 @@
     on('clear',p=>receiveCanvasControl('clear',p));on('undo',p=>receiveCanvasControl('undo',p));
     on('sync_request',p=>{if(isDrawer()&&p?.round_id===currentRoundId)queueSnapshotBroadcast();});
     // A provisional guess stays local: broadcasting raw text before scoring can reveal an answer.
-    on('guess_result',receiveGuessResult);on('state_sync',receiveStateSync);on('state_changed',p=>{if(!p?.sync)requestState();});
+    on('guess_result',receiveGuessResult);on('state_sync',receiveStateSync);on('room_transition',receiveRoomTransition);on('state_changed',p=>{if(!p?.sync)requestState();});
     on('ping',handlePing);on('pong',handlePong);
     // The old channel never carries the replacement token; fetch authorized state.
     on('channel_rotated',()=>{leaveRealtime(false);requestState(0);});
@@ -333,7 +335,7 @@
   }
   function checkHealth(){
     if(!state||suspended||document.hidden||window.navigator?.onLine===false)return;
-    const healthy=isRealtimeHealthy();setStatePoll(healthy?3000:1200);updateRealtimeStatus();
+    const healthy=isRealtimeHealthy();setStatePoll(healthy?18000:1800);updateRealtimeStatus();
     if(canvasNeedsSync)pullCanvasFallback(false);
     if(healthy&&!isDrawer()&&state.room.status==='playing'&&Date.now()-lastDrawerAt>10000)requestCanvas();
     if(healthy&&Date.now()-subscribedAt>20000)reconnectAttempt=0;
@@ -397,6 +399,7 @@
   }
   function receiveStateSync(p){
     if(!state||!p||p.room_id!==state.room.id||!p.room)return;
+    if(Number(p.room.state_revision||0)<Number(state.room.state_revision||0))return;
     const oldStatus=state.room.status,oldRound=currentRoundId,nextRound=p.round||null,roundChanged=(nextRound?.id||null)!==(state.round?.id||null);
     state.room={...state.room,...p.room};
     if(Array.isArray(p.players))state.players=p.players;
@@ -410,6 +413,18 @@
     if(oldStatus!==state.room.status||oldRound!==(nextRound?.id||null))transitionRetryAt=0;
     renderState();
     if(state.room.status==='choosing'&&state.room.current_drawer_member_id===me?.id&&!state.options?.length)requestState(20);
+  }
+  function receiveRoomTransition(p){
+    if(!state||!p?.room||p.room_id!==state.room.id)return;
+    if(Number(p.room.state_revision||0)<Number(state.room.state_revision||0))return;
+    const oldStatus=state.room.status;
+    state.room={...state.room,...p.room};
+    if(Object.prototype.hasOwnProperty.call(p,'revealed_answer')&&state.room.status==='summary')
+      state.revealed_answer=p.revealed_answer;
+    applyScores(p.score_state);
+    if(oldStatus!==state.room.status)transitionRetryAt=0;
+    renderState();
+    // Lost authoritative events are still reconciled by periodic HTTP snapshots.
   }
 
   function renderState(){
@@ -469,7 +484,11 @@
       is_correct:!!p.correct,score_awarded:Number(p.points)||0,created_at:p.created_at||prev.created_at||new Date().toISOString(),pending:false,failed:false});
     applyScores(p.score_state);renderScores();renderGuessFeed();
     if(p.member_id===me?.id&&p.correct)renderGame();
-    if(p.correct)requestState(p.round_complete?50:200);
+    if(p.correct&&p.round_complete){
+      const epoch=roomEpoch,roundId=currentRoundId;
+      setTimeout(()=>{if(epoch===roomEpoch&&roundId===currentRoundId&&state?.room?.status==='playing')
+        requestState(0);},1500);
+    }
   }
 
   function tick(){

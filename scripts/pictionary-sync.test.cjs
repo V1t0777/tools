@@ -6,7 +6,7 @@ const vm=require('node:vm');
 const path=require('node:path');
 const source=fs.readFileSync(path.join(__dirname,'../pictionary/app.js'),'utf8');
 const fields=['state','me','currentRoundId','strokes','canvasRevision','canvasDirty','canvasNeedsSync','lastDrawerAt','lastPongAt','realtimeStatus','suspended','scoreRevision','roomEpoch','connectionEpoch','clockTimer','canvasSyncTimer','heartbeatTimer','pollTimer','refreshQueued','transitionBusy','guessRequests','liveGuesses','pendingPings','reconnectTimer','subscribedAt','serverHeartbeatAt','transportFailed','reconnectAttempt','pendingCanvasDeltas','canvasGapTimer','snapshotBroadcastTimer'];
-const injected=source.replace('  boot();',`globalThis.audit={api,initializeSession,bind,enterRoom,connectRealtime,leaveRealtime,refreshState,requestState,exitToHome,adoptState,applyScores,receiveGuessResult,submitGuess,deliverGuess,hasGuessed,switchRound,receiveStroke,receiveCanvasControl,queueCanvasDelta,queueSnapshotBroadcast,resizeCanvas,receiveSnapshot,applyCanvasSnapshot,pullCanvasFallback,persistCanvasFallback,sendSnapshot,sendPing,handlePong,isRealtimeHealthy,isCanvasHealthy,checkHealth,startRoomTimers,resumeRoom,
+const injected=source.replace('  boot();',`globalThis.audit={api,initializeSession,bind,enterRoom,connectRealtime,leaveRealtime,refreshState,requestState,exitToHome,adoptState,applyScores,receiveGuessResult,receiveRoomTransition,receiveStateSync,submitGuess,deliverGuess,hasGuessed,switchRound,receiveStroke,receiveCanvasControl,queueCanvasDelta,queueSnapshotBroadcast,resizeCanvas,receiveSnapshot,applyCanvasSnapshot,pullCanvasFallback,persistCanvasFallback,sendSnapshot,sendPing,handlePong,isRealtimeHealthy,isCanvasHealthy,checkHealth,startRoomTimers,resumeRoom,
 setApi(fn){api=fn;},set(v){${fields.map(f=>`if('${f}' in v)${f}=v.${f};`).join('')}} ,get(){return {${fields.join(',')}}}};`);
 function setup(){
  const elements=new Map(),timeouts=new Map(),intervals=new Map(),events=new Map(),channels=[];
@@ -204,4 +204,27 @@ test('multiple simultaneous sync requests schedule only one room snapshot',async
  const fn=channels[0].handlers.get('broadcast:sync_request');
  fn({payload:{round_id:'r1'}});fn({payload:{round_id:'r1'}});fn({payload:{round_id:'r1'}});
  assert.equal([...timeouts.values()].filter(t=>t.ms===70).length,1);
+});
+
+test('authoritative summary event immediately transitions into the 3.2s overlay',()=>{
+ const {a}=setup();
+ a.get().state.room.state_revision=4;
+ a.receiveRoomTransition({room_id:'room',room:{status:'summary',state_revision:5,summary_until:new Date(Date.now()+3200).toISOString()},revealed_answer:'测试答案',score_state:score(4,200,150)});
+ assert.equal(a.get().state.room.status,'summary');
+ assert.equal(a.get().state.revealed_answer,'测试答案');
+ assert.equal(a.get().state.room.state_revision,5);
+ assert.equal(a.get().state.players[1].score,200);
+});
+test('stale room summary and old state snapshots cannot override newer transitions',()=>{
+ const {a}=setup();a.get().state.room.state_revision=8;
+ a.receiveRoomTransition({room_id:'room',room:{status:'summary',state_revision:7},revealed_answer:'stale'});
+ assert.equal(a.get().state.room.status,'playing');
+ a.adoptState({...a.get().state,room:{...a.get().state.room,status:'choosing',state_revision:6}});
+ assert.equal(a.get().state.room.status,'playing');
+});
+test('healthy sockets reconcile slowly; disconnected sockets poll quickly',()=>{
+ const {a,intervals}=setup();
+ a.set({realtimeStatus:'SUBSCRIBED',serverHeartbeatAt:Date.now()});
+ a.startRoomTimers();
+ assert.equal([...intervals.values()].filter(t=>t.ms===18000).length,1);
 });

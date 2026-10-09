@@ -107,3 +107,13 @@ multi-device mobile network testing or measure production login percentiles.
 - Confirmed channel failure retries quickly (subsecond initial delay with exponential backoff); retries still fence old socket callbacks by connection epoch.
 - Unverified guesses are optimistic only on the sender's screen. Other players receive `guess_result` only after server scoring, never potentially correct plaintext guesses. Migration `20261009143619_pictionary_no_unverified_guesses` removes permission to publish `guess_pending` while retaining the existing server-authoritative result and private-room controls.
 - This is a reliability update, not a claim that client-to-client p95 latency has been measured. Continue dual-device network profiling after release.
+
+
+## Phase 2 — service-authoritative low-latency pipeline
+
+- `pictionary_identity_v3` combines revoked-session verification with display-member lookup under JWT-based identity; no client-selected member IDs.
+- `pictionary_state_snapshot_v3` runs as service-role-only SECURITY INVOKER, verifies active room membership and returns one complete, permission-trimmed JSON snapshot. Normal `state` requests do not perform the old cross-table PostgREST fan-out; recovery of expired rounds is conditional.
+- A monotonic `state_revision` on every room update fences delayed HTTP snapshots and authoritative Realtime state messages. It does **not** use wall-clock timestamps or client-controlled sequence numbers.
+- The database emits `room_transition` transactionally when a round enters summary; only after validated scoring can the correct answer appear. Edge broadcasts compact server-built `state_sync` events on selections and next-round transitions; clients receive without querying the entire room unless the drawing player needs secret word options.
+- Normal fully-connected browsers reconcile snapshots every 18 seconds; degraded sockets poll at 1.8 seconds. The 30-second hint fetch, reconnect recovery, and stale-round checks remain.
+- The Supabase function stays pinned to ap-southeast-1 by the frontend query parameter. Scores and event authorization remain server-side.
