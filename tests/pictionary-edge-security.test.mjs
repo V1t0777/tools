@@ -16,7 +16,7 @@ function setup({limited=false,unavailable=false,active=true,roomMember=false}={}
       return Promise.resolve({data,error:null}).then(resolve,reject);
     }};return q;
   }
-  vm.runInNewContext(source,{Request,Response,TextEncoder,TextDecoder,Uint8Array,crypto:webcrypto,console:{error(){}},Deno:{env:{get:k=>k==='SUPABASE_URL'?'https://example.supabase.co':'mock'},serve:fn=>handler=fn},createClient:()=>({from:query,rpc:async(name,args)=>{
+  vm.runInNewContext(source,{Request,Response,TextEncoder,TextDecoder,Uint8Array,crypto:webcrypto,console:{error(){},info(){}},Deno:{env:{get:k=>k==='SUPABASE_URL'?'https://example.supabase.co':'mock'},serve:fn=>handler=fn},createClient:()=>({from:query,rpc:async(name,args)=>{
     if(name==='pictionary_identity_v3')return {data:active?{id:'m1',user_id:'u1',nickname:'friend',color:'#fff'}:null,error:null};
     if(name==='pictionary_state_snapshot_v3')
       return roomMember?{data:{room:{id:'r1',status:'playing',ends_at:null}},error:null}:{data:null,error:{message:'NOT_ROOM_MEMBER'}};
