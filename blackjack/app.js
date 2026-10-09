@@ -13,6 +13,11 @@
   const SOUND_KEY = 'toolbox_blackjack_sound_v15';
   const PRESENTATION_MAX = 8;
   const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+  const lowPowerMode = Boolean(
+    navigator.connection?.saveData ||
+    (Number.isFinite(navigator.deviceMemory) && navigator.deviceMemory <= 4) ||
+    (Number.isFinite(navigator.hardwareConcurrency) && navigator.hardwareConcurrency <= 4)
+  );
 
   let session = null;
   let sdkPromise = null;
@@ -58,6 +63,12 @@
   let presentationBusy = false;
   let presentationGeneration = 0;
   let lastReactionAt = 0;
+
+  document.documentElement.classList.toggle('low-power',lowPowerMode);
+
+  function motionAllowed() {
+    return !prefersReducedMotion?.matches && !lowPowerMode && !document.hidden;
+  }
 
   function show(id) {
     SCREENS.forEach((name) => $(name).classList.toggle('active', name === id));
@@ -158,7 +169,7 @@
     try { if (navigator.vibrate) navigator.vibrate(pattern); } catch {}
   }
   function animateChipFlight(button) {
-    if (!button || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    if (!button || !motionAllowed()) return;
     if (document.querySelectorAll('.chip-flight').length >= 5) return;
     const target = $('pendingBet');
     if (!target) return;
@@ -250,12 +261,21 @@
       if (!before) continue;
       const oldHands = handMap(before);
       const newHands = handMap(player);
+      if (!before.bet_locked && player.bet_locked) {
+        events.push({type:'bet',member_id:String(player.member_id),name:player.nickname,amount:Number(player.current_bet || 0)});
+      }
+      if (!before.insurance_decided && player.insurance_decided) {
+        events.push({type:'insurance',member_id:String(player.member_id),name:player.nickname,amount:Number(player.insurance_bet || 0)});
+      }
       if (newHands.size > oldHands.size) events.push({type:'split',member_id:String(player.member_id),name:player.nickname});
       for (const [id,hand] of newHands) {
         const old = oldHands.get(id);
         if (!old) continue;
         if (!old.doubled && hand.doubled) events.push({type:'double',member_id:String(player.member_id),name:player.nickname});
-        if ((hand.cards?.length || 0) > (old.cards?.length || 0)) events.push({type:'card',member_id:String(player.member_id)});
+        if ((hand.cards?.length || 0) > (old.cards?.length || 0)) {
+          events.push({type:'card',member_id:String(player.member_id),name:player.nickname,index:(hand.cards?.length || 1)-1});
+        }
+        if (old.status === 'active' && hand.status === 'stand') events.push({type:'stand',member_id:String(player.member_id),name:player.nickname});
         if (old.status !== 'blackjack' && hand.status === 'blackjack') events.push({type:'blackjack',member_id:String(player.member_id),name:player.nickname});
         if (old.status !== 'bust' && hand.status === 'bust') events.push({type:'bust',member_id:String(player.member_id),name:player.nickname});
         if (old.status !== 'surrender' && hand.status === 'surrender') events.push({type:'surrender',member_id:String(player.member_id),name:player.nickname});
@@ -268,7 +288,15 @@
       for (let index=oldDealer.length;index<newDealer.length;index++) events.push({type:'dealer_card',index});
     }
     if (previous.room?.phase === 'betting' && next.room?.phase !== 'betting') events.unshift({type:'deal'});
-    if (previous.room?.phase !== 'settlement' && next.room?.phase === 'settlement') events.push({type:'settle'});
+    if (previous.room?.phase !== 'settlement' && next.room?.phase === 'settlement') {
+      events.push({
+        type:'settle',
+        settlements:next.players.map((player) => ({
+          member_id:String(player.member_id),
+          amount:Number(player.stack || 0)-Number(player.round_start_stack || 0),
+        })),
+      });
+    }
     return events.slice(0,PRESENTATION_MAX);
   }
   function announce(message) {
@@ -284,28 +312,47 @@
   function presentationTarget(memberId) {
     return memberId ? playerSeatNodes.get(String(memberId))?.seat : null;
   }
-  function animatePayout(net) {
-    if (!net || prefersReducedMotion?.matches || document.hidden) return;
-    const target = presentationTarget(String(me?.id || ''));
+  function chipFace(amount,index) {
+    const absolute = Math.abs(Number(amount || 0));
+    const values = absolute >= 250 ? [250,100,50] : absolute >= 100 ? [100,50,20] : absolute >= 50 ? [50,20,10] : [20,10,10];
+    return values[index % values.length];
+  }
+  function animateChipTransfer(fromRect,toRect,amount,count = 3) {
+    if (!fromRect || !toRect || !amount || !motionAllowed()) return;
+    const total = lowPowerMode ? 1 : Math.min(4,count);
+    for (let index=0;index<total;index++) {
+      const chip = document.createElement('span');
+      const face = chipFace(amount,index);
+      chip.className = `payout-chip payout-chip-${face}`;
+      chip.textContent = String(face);
+      chip.style.left = `${fromRect.left+fromRect.width/2}px`;
+      chip.style.top = `${fromRect.top+fromRect.height/2}px`;
+      document.body.append(chip);
+      const spread = (index-(total-1)/2)*8;
+      const dx = toRect.left+toRect.width/2-(fromRect.left+fromRect.width/2)+spread;
+      const dy = toRect.top+toRect.height/2-(fromRect.top+fromRect.height/2)-index*3;
+      const animation = chip.animate([
+        {transform:`translate3d(${spread*.2}px,0,0) rotate(${spread}deg) scale(.82)`,opacity:0},
+        {transform:`translate3d(${spread*.2}px,-9px,0) rotate(${spread}deg) scale(1)`,opacity:1,offset:.14},
+        {transform:`translate3d(${dx*.72}px,${dy*.72-12}px,0) rotate(${spread*1.8}deg) scale(.94)`,opacity:1,offset:.76},
+        {transform:`translate3d(${dx}px,${dy}px,0) rotate(${spread*2.4}deg) scale(.78)`,opacity:0},
+      ],{duration:430+index*45,delay:index*42,easing:'cubic-bezier(.18,.76,.2,1)',fill:'forwards'});
+      animation.finished.finally(() => chip.remove()).catch(() => chip.remove());
+    }
+  }
+  function animatePayout(net,memberId) {
+    if (!net || !motionAllowed()) return;
+    const target = presentationTarget(String(memberId || me?.id || ''));
     const dealer = $('dealerHand');
     if (!target || !dealer) return;
     const fromRect = (net > 0 ? dealer : target).getBoundingClientRect();
     const toRect = (net > 0 ? target : dealer).getBoundingClientRect();
-    const chip = document.createElement('span');
-    chip.className = 'payout-chip';
-    chip.textContent = '●';
-    chip.style.left = `${fromRect.left+fromRect.width/2}px`;
-    chip.style.top = `${fromRect.top+fromRect.height/2}px`;
-    document.body.append(chip);
-    const dx = toRect.left+toRect.width/2-(fromRect.left+fromRect.width/2);
-    const dy = toRect.top+toRect.height/2-(fromRect.top+fromRect.height/2);
-    const animation = chip.animate([
-      {transform:'translate3d(0,0,0) scale(.8)',opacity:0},
-      {transform:'translate3d(0,0,0) scale(1)',opacity:1,offset:.12},
-      {transform:`translate3d(${dx}px,${dy}px,0) scale(.72)`,opacity:.9,offset:.82},
-      {transform:`translate3d(${dx}px,${dy}px,0) scale(.58)`,opacity:0},
-    ],{duration:360,easing:'cubic-bezier(.18,.76,.2,1)',fill:'forwards'});
-    animation.finished.finally(() => chip.remove()).catch(() => chip.remove());
+    animateChipTransfer(fromRect,toRect,net,Math.min(4,Math.max(2,Math.ceil(Math.abs(net)/100))));
+  }
+  function animateBetCommit(amount,fromRect) {
+    const target = presentationTarget(String(me?.id || ''))?.querySelector('.bet-spot');
+    if (!target || !fromRect || !motionAllowed()) return;
+    animateChipTransfer(fromRect,target.getBoundingClientRect(),amount,3);
   }
 
   async function playPresentation(item,generation) {
@@ -325,7 +372,21 @@
       await pulse($('gameScreen'),'presentation-deal',220);
     } else if (item.type === 'card') {
       playSound('card');
-      await sleep(90);
+      announce(`${item.name || '玩家'}要牌`);
+      const card = target?.querySelector('.mini-hand.active .card:last-child') || target?.querySelector('.card:last-child');
+      await pulse(card,'presentation-card',180);
+    } else if (item.type === 'stand') {
+      playSound('flip');
+      announce(`${item.name || '玩家'}停牌`);
+      await pulse(target,'stand-pulse',220);
+    } else if (item.type === 'bet') {
+      playSound('chip');
+      announce(`${item.name || '玩家'}下注 ${formatChips(item.amount)}`);
+      await pulse(target?.querySelector('.bet-spot'),'bet-pulse',240);
+    } else if (item.type === 'insurance') {
+      playSound('chip');
+      announce(`${item.name || '玩家'}${item.amount > 0 ? '购买了保险' : '未购买保险'}`);
+      await pulse(target,'insurance-pulse',220);
     } else if (item.type === 'reveal') {
       playSound('flip');
       announce('庄家翻开暗牌');
@@ -361,7 +422,9 @@
       const mine = nextPlayerForPresentation();
       const net = mine ? Number(mine.stack || 0)-Number(mine.round_start_stack || 0) : 0;
       playSound(net > 0 ? 'win' : net < 0 ? 'loss' : 'chip');
-      animatePayout(net);
+      const settlements = Array.isArray(item.settlements) ? item.settlements : [];
+      const visible = lowPowerMode ? settlements.filter((entry) => entry.member_id === String(me?.id || '')) : settlements;
+      visible.forEach((entry) => animatePayout(entry.amount,entry.member_id));
       await pulse($('gameScreen'),'settle-pulse',320);
     }
   }
@@ -369,7 +432,7 @@
     return myPlayer();
   }
   function enqueuePresentation(items) {
-    if (!items?.length || document.hidden || prefersReducedMotion?.matches) return;
+    if (!items?.length || !motionAllowed()) return;
     presentationQueue.push(...items);
     if (presentationQueue.length > PRESENTATION_MAX) presentationQueue = presentationQueue.slice(-PRESENTATION_MAX);
     if (presentationBusy) return;
@@ -738,10 +801,14 @@
       return;
     }
     const amount = pendingBet;
+    const fromRect = $('pendingBet')?.getBoundingClientRect();
     pulseHaptic(12);
     playSound('chip');
     const ok = await mutate('bet',{amount,action_id:makeId()});
-    if (ok) lastConfirmedBet = amount;
+    if (ok) {
+      lastConfirmedBet = amount;
+      animateBetCommit(amount,fromRect);
+    }
   }
 
   async function mutate(action,payload = {}) {
@@ -1035,11 +1102,28 @@
     head.append(name,score);
     const status = document.createElement('div');
     status.className = 'seat-status';
-    meta.append(head,status);
+    const betSpot = document.createElement('div');
+    betSpot.className = 'bet-spot';
+    betSpot.setAttribute('aria-label','下注区');
+    const turn = document.createElement('span');
+    turn.className = 'turn-indicator';
+    turn.textContent = '操作中';
+    meta.append(head,status,betSpot,turn);
     const hands = document.createElement('div');
     hands.className = 'seat-hands';
     seat.append(meta,hands);
-    return {seat,name,score,status,hands,handNodes:new Map()};
+    return {seat,name,score,status,betSpot,turn,hands,handNodes:new Map()};
+  }
+
+  function seatSlot(player) {
+    if (String(player.member_id) === String(me?.id || '')) return ' seat-slot-self';
+    const others = state.players
+      .filter((candidate) => String(candidate.member_id) !== String(me?.id || ''))
+      .sort((a,b) => Number(a.seat || 0)-Number(b.seat || 0));
+    if (others.length === 1) return ' seat-slot-solo';
+    return others.findIndex((candidate) => String(candidate.member_id) === String(player.member_id)) === 0
+      ? ' seat-slot-left'
+      : ' seat-slot-right';
   }
 
   function renderPlayerHands(node,player) {
@@ -1136,9 +1220,14 @@
         node = createPlayerSeatNode();
         playerSeatNodes.set(key,node);
       }
-      node.seat.className = 'player-seat' + (key === String(me?.id) ? ' me' : '');
+      const active = phase === 'player_action' && Boolean(activeHand(player));
+      node.seat.className = 'player-seat' + (key === String(me?.id) ? ' me' : '') + seatSlot(player) + (active ? ' is-turn' : '');
+      node.seat.dataset.seat = String(player.seat || '');
+      node.seat.setAttribute('aria-current',active ? 'true' : 'false');
       node.name.textContent = player.nickname || '好友';
       node.score.textContent = `${formatChips(player.stack)} 筹码`;
+      node.betSpot.textContent = Number(player.current_bet || 0) > 0 ? formatChips(player.current_bet) : '下注区';
+      node.betSpot.classList.toggle('has-bet',Number(player.current_bet || 0) > 0);
       if (phase === 'betting') {
         node.status.textContent = Number(player.stack || 0) < Number(state.room.min_bet || 10)
           ? '筹码不足 · 观战'
@@ -1281,9 +1370,16 @@
       const current = container.children[i];
       if (current?.dataset.code === desired[i]) continue;
       const card = createCard(desired[i]);
-      if (container.isConnected && !prefersReducedMotion?.matches) {
-        card.classList.add('dealt');
-        card.addEventListener('animationend',() => card.classList.remove('dealt'),{once:true});
+      if (container.isConnected && motionAllowed()) {
+        const className = current?.dataset.code === 'BACK' && desired[i] !== 'BACK' ? 'flipped' : 'dealt';
+        card.style.setProperty('--deal-delay',`${Math.min(i,4)*45}ms`);
+        if (className === 'flipped') {
+          card.classList.add('flipped');
+          card.addEventListener('animationend',() => card.classList.remove('flipped'),{once:true});
+        } else {
+          card.classList.add('dealt');
+          card.addEventListener('animationend',() => card.classList.remove('dealt'),{once:true});
+        }
       }
       if (current) current.replaceWith(card);
       else container.append(card);

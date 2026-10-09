@@ -601,3 +601,196 @@ button,input,select{font:inherit}.app{width:min(880px,100%);margin:auto}.hidden{
     contain:layout paint style;
   }
 }
+
+/* ===== Blackjack V1.6 Immersive Private Table ===== */
+#gameScreen .dealer-zone{position:relative}
+.card-shoe{
+  position:absolute;
+  top:30px;
+  right:clamp(18px,12vw,86px);
+  width:52px;
+  height:70px;
+  border:1px solid rgba(230,207,147,.3);
+  border-radius:8px 8px 12px 12px;
+  background:linear-gradient(145deg,#291b14,#100d0b 72%);
+  box-shadow:inset 0 0 0 3px rgba(202,168,93,.08),0 10px 18px rgba(0,0,0,.25);
+  transform:perspective(180px) rotateY(-9deg) rotateZ(4deg);
+  opacity:.86;
+  pointer-events:none;
+}
+.card-shoe::before{
+  content:"";
+  position:absolute;
+  inset:7px 7px 15px;
+  border:3px solid #e8d49c;
+  border-radius:5px;
+  background:repeating-linear-gradient(135deg,#153c30 0 4px,#0b271f 4px 8px);
+}
+.card-shoe::after{
+  content:"";
+  position:absolute;
+  left:8px;
+  right:8px;
+  bottom:8px;
+  height:3px;
+  border-radius:99px;
+  background:#b58c45;
+}
+.card-shoe span{position:relative;z-index:1;display:grid;height:100%;place-items:center;color:#ead49b;font-size:18px}
+
+.card.dealt{
+  animation:cardDealV16 .34s cubic-bezier(.18,.82,.2,1) var(--deal-delay,0ms) both;
+  transform-origin:center;
+}
+@keyframes cardDealV16{
+  0%{opacity:.08;transform:translate3d(96px,-78px,0) rotateZ(12deg) scale(.78)}
+  68%{opacity:1;transform:translate3d(-3px,2px,0) rotateZ(-1.5deg) scale(1.025)}
+  100%{opacity:1;transform:translate3d(0,0,0) rotateZ(0) scale(1)}
+}
+.card.flipped{
+  animation:cardFlipV16 .42s cubic-bezier(.2,.72,.18,1) both;
+  transform-origin:center;
+}
+@keyframes cardFlipV16{
+  0%{opacity:.55;transform:perspective(560px) rotateY(88deg) scale(.96)}
+  52%{opacity:1;transform:perspective(560px) rotateY(-9deg) scale(1.025)}
+  100%{opacity:1;transform:perspective(560px) rotateY(0) scale(1)}
+}
+
+.seat-meta{position:relative}
+.turn-indicator{
+  display:none;
+  width:max-content;
+  margin:5px auto 0;
+  padding:3px 7px;
+  border-radius:999px;
+  background:rgba(230,207,147,.13);
+  color:#f0dca8;
+  font-size:8px;
+  font-weight:950;
+  letter-spacing:.08em;
+}
+.player-seat.is-turn{
+  border-color:rgba(230,207,147,.5);
+  box-shadow:0 0 0 1px rgba(230,207,147,.1),0 0 24px rgba(202,168,93,.1);
+}
+.player-seat.is-turn .turn-indicator{display:inline-flex}
+.bet-spot{
+  width:max-content;
+  min-width:46px;
+  min-height:21px;
+  margin:4px auto 0;
+  padding:3px 8px;
+  border:1px dashed rgba(230,207,147,.22);
+  border-radius:999px;
+  color:rgba(230,207,147,.5);
+  font-size:8px;
+  font-weight:900;
+  line-height:13px;
+  text-align:center;
+}
+.bet-spot.has-bet{
+  border-style:solid;
+  border-color:rgba(230,207,147,.42);
+  background:radial-gradient(circle at 35% 30%,rgba(255,255,255,.15),transparent 25%),#7f2d29;
+  color:#fff0cf;
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.08),0 3px 8px rgba(0,0,0,.2);
+}
+.bet-spot.bet-pulse{animation:betSpotV16 .24s ease-out both}
+@keyframes betSpotV16{50%{transform:translate3d(0,-3px,0) scale(1.08)}}
+.player-seat.stand-pulse,.player-seat.insurance-pulse{animation:seatActionV16 .22s ease-out both}
+@keyframes seatActionV16{50%{border-color:rgba(230,207,147,.5);transform:translate3d(0,-2px,0)}}
+
+.payout-chip{
+  display:grid;
+  place-items:center;
+  width:28px;
+  height:28px;
+  margin:-14px 0 0 -14px;
+  border:3px dashed rgba(255,255,255,.78);
+  background:radial-gradient(circle at 34% 28%,rgba(255,255,255,.25),transparent 25%),#983c37;
+  box-shadow:inset 0 0 0 2px rgba(0,0,0,.16),0 7px 12px rgba(0,0,0,.28);
+  color:#fff5d7;
+  font-size:7px;
+  line-height:1;
+  font-weight:1000;
+  text-shadow:0 1px 1px rgba(0,0,0,.35);
+}
+.payout-chip-10{background-color:#d8d5c9;color:#282724}
+.payout-chip-20{background-color:#3c75bd}
+.payout-chip-50{background-color:#b74742}
+.payout-chip-100{background-color:#292e33}
+.payout-chip-250{background-color:#378159}
+
+@media(max-width:620px){
+  #gameScreen .dealer-zone{padding-top:20px;padding-bottom:4px}
+  .card-shoe{top:24px;right:12px;width:40px;height:56px;opacity:.72}
+  #gameScreen .player-table{
+    position:relative;
+    display:grid;
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+    grid-template-rows:auto auto;
+    gap:9px 7px;
+    min-height:300px;
+    padding:22px 4px 2px;
+    align-items:start;
+  }
+  #gameScreen .player-table::before{
+    content:"";
+    position:absolute;
+    inset:4px 10px 24px;
+    border:1px solid rgba(230,207,147,.1);
+    border-bottom-color:transparent;
+    border-radius:50% 50% 34% 34% / 42% 42% 18% 18%;
+    pointer-events:none;
+  }
+  #gameScreen .player-seat{
+    display:block;
+    width:100%;
+    min-width:0;
+    padding:9px 5px 7px;
+    text-align:center;
+    transform-origin:center;
+  }
+  #gameScreen .seat-slot-left{grid-column:1;grid-row:1;transform:translate3d(0,8px,0) rotateZ(1.2deg)}
+  #gameScreen .seat-slot-right{grid-column:2;grid-row:1;transform:translate3d(0,8px,0) rotateZ(-1.2deg)}
+  #gameScreen .seat-slot-solo{grid-column:1 / -1;grid-row:1;width:68%;justify-self:center}
+  #gameScreen .seat-slot-self{grid-column:1 / -1;grid-row:2;width:92%;justify-self:center;margin-top:2px}
+  #gameScreen .seat-head,#gameScreen .seat-status{justify-content:center;text-align:center}
+  #gameScreen .seat-head{gap:4px}
+  #gameScreen .seat-head b{max-width:64px;font-size:11px}
+  #gameScreen .seat-score{font-size:9px}
+  #gameScreen .seat-status{min-height:16px;margin:3px 0;font-size:9px}
+  #gameScreen .seat-hands{justify-content:center;overflow-x:auto;scrollbar-width:none}
+  #gameScreen .seat-hands::-webkit-scrollbar{display:none}
+  #gameScreen .mini-hand{min-width:76px;padding:5px 3px 4px}
+  #gameScreen .mini-hand .hand{
+    justify-content:center;
+    margin:-12px -24px -15px;
+    transform:scale(.56);
+    transform-origin:center;
+  }
+  #gameScreen .seat-slot-self .mini-hand .hand{transform:scale(.64)}
+  #gameScreen .seat-slot-self .seat-head b{max-width:110px;font-size:12px}
+  #gameScreen .seat-slot-self .seat-score{font-size:10px}
+  .turn-indicator{margin-top:3px}
+  .bet-spot{margin-top:3px}
+  .card.dealt{animation-duration:.28s}
+}
+
+@media(max-width:390px){
+  #gameScreen .player-table{min-height:286px;padding-inline:1px;gap-inline:5px}
+  #gameScreen .player-seat{padding-inline:3px}
+  #gameScreen .seat-slot-self{width:96%}
+  #gameScreen .seat-slot-solo{width:74%}
+  #gameScreen .mini-hand{min-width:70px}
+  .card-shoe{right:4px;transform:scale(.9) rotateZ(4deg)}
+}
+
+.low-power .card-shoe{box-shadow:none;opacity:.56}
+.low-power .card.dealt,.low-power .card.flipped,.low-power .player-seat,.low-power .bet-spot{animation:none!important;transition:none!important}
+.low-power .reaction-layer,.low-power .payout-chip,.low-power .chip-flight{display:none!important}
+@media(prefers-reduced-motion:reduce){
+  .card.dealt,.card.flipped,.bet-spot.bet-pulse,.player-seat.stand-pulse,.player-seat.insurance-pulse{animation:none!important}
+  .reaction-layer,.payout-chip,.chip-flight{display:none!important}
+}

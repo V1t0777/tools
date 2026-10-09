@@ -9,7 +9,7 @@
   <title>朋友21点｜钊的工具箱</title>
   <link rel="stylesheet" href="../shared/toolbox-ui.css">
   <link rel="stylesheet" href="../shared/toolbox-motion.css">
-  <link rel="stylesheet" href="./style.css?v=20261008-1">
+  <link rel="stylesheet" href="./style.css?v=20261009-v16">
 </head>
 <body>
   <main class="app">
@@ -137,7 +137,8 @@
         <span class="status-pill" id="gameConnectionStatus">连接中</span>
       </div>
 
-      <section class="dealer-zone">
+      <section class="dealer-zone" aria-label="庄家牌区">
+        <div class="card-shoe" id="cardShoe" aria-hidden="true"><span>♠</span></div>
         <div class="dealer-title"><span>庄家</span><b id="dealerValue">?</b></div>
         <div class="hand dealer-hand" id="dealerHand"></div>
       </section>
@@ -145,7 +146,7 @@
       <section class="table-message" id="tableMessage" aria-live="polite">请选择要牌或停牌</section>
       <div class="table-feed" id="tableFeed" aria-live="polite" aria-atomic="true"></div>
 
-      <section class="player-table" id="playerTable"></section>
+      <section class="player-table" id="playerTable" aria-label="半环形玩家座位"></section>
 
       <section class="betting-dock panel hidden" id="bettingDock">
         <div class="casino-ledger">
@@ -219,6 +220,6 @@
   <div class="reaction-layer" id="reactionLayer" aria-hidden="true"></div>
 
   <script src="../shared/toolbox-auth.js?v=20261008-security"></script>
-  <script src="./app.js?v=20261008-1"></script>
+  <script src="./app.js?v=20261009-v16"></script>
 </body>
 </html>
