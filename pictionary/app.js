@@ -447,9 +447,10 @@
   function updateRealtimeStatus(){
     const healthy=isRealtimeHealthy();
     const canvasRecovering=healthy&&state?.room.status==='playing'&&!isCanvasHealthy();
+    const drawOffline=healthy&&state?.room.status==='playing'&&drawStatus!=='SUBSCRIBED';
     for(const id of ['connectionStatus','gameConnectionStatus']){
       const pill=$(id);if(!pill)continue;
-      pill.textContent=!healthy?'连接恢复中':canvasRecovering?'实时在线 · 画布同步中':(Number.isFinite(realtimeRtt)?`实时在线 · ${Math.round(realtimeRtt)}ms`:'实时在线');
+      pill.textContent=!healthy?'连接恢复中':drawOffline?'画布通道连接中':canvasRecovering?'实时在线 · 画布同步中':(Number.isFinite(realtimeRtt)?`实时在线 · ${Math.round(realtimeRtt)}ms`:'实时在线');
       pill.classList.toggle('online',healthy);
     }
   }
@@ -908,7 +909,7 @@
       if(epoch!==roomEpoch||roundId!==currentRoundId)return;
       const version=Number(data.version)||0;
       if(Array.isArray(data.strokes))applyCanvasSnapshot(roundId,version,data.strokes);
-      if(data.unchanged&&version<=canvasRevision)canvasNeedsSync=false;
+      if(data.unchanged&&version===canvasRevision)canvasNeedsSync=false;
       lastCanvasVersion=Math.max(lastCanvasVersion,version);
     }catch(err){if(!err.cancelled)console.warn('画布同步尚未确认');}
     finally{canvasFetchBusy=false;}
