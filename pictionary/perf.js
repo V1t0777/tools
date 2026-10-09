@@ -2,7 +2,7 @@
   'use strict';
   // Local, bounded, metadata-only instrumentation. Never capture payloads or identifiers.
   const MAX_SAMPLES=96;
-  const timing=new Map(), longTasks=[], send={pending:0,maxPending:0,errors:0,slow:0};
+  const timing=new Map(), longTasks=[], sendWindow=[], send={pending:0,maxPending:0,errors:0,slow:0};
   const allowed=/^[a-z0-9_.-]{1,48}$/;
   const perf=globalThis.performance;
   let counter=0,peerRtt=null,edgeRegion='未观测',realtimeFailures=0;
@@ -80,6 +80,7 @@
       if(done)return;
       done=true;send.pending=Math.max(0,send.pending-1);
       const elapsed=now()-beginAt;
+      sendWindow.push(elapsed);if(sendWindow.length>24)sendWindow.shift();
       sample('realtime.send_wait',elapsed);
       if(elapsed>250)send.slow++;
       if(status!=='ok')send.errors++;
@@ -93,7 +94,8 @@
   }
   function profile(){
     const hint=connectionHint();
-    const congestion=send.pending>8||send.slow>6&&send.slow>send.errors*2;
+    const recent=sendWindow.slice(-12);
+    const congestion=send.pending>8||(recent.length>=8&&recent.filter(ms=>ms>300).length>=5);
     const badRtt=peerRtt!==null&&peerRtt>600;
     const recentLong=longTasks.some(e=>Date.now()-e.time<15000&&e.duration>150);
     if(hint==='slow'||congestion||badRtt)return {tier:'slow',strokeMs:46,maxPoints:120,recoveryMs:8000,snapshotMs:4200,chunkGapMs:16};
