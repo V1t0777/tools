@@ -130,3 +130,10 @@ The secure Pictionary page loads `pictionary/perf.js` before `app.js`, and displ
 - Edge routing remains explicitly pinned to `ap-southeast-1`. The browser shows the observed `x-sb-edge-region` only if the runtime exposes it. Otherwise **未观测** is accurate: the requested Singapore region is not proof of the observed region. Realtime peer echo RTT reflects the peers and network path, not necessarily a direct cross-border path to the Singapore database.
 - Client diagnostics exist in volatile memory only and reset on reload; no persistent identifier or telemetry table is created. Browser long-task observation may be unsupported on iOS Safari.
 - For production comparisons collect **separate good/poor-network samples and P50/P95** before claiming latency improvement.
+
+ 
+## v3.1 — reliable canvas delivery
+- Each active round uses a fresh private `pictionary-draw:<room>:<round>:<nonce>` channel. Supabase authorizes the current drawer to send only while playing; active room members may receive. Room control chat remains on the original channel.
+- Realtime `ack:true` detects server receive/rejection of strokes and snapshots. It is not an end-to-end recipient display ACK; peer Pong carries the latest observed canvas revision for gap detection.
+- A 10-second drawing-channel watchdog and bounded independent retry handle failed subscriptions. Missed messages recover through the persisted server-authoritative snapshot with a periodic version check (at least every 6.5 seconds under a healthy connection).
+- The page uses a bumped JavaScript asset version so older clients do not accidentally mix the old room and new drawing-channel protocols. Member sessions, game scoring, round rules and Singapore Edge routing are unchanged.

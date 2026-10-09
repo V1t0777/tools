@@ -26,6 +26,6 @@ test('deltas have a bounded reorder window before authoritative repair',()=>{
   assert.doesNotMatch(app,/if\(!replace\)sendSnapshot\(\)/);
 });
 test('connection and canvas health are separate, reconnect does not idle for 8 seconds',()=>{
-  assert.match(app,/return isRealtimeHealthy\(\)&&!canvasNeedsSync;/);
+  assert.match(app,/return isRealtimeHealthy\(\)&&drawStatus==='SUBSCRIBED'&&!canvasNeedsSync;/);
   assert.doesNotMatch(app,/scheduleReconnect\(8000\)/);
 });

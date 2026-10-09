@@ -5,8 +5,8 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 const path=require('node:path');
 const source=fs.readFileSync(path.join(__dirname,'../pictionary/app.js'),'utf8');
-const fields=['state','me','currentRoundId','strokes','canvasRevision','canvasDirty','canvasNeedsSync','lastDrawerAt','lastPongAt','realtimeStatus','suspended','scoreRevision','roomEpoch','connectionEpoch','clockTimer','canvasSyncTimer','heartbeatTimer','pollTimer','refreshQueued','transitionBusy','guessRequests','liveGuesses','pendingPings','reconnectTimer','subscribedAt','serverHeartbeatAt','transportFailed','reconnectAttempt','pendingCanvasDeltas','canvasGapTimer','snapshotBroadcastTimer'];
-const injected=source.replace('  boot();',`globalThis.audit={api,initializeSession,bind,enterRoom,connectRealtime,leaveRealtime,refreshState,requestState,exitToHome,adoptState,applyScores,receiveGuessResult,receiveRoomTransition,receiveStateSync,submitGuess,deliverGuess,hasGuessed,switchRound,receiveStroke,receiveCanvasControl,queueCanvasDelta,queueSnapshotBroadcast,resizeCanvas,receiveSnapshot,applyCanvasSnapshot,pullCanvasFallback,persistCanvasFallback,sendSnapshot,sendPing,handlePong,isRealtimeHealthy,isCanvasHealthy,checkHealth,startRoomTimers,resumeRoom,
+const fields=['state','me','currentRoundId','strokes','canvasRevision','canvasDirty','canvasNeedsSync','lastDrawerAt','lastPongAt','realtimeStatus','suspended','scoreRevision','roomEpoch','connectionEpoch','clockTimer','canvasSyncTimer','heartbeatTimer','pollTimer','refreshQueued','transitionBusy','guessRequests','liveGuesses','pendingPings','reconnectTimer','subscribedAt','serverHeartbeatAt','transportFailed','reconnectAttempt','pendingCanvasDeltas','canvasGapTimer','snapshotBroadcastTimer','drawChannel','drawStatus','drawTopic','drawRetryTimer','drawRetryAttempt','activeStroke','sendPoints','lastCanvasCheck'];
+const injected=source.replace('  boot();',`globalThis.audit={api,initializeSession,bind,enterRoom,connectRealtime,leaveRealtime,refreshState,requestState,exitToHome,adoptState,applyScores,receiveGuessResult,receiveRoomTransition,receiveStateSync,submitGuess,deliverGuess,hasGuessed,switchRound,receiveStroke,receiveCanvasControl,queueCanvasDelta,queueSnapshotBroadcast,resizeCanvas,syncDrawingChannel,stopDrawingChannel,sendDrawEvent,flushStroke,receiveSnapshot,applyCanvasSnapshot,pullCanvasFallback,persistCanvasFallback,sendSnapshot,sendPing,handlePong,isRealtimeHealthy,isCanvasHealthy,checkHealth,startRoomTimers,resumeRoom,
 setApi(fn){api=fn;},set(v){${fields.map(f=>`if('${f}' in v)${f}=v.${f};`).join('')}} ,get(){return {${fields.join(',')}}}};`);
 function setup(){
  const elements=new Map(),timeouts=new Map(),intervals=new Map(),events=new Map(),channels=[];
@@ -195,7 +195,7 @@ test('unchanged canvas dimensions do not reset backing buffer on state updates',
 test('viewer silence alone never marks a connected, synchronized canvas unhealthy',()=>{
  const {a}=setup();
  a.set({realtimeStatus:'SUBSCRIBED',serverHeartbeatAt:Date.now(),lastDrawerAt:0,canvasNeedsSync:false});
- assert.equal(a.isCanvasHealthy(),true);
+ a.set({drawStatus:'SUBSCRIBED'});assert.equal(a.isCanvasHealthy(),true);
 });
 test('multiple simultaneous sync requests schedule only one room snapshot',async()=>{
  const {a,timeouts,channels}=setup();
@@ -227,4 +227,49 @@ test('healthy sockets reconcile slowly; disconnected sockets poll quickly',()=>{
  a.set({realtimeStatus:'SUBSCRIBED',serverHeartbeatAt:Date.now()});
  a.startRoomTimers();
  assert.equal([...intervals.values()].filter(t=>t.ms===18000).length,1);
+});
+
+test('v3.1 private drawing channel is joined only in playing, and recreated each round',async()=>{
+ const {a,channels}=setup();a.get().state.room.realtime_token='nonce';
+ a.get().state.room.status='choosing';await a.connectRealtime();await channels[0].status('SUBSCRIBED');
+ assert.equal(channels.length,1);
+ a.get().state.room.status='playing';a.syncDrawingChannel();assert.equal(channels.length,2);
+ await channels[1].status('SUBSCRIBED');assert.equal(a.get().drawStatus,'SUBSCRIBED');
+ a.get().state.room.status='summary';a.syncDrawingChannel();assert.equal(a.get().drawStatus,'CLOSED');
+ a.get().state.room.status='playing';a.get().state.round.id='r2';a.set({currentRoundId:'r2'});
+ a.syncDrawingChannel();assert.equal(channels.length,3);
+});
+test('v3.1 two simulated clients can deliver the first full drawing via private channel',async()=>{
+ const drawer=setup(),viewer=setup();
+ drawer.a.get().state.room.realtime_token='nonce';
+ viewer.a.get().state.room.realtime_token='nonce';
+ drawer.a.set({me:{id:'drawer',nickname:'drawer'}});
+ await drawer.a.connectRealtime();await drawer.channels[0].status('SUBSCRIBED');
+ await viewer.a.connectRealtime();await viewer.channels[0].status('SUBSCRIBED');
+ assert.equal(drawer.channels.length,2);assert.equal(viewer.channels.length,2);
+ await drawer.channels[1].status('SUBSCRIBED');await viewer.channels[1].status('SUBSCRIBED');
+ drawer.channels[1].send=async packet=>{
+   viewer.channels[1].handlers.get('broadcast:'+packet.event)({payload:packet.payload});
+   return 'ok';
+ };
+ drawer.a.set({activeStroke:stroke('first'),sendPoints:[[0,0],[.5,.5]]});
+ drawer.a.flushStroke(true);
+ await Promise.resolve();await Promise.resolve();
+ assert.equal(viewer.a.get().strokes[0].id,'first');
+ assert.ok(viewer.a.get().canvasRevision>0);
+});
+test('v3.1 periodic server version check repairs a silent message blackout',async()=>{
+ const {a}=setup();const calls=[];
+ a.set({canvasRevision:0,canvasNeedsSync:false,lastCanvasCheck:Date.now()-10000});
+ a.setApi(async action=>{calls.push(action);return {version:15,strokes:[stroke('restored')]};});
+ await a.pullCanvasFallback(false);
+ assert.deepEqual(calls,['canvas']);assert.equal(a.get().strokes[0].id,'restored');
+});
+test('v3.1 rejected draw send triggers recovery without restarting the room channel',async()=>{
+ const {a,channels}=setup();a.get().state.room.realtime_token='nonce';
+ a.set({me:{id:'drawer',nickname:'drawer'}});
+ await a.connectRealtime();await channels[0].status('SUBSCRIBED');await channels[1].status('SUBSCRIBED');
+ channels[1].send=async()=> 'error';
+ await a.sendDrawEvent('stroke',{round_id:'r1',base_revision:0,revision:1,id:'x',points:[[0,0]]});
+ assert.ok(a.get().drawRetryTimer);assert.equal(a.get().realtimeStatus,'SUBSCRIBED');
 });
