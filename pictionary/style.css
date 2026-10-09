@@ -29,3 +29,10 @@ button,input{font:inherit}button{cursor:pointer}.app{width:min(100%,760px);margi
 
 
 .sync-status{display:flex;justify-content:flex-end;margin:-4px 0 8px}.sync-status .status-pill{font-size:11px;padding:4px 8px}.retry-guess{font:inherit;font-size:11px;margin-left:8px;padding:2px 7px;border:1px solid currentColor;border-radius:6px;background:transparent;color:var(--muted,#abb4cb);cursor:pointer}
+
+/* In-room diagnostics: closed by default; never overlaps the drawing surface. */
+.perf-details{margin:-4px 0 8px;border:1px solid var(--line);border-radius:11px;background:rgba(255,255,255,.025);color:var(--muted);font-size:11px}
+.perf-details summary{padding:8px 12px;cursor:pointer;list-style-position:inside;min-height:34px}
+.perf-details summary small{font-size:10px;color:var(--muted);margin-left:5px}
+.perf-details pre{margin:0;border-top:1px solid var(--line);padding:10px 12px;white-space:pre-wrap;overflow-wrap:anywhere;color:#c4cbda;font:11px/1.65 ui-monospace,Menlo,Consolas,monospace}
+@media(max-width:600px){.perf-details pre{font-size:10px}}

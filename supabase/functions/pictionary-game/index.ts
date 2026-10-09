@@ -15,8 +15,34 @@ const ADMIN_KEY=adminKey();
 if(!ADMIN_KEY)throw new Error("服务端数据库密钥未配置");
 const admin=createClient(URL,ADMIN_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
 const ORIGINS=new Set(["https://v1t0777.github.io","https://zhao-toolbox-secure.pages.dev","http://localhost:8000","http://127.0.0.1:8000"]);
-const headers=(req:Request)=>({"Access-Control-Allow-Origin":ORIGINS.has(req.headers.get("origin")||"")?(req.headers.get("origin")||""):"https://v1t0777.github.io","Access-Control-Allow-Headers":"authorization, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store","Vary":"Origin"});
-const reply=(req:Request,body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:headers(req)});
+const headers=(req:Request)=>({"Access-Control-Allow-Origin":ORIGINS.has(req.headers.get("origin")||"")?(req.headers.get("origin")||""):"https://v1t0777.github.io","Access-Control-Allow-Headers":"authorization, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Access-Control-Expose-Headers":"Server-Timing, x-sb-edge-region","Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store","Vary":"Origin"});
+type RequestTrace={started:number,action:string,parse:number,auth:number,limit:number};
+const traces=new WeakMap<Request,RequestTrace>();
+const monotonicNow=()=>typeof performance!=="undefined"&&typeof performance.now==="function"?performance.now():Date.now();
+const rounded=(value:number)=>Math.max(0,Math.round(value*10)/10);
+function reply(req:Request,body:unknown,status=200){
+  const responseHeaders:Record<string,string>=headers(req);
+  const timing=traces.get(req);
+  if(timing){
+    const total=rounded(monotonicNow()-timing.started);
+    const business=rounded(Math.max(0,total-timing.parse-timing.auth-timing.limit));
+    responseHeaders["Server-Timing"]=[
+      `parse;dur=${rounded(timing.parse)}`,
+      `auth;dur=${rounded(timing.auth)}`,
+      `limit;dur=${rounded(timing.limit)}`,
+      `business;dur=${business}`,
+      `total;dur=${total}`
+    ].join(", ");
+    // Bounded, sampled metadata only: never log answers, guesses, IDs or headers.
+    if(status>=500||Math.random()<(timing.action==="state"?.08:.2))
+      console.info("pictionary_perf",JSON.stringify({
+        action:timing.action,status,total_ms:total,parse_ms:rounded(timing.parse),
+        auth_ms:rounded(timing.auth),limit_ms:rounded(timing.limit),business_ms:business
+      }));
+    traces.delete(req);
+  }
+  return new Response(JSON.stringify(body),{status,headers:responseHeaders});
+}
 function fail(message:string,status=400,code?:string):never{const e=new Error(message) as Error&{status?:number,code?:string};e.status=status;e.code=code;(e as any).safeToExpose=true;throw e;}
 function code(){const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789",a=new Uint8Array(6);crypto.getRandomValues(a);return [...a].map(x=>chars[x%chars.length]).join("");}
 function shuffle<T>(items:T[]){const a=[...items];for(let i=a.length-1;i;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
@@ -181,10 +207,18 @@ async function limitAction(userId:string,action:string){
 Deno.serve(async(req:Request)=>{
   if(req.method==="OPTIONS")return new Response("ok",{headers:headers(req)});if(req.method!=="POST")return reply(req,{error:"仅支持 POST"},405);
   const origin=req.headers.get("origin")||"";if(origin&&!ORIGINS.has(origin))return reply(req,{error:"来源未获授权"},403);
+  const timing:RequestTrace={started:monotonicNow(),action:"unknown",parse:0,auth:0,limit:0};
+  traces.set(req,timing);
   try{
-    const b=await readBody(req);const action=String(b.action||"");
+    let stage=monotonicNow();
+    const b=await readBody(req);timing.parse=monotonicNow()-stage;
+    const action=String(b.action||"");
     if(!Object.hasOwn(ACTION_LIMITS,action))fail("未知操作",400,"UNKNOWN_ACTION");
-    const member=await identify(req);await limitAction(member.user_id,action);
+    timing.action=action;
+    stage=monotonicNow();
+    const member=await identify(req);timing.auth=monotonicNow()-stage;
+    stage=monotonicNow();
+    await limitAction(member.user_id,action);timing.limit=monotonicNow()-stage;
     if(action==="me"||(action==="bootstrap"&&!b.code))return reply(req,{member});
     if(action==="create_room"){
       let r:any=null;for(let i=0;i<8&&!r;i++){const out=await admin.from("pictionary_rooms").insert({room_code:code(),host_user_id:member.user_id,status:"lobby"}).select("*").single();if(!out.error)r=out.data;}if(!r)fail("暂时无法生成房间码",503);
