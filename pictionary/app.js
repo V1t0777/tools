@@ -19,7 +19,7 @@
   let scoreRevision=-1, scoreTotals=new Map(), hintRequested=false, suspended=false;
   let transitionRetryAt=0;
   let pendingCanvasDeltas=new Map(),canvasGapTimer=null,snapshotBroadcastTimer=null,lastSnapshotBroadcastAt=0;
-  let drawChannel=null,drawStatus='CLOSED',drawTopic=null,drawChannelEpoch=0,drawRetryTimer=null,drawRetryAttempt=0;
+  let drawChannel=null,drawStatus='CLOSED',drawTopic=null,drawChannelEpoch=0,drawRetryTimer=null,drawRetryAttempt=0,drawConnectDeadline=null;
   let lastPeerCanvasAckAt=0,drawInFlight=0;
   const CANVAS_REORDER_WAIT_MS=140, SNAPSHOT_COALESCE_MS=850;
 
@@ -42,6 +42,7 @@
       `Edge 身份/限流/业务：${fmt('edge.auth')} | ${fmt('edge.limit')} | ${fmt('edge.business')}`,
       `Realtime SDK 发送等待：${fmt('realtime.send_wait')}`,
       `发送进行中/峰值：${summary.send.pending}/${summary.send.maxPending}；失败：${summary.send.errors}`,
+      `画布私有频道：${drawStatus}，待确认发送：${drawInFlight}`,
       `画布全量重绘：${fmt('canvas.redraw')}`,
       `主线程长任务：${fmt('main.longtask')}`,
       '说明：RTT 含对端回声耗时；SDK 等待不等于远端确认；仅本地保存匿名指标。'
@@ -365,6 +366,7 @@
   function stopDrawingChannel(){
     drawChannelEpoch++;
     clearTimeout(drawRetryTimer);drawRetryTimer=null;
+    clearTimeout(drawConnectDeadline);drawConnectDeadline=null;
     const old=drawChannel,client=realtime;
     drawChannel=null;drawTopic=null;drawStatus='CLOSED';drawInFlight=0;
     if(old&&client?.removeChannel)Promise.resolve(client.removeChannel(old)).catch(()=>{});
@@ -395,8 +397,14 @@
     on('stroke',receiveStroke);on('snapshot',receiveSnapshot);
     on('clear',p=>receiveCanvasControl('clear',p));
     on('undo',p=>receiveCanvasControl('undo',p));
+    drawConnectDeadline=setTimeout(()=>{
+      if(current()&&drawStatus==='CONNECTING'){
+        stopDrawingChannel();scheduleDrawRetry();
+      }
+    },10000);
     ch.subscribe(status=>{
       if(!current())return;
+      if(status!=='CONNECTING'){clearTimeout(drawConnectDeadline);drawConnectDeadline=null;}
       drawStatus=status;updateRealtimeStatus();
       if(status==='SUBSCRIBED'){
         drawRetryAttempt=0;

@@ -3,7 +3,7 @@
   "source_kind": "applied SQL statement history (not a data backup)",
   "project_ref": "tmxpueakxibsaakdyusn",
   "captured_on": "2026-10-09",
-  "count": 46,
+  "count": 47,
   "privacy_exceptions": {
     "20260916134448": "Historical admin email and named staff seed rows omitted; restore via private provisioning and encrypted data backup.",
     "20260923152254": "Historical test-account email replaced with non-functional example.invalid placeholder.",
@@ -284,6 +284,12 @@
       "version": "20261009144652",
       "name": "pictionary_authoritative_state_v3",
       "original_sha256": "2f0255d38ed46fbceae7f03128b705ef90f61d41467aba273a2a1c1be155ad35",
+      "sanitized": false
+    },
+    {
+      "version": "20261009154405",
+      "name": "pictionary_draw_delivery_v31",
+      "original_sha256": "7b9637892f8fa146143b7726bcb30aae0e05bc75c93ce0b184e369ba4f7c767a",
       "sanitized": false
     }
   ]
