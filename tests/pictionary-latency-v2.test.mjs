@@ -10,7 +10,7 @@ const summaryRegionMigration=readFileSync(new URL('../supabase/migrations/202610
 
 test('pictionary v2 keeps high-frequency paths realtime and bounded',()=>{
   assert.match(app,/setTimeout\(\(\)=>flushStroke\(false\),14\)/);
-  assert.match(app,/guess_pending/);
+  assert.doesNotMatch(app,/guess_pending/,'never share unverified guess text over room Realtime');
   assert.match(app,/setTimeout\(\(\)=>\{[\s\S]*optimistic&&current\.pending[\s\S]*\},2500\)/);
   assert.match(app,/attemptTransition\('finish_round'\)/);
   assert.match(app,/attemptTransition\('next_round'\)/);
