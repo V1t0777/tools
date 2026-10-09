@@ -33,7 +33,7 @@ test('membership and session revocations rekey all affected rooms',()=>{
 });
 
 test('clients rebind using an authorized state snapshot, not a broadcast token',()=>{
-  assert.match(picEdge,/realtime_token:r\.realtime_token,realtime_generation:r\.realtime_generation/);
+  assert.match(picEdge,/pictionary_state_snapshot_v3/);
   for(const src of [pic,bj]){
     assert.match(src,/realtime_token/);
     assert.match(src,/realtime_generation/);
