@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 
 const app=readFileSync(new URL('../blackjack/app.js',import.meta.url),'utf8');
 const html=readFileSync(new URL('../blackjack/index.html',import.meta.url),'utf8');
+const css=readFileSync(new URL('../blackjack/style.css',import.meta.url),'utf8');
 
 test('blackjack frontend source parses as JavaScript',()=>{
   assert.doesNotThrow(()=>new Function(app));
@@ -40,6 +41,26 @@ test('blackjack hot table avoids full DOM rebuilds and uses adaptive clock ticks
   assert.match(app,/current\?\.dataset\.code === desired\[i\]/);
   assert.match(app,/scheduleClockTick\(Math\.min\(decisionMs,summaryMs\) <= 3000 \? 250 : 1000\)/);
   assert.doesNotMatch(app,/playerTable'\)\.replaceChildren\(\);\n    for \(const player of state\.players\)/);
+});
+
+test('blackjack V1.6 keeps immersive presentation client-only and non-blocking',()=>{
+  assert.match(html,/id="cardShoe"/);
+  assert.match(html,/aria-label="半环形玩家座位"/);
+  assert.match(app,/function seatSlot\(player\)/);
+  assert.match(app,/seat-slot-self/);
+  assert.match(app,/seat-slot-left/);
+  assert.match(app,/seat-slot-right/);
+  assert.match(app,/current\?\.dataset\.code === 'BACK'.*'flipped'/);
+  assert.match(app,/animateChipTransfer\(fromRect,toRect,amount/);
+  assert.match(app,/events\.push\(\{type:'stand'/);
+  assert.match(app,/events\.push\(\{type:'bet'/);
+  assert.match(css,/@keyframes cardDealV16/);
+  assert.match(css,/@keyframes cardFlipV16/);
+  assert.match(css,/\.seat-slot-self/);
+  assert.match(css,/prefers-reduced-motion:reduce/);
+  assert.match(css,/\.low-power \.card\.dealt/);
+  assert.doesNotMatch(app,/await enqueuePresentation/,
+    'presentation queue must never block authoritative state adoption or controls');
 });
 
 test('blackjack player actions use per-hand one-time token rather than global room version',()=>{
