@@ -1,6 +1,7 @@
 (() => {
   'use strict';
   const FUNCTION_URL = `${ToolboxAuth.url}/functions/v1/pictionary-game?forceFunctionRegion=ap-southeast-1`;
+  const telemetry=globalThis.PictionaryPerf||{begin:()=>()=>{},sample:()=>{},setPeerRtt:()=>{},readServerTiming:()=>{},sendStart:()=>()=>{},noteRealtimeFailure:()=>{},snapshot:()=>({}),profile:()=>({strokeMs:14,maxPoints:48,recoveryMs:5000,snapshotMs:2500,chunkGapMs:8})};
   const COLORS = ['#111827','#ef4444','#f59e0b','#22c55e','#3b82f6','#8b5cf6','#ec4899','#ffffff'];
   const $ = id => document.getElementById(id);
   const screens = ['authScreen','homeScreen','roomScreen','gameScreen','finishScreen','recoveryScreen'];
@@ -20,6 +21,31 @@
   let pendingCanvasDeltas=new Map(),canvasGapTimer=null,snapshotBroadcastTimer=null,lastSnapshotBroadcastAt=0;
   const CANVAS_REORDER_WAIT_MS=140, SNAPSHOT_COALESCE_MS=850;
 
+  function updatePerfDiagnostics(){
+    const panel=$('networkDiagnostics');
+    if(!panel?.open)return;
+    const box=$('perfDetails'),summary=telemetry.snapshot();
+    if(!box||!summary?.latency)return;
+    const fmt=key=>{
+      const m=summary.latency[key];
+      return m?`${Math.round(m.p50)}/${Math.round(m.p95)} ms (n=${m.count})`:'样本不足';
+    };
+    box.textContent=[
+      `Edge 固定路由：新加坡 (${summary.route})`,
+      `实际观测区域：${summary.observedRegion}`,
+      `网络自适应：${summary.tier}（自动）`,
+      `Realtime 对端 RTT：${summary.peerRtt===null?'样本不足':summary.peerRtt+' ms'}`,
+      `HTTP API P50/P95：${fmt('api.total')}`,
+      `Edge 执行 P50/P95：${fmt('edge.total')}`,
+      `Edge 身份/限流/业务：${fmt('edge.auth')} | ${fmt('edge.limit')} | ${fmt('edge.business')}`,
+      `Realtime SDK 发送等待：${fmt('realtime.send_wait')}`,
+      `发送进行中/峰值：${summary.send.pending}/${summary.send.maxPending}；失败：${summary.send.errors}`,
+      `画布全量重绘：${fmt('canvas.redraw')}`,
+      `主线程长任务：${fmt('main.longtask')}`,
+      '说明：RTT 含对端回声耗时；SDK 等待不等于远端确认；仅本地保存匿名指标。'
+    ].join('\n');
+  }
+
   function show(id){ screens.forEach(x => $(x).classList.toggle('active',x===id)); }
   function toast(message){ const el=$('toast'); el.textContent=message; el.classList.add('show'); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),2300); }
   function escapeHTML(v=''){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
@@ -34,6 +60,7 @@
 
   async function api(action,payload={},options={}){
     if(window.navigator?.onLine===false)throw Object.assign(new Error("网络已断开，恢复后请重试"),{retryable:true});
+    const stopTotal=telemetry.begin('api.total');
     const controller=new AbortController(), epoch=roomEpoch;
     requests.add(controller);
     let timer;
@@ -42,20 +69,28 @@
       timer=setTimeout(()=>controller.abort(Object.assign(new Error('网络较慢，尚未确认，请重试'),{retryable:true})),options.timeout||8000);
     });
     const work=(async()=>{
-      const auth=await ToolboxAuth.getSession();
+      const stopAuth=telemetry.begin('api.auth');
+      let auth;try{auth=await ToolboxAuth.getSession();}finally{stopAuth();}
       if(controller.signal.aborted)throw controller.signal.reason;
       if(!auth)throw Object.assign(new Error('请先登录'),{code:'AUTH_REQUIRED',status:401});
       session=auth;
       if(realtime&&realtimeToken!==auth.access_token){realtimeToken=auth.access_token;Promise.resolve(realtime.realtime.setAuth(auth.access_token)).catch(()=>scheduleReconnect());}
-      const r=await fetch(FUNCTION_URL,{method:'POST',cache:'no-store',signal:controller.signal,headers:{'Content-Type':'application/json','apikey':ToolboxAuth.key,'Authorization':`Bearer ${auth.access_token}`},body:JSON.stringify({action,...payload})});
-      const data=await r.json().catch(()=>({}));
+      const stopFetch=telemetry.begin('api.fetch');
+      let r;try{
+        r=await fetch(FUNCTION_URL,{method:'POST',cache:'no-store',signal:controller.signal,
+          headers:{'Content-Type':'application/json','apikey':ToolboxAuth.key,'Authorization':`Bearer ${auth.access_token}`},
+          body:JSON.stringify({action,...payload})});
+      }finally{stopFetch();}
+      telemetry.readServerTiming(action,r.headers);
+      const stopParse=telemetry.begin('api.parse');
+      let data;try{data=await r.json().catch(()=>({}));}finally{stopParse();}
       if(!r.ok||data.error)throw Object.assign(new Error(data.error||`请求失败（${r.status}）`),{status:r.status,code:data.code,retryable:r.status>=500||r.status===429});
       if(epoch!==roomEpoch)throw Object.assign(new Error('会话已切换'),{cancelled:true});
       return data;
     })();
     try{return await Promise.race([work,cancelled]);}
     catch(err){if(err instanceof TypeError)err.retryable=true;throw err;}
-    finally{clearTimeout(timer);requests.delete(controller);}
+    finally{clearTimeout(timer);requests.delete(controller);stopTotal();}
   }
   function invalidateRoom(){
     roomEpoch++;stateGeneration++;
@@ -287,7 +322,7 @@
     const client=window.supabase.createClient(ToolboxAuth.url,ToolboxAuth.key,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},realtime:{heartbeatCallback:status=>{
       if(!current())return;
       if(status==='ok'){serverHeartbeatAt=Date.now();transportFailed=false;if(realtimeStatus==='SUBSCRIBED'){clearTimeout(reconnectTimer);reconnectTimer=null;}}
-      else if(['timeout','error','disconnected'].includes(status)){transportFailed=true;scheduleReconnect(750);}
+      else if(['timeout','error','disconnected'].includes(status)){telemetry.noteRealtimeFailure();transportFailed=true;scheduleReconnect(750);}
     }}});
     realtime=client;realtimeToken=auth.access_token;await client.realtime.setAuth(auth.access_token);if(!current()){client.realtime.disconnect();return;}
     const nonce=state?.room?.realtime_token;
@@ -314,7 +349,7 @@
         if(!current())return;
         clearInterval(snapshotTimer);snapshotTimer=setInterval(()=>{if(isDrawer()&&canvasDirty)persistCanvasFallback();},2000);
       }else if(['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(status)){
-        lastPongAt=lastDrawerAt=0;transportFailed=true;checkHealth();scheduleReconnect(350);
+        telemetry.noteRealtimeFailure();lastPongAt=lastDrawerAt=0;transportFailed=true;checkHealth();scheduleReconnect(350);
       }
     });
   }
@@ -339,6 +374,7 @@
     if(canvasNeedsSync)pullCanvasFallback(false);
     if(healthy&&!isDrawer()&&state.room.status==='playing'&&Date.now()-lastDrawerAt>10000)requestCanvas();
     if(healthy&&Date.now()-subscribedAt>20000)reconnectAttempt=0;
+    updatePerfDiagnostics();
     if(realtimeStatus==='SUBSCRIBED'&&!healthy)scheduleReconnect(750);
   }
   function startPing(){clearInterval(pingTimer);sendPing();pingTimer=setInterval(sendPing,2000);}
@@ -355,7 +391,7 @@
   function handlePong(p){
     const sent=pendingPings.get(p?.ping_id);
     if(!sent||p.target_member_id!==me?.id||!state?.players.some(x=>x.member_id===p.responder_member_id))return;
-    lastPongAt=Date.now();realtimeRtt=Math.max(0,lastPongAt-sent);
+    lastPongAt=Date.now();realtimeRtt=Math.max(0,lastPongAt-sent);telemetry.setPeerRtt(realtimeRtt);
     if(p.responder_member_id===state.room.current_drawer_member_id&&p.round_id===currentRoundId){
       lastDrawerAt=Date.now();
       if(Number(p.canvas_revision)>canvasRevision){canvasNeedsSync=true;requestCanvas();}
@@ -381,10 +417,20 @@
   }
   function sendEvent(event,payload){
     if(!channel||realtimeStatus!=='SUBSCRIBED')return Promise.resolve('not_connected');
-    const epoch=connectionEpoch;
+    const epoch=connectionEpoch,finish=telemetry.sendStart(event);
     try{
-      return Promise.resolve(channel.send({type:'broadcast',event,payload})).then(status=>{if(epoch===connectionEpoch&&status&&status!=='ok')scheduleReconnect();return status;}).catch(()=>{if(epoch===connectionEpoch)scheduleReconnect();return 'error';});
-    }catch{scheduleReconnect();return Promise.resolve('error');}
+      return Promise.resolve(channel.send({type:'broadcast',event,payload}))
+        .then(status=>{
+          finish(status);
+          if(epoch===connectionEpoch&&status&&status!=='ok')scheduleReconnect();
+          return status;
+        })
+        .catch(()=>{
+          finish('error');
+          if(epoch===connectionEpoch)scheduleReconnect();
+          return 'error';
+        });
+    }catch{finish('error');scheduleReconnect();return Promise.resolve('error');}
   }
   function transitionLeaderId(){
     if(!state?.players?.length)return null;
@@ -555,7 +601,7 @@
   function point(e){const r=canvas.getBoundingClientRect();return [Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)),Math.max(0,Math.min(1,(e.clientY-r.top)/r.height))];}
   function pointerDown(e){if(!isDrawer()||state.room.status!=='playing'||activeStroke)return;e.preventDefault();canvas.setPointerCapture(e.pointerId);const p=point(e);activeStroke={id:makeClientId(),color:erasing?'#ffffff':selectedColor,size:brushSize,points:[p]};sendPoints=[p];drawDot(activeStroke,p);flushStroke(false);scheduleServerCanvasSave();}
   function pointerMove(e){
-    if(!activeStroke)return;e.preventDefault();
+    if(!activeStroke)return;const finish=Math.random()<.1?telemetry.begin('canvas.pointer_move'):()=>{};e.preventDefault();
     const events=typeof e.getCoalescedEvents==='function'?(e.getCoalescedEvents()||[]):[];
     const samples=events.length?events:[e];let changed=false;
     for(const ev of samples){
@@ -563,7 +609,8 @@
       if(Math.hypot((p[0]-last[0])*logical.w,(p[1]-last[1])*logical.h)<1.5)continue;
       activeStroke.points.push(p);sendPoints.push(p);drawSegment(activeStroke,last,p);changed=true;
     }
-    if(changed){scheduleSend();scheduleServerCanvasSave();}
+    if(changed){if(sendPoints.length>=telemetry.profile().maxPoints)flushStroke(false);else scheduleSend();scheduleServerCanvasSave();}
+    finish();
   }
   function pointerUp(e){
     if(!activeStroke)return;e.preventDefault();flushStroke(true);strokes.push(activeStroke);activeStroke=null;sendPoints=[];saveCanvas();
@@ -571,18 +618,29 @@
   }
   function encodePoints(points){return points.map(p=>[Math.round(p[0]*4095),Math.round(p[1]*4095)]);}
   function decodePoints(points,q){return q===1?points.map(p=>[Number(p[0])/4095,Number(p[1])/4095]):points;}
-  function scheduleSend(){if(sendTimer)return;sendTimer=setTimeout(()=>flushStroke(false),14);}
+  function scheduleSend(){if(sendTimer)return;sendTimer=setTimeout(()=>flushStroke(false),telemetry.profile().strokeMs);}
   function nextCanvasRevision(){const base=canvasRevision;canvasRevision=Math.max(canvasRevision+1,Date.now()*1000);canvasDirty=true;return base;}
   function flushStroke(done){
-    clearTimeout(sendTimer);sendTimer=null;if(!activeStroke||(!done&&sendPoints.length<1))return;
-    const base=nextCanvasRevision();
-    const payload={round_id:currentRoundId,revision:canvasRevision,base_revision:base,id:activeStroke.id,color:activeStroke.color,size:activeStroke.size,q:1};
-    if(done){
-      const replace=activeStroke.points.length<=600;
-      sendEvent('stroke',{...payload,points:encodePoints(replace?activeStroke.points:sendPoints),done:true,replace});
-      sendPoints=[];return;
+    clearTimeout(sendTimer);sendTimer=null;
+    if(!activeStroke||(!done&&sendPoints.length<1))return;
+    const maxPoints=telemetry.profile().maxPoints;
+    // A short completed stroke is sent as a replacement for gap-free final rendering.
+    // Long strokes are chunked without dropping or reordering revisions.
+    const replace=done&&activeStroke.points.length<=600;
+    const chunks=[];
+    if(replace)chunks.push(activeStroke.points);
+    else{
+      for(let i=0;i<sendPoints.length;i+=maxPoints)chunks.push(sendPoints.slice(i,i+maxPoints));
+      if(done&&!chunks.length)chunks.push([]);
     }
-    sendEvent('stroke',{...payload,points:encodePoints(sendPoints),done:false});
+    for(let i=0;i<chunks.length;i++){
+      const base=nextCanvasRevision(),last=i===chunks.length-1;
+      sendEvent('stroke',{
+        round_id:currentRoundId,revision:canvasRevision,base_revision:base,
+        id:activeStroke.id,color:activeStroke.color,size:activeStroke.size,q:1,
+        points:encodePoints(chunks[i]),done:done&&last,replace:replace&&last
+      });
+    }
     sendPoints=[];
   }
   function applyCanvasDelta(kind,p){
@@ -646,7 +704,7 @@
 
   function drawDot(s,p){ctx.fillStyle=s.color;ctx.beginPath();ctx.arc(p[0]*logical.w,p[1]*logical.h,s.size/2,0,Math.PI*2);ctx.fill();}
   function drawSegment(s,a,b){ctx.strokeStyle=s.color;ctx.lineWidth=s.size;ctx.beginPath();ctx.moveTo(a[0]*logical.w,a[1]*logical.h);ctx.lineTo(b[0]*logical.w,b[1]*logical.h);ctx.stroke();}
-  function redraw(){if(!logical.w)return;ctx.clearRect(0,0,logical.w,logical.h);ctx.fillStyle='#fff';ctx.fillRect(0,0,logical.w,logical.h);for(const s of strokes){if(s.points.length===1)drawDot(s,s.points[0]);for(let i=1;i<s.points.length;i++)drawSegment(s,s.points[i-1],s.points[i]);}if(activeStroke){if(activeStroke.points.length===1)drawDot(activeStroke,activeStroke.points[0]);for(let i=1;i<activeStroke.points.length;i++)drawSegment(activeStroke,activeStroke.points[i-1],activeStroke.points[i]);}}
+  function redraw(){if(!logical.w)return;const finish=telemetry.begin('canvas.redraw');try{ctx.clearRect(0,0,logical.w,logical.h);ctx.fillStyle='#fff';ctx.fillRect(0,0,logical.w,logical.h);for(const s of strokes){if(s.points.length===1)drawDot(s,s.points[0]);for(let i=1;i<s.points.length;i++)drawSegment(s,s.points[i-1],s.points[i]);}if(activeStroke){if(activeStroke.points.length===1)drawDot(activeStroke,activeStroke.points[0]);for(let i=1;i<activeStroke.points.length;i++)drawSegment(activeStroke,activeStroke.points[i-1],activeStroke.points[i]);}}finally{finish();}}
   function undoStroke(){if(!isDrawer()||!strokes.length)return;if(activeStroke)pointerUp({preventDefault(){}});const s=strokes.pop(),base=nextCanvasRevision();redraw();saveCanvas();sendEvent('undo',{round_id:currentRoundId,id:s.id,base_revision:base,revision:canvasRevision});persistCanvasFallback();}
   function bindHoldClear(){
     let t=null;const b=$('clearBtn');
@@ -671,7 +729,7 @@
   }
   function requestCanvas(urgent=false){
     if(!currentRoundId||isDrawer()||!channel||realtimeStatus!=='SUBSCRIBED')return;
-    const now=Date.now(),minInterval=urgent?700:2500;
+    const now=Date.now(),minInterval=urgent?Math.max(700,Math.round(telemetry.profile().snapshotMs/3)):telemetry.profile().snapshotMs;
     if(now-lastSnapshotRequest<minInterval)return;
     lastSnapshotRequest=now;
     sendEvent('sync_request',{member_id:me.id,round_id:currentRoundId});
@@ -692,7 +750,7 @@
     lastSnapshotBroadcastAt=Date.now();
     const id=makeClientId(),roundId=currentRoundId,revision=canvasRevision,epoch=connectionEpoch;
     for(let i=0;i<total;i++){
-      setTimeout(()=>{if(epoch===connectionEpoch&&roundId===currentRoundId)sendEvent('snapshot',{snapshot_id:id,round_id:roundId,revision,index:i,total,part:text.slice(i*size,(i+1)*size)});},i*8);
+      setTimeout(()=>{if(epoch===connectionEpoch&&roundId===currentRoundId)sendEvent('snapshot',{snapshot_id:id,round_id:roundId,revision,index:i,total,part:text.slice(i*size,(i+1)*size)});},i*telemetry.profile().chunkGapMs);
     }
   }
   function applyCanvasSnapshot(roundId,revision,next){
@@ -722,7 +780,7 @@
   }
   function scheduleServerCanvasSave(){
     if(serverSaveTimer||!isDrawer()||state?.room?.status!=='playing'||!currentRoundId)return;
-    serverSaveTimer=setTimeout(()=>{serverSaveTimer=null;persistCanvasFallback();},isCanvasHealthy()?1800:500);
+    serverSaveTimer=setTimeout(()=>{serverSaveTimer=null;persistCanvasFallback();},isCanvasHealthy()?Math.max(1800,telemetry.profile().strokeMs*55):900);
   }
   async function persistCanvasFallback(){
     clearTimeout(serverSaveTimer);serverSaveTimer=null;
@@ -747,7 +805,7 @@
     if(isDrawer()&&(activeStroke||canvasDirty))return;
     const now=Date.now();
     if(!force&&!canvasNeedsSync)return;
-    if(now-lastCanvasCheck<(force?700:(isRealtimeHealthy()?5000:1500)))return;
+    if(now-lastCanvasCheck<(force?Math.max(700,Math.round(telemetry.profile().snapshotMs/3)):(isRealtimeHealthy()?telemetry.profile().recoveryMs:Math.max(1500,telemetry.profile().snapshotMs))))return;
     lastCanvasCheck=now;canvasFetchBusy=true;
     const epoch=roomEpoch,roundId=currentRoundId,roomId=state.room.id;
     try{

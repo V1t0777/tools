@@ -117,3 +117,16 @@ multi-device mobile network testing or measure production login percentiles.
 - The database emits `room_transition` transactionally when a round enters summary; only after validated scoring can the correct answer appear. Edge broadcasts compact server-built `state_sync` events on selections and next-round transitions; clients receive without querying the entire room unless the drawing player needs secret word options.
 - Normal fully-connected browsers reconcile snapshots every 18 seconds; degraded sockets poll at 1.8 seconds. The 30-second hint fetch, reconnect recovery, and stale-round checks remain.
 - The Supabase function stays pinned to ap-southeast-1 by the frontend query parameter. Scores and event authorization remain server-side.
+
+
+## Phase 3 — local latency diagnostics and adaptive network policy
+
+The secure Pictionary page loads `pictionary/perf.js` before `app.js`, and displays an optional expandable **网络诊断** panel below the game connection indicator.
+
+- Client `performance.mark()` and `performance.measure()` track request authentication, fetch, JSON parse and total; `PerformanceObserver` observes browser long tasks when supported, while Canvas full redraw and pointer handling are measured explicitly.
+- The panel presents rolling local P50/P95 samples (maximum 96 per metric), peer Realtime echo RTT, and SDK send-promise pending/completion. **SDK promise time is not actual WebSocket buffered bytes or remote delivery confirmation.**
+- Supabase Edge Function responses include a sanitized `Server-Timing` header (`parse`, `auth`, `limit`, `business`, `total`) exposed by CORS; logs randomly sample those numeric phases and the whitelisted action/status only. No request body, room code, account, nickname, token, guess, or drawing is sent to metrics collectors.
+- Network tiers: fast = 14 ms / 48 points per delta; moderate = 28 ms / 84; slow = 46 ms / 120. All submitted points remain ordered and versioned; this does not drop points in poor networks. Full-canvas snapshot spacing and fallback polling back off under poor conditions and become more responsive after recovery.
+- Edge routing remains explicitly pinned to `ap-southeast-1`. The browser shows the observed `x-sb-edge-region` only if the runtime exposes it. Otherwise **未观测** is accurate: the requested Singapore region is not proof of the observed region. Realtime peer echo RTT reflects the peers and network path, not necessarily a direct cross-border path to the Singapore database.
+- Client diagnostics exist in volatile memory only and reset on reload; no persistent identifier or telemetry table is created. Browser long-task observation may be unsupported on iOS Safari.
+- For production comparisons collect **separate good/poor-network samples and P50/P95** before claiming latency improvement.

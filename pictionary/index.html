@@ -66,6 +66,10 @@
     <section class="screen" id="gameScreen">
       <div class="game-head"><div><small id="roundLabel">第 1 轮</small><strong id="drawerLabel" aria-live="polite">准备中</strong></div><div class="timer" id="timer" aria-label="剩余时间">60</div></div>
       <div class="sync-status"><span class="status-pill" id="gameConnectionStatus" aria-live="polite">连接中</span></div>
+       <details class="perf-details" id="networkDiagnostics">
+         <summary>网络诊断 <small>本机匿名性能指标</small></summary>
+         <pre id="perfDetails">正在收集本机性能样本…</pre>
+       </details>
       <div class="word-box" id="wordBox"><span id="wordLabel">等待画手选词</span></div>
       <div class="hint-bar" id="hintBar" aria-live="polite">范围提示将在剩余 30 秒时出现</div>
       <section class="canvas-shell" id="canvasShell"><canvas id="canvas"></canvas><div class="canvas-cover" id="canvasCover"><div id="coverText">等待本轮开始</div></div></section>
@@ -92,6 +96,7 @@
   <div class="toast" id="toast" role="status"></div>
 
   <script src="../shared/toolbox-auth.js?v=20261008-security"></script>
-  <script src="./app.js?v=20260923-1"></script>
+  <script src="./perf.js?v=20261009-1"></script>
+  <script src="./app.js?v=20261009-observe"></script>
 </body>
 </html>
