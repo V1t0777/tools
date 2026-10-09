@@ -9,7 +9,8 @@ const hardening=readFileSync(new URL('../supabase/migrations/20261007140800_pict
 const summaryRegionMigration=readFileSync(new URL('../supabase/migrations/20261007161101_pictionary_summary_and_region.sql',import.meta.url),'utf8');
 
 test('pictionary v2 keeps high-frequency paths realtime and bounded',()=>{
-  assert.match(app,/setTimeout\(\(\)=>flushStroke\(false\),14\)/);
+  assert.match(app,/setTimeout\(\(\)=>flushStroke\(false\),telemetry\.profile\(\)\.strokeMs\)/);
+  assert.match(app,/const maxPoints=telemetry\.profile\(\)\.maxPoints/);
   assert.doesNotMatch(app,/guess_pending/,'never share unverified guess text over room Realtime');
   assert.match(app,/liveGuesses\.set\(id,\{\.\.\.item,pending:true,failed:false\}\)/);
   assert.match(app,/attemptTransition\('finish_round'\)/);
