@@ -1106,3 +1106,31 @@ button,input,select{font:inherit}.app{width:min(880px,100%);margin:auto}.hidden{
 @media(prefers-reduced-motion:reduce){
   .casino-stage .player-seat,.casino-stage .card,.bet-stack,.immersive-toggle{transition:none!important;animation:none!important}
 }
+
+
+/* Bounded overlay for shoe-to-card flights. The real card remains in the DOM
+   and the overlay can be cancelled on pagehide, room exit or state recovery. */
+.flying-card{
+  position:fixed!important;
+  z-index:89!important;
+  margin:0!important;
+  padding:5px!important;
+  display:flex;
+  flex-direction:column;
+  border:1px solid rgba(171,150,110,.36);
+  border-radius:9px;
+  background:linear-gradient(137deg,#fffdf4,#f8f2e4 72%,#e9dfc9);
+  box-shadow:1px 2px 0 #c9baa0,0 10px 20px rgba(0,0,0,.35);
+  pointer-events:none!important;
+  transform-origin:center;
+  will-change:transform,opacity;
+  contain:layout paint;
+}
+.flying-card .rank,.flying-card .suit{font-size:clamp(12px,2.8vw,19px)}
+.flying-card .center{font-size:clamp(16px,3.2vw,26px)}
+.flying-card.back{
+  border:4px solid #e7d2a1;
+  background:repeating-linear-gradient(45deg,#154c3a 0 4px,#0e3025 4px 8px);
+}
+.low-power .flying-card{display:none!important}
+@media(prefers-reduced-motion:reduce){.flying-card{display:none!important}}
