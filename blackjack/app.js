@@ -252,30 +252,67 @@
     if (audioContext.state === 'suspended') audioContext.resume().catch(() => {});
     return audioContext;
   }
-  function playSound(kind) {
+  // Procedural, cached material sounds: paper scrape, ceramic chip strike and
+  // restrained victory chimes. No network audio downloads or persistent audio loop.
+  function materialSound(ctx,kind) {
+    const key = kind + ':' + ctx.sampleRate;
+    if (soundSamples.has(key)) return soundSamples.get(key);
+    const durations = {chip:.12,card:.11,flip:.16,blackjack:.24,win:.19,loss:.13};
+    const duration = durations[kind] || .11;
+    const buffer = ctx.createBuffer(1,Math.ceil(duration*ctx.sampleRate),ctx.sampleRate);
+    const samples = buffer.getChannelData(0);
+    let seed = 17 + kind.length*231;
+    let previousNoise = 0;
+    for (let i=0;i<samples.length;i++) {
+      const t = i/ctx.sampleRate;
+      const progress = t/duration;
+      seed = (Math.imul(seed,1664525)+1013904223) >>> 0;
+      const noise = (seed/4294967296)*2-1;
+      const scrape = noise-previousNoise*.82;
+      previousNoise = noise;
+      const decay = Math.pow(Math.max(0,1-progress),2);
+      let value = 0;
+      if (kind === 'card') {
+        value = (scrape*.5+Math.sin(t*1800)*.04)*decay;
+      } else if (kind === 'flip') {
+        value = (scrape*.26+Math.sin(2*Math.PI*210*t)*.07)*decay;
+      } else if (kind === 'chip') {
+        value = (Math.sin(2*Math.PI*1450*t)*.47+Math.sin(2*Math.PI*2450*t)*.21+scrape*.08)*Math.exp(-t*35);
+      } else if (kind === 'blackjack' || kind === 'win') {
+        const second = kind === 'blackjack' ? 1047 : 880;
+        value = (Math.sin(2*Math.PI*659*t)*.38+
+          Math.sin(2*Math.PI*second*t)*.25*(t>.045?1:.25))*Math.exp(-t*13);
+      } else {
+        value = (Math.sin(2*Math.PI*185*t)*.32+scrape*.06)*Math.exp(-t*30);
+      }
+      samples[i] = Math.max(-1,Math.min(1,value*decay));
+    }
+    soundSamples.set(key,buffer);
+    return buffer;
+  }
+  function playSound(kind,memberId = null) {
     if (!soundEnabled || document.hidden) return;
     const ctx = ensureAudio();
-    if (!ctx) return;
-    const map = {
-      chip:[180,.035,'triangle',.025],
-      card:[520,.045,'sine',.018],
-      flip:[310,.075,'triangle',.022],
-      blackjack:[740,.13,'sine',.028],
-      win:[620,.11,'sine',.026],
-      loss:[150,.09,'triangle',.018],
-    };
-    const spec = map[kind] || map.card;
-    const oscillator = ctx.createOscillator();
-    const gain = ctx.createGain();
-    oscillator.type = spec[2];
-    oscillator.frequency.setValueAtTime(spec[0],ctx.currentTime);
-    if (kind === 'blackjack' || kind === 'win') oscillator.frequency.exponentialRampToValueAtTime(spec[0]*1.32,ctx.currentTime+spec[1]);
-    gain.gain.setValueAtTime(spec[3],ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+spec[1]);
-    oscillator.connect(gain);
-    gain.connect(ctx.destination);
-    oscillator.start();
-    oscillator.stop(ctx.currentTime+spec[1]+.01);
+    if (!ctx || ctx.state !== 'running') return;
+    try {
+      const source = ctx.createBufferSource();
+      source.buffer = materialSound(ctx,kind);
+      const gain = ctx.createGain();
+      gain.gain.value = kind === 'card' ? .13 : kind === 'flip' ? .12 : kind === 'chip' ? .14 : .1;
+      source.connect(gain);
+      if (memberId && typeof ctx.createStereoPanner === 'function') {
+        const pan = ctx.createStereoPanner();
+        const slot = presentationTarget(memberId)?.className || '';
+        pan.pan.value = slot.includes('seat-slot-left') ? -.24 : slot.includes('seat-slot-right') ? .24 : 0;
+        gain.connect(pan);
+        pan.connect(ctx.destination);
+      } else {
+        gain.connect(ctx.destination);
+      }
+      source.start();
+    } catch {
+      // Audio is optional; gameplay must never depend on playback success.
+    }
   }
   function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve,ms));
@@ -402,7 +439,7 @@
       announce('发牌');
       await pulse($('gameScreen'),'presentation-deal',220);
     } else if (item.type === 'card') {
-      playSound('card');
+      playSound('card',item.member_id);
       announce(`${item.name || '玩家'}要牌`);
       const card = target?.querySelector('.mini-hand.active .card:last-child') || target?.querySelector('.card:last-child');
       await pulse(card,'presentation-card',180);
@@ -411,11 +448,11 @@
       announce(`${item.name || '玩家'}停牌`);
       await pulse(target,'stand-pulse',220);
     } else if (item.type === 'bet') {
-      playSound('chip');
+      playSound('chip',item.member_id);
       announce(`${item.name || '玩家'}下注 ${formatChips(item.amount)}`);
       await pulse(target?.querySelector('.bet-spot'),'bet-pulse',240);
     } else if (item.type === 'insurance') {
-      playSound('chip');
+      playSound('chip',item.member_id);
       announce(`${item.name || '玩家'}${item.amount > 0 ? '购买了保险' : '未购买保险'}`);
       await pulse(target,'insurance-pulse',220);
     } else if (item.type === 'reveal') {
@@ -437,7 +474,7 @@
       announce(`${item.name || '玩家'}选择加倍`);
       await pulse(target,'double-pulse',300);
     } else if (item.type === 'blackjack') {
-      playSound('blackjack');
+      playSound('blackjack',item.member_id);
       pulseHaptic([10,35,16]);
       announce(`${item.name || '玩家'}拿到黑杰克`);
       await pulse(target,'blackjack-pulse',420);
