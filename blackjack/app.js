@@ -11,6 +11,8 @@
   const RECONNECT_GRACE_MS = 5000;
   const DEVICE_KEY = 'toolbox_blackjack_device_v12';
   const SOUND_KEY = 'toolbox_blackjack_sound_v15';
+  const IMMERSIVE_KEY = 'toolbox_blackjack_immersive_v173';
+  const DEAL_FLIGHT_MAX = 5;
   const PRESENTATION_MAX = 8;
   const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
   const lowPowerMode = Boolean(
@@ -60,7 +62,10 @@
   let pendingBet = 0;
   let lastConfirmedBet = 0;
   let soundEnabled = true;
+  let immersiveMode = false;
   let audioContext = null;
+  const soundSamples = new Map();
+  const activeDealFlights = new Set();
   let presentationQueue = [];
   let presentationBusy = false;
   let presentationGeneration = 0;
@@ -75,6 +80,8 @@
   function show(id) {
     SCREENS.forEach((name) => $(name).classList.toggle('active', name === id));
     $('soundBtn')?.classList.toggle('hidden',!['roomScreen','gameScreen','finishScreen'].includes(id));
+    $('immersiveBtn')?.classList.toggle('hidden',id !== 'gameScreen');
+    document.documentElement.classList.toggle('immersive-mode',immersiveMode && id === 'gameScreen');
   }
   function toast(message) {
     const el = $('toast');
@@ -196,8 +203,30 @@
   }
 
   function loadPreferences() {
-    try { soundEnabled = localStorage.getItem(SOUND_KEY) !== '0'; } catch { soundEnabled = true; }
+    try {
+      soundEnabled = localStorage.getItem(SOUND_KEY) !== '0';
+      immersiveMode = localStorage.getItem(IMMERSIVE_KEY) === '1';
+    } catch {
+      soundEnabled = true;
+      immersiveMode = false;
+    }
     updateSoundButton();
+    updateImmersiveButton();
+  }
+  function updateImmersiveButton() {
+    const button = $('immersiveBtn');
+    if (!button) return;
+    button.textContent = immersiveMode ? '⛶ 退出沉浸' : '⛶ 沉浸';
+    button.setAttribute('aria-pressed',immersiveMode ? 'true' : 'false');
+    button.title = immersiveMode ? '退出沉浸牌桌' : '开启沉浸牌桌';
+  }
+  function toggleImmersive() {
+    immersiveMode = !immersiveMode;
+    try { localStorage.setItem(IMMERSIVE_KEY,immersiveMode ? '1' : '0'); } catch {}
+    updateImmersiveButton();
+    document.documentElement.classList.toggle('immersive-mode',immersiveMode && $('gameScreen').classList.contains('active'));
+    pulseHaptic(7);
+    toast(immersiveMode ? '已开启沉浸牌桌' : '已返回标准牌桌');
   }
   function updateSoundButton() {
     const button = $('soundBtn');
@@ -457,6 +486,7 @@
   function cancelPresentation() {
     presentationGeneration += 1;
     presentationQueue.length = 0;
+    for (const finish of [...activeDealFlights]) finish();
   }
 
   function isHost() {
@@ -622,6 +652,7 @@
     };
     $('historyRefreshBtn').onclick = () => loadDashboard(true);
     $('soundBtn').onclick = toggleSound;
+    $('immersiveBtn').onclick = toggleImmersive;
     document.addEventListener('pointerdown',() => { if (soundEnabled) ensureAudio(); },{once:true,passive:true});
     $('createBtn').onclick = async () => {
       if (busy) return;
@@ -1144,6 +1175,13 @@
     const betSpot = document.createElement('div');
     betSpot.className = 'bet-spot';
     betSpot.setAttribute('aria-label','下注区');
+    const betStack = document.createElement('span');
+    betStack.className = 'bet-stack hidden';
+    betStack.setAttribute('aria-hidden','true');
+    const betAmount = document.createElement('span');
+    betAmount.className = 'bet-amount';
+    betAmount.textContent = '下注区';
+    betSpot.append(betStack,betAmount);
     const turn = document.createElement('span');
     turn.className = 'turn-indicator';
     turn.textContent = '操作中';
@@ -1151,7 +1189,7 @@
     const hands = document.createElement('div');
     hands.className = 'seat-hands';
     seat.append(meta,hands);
-    return {seat,name,score,status,betSpot,turn,hands,handNodes:new Map()};
+    return {seat,name,score,status,betSpot,betStack,betAmount,turn,hands,handNodes:new Map()};
   }
 
   function seatSlot(player) {
@@ -1265,8 +1303,10 @@
       node.seat.setAttribute('aria-current',active ? 'true' : 'false');
       node.name.textContent = player.nickname || '好友';
       node.score.textContent = `${formatChips(player.stack)} 筹码`;
-      node.betSpot.textContent = Number(player.current_bet || 0) > 0 ? formatChips(player.current_bet) : '下注区';
-      node.betSpot.classList.toggle('has-bet',Number(player.current_bet || 0) > 0);
+      const hasBet = Number(player.current_bet || 0) > 0;
+      node.betAmount.textContent = hasBet ? formatChips(player.current_bet) : '下注区';
+      node.betSpot.classList.toggle('has-bet',hasBet);
+      node.betStack.classList.toggle('hidden',!hasBet);
       if (phase === 'betting') {
         node.status.textContent = Number(player.stack || 0) < Number(state.room.min_bet || 10)
           ? '筹码不足 · 观战'
@@ -1403,25 +1443,67 @@
     return /^#[0-9a-f]{6}$/i.test(color) ? color : '#4b8e76';
   }
 
+  // Render the authoritative card immediately; animate only a bounded, aria-hidden
+  // visual clone from the shoe. Flights never delay game actions or Realtime updates.
+  function animateDealFlight(card,index = 0) {
+    if (!motionAllowed() || resyncing || activeDealFlights.size >= DEAL_FLIGHT_MAX ||
+        !$('casinoStage')?.contains(card) || typeof card.animate !== 'function') return false;
+    const shoe = $('cardShoe');
+    if (!shoe?.isConnected) return false;
+    const from = shoe.getBoundingClientRect();
+    const to = card.getBoundingClientRect();
+    if (from.width < 10 || to.width < 10 || to.height < 10) return false;
+    const clone = card.cloneNode(true);
+    clone.classList.remove('dealt','flipped');
+    clone.classList.add('flying-card');
+    clone.setAttribute('aria-hidden','true');
+    clone.style.left = `${to.left}px`;
+    clone.style.top = `${to.top}px`;
+    clone.style.width = `${to.width}px`;
+    clone.style.height = `${to.height}px`;
+    document.body.append(clone);
+    card.style.opacity = '0';
+    const finish = () => {
+      card.style.removeProperty('opacity');
+      clone.remove();
+      activeDealFlights.delete(finish);
+    };
+    activeDealFlights.add(finish);
+    const dx = from.left + from.width*.5 - (to.left + to.width*.5);
+    const dy = from.top + from.height*.5 - (to.top + to.height*.5);
+    try {
+      const animation = clone.animate([
+        {transform:`translate3d(${dx}px,${dy}px,0) rotate(-14deg) scale(.72)`,opacity:.8},
+        {transform:`translate3d(${dx*.1}px,${dy*.09}px,0) rotate(1deg) scale(1.04)`,opacity:1,offset:.8},
+        {transform:'translate3d(0,0,0) rotate(0deg) scale(1)',opacity:1},
+      ],{duration:330+Math.min(index,4)*25,easing:'cubic-bezier(.18,.78,.2,1)',fill:'forwards'});
+      animation.finished.then(finish,finish);
+      return true;
+    } catch {
+      finish();
+      return false;
+    }
+  }
+
   function renderHand(container,cards) {
     const desired = cards.map((code) => String(code));
     for (let i=0;i<desired.length;i++) {
       const current = container.children[i];
       if (current?.dataset.code === desired[i]) continue;
       const card = createCard(desired[i]);
+      const flip = current?.dataset.code === 'BACK' && desired[i] !== 'BACK';
+      if (current) current.replaceWith(card);
+      else container.append(card);
       if (container.isConnected && motionAllowed()) {
-        const className = current?.dataset.code === 'BACK' && desired[i] !== 'BACK' ? 'flipped' : 'dealt';
-        card.style.setProperty('--deal-delay',`${Math.min(i,4)*45}ms`);
-        if (className === 'flipped') {
+        if (flip) {
           card.classList.add('flipped');
           card.addEventListener('animationend',() => card.classList.remove('flipped'),{once:true});
-        } else {
+        } else if (!animateDealFlight(card,i)) {
+          card.style.setProperty('--deal-delay',`${Math.min(i,4)*45}ms`);
           card.classList.add('dealt');
           card.addEventListener('animationend',() => card.classList.remove('dealt'),{once:true});
         }
       }
-      if (current) current.replaceWith(card);
-      else container.append(card);
     }
     while (container.children.length > desired.length) container.lastElementChild.remove();
   }
