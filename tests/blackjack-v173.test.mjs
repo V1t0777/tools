@@ -21,6 +21,9 @@ test('V1.7.3 renders a localized, avatar-free 2.5D table without changing backen
   assert.match(css,/--casino-champagne:/);
   assert.match(css,/@media\(orientation:landscape\) and \(max-height:560px\)/);
   assert.match(css,/@media\(max-width:620px\)/);
+  assert.match(app,/table\.classList\.toggle\('two-players',state\.players\.length === 2\)/);
+  assert.match(css,/\.player-table\.two-players/);
+  assert.match(css,/\.seat-slot-self\{grid-column:2;grid-row:1\}/);
 });
 
 test('V1.7.3 keeps cards authoritative and flights bounded, cancellable and visual-only',()=>{
