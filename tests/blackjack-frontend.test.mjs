@@ -50,7 +50,8 @@ test('blackjack V1.6 keeps immersive presentation client-only and non-blocking',
   assert.match(app,/seat-slot-self/);
   assert.match(app,/seat-slot-left/);
   assert.match(app,/seat-slot-right/);
-  assert.match(app,/current\?\.dataset\.code === 'BACK'.*'flipped'/);
+  assert.match(app,/const flip = current\?\.dataset\.code === 'BACK'/);
+  assert.match(app,/card\.classList\.add\('flipped'\)/);
   assert.match(app,/animateChipTransfer\(fromRect,toRect,amount/);
   assert.match(app,/events\.push\(\{type:'stand'/);
   assert.match(app,/events\.push\(\{type:'bet'/);
