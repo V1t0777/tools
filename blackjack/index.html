@@ -9,7 +9,7 @@
   <title>朋友21点｜钊的工具箱</title>
   <link rel="stylesheet" href="../shared/toolbox-ui.css">
   <link rel="stylesheet" href="../shared/toolbox-motion.css">
-  <link rel="stylesheet" href="./style.css?v=20261009-v16">
+  <link rel="stylesheet" href="./style.css?v=20261010-v173">
 </head>
 <body>
   <main class="app">
@@ -17,6 +17,7 @@
       <a class="back" href="https://v1t0777.github.io/tools/games/">← 小游戏</a>
       <div class="brand"><span>♠</span><strong>朋友21点</strong><span class="heart">♥</span></div>
       <div class="top-actions">
+        <button class="ghost immersive-toggle hidden" id="immersiveBtn" type="button" aria-pressed="false" title="开启沉浸牌桌">⛶ 沉浸</button>
         <button class="ghost sound-toggle hidden" id="soundBtn" type="button" aria-pressed="false" title="牌桌音效">🔊</button>
         <button class="ghost hidden" id="shareBtn" type="button">邀请</button>
         <button class="ghost danger hidden" id="leaveBtn" type="button">退出</button>
@@ -137,6 +138,13 @@
         <span class="status-pill" id="gameConnectionStatus">连接中</span>
       </div>
 
+      <section class="casino-stage" id="casinoStage" aria-label="翡翠绿立体赌场牌桌">
+        <div class="table-brass-track" aria-hidden="true"></div>
+        <div class="table-felt-mark" aria-hidden="true">
+          <span>PRIVATE BLACKJACK</span>
+          <small>BLACKJACK PAYS 3 TO 2 · STAND ON SOFT 17</small>
+        </div>
+        <div class="table-layout">
       <section class="dealer-zone" aria-label="庄家牌区">
         <div class="card-shoe" id="cardShoe" aria-hidden="true"><span>♠</span></div>
         <div class="dealer-title"><span>庄家</span><b id="dealerValue">?</b></div>
@@ -147,6 +155,8 @@
       <div class="table-feed" id="tableFeed" aria-live="polite" aria-atomic="true"></div>
 
       <section class="player-table" id="playerTable" aria-label="半环形玩家座位"></section>
+        </div>
+      </section>
 
       <section class="betting-dock panel hidden" id="bettingDock">
         <div class="casino-ledger">
@@ -220,6 +230,6 @@
   <div class="reaction-layer" id="reactionLayer" aria-hidden="true"></div>
 
   <script src="../shared/toolbox-auth.js?v=20261008-security"></script>
-  <script src="./app.js?v=20261010-v161"></script>
+  <script src="./app.js?v=20261010-v173"></script>
 </body>
 </html>
