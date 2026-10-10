@@ -120,3 +120,22 @@ test('blackjack player-facing V1.4 casino copy is fully localized to Simplified 
   assert.match(app,/settlement:'本局结算'/);
   assert.match(css,/黑杰克赔付 3:2/);
 });
+
+test('blackjack V1.6.1 releases lobby controls after joining or creating a room',()=>{
+  assert.match(app,/finally \{\s*busy = false;\s*if \(state\?\.room\.status === 'lobby'\) renderRoom\(\);\s*updateActions\(\);/);
+  assert.match(app,/\$\('createBtn'\)\.disabled = false;\s*if \(state\?\.room\.status === 'lobby'\) renderRoom\(\);/);
+  assert.match(app,/\$\('readyBtn'\)\.disabled = busy \|\| !mine/);
+  assert.match(app,/void Promise\.allSettled\(\[claim,realtimeConnect\]\)/);
+});
+
+test('blackjack V1.6.1 gives explicit pending, success and uncertain-error feedback',()=>{
+  assert.match(app,/正在准备…/);
+  assert.match(app,/正在取消准备…/);
+  assert.match(app,/正在开始游戏…/);
+  assert.match(app,/准备成功，等待房主开始/);
+  assert.match(app,/游戏已开始，正在发牌…/);
+  assert.match(app,/操作状态未确认，正在重新同步/);
+  assert.match(app,/requestState\(0,true\)/);
+  assert.match(html,/id="lobbyHint" role="status" aria-live="polite"/);
+  assert.match(html,/app\.js\?v=20261010-v161/);
+});

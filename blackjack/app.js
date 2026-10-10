@@ -52,6 +52,8 @@
   let deviceId = null;
   let deviceControl = 'UNKNOWN';
   let pendingGameAction = null;
+  let lobbyPendingAction = null;
+  let lobbyPendingWasReady = false;
   let resyncing = false;
   let stateRefreshPromise = null;
   let refreshQueued = false;
@@ -631,7 +633,12 @@
         me = data.member || me;
         await enterRoom(data.state);
       } catch (err) { toast(err.message); }
-      finally { busy = false; $('createBtn').disabled = false; }
+      finally {
+        busy = false;
+        $('createBtn').disabled = false;
+        if (state?.room.status === 'lobby') renderRoom();
+        updateActions();
+      }
     };
     $('joinForm').addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -716,7 +723,11 @@
       me = data.member || me;
       await enterRoom(data.state);
     } catch (err) { toast(err.message); }
-    finally { busy = false; }
+    finally {
+      busy = false;
+      if (state?.room.status === 'lobby') renderRoom();
+      updateActions();
+    }
   }
 
   async function enterRoom(next) {
@@ -729,9 +740,10 @@
     setURL(next.room.code);
     $('shareBtn').classList.remove('hidden');
     $('leaveBtn').classList.remove('hidden');
+    // Background connections must not hold the lobby's ready/start controls hostage.
     const claim = claimDevice(false).catch(() => false);
     const realtimeConnect = connectRealtime().catch(() => { scheduleReconnect(400); return false; });
-    await Promise.allSettled([claim,realtimeConnect]);
+    void Promise.allSettled([claim,realtimeConnect]);
   }
 
   function clearRoom() {
@@ -745,6 +757,7 @@
     state = null;
     deviceControl = 'UNKNOWN';
     pendingGameAction = null;
+    lobbyPendingAction = null;
     resyncing = false;
     stateRefreshPromise = null;
     refreshQueued = false;
@@ -820,7 +833,10 @@
     }
     busy = true;
     pendingGameAction = gameplayAction ? action : null;
+    lobbyPendingAction = ['toggle_ready','start_game'].includes(action) ? action : null;
+    lobbyPendingWasReady = Boolean(myPlayer()?.ready);
     updateActions();
+    if (state?.room.status === 'lobby') renderRoom();
     if (state?.room.status === 'playing') renderGame();
     const roomId = state.room.id;
     const startedAt = performance.now();
@@ -833,6 +849,11 @@
       if (action === 'bet') pendingBet = 0;
       if (data.state) adoptState(data.state);
       succeeded = true;
+      if (action === 'toggle_ready') {
+        toast(myPlayer()?.ready ? '准备成功，等待房主开始' : '已取消准备');
+      } else if (action === 'start_game') {
+        toast('游戏已开始，正在发牌…');
+      }
     } catch (err) {
       pendingGameAction = null;
       if (err.code === 'DEVICE_CONFLICT') {
@@ -843,11 +864,18 @@
         toast('牌局刚刚更新，已重新同步');
         requestState(0,true);
       } else if (!err.cancelled) {
-        toast(err.message || '操作失败');
+        if (lobbyPendingAction && (err.retryable || err.status >= 500)) {
+          toast('操作状态未确认，正在重新同步，请稍候');
+          requestState(0,true);
+        } else {
+          toast(err.message || (lobbyPendingAction ? '操作失败，请重试' : '操作失败'));
+        }
       }
     } finally {
       busy = false;
+      lobbyPendingAction = null;
       updateActions();
+      if (state?.room.status === 'lobby') renderRoom();
       if (state?.room.status === 'playing') renderGame();
     }
     return succeeded;
@@ -1079,15 +1107,26 @@
       list.append(row);
     }
     const mine = myPlayer();
+    const preparing = lobbyPendingAction === 'toggle_ready';
+    const starting = lobbyPendingAction === 'start_game';
     $('readyBtn').classList.toggle('hidden',isHost());
-    $('readyBtn').textContent = mine?.ready ? '取消准备' : '我准备好了';
+    $('readyBtn').disabled = busy || !mine;
+    $('readyBtn').setAttribute('aria-busy',preparing ? 'true' : 'false');
+    $('readyBtn').textContent = preparing
+      ? (lobbyPendingWasReady ? '正在取消准备…' : '正在准备…')
+      : (mine?.ready ? '取消准备' : '我准备好了');
     const everyoneReady = state.players.length >= 2 && state.players.length <= 3 &&
       state.players.every((p) => p.ready || String(p.member_id) === String(state.room.host_member_id));
     $('startBtn').classList.toggle('hidden',!isHost());
     $('startBtn').disabled = !everyoneReady || busy;
-    $('lobbyHint').textContent = isHost()
-      ? (everyoneReady ? '大家都准备好了，可以开始。' : '至少 2 人，等待其他玩家准备。')
-      : (mine?.ready ? '已准备，等待房主开始。' : '准备好后，等待房主开始。');
+    $('startBtn').setAttribute('aria-busy',starting ? 'true' : 'false');
+    $('startBtn').textContent = starting ? '正在开始游戏…' : '开始游戏';
+    $('lobbyHint').textContent = preparing
+      ? '正在提交准备状态，请稍候…'
+      : starting ? '正在创建牌局并发牌，请稍候…'
+      : isHost()
+        ? (everyoneReady ? '大家都准备好了，可以开始。' : '至少 2 人，等待其他玩家准备。')
+        : (mine?.ready ? '已准备，等待房主开始。' : '准备好后，等待房主开始。');
   }
 
   function createPlayerSeatNode() {
