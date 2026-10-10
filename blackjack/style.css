@@ -1134,3 +1134,14 @@ button,input,select{font:inherit}.app{width:min(880px,100%);margin:auto}.hidden{
 }
 .low-power .flying-card{display:none!important}
 @media(prefers-reduced-motion:reduce){.flying-card{display:none!important}}
+
+
+/* Seat order is visual, not database row order: own seat stays centered. */
+@media(min-width:621px) and (min-height:561px){
+  #gameScreen .casino-stage .seat-slot-left{grid-column:1;grid-row:1}
+  #gameScreen .casino-stage .seat-slot-self{grid-column:2;grid-row:1}
+  #gameScreen .casino-stage .seat-slot-right{grid-column:3;grid-row:1}
+  #gameScreen .casino-stage .player-table.two-players{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #gameScreen .casino-stage .player-table.two-players .seat-slot-solo{grid-column:1;grid-row:1}
+  #gameScreen .casino-stage .player-table.two-players .seat-slot-self{grid-column:2;grid-row:1}
+}
