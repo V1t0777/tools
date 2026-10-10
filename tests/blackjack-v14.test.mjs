@@ -137,5 +137,5 @@ test('blackjack V1.6.1 gives explicit pending, success and uncertain-error feedb
   assert.match(app,/操作状态未确认，正在重新同步/);
   assert.match(app,/requestState\(0,true\)/);
   assert.match(html,/id="lobbyHint" role="status" aria-live="polite"/);
-  assert.match(html,/app\.js\?v=20261010-v161/);
+  assert.match(html,/app\.js\?v=20261010-v173/);
 });
