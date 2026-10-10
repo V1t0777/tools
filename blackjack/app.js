@@ -11,6 +11,8 @@
   const RECONNECT_GRACE_MS = 5000;
   const DEVICE_KEY = 'toolbox_blackjack_device_v12';
   const SOUND_KEY = 'toolbox_blackjack_sound_v15';
+  const IMMERSIVE_KEY = 'toolbox_blackjack_immersive_v173';
+  const DEAL_FLIGHT_MAX = 5;
   const PRESENTATION_MAX = 8;
   const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
   const lowPowerMode = Boolean(
@@ -60,7 +62,10 @@
   let pendingBet = 0;
   let lastConfirmedBet = 0;
   let soundEnabled = true;
+  let immersiveMode = false;
   let audioContext = null;
+  const soundSamples = new Map();
+  const activeDealFlights = new Set();
   let presentationQueue = [];
   let presentationBusy = false;
   let presentationGeneration = 0;
@@ -75,6 +80,8 @@
   function show(id) {
     SCREENS.forEach((name) => $(name).classList.toggle('active', name === id));
     $('soundBtn')?.classList.toggle('hidden',!['roomScreen','gameScreen','finishScreen'].includes(id));
+    $('immersiveBtn')?.classList.toggle('hidden',id !== 'gameScreen');
+    document.documentElement.classList.toggle('immersive-mode',immersiveMode && id === 'gameScreen');
   }
   function toast(message) {
     const el = $('toast');
@@ -196,8 +203,30 @@
   }
 
   function loadPreferences() {
-    try { soundEnabled = localStorage.getItem(SOUND_KEY) !== '0'; } catch { soundEnabled = true; }
+    try {
+      soundEnabled = localStorage.getItem(SOUND_KEY) !== '0';
+      immersiveMode = localStorage.getItem(IMMERSIVE_KEY) === '1';
+    } catch {
+      soundEnabled = true;
+      immersiveMode = false;
+    }
     updateSoundButton();
+    updateImmersiveButton();
+  }
+  function updateImmersiveButton() {
+    const button = $('immersiveBtn');
+    if (!button) return;
+    button.textContent = immersiveMode ? '⛶ 退出沉浸' : '⛶ 沉浸';
+    button.setAttribute('aria-pressed',immersiveMode ? 'true' : 'false');
+    button.title = immersiveMode ? '退出沉浸牌桌' : '开启沉浸牌桌';
+  }
+  function toggleImmersive() {
+    immersiveMode = !immersiveMode;
+    try { localStorage.setItem(IMMERSIVE_KEY,immersiveMode ? '1' : '0'); } catch {}
+    updateImmersiveButton();
+    document.documentElement.classList.toggle('immersive-mode',immersiveMode && $('gameScreen').classList.contains('active'));
+    pulseHaptic(7);
+    toast(immersiveMode ? '已开启沉浸牌桌' : '已返回标准牌桌');
   }
   function updateSoundButton() {
     const button = $('soundBtn');
@@ -223,30 +252,67 @@
     if (audioContext.state === 'suspended') audioContext.resume().catch(() => {});
     return audioContext;
   }
-  function playSound(kind) {
+  // Procedural, cached material sounds: paper scrape, ceramic chip strike and
+  // restrained victory chimes. No network audio downloads or persistent audio loop.
+  function materialSound(ctx,kind) {
+    const key = kind + ':' + ctx.sampleRate;
+    if (soundSamples.has(key)) return soundSamples.get(key);
+    const durations = {chip:.12,card:.11,flip:.16,blackjack:.24,win:.19,loss:.13};
+    const duration = durations[kind] || .11;
+    const buffer = ctx.createBuffer(1,Math.ceil(duration*ctx.sampleRate),ctx.sampleRate);
+    const samples = buffer.getChannelData(0);
+    let seed = 17 + kind.length*231;
+    let previousNoise = 0;
+    for (let i=0;i<samples.length;i++) {
+      const t = i/ctx.sampleRate;
+      const progress = t/duration;
+      seed = (Math.imul(seed,1664525)+1013904223) >>> 0;
+      const noise = (seed/4294967296)*2-1;
+      const scrape = noise-previousNoise*.82;
+      previousNoise = noise;
+      const decay = Math.pow(Math.max(0,1-progress),2);
+      let value = 0;
+      if (kind === 'card') {
+        value = (scrape*.5+Math.sin(t*1800)*.04)*decay;
+      } else if (kind === 'flip') {
+        value = (scrape*.26+Math.sin(2*Math.PI*210*t)*.07)*decay;
+      } else if (kind === 'chip') {
+        value = (Math.sin(2*Math.PI*1450*t)*.47+Math.sin(2*Math.PI*2450*t)*.21+scrape*.08)*Math.exp(-t*35);
+      } else if (kind === 'blackjack' || kind === 'win') {
+        const second = kind === 'blackjack' ? 1047 : 880;
+        value = (Math.sin(2*Math.PI*659*t)*.38+
+          Math.sin(2*Math.PI*second*t)*.25*(t>.045?1:.25))*Math.exp(-t*13);
+      } else {
+        value = (Math.sin(2*Math.PI*185*t)*.32+scrape*.06)*Math.exp(-t*30);
+      }
+      samples[i] = Math.max(-1,Math.min(1,value*decay));
+    }
+    soundSamples.set(key,buffer);
+    return buffer;
+  }
+  function playSound(kind,memberId = null) {
     if (!soundEnabled || document.hidden) return;
     const ctx = ensureAudio();
-    if (!ctx) return;
-    const map = {
-      chip:[180,.035,'triangle',.025],
-      card:[520,.045,'sine',.018],
-      flip:[310,.075,'triangle',.022],
-      blackjack:[740,.13,'sine',.028],
-      win:[620,.11,'sine',.026],
-      loss:[150,.09,'triangle',.018],
-    };
-    const spec = map[kind] || map.card;
-    const oscillator = ctx.createOscillator();
-    const gain = ctx.createGain();
-    oscillator.type = spec[2];
-    oscillator.frequency.setValueAtTime(spec[0],ctx.currentTime);
-    if (kind === 'blackjack' || kind === 'win') oscillator.frequency.exponentialRampToValueAtTime(spec[0]*1.32,ctx.currentTime+spec[1]);
-    gain.gain.setValueAtTime(spec[3],ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+spec[1]);
-    oscillator.connect(gain);
-    gain.connect(ctx.destination);
-    oscillator.start();
-    oscillator.stop(ctx.currentTime+spec[1]+.01);
+    if (!ctx || ctx.state !== 'running') return;
+    try {
+      const source = ctx.createBufferSource();
+      source.buffer = materialSound(ctx,kind);
+      const gain = ctx.createGain();
+      gain.gain.value = kind === 'card' ? .13 : kind === 'flip' ? .12 : kind === 'chip' ? .14 : .1;
+      source.connect(gain);
+      if (memberId && typeof ctx.createStereoPanner === 'function') {
+        const pan = ctx.createStereoPanner();
+        const slot = presentationTarget(memberId)?.className || '';
+        pan.pan.value = slot.includes('seat-slot-left') ? -.24 : slot.includes('seat-slot-right') ? .24 : 0;
+        gain.connect(pan);
+        pan.connect(ctx.destination);
+      } else {
+        gain.connect(ctx.destination);
+      }
+      source.start();
+    } catch {
+      // Audio is optional; gameplay must never depend on playback success.
+    }
   }
   function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve,ms));
@@ -373,7 +439,7 @@
       announce('发牌');
       await pulse($('gameScreen'),'presentation-deal',220);
     } else if (item.type === 'card') {
-      playSound('card');
+      playSound('card',item.member_id);
       announce(`${item.name || '玩家'}要牌`);
       const card = target?.querySelector('.mini-hand.active .card:last-child') || target?.querySelector('.card:last-child');
       await pulse(card,'presentation-card',180);
@@ -382,11 +448,11 @@
       announce(`${item.name || '玩家'}停牌`);
       await pulse(target,'stand-pulse',220);
     } else if (item.type === 'bet') {
-      playSound('chip');
+      playSound('chip',item.member_id);
       announce(`${item.name || '玩家'}下注 ${formatChips(item.amount)}`);
       await pulse(target?.querySelector('.bet-spot'),'bet-pulse',240);
     } else if (item.type === 'insurance') {
-      playSound('chip');
+      playSound('chip',item.member_id);
       announce(`${item.name || '玩家'}${item.amount > 0 ? '购买了保险' : '未购买保险'}`);
       await pulse(target,'insurance-pulse',220);
     } else if (item.type === 'reveal') {
@@ -408,7 +474,7 @@
       announce(`${item.name || '玩家'}选择加倍`);
       await pulse(target,'double-pulse',300);
     } else if (item.type === 'blackjack') {
-      playSound('blackjack');
+      playSound('blackjack',item.member_id);
       pulseHaptic([10,35,16]);
       announce(`${item.name || '玩家'}拿到黑杰克`);
       await pulse(target,'blackjack-pulse',420);
@@ -457,6 +523,7 @@
   function cancelPresentation() {
     presentationGeneration += 1;
     presentationQueue.length = 0;
+    for (const finish of [...activeDealFlights]) finish();
   }
 
   function isHost() {
@@ -622,6 +689,7 @@
     };
     $('historyRefreshBtn').onclick = () => loadDashboard(true);
     $('soundBtn').onclick = toggleSound;
+    $('immersiveBtn').onclick = toggleImmersive;
     document.addEventListener('pointerdown',() => { if (soundEnabled) ensureAudio(); },{once:true,passive:true});
     $('createBtn').onclick = async () => {
       if (busy) return;
@@ -1144,6 +1212,13 @@
     const betSpot = document.createElement('div');
     betSpot.className = 'bet-spot';
     betSpot.setAttribute('aria-label','下注区');
+    const betStack = document.createElement('span');
+    betStack.className = 'bet-stack hidden';
+    betStack.setAttribute('aria-hidden','true');
+    const betAmount = document.createElement('span');
+    betAmount.className = 'bet-amount';
+    betAmount.textContent = '下注区';
+    betSpot.append(betStack,betAmount);
     const turn = document.createElement('span');
     turn.className = 'turn-indicator';
     turn.textContent = '操作中';
@@ -1151,7 +1226,7 @@
     const hands = document.createElement('div');
     hands.className = 'seat-hands';
     seat.append(meta,hands);
-    return {seat,name,score,status,betSpot,turn,hands,handNodes:new Map()};
+    return {seat,name,score,status,betSpot,betStack,betAmount,turn,hands,handNodes:new Map()};
   }
 
   function seatSlot(player) {
@@ -1250,6 +1325,7 @@
     $('dealerValue').textContent = state.dealer.value == null ? '?' : String(state.dealer.value);
 
     const table = $('playerTable');
+    table.classList.toggle('two-players',state.players.length === 2);
     const wanted = new Set();
     for (const player of state.players) {
       const key = String(player.member_id);
@@ -1265,8 +1341,10 @@
       node.seat.setAttribute('aria-current',active ? 'true' : 'false');
       node.name.textContent = player.nickname || '好友';
       node.score.textContent = `${formatChips(player.stack)} 筹码`;
-      node.betSpot.textContent = Number(player.current_bet || 0) > 0 ? formatChips(player.current_bet) : '下注区';
-      node.betSpot.classList.toggle('has-bet',Number(player.current_bet || 0) > 0);
+      const hasBet = Number(player.current_bet || 0) > 0;
+      node.betAmount.textContent = hasBet ? formatChips(player.current_bet) : '下注区';
+      node.betSpot.classList.toggle('has-bet',hasBet);
+      node.betStack.classList.toggle('hidden',!hasBet);
       if (phase === 'betting') {
         node.status.textContent = Number(player.stack || 0) < Number(state.room.min_bet || 10)
           ? '筹码不足 · 观战'
@@ -1403,25 +1481,67 @@
     return /^#[0-9a-f]{6}$/i.test(color) ? color : '#4b8e76';
   }
 
+  // Render the authoritative card immediately; animate only a bounded, aria-hidden
+  // visual clone from the shoe. Flights never delay game actions or Realtime updates.
+  function animateDealFlight(card,index = 0) {
+    if (!motionAllowed() || resyncing || activeDealFlights.size >= DEAL_FLIGHT_MAX ||
+        !$('casinoStage')?.contains(card) || typeof card.animate !== 'function') return false;
+    const shoe = $('cardShoe');
+    if (!shoe?.isConnected) return false;
+    const from = shoe.getBoundingClientRect();
+    const to = card.getBoundingClientRect();
+    if (from.width < 10 || to.width < 10 || to.height < 10) return false;
+    const clone = card.cloneNode(true);
+    clone.classList.remove('dealt','flipped');
+    clone.classList.add('flying-card');
+    clone.setAttribute('aria-hidden','true');
+    clone.style.left = `${to.left}px`;
+    clone.style.top = `${to.top}px`;
+    clone.style.width = `${to.width}px`;
+    clone.style.height = `${to.height}px`;
+    document.body.append(clone);
+    card.style.opacity = '0';
+    const finish = () => {
+      card.style.removeProperty('opacity');
+      clone.remove();
+      activeDealFlights.delete(finish);
+    };
+    activeDealFlights.add(finish);
+    const dx = from.left + from.width*.5 - (to.left + to.width*.5);
+    const dy = from.top + from.height*.5 - (to.top + to.height*.5);
+    try {
+      const animation = clone.animate([
+        {transform:`translate3d(${dx}px,${dy}px,0) rotate(-14deg) scale(.72)`,opacity:.8},
+        {transform:`translate3d(${dx*.1}px,${dy*.09}px,0) rotate(1deg) scale(1.04)`,opacity:1,offset:.8},
+        {transform:'translate3d(0,0,0) rotate(0deg) scale(1)',opacity:1},
+      ],{duration:330+Math.min(index,4)*25,easing:'cubic-bezier(.18,.78,.2,1)',fill:'forwards'});
+      animation.finished.then(finish,finish);
+      return true;
+    } catch {
+      finish();
+      return false;
+    }
+  }
+
   function renderHand(container,cards) {
     const desired = cards.map((code) => String(code));
     for (let i=0;i<desired.length;i++) {
       const current = container.children[i];
       if (current?.dataset.code === desired[i]) continue;
       const card = createCard(desired[i]);
+      const flip = current?.dataset.code === 'BACK' && desired[i] !== 'BACK';
+      if (current) current.replaceWith(card);
+      else container.append(card);
       if (container.isConnected && motionAllowed()) {
-        const className = current?.dataset.code === 'BACK' && desired[i] !== 'BACK' ? 'flipped' : 'dealt';
-        card.style.setProperty('--deal-delay',`${Math.min(i,4)*45}ms`);
-        if (className === 'flipped') {
+        if (flip) {
           card.classList.add('flipped');
           card.addEventListener('animationend',() => card.classList.remove('flipped'),{once:true});
-        } else {
+        } else if (!animateDealFlight(card,i)) {
+          card.style.setProperty('--deal-delay',`${Math.min(i,4)*45}ms`);
           card.classList.add('dealt');
           card.addEventListener('animationend',() => card.classList.remove('dealt'),{once:true});
         }
       }
-      if (current) current.replaceWith(card);
-      else container.append(card);
     }
     while (container.children.length > desired.length) container.lastElementChild.remove();
   }

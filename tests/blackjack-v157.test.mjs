@@ -38,5 +38,5 @@ test('V1.5.7 backs off degraded polling and labels latency sources',()=>{
   assert.match(app,/DEGRADED_POLL_STEPS = \[\[5000,1500\],\[15000,2500\],\[Infinity,4000\]\]/);
   assert.match(app,/const network = Number\.isFinite\(realtimeRtt\) \? `实时 \$\{Math\.round\(realtimeRtt\)\}ms`/);
   assert.match(app,/const action = Number\.isFinite\(lastActionRtt\) \? `操作 \$\{lastActionRtt\}ms`/);
-  assert.match(html,/app\.js\?v=20261010-v161/);
+  assert.match(html,/app\.js\?v=20261010-v173/);
 });
