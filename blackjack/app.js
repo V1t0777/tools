@@ -1325,6 +1325,7 @@
     $('dealerValue').textContent = state.dealer.value == null ? '?' : String(state.dealer.value);
 
     const table = $('playerTable');
+    table.classList.toggle('two-players',state.players.length === 2);
     const wanted = new Set();
     for (const player of state.players) {
       const key = String(player.member_id);
