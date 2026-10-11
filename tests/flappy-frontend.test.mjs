@@ -3,7 +3,20 @@ import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 const html=readFileSync(new URL('../flappy/index.html',import.meta.url),'utf8');
-const source=html.match(/<script>\s*([\s\S]*?)<\/script>/)[1];
+// Read the one known inline script from this checked-in static fixture.
+// Explicit markers avoid treating a regular expression as an HTML parser/sanitizer.
+function extractGameScript(documentSource){
+  const opening='<script>';
+  const closing='</script>';
+  const start=documentSource.indexOf(opening);
+  if(start<0)throw new Error('Flappy inline script opening tag missing');
+  if(documentSource.indexOf(opening,start+opening.length)!==-1)throw new Error('Multiple inline scripts need explicit review');
+  const bodyStart=start+opening.length;
+  const end=documentSource.indexOf(closing,bodyStart);
+  if(end<0)throw new Error('Flappy inline script closing tag missing');
+  return documentSource.slice(bodyStart,end).trimStart();
+}
+const source=extractGameScript(html);
 new vm.Script(source); // Syntax check independent of the DOM harness.
 function setup({auth=true,fetchImpl=async()=>{throw new Error('offline');},storage=new Map([['zhaoFlappyBest.v1','12']])}={}){
   const elements=new Map(),events={};let authChange;
@@ -85,3 +98,10 @@ test('network failure persists the best pending run and reload retries it',async
   assert.deepEqual(JSON.parse(storage.get('zhaoFlappyPendingRuns.v1')),[]);
 });
 
+
+test('fixture script extraction rejects missing or unexpected extra inline blocks',()=>{
+  assert.equal(extractGameScript('<script>let value=1;</script>'),'let value=1;');
+  assert.throws(()=>extractGameScript('<div>missing</div>'),/missing/);
+  assert.throws(()=>extractGameScript('<script>unterminated'),/closing/);
+  assert.throws(()=>extractGameScript('<script>a</script><script>b</script>'),/Multiple/);
+});
