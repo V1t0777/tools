@@ -1,6 +1,7 @@
 import {readFileSync} from 'node:fs';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import {returnLinks} from '../scripts/static-anchor-links.mjs';
 
 const root='https://v1t0777.github.io/tools/';
 const games=`${root}games/`;
@@ -30,12 +31,6 @@ function source(path){
   return readFileSync(new URL(`../${path}`,import.meta.url),'utf8');
 }
 
-function returnLinks(html){
-  return [...html.matchAll(/<a\b[^>]*\bhref="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi)]
-    .filter(([, ,body])=>/^(?:←|返回)/.test(body.replace(/<[^>]*>/g,'').trim()))
-    .map(([,href])=>href);
-}
-
 test('ordinary secondary pages return to the GitHub Pages home page',()=>{
   for(const path of ordinaryPages){
     const links=returnLinks(source(path));
@@ -58,4 +53,13 @@ test('no secondary-page return link targets a mirror or old relative address',()
       assert.doesNotMatch(href,/pages\.dev|workers\.dev|^\.\.?\//,`${path}: ${href}`);
     }
   }
+});
+
+test('static anchor reader supports nested text, quoted attributes and ignores false tags',()=>{
+  const html='<aside>not a link</aside><a data-note="> no close" href="https://example.test/">'
+    +'<span aria-hidden="true">←</span><span>工具箱</span></a>'
+    +"<a href='https://example.test/games/'>返回小游戏</a>";
+  assert.deepEqual(returnLinks(html),['https://example.test/','https://example.test/games/']);
+  assert.deepEqual(returnLinks('<a href="/somewhere">其他页面</a>'),[]);
+  assert.throws(()=>returnLinks('<a href="/broken">返回'),/Unclosed anchor/);
 });
