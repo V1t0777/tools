@@ -247,10 +247,10 @@
       width:42px;height:42px;border:1px solid var(--border);border-radius:14px;
       background:rgba(255,255,255,.055);color:var(--text);font-size:22px
     }
-    .weekdays,.grid{display:grid;grid-template-columns:repeat(7,1fr)}
+    .weekdays,.grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}
     .weekdays div{text-align:center;padding:7px 0 9px;color:#7f899d;font-size:11px}
     .day{
-      position:relative;min-height:104px;margin:2px;padding:6px 4px;border:1px solid transparent;
+      position:relative;min-width:0;min-height:104px;margin:2px;padding:6px 4px;border:1px solid transparent;
       border-radius:14px;overflow:hidden
     }
     .day.other{opacity:.22}
@@ -313,8 +313,15 @@
     .item-meta{margin-top:5px;color:var(--muted);font-size:12px}
     .empty{padding:26px 12px;text-align:center;border:1px dashed var(--border);border-radius:18px;color:var(--muted);font-size:13px}
 
-    .fab-wrap{position:sticky;bottom:max(16px,env(safe-area-inset-bottom));margin-top:18px;pointer-events:none}
-    .fab{pointer-events:auto;box-shadow:0 14px 32px rgba(101,130,210,.25)}
+    .fab-wrap{
+      position:sticky;z-index:10;bottom:max(12px,env(safe-area-inset-bottom));
+      display:flex;justify-content:flex-end;margin-top:18px;pointer-events:none
+    }
+    .fab{
+      width:auto;max-width:100%;min-height:48px;padding:0 20px;
+      border-radius:999px;pointer-events:auto;
+      box-shadow:0 14px 32px rgba(101,130,210,.25)
+    }
 
     .overlay{position:fixed;inset:0;z-index:100;display:flex;align-items:flex-end;background:rgba(4,7,13,.69);backdrop-filter:blur(6px)}
     .sheet{
@@ -607,6 +614,8 @@
   let types = [];
   let assignments = [];
   let monthCursor = new Date();
+  // Prevent stale month requests from replacing the currently selected month.
+  let monthLoadVersion = 0;
   let selectedDate = null;
 
   let filterGroup = "all";
@@ -827,12 +836,20 @@
   });
 
   async function loadMonth() {
+    const requestVersion = ++monthLoadVersion;
+    // Snapshot the month before any await: navigation can happen while requests run.
     const y = monthCursor.getFullYear();
     const m = monthCursor.getMonth();
     const first = new Date(y,m,1);
     const last = new Date(y,m+1,0);
+    const firstVisible = new Date(y,m,1-first.getDay());
+    const visibleCells = Math.max(35,Math.ceil((first.getDay()+last.getDate())/7)*7);
+    const lastVisible = new Date(y,m,1-first.getDay()+visibleCells-1);
+    const visibleYears = new Set([y,firstVisible.getFullYear(),lastVisible.getFullYear()]);
 
-    await loadHolidayYear(y);
+    // Holiday data is fetched once before calendar construction, never per cell.
+    await Promise.all([...visibleYears].map(loadHolidayYear));
+    if (requestVersion !== monthLoadVersion) return;
 
     const {data,error} = await db
       .from("schedule_assignments")
@@ -841,6 +858,7 @@
       .lte("work_date",toYMD(last))
       .order("work_date",{ascending:true});
 
+    if (requestVersion !== monthLoadVersion) return;
     if (error) {
       console.warn('admin-night-shift request failed', error?.code||'OPERATION_ERROR');
       assignments = [];
@@ -1007,29 +1025,40 @@
   $("calendarModeBtn").addEventListener("click",() => setViewMode("calendar"));
   $("tableModeBtn").addEventListener("click",() => setViewMode("table"));
 
-  async function renderCalendar() {
+  function renderCalendar() {
     const y = monthCursor.getFullYear();
     const m = monthCursor.getMonth();
     $("calTitle").textContent = `${y}年${m+1}月`;
 
     const first = new Date(y,m,1);
+    const daysInMonth = new Date(y,m+1,0).getDate();
     const start = new Date(y,m,1-first.getDay());
     const today = toYMD(new Date());
+    const totalCells = Math.max(35,Math.ceil((first.getDay()+daysInMonth)/7)*7);
     const grid = $("grid");
-    grid.replaceChildren();
+    const fragment = document.createDocumentFragment();
+    const assignmentsByDate = new Map();
 
-    for (let i=0;i<42;i++) {
+    for (const item of assignments) {
+      if (!assignmentsByDate.has(item.work_date)) assignmentsByDate.set(item.work_date,[]);
+      assignmentsByDate.get(item.work_date).push(item);
+    }
+
+    // Build the entire calendar synchronously off-screen. A new render cannot
+    // interleave between clearing the grid and appending date cells.
+    for (let i=0;i<totalCells;i++) {
       const d = new Date(start);
       d.setDate(start.getDate()+i);
       const ds = toYMD(d);
 
       const cell = document.createElement("div");
       cell.className = "day";
+      cell.dataset.date = ds;
 
       if (d.getMonth() !== m) cell.classList.add("other");
       if (ds === today) cell.classList.add("today");
 
-      const holiday = await holidayFor(ds);
+      const holiday = holidayCache.get(d.getFullYear())?.[ds] || null;
       if (holiday) {
         cell.classList.add(
           holiday.type === "holiday" ? "holiday-day" : "workday-day"
@@ -1053,11 +1082,8 @@
         cell.appendChild(name);
       }
 
-      const allDay = sortAssignments(
-        assignments.filter(x => x.work_date === ds)
-      );
+      const allDay = sortAssignments(assignmentsByDate.get(ds) || []);
       const shown = filteredAssignments(allDay);
-
       if (shown.length) cell.classList.add("has");
 
       if (filterGroup === "all" && !filterCode) {
@@ -1084,8 +1110,11 @@
         cell.addEventListener("click",() => openDetail(ds));
       }
 
-      grid.appendChild(cell);
+      fragment.appendChild(cell);
     }
+
+    // One atomic commit, independent of how often filters or views were toggled.
+    grid.replaceChildren(fragment);
   }
 
   function createCalendarChip(item) {
@@ -1268,7 +1297,10 @@
       monthCursor.getMonth()+delta,
       1
     );
-    await loadMonth();
+    const pending = loadMonth();
+    const requestVersion = monthLoadVersion;
+    await pending;
+    if (requestVersion !== monthLoadVersion) return;
     [$("grid"),$("tableView")].forEach(el=>{el.classList.remove("is-changing");void el.offsetWidth;el.classList.add("is-changing");});
   }
 
