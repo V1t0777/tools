@@ -5439,7 +5439,8 @@
         left = left.substring(0,size-n);
       }
       size = left.length;
-      while((size-keySize!==left.lastIndexOf(key))&&size>=_SIZE){
+      // Downstream safety fix for upstream lunar-javascript v1.7.7: avoid -1 == -1 suffix matches.
+      while(size>=_SIZE&&!left.endsWith(key)){
         left = left.substring(0,size-_SIZE);
         size = left.length;
       }
@@ -5465,7 +5466,8 @@
       }
       var size = s.length;
       var keySize = key.length;
-      while(size-keySize===s.lastIndexOf(key)){
+      // A missing suffix must not match merely because key is longer than the remaining data.
+      while(size>=_SIZE&&s.endsWith(key)){
         l.push(_buildHolidayBackward(s));
         s = s.substring(0,size-_SIZE);
         size = s.length;
