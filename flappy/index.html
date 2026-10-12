@@ -471,7 +471,7 @@
     if(!leaderboardData)return;
     var session=ToolboxAuth.peekSession();
     if(leaderboardData.excluded_account){
-      accountCopy.innerHTML='<strong>test@test.com 是测试账号</strong><br>可以游玩和查看榜单，但成绩不参与排名。 <button class="signout-btn" id="leaderboardSignOut" type="button">退出登录</button>';
+      accountCopy.innerHTML='<strong>当前账号为测试账号</strong><br>可以游玩和查看榜单，但成绩不参与排名。 <button class="signout-btn" id="leaderboardSignOut" type="button">退出登录</button>';
       loginForm.hidden=true;
     }else if(leaderboardData.viewer){
       accountCopy.innerHTML='已登录为 <strong>'+escapeHTML(leaderboardData.viewer.nickname)+'</strong>，新完成的有效成绩会自动提交。 <button class="signout-btn" id="leaderboardSignOut" type="button">退出登录</button>';
