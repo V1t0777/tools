@@ -18,25 +18,33 @@ function extractGameScript(documentSource){
 }
 const source=extractGameScript(html);
 new vm.Script(source); // Syntax check independent of the DOM harness.
-function setup({auth=true,fetchImpl=async()=>{throw new Error('offline');},storage=new Map([['zhaoFlappyBest.v1','12']])}={}){
-  const elements=new Map(),events={};let authChange;
+function setup({auth=true,fetchImpl=async()=>{throw new Error('offline');},storage=new Map([['zhaoFlappyBest.v1','12']]),render=false}={}){
+  const elements=new Map(),events={},rafQueue=[];let authChange,createdCanvases=0,drawImages=0;
+  const gradient={addColorStop(){}};
+  const fakeCtx=new Proxy({createLinearGradient(){return gradient;},createRadialGradient(){return gradient;},drawImage(){drawImages++;}},
+    {get(target,key){return target[key]??(()=>{});}});
   function element(id){
     if(elements.has(id))return elements.get(id);
     const classes=new Set(),listeners={};
     const node={id,textContent:'',innerHTML:'',value:'',hidden:false,disabled:false,listeners,
       classList:{add(...xs){xs.forEach(x=>classes.add(x));},remove(...xs){xs.forEach(x=>classes.delete(x));},contains(x){return classes.has(x);},toggle(x,on){if(on??!classes.has(x))classes.add(x);else classes.delete(x);}},
-      addEventListener(t,fn){listeners[t]=fn;},setAttribute(){},focus(){},querySelector(){return element(id+'button');},querySelectorAll(){return [];},getBoundingClientRect(){return {width:360,height:600};},getContext(){return {};},closest(){return null;}};
+      addEventListener(t,fn){listeners[t]=fn;},setAttribute(){},focus(){},querySelector(){return element(id+'button');},querySelectorAll(){return [];},getBoundingClientRect(){return {width:360,height:600};},getContext(){return render?fakeCtx:{};},closest(){return null;}};
     elements.set(id,node);return node;
   }
   const session={user:{id:'u1'},access_token:'fake'};
   const toolbox={url:'https://example.test',key:'public',peekSession:()=>session,getSession:async()=>session,onAuthStateChange:fn=>{authChange=fn;},signIn:async()=>{},authMessage:e=>e.message};
   const window={matchMedia:()=>({matches:false}),addEventListener(){},ToolboxAuth:auth?toolbox:undefined};
   const localStorage={getItem(key){return storage.has(key)?storage.get(key):null;},setItem(key,value){storage.set(key,String(value));}};
-  const context={window,document:{getElementById:element,addEventListener(t,fn){events[t]=fn;}},navigator:{},localStorage,performance:{now:()=>1000},requestAnimationFrame(){},setTimeout,clearTimeout,AbortController,fetch:fetchImpl,Intl,console};
+  const document={getElementById:element,addEventListener(t,fn){events[t]=fn;},body:{setAttribute(){}},
+    createElement(tag){if(tag!=='canvas')throw new Error('Unexpected element');createdCanvases++;return {getContext(){return fakeCtx;}};}};
+  const context={window,document,navigator:{},localStorage,performance:{now:()=>1000},
+    requestAnimationFrame(fn){if(render)rafQueue.push(fn);},setTimeout,clearTimeout,AbortController,fetch:fetchImpl,Intl,console};
   // Test-only closure access, not shipped in the game.
   const instrumented=source.replace('  loadBest();loadPendingBest();restorePendingRuns();resetGame(true);',`  window.testApi={startGame,finishGame,openLeaderboard,closeLeaderboard,sendRun,submitOnlineRun,refreshLeaderboard,retryPendingSubmission,get active(){return activeRun;},get state(){return state;},get best(){return best;},get pendingBest(){return pendingBest;},set score(value){score=value;}};\n  loadBest();loadPendingBest();restorePendingRuns();resetGame(true);`);
   vm.runInNewContext(instrumented,context);
-  return {api:window.testApi,e:element,events,authChange,session,storage};
+  return {api:window.testApi,e:element,events,authChange,session,storage,
+    tick(t){const callback=rafQueue.shift();if(!callback)throw new Error('Missing RAF callback');callback(t);},
+    createdCanvases(){return createdCanvases;},drawImages(){return drawImages;}};
 }
 const flush=()=>new Promise(r=>setImmediate(r));
 test('guest still plays when shared auth and network are unavailable; local BEST remains',async()=>{
@@ -104,4 +112,24 @@ test('fixture script extraction rejects missing or unexpected extra inline block
   assert.throws(()=>extractGameScript('<div>missing</div>'),/missing/);
   assert.throws(()=>extractGameScript('<script>unterminated'),/closing/);
   assert.throws(()=>extractGameScript('<script>a</script><script>b</script>'),/Multiple/);
+});
+
+test('cinematic Canvas rendering reuses sky/cloud buffers and keeps flight functional',async()=>{
+  const scene=setup({render:true});
+  scene.tick(1000); // resize + first draw
+  assert.equal(scene.createdCanvases(),2,'one cloud sprite and one cached sky');
+  const firstDrawImages=scene.drawImages();
+  scene.tick(1016);
+  scene.tick(1032);
+  assert.equal(scene.createdCanvases(),2,'do not rebuild static scenery every frame');
+  assert.ok(scene.drawImages()>firstDrawImages,'canvas layers are actually painted');
+  scene.api.startGame();
+  scene.tick(1048);
+  assert.equal(scene.api.state,'running');
+  scene.api.score=13;
+  scene.tick(1064); // airflow is now part of the draw pipeline
+  assert.equal(scene.createdCanvases(),3,'score band updates only the cached sky');
+  scene.api.finishGame();
+  await flush();
+  assert.equal(scene.api.state,'over');
 });
