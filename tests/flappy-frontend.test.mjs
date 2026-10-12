@@ -19,10 +19,10 @@ function extractGameScript(documentSource){
 const source=extractGameScript(html);
 new vm.Script(source); // Syntax check independent of the DOM harness.
 function setup({auth=true,fetchImpl=async()=>{throw new Error('offline');},storage=new Map([['zhaoFlappyBest.v1','12']]),render=false}={}){
-  const elements=new Map(),events={},rafQueue=[];let authChange,createdCanvases=0,drawImages=0;
+  const elements=new Map(),events={},rafQueue=[];let authChange,createdCanvases=0,drawImages=0;const paintedColors=[];
   const gradient={addColorStop(){}};
   const fakeCtx=new Proxy({createLinearGradient(){return gradient;},createRadialGradient(){return gradient;},drawImage(){drawImages++;}},
-    {get(target,key){return target[key]??(()=>{});}});
+    {get(target,key){return target[key]??(()=>{});},set(target,key,value){if(key==='fillStyle'&&typeof value==='string')paintedColors.push(value);target[key]=value;return true;}});
   function element(id){
     if(elements.has(id))return elements.get(id);
     const classes=new Set(),listeners={};
@@ -40,11 +40,12 @@ function setup({auth=true,fetchImpl=async()=>{throw new Error('offline');},stora
   const context={window,document,navigator:{},localStorage,performance:{now:()=>1000},
     requestAnimationFrame(fn){if(render)rafQueue.push(fn);},setTimeout,clearTimeout,AbortController,fetch:fetchImpl,Intl,console};
   // Test-only closure access, not shipped in the game.
-  const instrumented=source.replace('  loadBest();loadPendingBest();restorePendingRuns();resetGame(true);',`  window.testApi={startGame,finishGame,openLeaderboard,closeLeaderboard,sendRun,submitOnlineRun,refreshLeaderboard,retryPendingSubmission,get active(){return activeRun;},get state(){return state;},get best(){return best;},get pendingBest(){return pendingBest;},set score(value){score=value;}};\n  loadBest();loadPendingBest();restorePendingRuns();resetGame(true);`);
+  const instrumented=source.replace('  loadBest();loadPendingBest();restorePendingRuns();resetGame(true);',`  window.testApi={startGame,finishGame,openLeaderboard,closeLeaderboard,sendRun,submitOnlineRun,refreshLeaderboard,retryPendingSubmission,get active(){return activeRun;},get state(){return state;},get best(){return best;},get pendingBest(){return pendingBest;},set score(value){score=value;},drawBirdForSkin(value){birdSkin=value;drawBird(1000);},birdRadiusForTest(){return birdRadius();},skinName(value){return BIRD_SKINS[value].name;}};\n  loadBest();loadPendingBest();restorePendingRuns();resetGame(true);`);
   vm.runInNewContext(instrumented,context);
   return {api:window.testApi,e:element,events,authChange,session,storage,
     tick(t){const callback=rafQueue.shift();if(!callback)throw new Error('Missing RAF callback');callback(t);},
-    createdCanvases(){return createdCanvases;},drawImages(){return drawImages;}};
+    createdCanvases(){return createdCanvases;},drawImages(){return drawImages;},
+    resetPaint(){paintedColors.length=0;},paintedColors(){return [...paintedColors]}};
 }
 const flush=()=>new Promise(r=>setImmediate(r));
 test('guest still plays when shared auth and network are unavailable; local BEST remains',async()=>{
@@ -132,4 +133,25 @@ test('cinematic Canvas rendering reuses sky/cloud buffers and keeps flight funct
   scene.api.finishGame();
   await flush();
   assert.equal(scene.api.state,'over');
+});
+
+test('warm traveler and slate night bird render from one geometric rig',()=>{
+  const scene=setup({render:true});
+  scene.tick(1000);
+  const radius=scene.api.birdRadiusForTest();
+  scene.resetPaint();
+  scene.api.drawBirdForSkin('warm');
+  const warm=scene.paintedColors();
+  scene.resetPaint();
+  scene.api.drawBirdForSkin('slate');
+  const slate=scene.paintedColors();
+  assert.equal(scene.api.skinName('warm'),'暖棕旅鸟');
+  assert.equal(scene.api.skinName('slate'),'板岩夜鸟');
+  assert.ok(warm.includes('#efd5b3'),'warm traveler cheek must be rendered');
+  assert.ok(warm.includes('#fff0d9'),'warm traveler ivory throat must be rendered');
+  assert.ok(slate.includes('#d8e0e6'),'slate night bird cheek must be rendered');
+  assert.ok(slate.includes('#f4f5f4'),'slate night bird throat must be rendered');
+  assert.equal(warm.length,slate.length,'both skins use the same drawing geometry');
+  assert.equal(scene.api.birdRadiusForTest(),radius,'a different skin cannot change collision radius');
+  assert.match(html,/每局随机遇见暖棕旅鸟或板岩夜鸟/);
 });

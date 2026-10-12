@@ -201,7 +201,7 @@
           <div class="ready-card">
             <div class="bird-mark">RANDOM FLIGHT</div>
             <h2>准备起飞</h2>
-            <p>每局会随机出现暖棕或青灰小鸟。轻触画面开始。</p>
+            <p>每局随机遇见暖棕旅鸟或板岩夜鸟。轻触画面开始。</p>
             <div class="tap-hint">轻触任意位置</div>
           </div>
         </div>
@@ -322,18 +322,24 @@
   var pendingBest=0;
   var leaderboardData=null,leaderboardMode='all_time',leaderboardRequest=0;
 
+  // Matching dimensions and flight rig for both birds; palette only changes their identity.
+  // Short silhouettes stay legible at native mobile gameplay size.
   var BIRD_SKINS={
     warm:{
-      name:'暖棕',
-      back:'#a77550',mid:'#c79a6e',belly:'#ead8b8',head:'#d1aa82',
-      wing:'#7d563d',wingHi:'#a97a58',tail:'#76513b',beak:'#d99552',
-      eye:'#172630',shine:'rgba(255,255,255,.20)'
+      name:'暖棕旅鸟',
+      back:'#94613f',mid:'#c08b60',belly:'#f0dfc5',head:'#c9956e',
+      wing:'#785039',wingHi:'#b98b61',tail:'#64432e',beak:'#554940',
+      eye:'#171414',shine:'rgba(255,246,215,.20)',
+      crown:'#ac704b',face:'#efd5b3',throat:'#fff0d9',
+      feather:'#d9ad7d',featherShade:'#644832',iris:'#6b4934',eyering:'#77513c'
     },
     slate:{
-      name:'青灰',
-      back:'#5f7886',mid:'#7f98a5',belly:'#d8e0e2',head:'#a6b6bd',
-      wing:'#4a606d',wingHi:'#69818d',tail:'#425762',beak:'#c59b63',
-      eye:'#14232c',shine:'rgba(255,255,255,.18)'
+      name:'板岩夜鸟',
+      back:'#50667d',mid:'#7b8fa3',belly:'#e3e8eb',head:'#8499ad',
+      wing:'#42586f',wingHi:'#879bb0',tail:'#394d65',beak:'#c4a17d',
+      eye:'#141b23',shine:'rgba(232,242,250,.17)',
+      crown:'#596f87',face:'#d8e0e6',throat:'#f4f5f4',
+      feather:'#abb9c8',featherShade:'#374c61',iris:'#716459',eyering:'#596c80'
     }
   };
 
@@ -461,7 +467,7 @@
     var viewerId=leaderboardData.viewer&&leaderboardData.viewer.member_id;
     leaderboardList.innerHTML=rows.map(function(row){
       var medalText=row.rank===1?'🥇':row.rank===2?'🥈':row.rank===3?'🥉':escapeHTML(row.rank);
-      var skin=row.bird_skin==='warm'?'暖棕小鸟':'青灰小鸟';
+      var skin=row.bird_skin==='warm'?'暖棕旅鸟':'板岩夜鸟';
       var color=/^#[0-9a-f]{3,8}$/i.test(row.color)?row.color:'#8EC5FF';
       var date='';try{date=new Intl.DateTimeFormat('zh-CN',{month:'numeric',day:'numeric'}).format(new Date(row.achieved_at));}catch(e){}
       return '<div class="leaderboard-row '+(row.member_id===viewerId?'me':'')+'"><div class="rank-number">'+medalText+'</div><div><div class="player-name"><span style="color:'+color+'">●</span> '+escapeHTML(row.nickname)+'</div><div class="player-detail">'+skin+(date?' · '+date:'')+'</div></div><div class="player-score">'+escapeHTML(row.score)+'</div></div>';
@@ -927,69 +933,137 @@
 
   function drawBird(now){
     var r=birdRadius(),skin=BIRD_SKINS[birdSkin];
-    var t=bird.flapAge,impulse=t<.075?t/.075:t<.30?1-(t-.075)/.225:0;
-    var wingAngle=-.04-impulse*.91+(state==='ready'&&!reduceMotion?Math.sin((now||0)*.005)*.13:0);
-    ctx.save();ctx.translate(bird.x,bird.y);ctx.rotate(bird.rot);
+    var t=bird.flapAge;
+    // The same four stages (rest/up/down/glide) drive both character skins.
+    var flap=t<.075?t/.075:t<.30?1-(t-.075)/.225:0;
+    var idle=state==='ready'&&!reduceMotion?Math.sin((now||0)*.005)*.12:0;
+    var falling=state==='falling'? .13 : clamp(bird.vy/(H*3),0,.11);
+    var wingAngle=-.07-flap*.86+idle+falling;
+    ctx.save();
+    ctx.translate(bird.x,bird.y);
+    ctx.rotate(bird.rot);
     var fallStretch=state==='running'?clamp(bird.vy/(H*.92),0,.035):0;
     ctx.scale(1+bird.squash*.30-fallStretch*.30,1-bird.squash*.38+fallStretch);
 
-    // Independently trailing tail feathers respond to velocity, not a continuous motor cycle.
-    ctx.save();ctx.translate(-r*.68,r*.02);ctx.rotate(-bird.tailLag*.18);
+    // Two short, layered tail feathers with a gentle inertial lag.
+    ctx.save();
+    ctx.translate(-r*.69,r*.04);
+    ctx.rotate(-bird.tailLag*.16);
     ctx.fillStyle=skin.tail;
     ctx.beginPath();
-    ctx.moveTo(-r*.12,-r*.13);ctx.lineTo(-r*.9,-r*.42);
-    ctx.lineTo(-r*.64,-r*.05);ctx.lineTo(-r*.93,r*.28);
-    ctx.lineTo(0,r*.12);ctx.closePath();ctx.fill();
-    ctx.strokeStyle='rgba(255,241,209,.10)';ctx.lineWidth=.7;
-    ctx.beginPath();ctx.moveTo(-r*.18,-r*.06);ctx.lineTo(-r*.73,-r*.30);ctx.stroke();
+    ctx.moveTo(0,-r*.20);
+    ctx.quadraticCurveTo(-r*.52,-r*.39,-r*.85,-r*.37);
+    ctx.quadraticCurveTo(-r*.62,-r*.13,-r*.29,-r*.04);
+    ctx.quadraticCurveTo(-r*.70,r*.17,-r*.83,r*.24);
+    ctx.quadraticCurveTo(-r*.27,r*.36,r*.05,r*.12);
+    ctx.closePath();ctx.fill();
+    ctx.strokeStyle=skin.featherShade;ctx.lineWidth=Math.max(.55,r*.038);
+    ctx.beginPath();ctx.moveTo(-r*.12,-r*.04);ctx.quadraticCurveTo(-r*.52,-r*.09,-r*.73,-r*.24);ctx.stroke();
     ctx.restore();
 
+    // Silhouette: continuous tear-drop torso, subtly fuller in front, not a round sticker.
     ctx.save();
-    ctx.shadowColor='rgba(0,0,0,.20)';ctx.shadowBlur=8;ctx.shadowOffsetY=3;
-    var bodyG=ctx.createLinearGradient(-r*1.05,-r*.7,r*.95,r*.7);
-    bodyG.addColorStop(0,skin.back);bodyG.addColorStop(.47,skin.mid);bodyG.addColorStop(1,skin.belly);
+    ctx.shadowColor='rgba(0,0,0,.19)';ctx.shadowBlur=7;ctx.shadowOffsetY=3;
+    var bodyG=ctx.createLinearGradient(-r,-r*.66,r*.93,r*.68);
+    bodyG.addColorStop(0,skin.back);bodyG.addColorStop(.46,skin.mid);bodyG.addColorStop(1,skin.belly);
     ctx.fillStyle=bodyG;ctx.beginPath();
-    ctx.moveTo(-r*.95,-r*.05);
-    ctx.bezierCurveTo(-r*.72,-r*.68,-r*.10,-r*.78,r*.48,-r*.54);
-    ctx.bezierCurveTo(r*.92,-r*.36,r*1.08,-r*.02,r*.82,r*.34);
-    ctx.bezierCurveTo(r*.46,r*.72,-r*.15,r*.69,-r*.64,r*.36);
-    ctx.bezierCurveTo(-r*.86,r*.21,-r*.98,r*.08,-r*.95,-r*.05);
+    ctx.moveTo(-r*.99,-r*.08);
+    ctx.bezierCurveTo(-r*.88,-r*.60,-r*.17,-r*.80,r*.47,-r*.61);
+    ctx.bezierCurveTo(r*.83,-r*.54,r*1.02,-r*.23,r*.93,r*.15);
+    ctx.bezierCurveTo(r*.79,r*.58,r*.25,r*.75,-r*.33,r*.56);
+    ctx.bezierCurveTo(-r*.75,r*.41,-r*1.03,r*.16,-r*.99,-r*.08);
     ctx.closePath();ctx.fill();ctx.restore();
 
-    // Matte under-feather shading is more legible than another glow.
-    ctx.fillStyle='rgba(255,255,255,.055)';ctx.beginPath();
-    ctx.ellipse(r*.22,r*.26,r*.46,r*.14,.19,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle=skin.head;ctx.beginPath();
-    ctx.ellipse(r*.56,-r*.28,r*.48,r*.42,-.08,0,Math.PI*2);ctx.fill();
-
-    ctx.save();ctx.translate(-r*.18,r*.04);ctx.rotate(wingAngle);
-    var wg=ctx.createLinearGradient(-r*.28,-r*.35,r*.78,r*.42);
-    wg.addColorStop(0,skin.wingHi);wg.addColorStop(1,skin.wing);
-    ctx.fillStyle=wg;ctx.beginPath();
-    ctx.moveTo(-r*.34,-r*.10);
-    ctx.bezierCurveTo(r*.02,-r*.48,r*.60,-r*.34,r*.80,-r*.04);
-    ctx.bezierCurveTo(r*.46,r*.10,r*.18,r*.34,-r*.20,r*.42);
-    ctx.bezierCurveTo(-r*.02,r*.16,-r*.18,r*.02,-r*.34,-r*.10);
+    // Ivory lower breast: broad enough to remain visible when the wing is raised.
+    ctx.fillStyle=skin.belly;ctx.beginPath();
+    ctx.moveTo(-r*.16,r*.24);
+    ctx.bezierCurveTo(r*.06,r*.52,r*.52,r*.57,r*.78,r*.27);
+    ctx.bezierCurveTo(r*.76,r*.64,r*.07,r*.79,-r*.29,r*.52);
     ctx.closePath();ctx.fill();
-    ctx.strokeStyle='rgba(250,242,215,.14)';ctx.lineWidth=Math.max(.7,r*.045);
-    ctx.beginPath();ctx.moveTo(-r*.12,r*.08);ctx.quadraticCurveTo(r*.21,r*.05,r*.55,-r*.03);ctx.stroke();
+
+    // Crown and swept nape are a single soft feather cap.
+    ctx.fillStyle=skin.crown;ctx.beginPath();
+    ctx.moveTo(-r*.34,-r*.47);
+    ctx.quadraticCurveTo(-r*.03,-r*.78,r*.40,-r*.70);
+    ctx.quadraticCurveTo(r*.83,-r*.64,r*.93,-r*.38);
+    ctx.quadraticCurveTo(r*.46,-r*.54,r*.03,-r*.32);
+    ctx.closePath();ctx.fill();
+    // Small feather crest keeps the profile distinctive without changing its hitbox.
+    ctx.beginPath();
+    ctx.moveTo(-r*.30,-r*.61);ctx.quadraticCurveTo(-r*.06,-r*.86,r*.08,-r*.70);
+    ctx.quadraticCurveTo(-r*.06,-r*.69,-r*.17,-r*.57);ctx.closePath();ctx.fill();
+
+    // Traveller's cream cheek and night bird's silver cheek share the same outline.
+    ctx.fillStyle=skin.face;ctx.beginPath();
+    ctx.moveTo(r*.16,-r*.43);
+    ctx.quadraticCurveTo(r*.43,-r*.59,r*.79,-r*.39);
+    ctx.quadraticCurveTo(r*.97,-r*.18,r*.80,r*.08);
+    ctx.quadraticCurveTo(r*.49,r*.35,r*.14,r*.03);
+    ctx.quadraticCurveTo(r*.38,-r*.15,r*.16,-r*.43);
+    ctx.closePath();ctx.fill();
+    ctx.fillStyle=skin.throat;ctx.beginPath();
+    ctx.moveTo(r*.68,-r*.05);
+    ctx.quadraticCurveTo(r*1.05,r*.14,r*.70,r*.44);
+    ctx.quadraticCurveTo(r*.38,r*.54,r*.20,r*.29);
+    ctx.quadraticCurveTo(r*.58,r*.23,r*.68,-r*.05);
+    ctx.closePath();ctx.fill();
+
+    // One articulated wing, made of flight feathers and overlapping coverts.
+    ctx.save();
+    ctx.translate(-r*.24,-r*.035);
+    ctx.rotate(wingAngle);
+    var wingG=ctx.createLinearGradient(-r*.49,-r*.45,r*.76,r*.49);
+    wingG.addColorStop(0,skin.wingHi);wingG.addColorStop(.56,skin.wing);wingG.addColorStop(1,skin.featherShade);
+    ctx.fillStyle=wingG;ctx.beginPath();
+    ctx.moveTo(-r*.39,-r*.17);
+    ctx.bezierCurveTo(-r*.04,-r*.51,r*.57,-r*.40,r*.73,-r*.09);
+    ctx.bezierCurveTo(r*.53,r*.16,r*.10,r*.46,-r*.39,r*.37);
+    ctx.quadraticCurveTo(-r*.61,r*.15,-r*.39,-r*.17);
+    ctx.closePath();ctx.fill();
+
+    // Three terminal feathers: readable texture even when the rendered bird is tiny.
+    for(var i=0;i<3;i++){
+      var fx=(-.41+i*.13)*r,fy=(.20+i*.065)*r;
+      ctx.fillStyle=i===0?skin.wing:skin.featherShade;
+      ctx.beginPath();
+      ctx.moveTo(fx-r*.08,fy-r*.10);
+      ctx.quadraticCurveTo(fx+r*.16,fy+r*.12,fx+r*.33,fy+r*.12);
+      ctx.quadraticCurveTo(fx+r*.07,fy+r*.29,fx-r*.14,fy+r*.14);
+      ctx.closePath();ctx.fill();
+    }
+    ctx.fillStyle=skin.feather;ctx.beginPath();
+    ctx.moveTo(-r*.20,-r*.23);
+    ctx.bezierCurveTo(r*.10,-r*.42,r*.47,-r*.30,r*.59,-r*.12);
+    ctx.quadraticCurveTo(r*.23,-r*.13,-r*.02,r*.04);
+    ctx.quadraticCurveTo(-r*.25,r*.14,-r*.20,-r*.23);
+    ctx.closePath();ctx.fill();
+    ctx.strokeStyle=skin.featherShade;ctx.lineWidth=Math.max(.6,r*.042);
+    ctx.beginPath();ctx.moveTo(-r*.07,r*.03);
+    ctx.quadraticCurveTo(r*.21,-r*.02,r*.43,-r*.14);ctx.stroke();
     ctx.restore();
 
-    ctx.fillStyle='rgba(255,255,255,.88)';
-    ctx.beginPath();ctx.arc(r*.72,-r*.39,r*.135,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle=skin.eye;
-    ctx.beginPath();ctx.arc(r*.755,-r*.39,r*.058,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='rgba(255,255,255,.88)';
-    ctx.beginPath();ctx.arc(r*.77,-r*.41,r*.018,0,Math.PI*2);ctx.fill();
+    // Tiny dark, bright-eyed expression; iris remains restrained at mobile scale.
+    ctx.fillStyle=skin.eyering;ctx.beginPath();
+    ctx.ellipse(r*.67,-r*.38,r*.188,r*.176,-.18,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=skin.iris;ctx.beginPath();
+    ctx.arc(r*.684,-r*.387,r*.154,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=skin.eye;ctx.beginPath();
+    ctx.arc(r*.702,-r*.389,r*.115,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#fffaf3';ctx.beginPath();
+    ctx.arc(r*.737,-r*.438,r*.037,0,Math.PI*2);ctx.fill();
 
+    // Short, tapered beak: within the existing visual silhouette / game hit radius.
     ctx.fillStyle=skin.beak;ctx.beginPath();
-    ctx.moveTo(r*.93,-r*.17);ctx.lineTo(r*1.43,-r*.05);ctx.lineTo(r*.93,r*.06);
+    ctx.moveTo(r*.90,-r*.16);
+    ctx.quadraticCurveTo(r*1.14,-r*.13,r*1.38,-r*.04);
+    ctx.quadraticCurveTo(r*1.15,r*.075,r*.90,r*.045);
     ctx.closePath();ctx.fill();
-    ctx.strokeStyle='rgba(80,55,35,.24)';ctx.lineWidth=Math.max(1,r*.035);
-    ctx.beginPath();ctx.moveTo(r*.98,-r*.055);ctx.lineTo(r*1.35,-r*.045);ctx.stroke();
+    ctx.strokeStyle='rgba(42,37,35,.26)';ctx.lineWidth=Math.max(.6,r*.032);
+    ctx.beginPath();ctx.moveTo(r*.96,-r*.042);ctx.lineTo(r*1.28,-r*.018);ctx.stroke();
 
+    // Single restrained highlight, not a synthetic all-over glow.
     ctx.fillStyle=skin.shine;ctx.beginPath();
-    ctx.ellipse(-r*.12,-r*.42,r*.36,r*.075,-.30,0,Math.PI*2);ctx.fill();
+    ctx.ellipse(-r*.18,-r*.53,r*.27,r*.052,-.21,0,Math.PI*2);ctx.fill();
     ctx.restore();
   }
 
