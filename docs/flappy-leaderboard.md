@@ -8,8 +8,9 @@ Game version: `2026.09.23-leaderboard-v1`.
 - Guests play normally; local `zhaoFlappyBest.v1` remains independent.
 - Existing Toolbox Auth sessions and `members` identify players. The Edge handler
   checks the live user and `toolbox_session_status`; no user-editable metadata is trusted.
-- `test@example.invalid` (case-insensitive) cannot start/submit ranked runs and is excluded
-  from public leaderboard results. Database triggers also reject its run writes.
+- Members marked `public.members.exclude_from_leaderboard = true` can play locally,
+  but cannot start or submit ranked runs or appear on public leaderboards.
+  The Edge Function and database trigger enforce this exclusion.
 - One all-time maximum and one current-week maximum per member. Equal scores retain
   the earliest record; ties between players sort by achievement time then member ID.
 - Weeks start Monday 00:00 Asia/Shanghai. Scores belong to the submission week.
