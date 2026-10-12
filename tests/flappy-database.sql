@@ -9,8 +9,8 @@ declare
   n integer;
   v_score integer;
 begin
-  select members.* into strict m from public.members join auth.users u on u.id=members.user_id where lower(u.email)<>'test@example.invalid' limit 1;
-  select members.* into strict t from public.members join auth.users u on u.id=members.user_id where lower(u.email)='test@example.invalid' limit 1;
+  select * into strict m from public.members where exclude_from_leaderboard = false limit 1;
+  select * into strict t from public.members where exclude_from_leaderboard = true limit 1;
   -- Fixtures use old created_at to avoid exercising the rate guard in this loop.
   foreach v_score in array array[4,9,6] loop
     insert into public.flappy_runs(user_id,member_id,run_token_hash,bird_skin,game_version,started_at,created_at,expires_at)
