@@ -922,32 +922,72 @@
     r=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();
   }
 
+  // Theme-matched weathered stone pillars, deliberately confined to the collision silhouette.
   function pipeStyle(w){
-    if(pipeMaterials&&pipeMaterials.width===w)return pipeMaterials;
+    var theme=birdSkin;
+    if(pipeMaterials&&pipeMaterials.width===w&&pipeMaterials.theme===theme)return pipeMaterials;
+    var warm=theme==='warm';
     var body=ctx.createLinearGradient(0,0,w,0);
-    body.addColorStop(0,'#255a50');body.addColorStop(.14,'#357265');
-    body.addColorStop(.48,'#31695c');body.addColorStop(.82,'#255447');body.addColorStop(1,'#173b34');
-    var cap=ctx.createLinearGradient(-6,0,w+6,0);
-    cap.addColorStop(0,'#255d52');cap.addColorStop(.17,'#3b796a');
-    cap.addColorStop(.65,'#285d50');cap.addColorStop(1,'#183c34');
-    pipeMaterials={width:w,body:body,cap:cap};
-    return pipeMaterials;
+    if(warm){
+      body.addColorStop(0,'#575e4f');body.addColorStop(.16,'#a6a089');
+      body.addColorStop(.42,'#958e7c');body.addColorStop(.73,'#777c6e');body.addColorStop(1,'#495349');
+    }else{
+      body.addColorStop(0,'#293f51');body.addColorStop(.17,'#708696');
+      body.addColorStop(.40,'#687c8d');body.addColorStop(.76,'#475e70');body.addColorStop(1,'#243b4d');
+    }
+    var cap=ctx.createLinearGradient(0,0,w,0);
+    if(warm){cap.addColorStop(0,'#656957');cap.addColorStop(.22,'#b0a58b');cap.addColorStop(.8,'#7d816b');cap.addColorStop(1,'#4c5849');}
+    else{cap.addColorStop(0,'#304b60');cap.addColorStop(.22,'#8798a6');cap.addColorStop(.8,'#4a6475');cap.addColorStop(1,'#273f50');}
+    pipeMaterials={width:w,theme:theme,body:body,cap:cap};return pipeMaterials;
   }
   function drawPipePart(x,y,w,h,top){
     if(h<=0)return;
-    var style=pipeStyle(w),capH=Math.min(24,H*.038),capY=top?h-capH:0;
+    var style=pipeStyle(w),capH=Math.min(25,H*.040),capY=top?h-capH:0;
+    var warm=birdSkin==='warm';
     ctx.save();ctx.translate(x,y);
-    ctx.fillStyle=style.body;ctx.shadowColor='rgba(0,0,0,.19)';ctx.shadowBlur=6;
-    roundedRect(0,0,w,h,7);ctx.fill();
-    ctx.shadowBlur=0;
-    ctx.fillStyle='rgba(231,255,239,.07)';roundedRect(w*.12,3,w*.06,Math.max(0,h-6),3);ctx.fill();
-    ctx.fillStyle='rgba(5,24,21,.15)';roundedRect(w*.84,2,w*.08,Math.max(0,h-4),3);ctx.fill();
-    ctx.fillStyle=style.cap;roundedRect(-6,capY,w+12,capH,7);ctx.fill();
-    ctx.fillStyle='rgba(226,250,229,.12)';roundedRect(-3,capY+2,w+6,Math.min(2.5,capH*.16),1);ctx.fill();
-    ctx.fillStyle='rgba(4,23,20,.12)';roundedRect(-3,capY+capH-3,w+6,2,1);ctx.fill();
+    ctx.shadowColor='rgba(3,15,19,.23)';ctx.shadowBlur=3;ctx.shadowOffsetX=1;
+    ctx.fillStyle=style.body;roundedRect(0,0,w,h,5);ctx.fill();
+    ctx.shadowBlur=0;ctx.shadowOffsetX=0;
+    ctx.save();roundedRect(0,0,w,h,5);ctx.clip();
+    // Hand-cut masonry courses: sparse, low-contrast, deterministic texture.
+    for(var row=18;row<h;row+=34){
+      var rowIdx=Math.floor(row/34),shift=Math.sin(rowIdx*13.13+3.1)*w*.18;
+      ctx.strokeStyle=warm?'rgba(42,49,40,.24)':'rgba(12,30,43,.27)';
+      ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(2,row);ctx.lineTo(w-2,row+Math.sin(rowIdx*1.7)*1.5);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(w*.5+shift,row-32);ctx.lineTo(w*.49+shift,row-2);ctx.stroke();
+      ctx.strokeStyle=warm?'rgba(231,219,183,.16)':'rgba(201,219,230,.14)';
+      ctx.lineWidth=.8;ctx.beginPath();ctx.moveTo(3,row+2);ctx.lineTo(w-3,row+2);ctx.stroke();
+      // Weathered diagonal hairline cracks that never protrude from the obstacle.
+      if(rowIdx%3===1){
+        ctx.strokeStyle=warm?'rgba(48,52,43,.33)':'rgba(21,37,49,.34)';
+        ctx.beginPath();ctx.moveTo(w*.72,row-24);ctx.lineTo(w*.68,row-14);
+        ctx.lineTo(w*.77,row-8);ctx.stroke();
+      }
+    }
+    ctx.fillStyle=warm?'rgba(183,197,122,.20)':'rgba(87,139,133,.18)';
+    for(var k=0;k<Math.ceil(h/67);k++){
+      var px=(Math.sin(k*13.1+2)*.5+.5)*w*.54;
+      var py=k*67+10;
+      ctx.beginPath();ctx.ellipse(px,py,w*.11,4.1,-.2,0,Math.PI*2);ctx.fill();
+    }
+    // Pseudo-volume on left and right edges.
+    ctx.fillStyle=warm?'rgba(244,227,184,.11)':'rgba(221,237,250,.11)';
+    ctx.fillRect(w*.09,1,Math.max(1,w*.06),Math.max(0,h-2));
+    ctx.fillStyle='rgba(6,20,27,.19)';
+    ctx.fillRect(w*.88,1,w*.12,Math.max(0,h-2));
+    ctx.restore();
+    // Within-width end cap keeps optical edge aligned with the existing hitbox.
+    ctx.fillStyle=style.cap;roundedRect(0,capY,w,capH,6);ctx.fill();
+    ctx.fillStyle=warm?'rgba(253,228,175,.26)':'rgba(207,231,245,.24)';
+    roundedRect(2,capY+2,w-4,Math.min(3,capH*.16),1.4);ctx.fill();
+    ctx.fillStyle='rgba(15,25,28,.29)';
+    roundedRect(1,capY+capH-4,w-2,3,1);ctx.fill();
+    ctx.strokeStyle=warm?'rgba(62,66,52,.45)':'rgba(24,43,57,.50)';
+    ctx.lineWidth=.8;ctx.beginPath();ctx.moveTo(w*.3,capY+5);ctx.lineTo(w*.33,capY+capH-5);
+    ctx.moveTo(w*.68,capY+6);ctx.lineTo(w*.69,capY+capH-5);ctx.stroke();
     ctx.restore();
   }
-
+  
   function drawPipes(){
     var pw=pipeWidth();
     for(var i=0;i<pipes.length;i++){
@@ -994,10 +1034,11 @@
     var r=birdRadius(),skin=BIRD_SKINS[birdSkin];
     var t=bird.flapAge;
     // The same four stages (rest/up/down/glide) drive both character skins.
-    var flap=t<.075?t/.075:t<.30?1-(t-.075)/.225:0;
-    var idle=state==='ready'&&!reduceMotion?Math.sin((now||0)*.005)*.12:0;
-    var falling=state==='falling'? .13 : clamp(bird.vy/(H*3),0,.11);
-    var wingAngle=-.07-flap*.86+idle+falling;
+    // Fast power stroke, slower recovery and quiet glide; not a sine-wave fan.
+    var flap=t<.065?t/.065:t<.18?1-(t-.065)/.115:t<.35?-.27*Math.sin((t-.18)/.17*Math.PI):0;
+    var idle=state==='ready'&&!reduceMotion?Math.sin((now||0)*.005)*.065:0;
+    var falling=state==='falling'?.20:clamp(bird.vy/(H*2),0,.15);
+    var wingAngle=-.09-flap*.93+idle+falling;
     ctx.save();
     ctx.translate(bird.x,bird.y);
     ctx.rotate(bird.rot);
@@ -1018,6 +1059,15 @@
     ctx.closePath();ctx.fill();
     ctx.strokeStyle=skin.featherShade;ctx.lineWidth=Math.max(.55,r*.038);
     ctx.beginPath();ctx.moveTo(-r*.12,-r*.04);ctx.quadraticCurveTo(-r*.52,-r*.09,-r*.73,-r*.24);ctx.stroke();
+    ctx.restore();
+
+    // Far wing moves behind the torso, giving the silhouette bilateral depth.
+    ctx.save();ctx.translate(-r*.31,-r*.23);ctx.rotate(wingAngle*.74-.15);
+    ctx.fillStyle=skin.featherShade;ctx.beginPath();ctx.moveTo(-r*.24,-r*.05);
+    ctx.bezierCurveTo(-r*.04,-r*.75,r*.41,-r*.87,r*.67,-r*.42);
+    ctx.quadraticCurveTo(r*.30,-r*.20,-r*.22,r*.29);ctx.closePath();ctx.fill();
+    ctx.strokeStyle=skin.wingHi;ctx.globalAlpha=.36;ctx.lineWidth=Math.max(.6,r*.032);
+    ctx.beginPath();ctx.moveTo(-r*.08,-r*.12);ctx.quadraticCurveTo(r*.12,-r*.52,r*.50,-r*.45);ctx.stroke();
     ctx.restore();
 
     // Silhouette: continuous tear-drop torso, subtly fuller in front, not a round sticker.
@@ -1101,6 +1151,15 @@
     ctx.quadraticCurveTo(r*.21,-r*.02,r*.43,-r*.14);ctx.stroke();
     ctx.restore();
 
+    // Overlapping coverts and tapered primaries define a real layered wing structure.
+    ctx.save();ctx.translate(-r*.24,-r*.035);ctx.rotate(wingAngle);
+    ctx.strokeStyle=skin.featherShade;ctx.lineWidth=Math.max(.45,r*.027);ctx.globalAlpha=.48;
+    for(var f=0;f<4;f++){
+      var u=f/4;
+      ctx.beginPath();ctx.moveTo(-r*.19+u*r*.15,r*(-.03+u*.07));
+      ctx.quadraticCurveTo(r*(.13+u*.13),r*(.14+u*.05),r*(.37+u*.07),r*(.25+u*.065));ctx.stroke();
+    }
+    ctx.globalAlpha=1;ctx.restore();
     // Tiny dark, bright-eyed expression; iris remains restrained at mobile scale.
     ctx.fillStyle=skin.eyering;ctx.beginPath();
     ctx.ellipse(r*.67,-r*.38,r*.188,r*.176,-.18,0,Math.PI*2);ctx.fill();
@@ -1110,6 +1169,10 @@
     ctx.arc(r*.702,-r*.389,r*.115,0,Math.PI*2);ctx.fill();
     ctx.fillStyle='#fffaf3';ctx.beginPath();
     ctx.arc(r*.737,-r*.438,r*.037,0,Math.PI*2);ctx.fill();
+    // Restrained upper eyelid and second micro-highlight for eye depth.
+    ctx.strokeStyle=skin.eyering;ctx.lineWidth=Math.max(.6,r*.038);
+    ctx.beginPath();ctx.arc(r*.686,-r*.393,r*.158,Math.PI*1.1,Math.PI*1.89);ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,.55)';ctx.beginPath();ctx.arc(r*.668,-r*.423,r*.015,0,Math.PI*2);ctx.fill();
 
     // Short, tapered beak: within the existing visual silhouette / game hit radius.
     ctx.fillStyle=skin.beak;ctx.beginPath();
