@@ -1,0 +1,23 @@
+{
+  "version": 3,
+  "type": "transparent-vector-sprite-atlas",
+  "columns": 6,
+  "rows": 4,
+  "frames": 24,
+  "cell": {
+    "width": 240,
+    "height": 240
+  },
+  "atlas": {
+    "width": 1440,
+    "height": 960
+  },
+  "phaseSeconds": 0.42,
+  "rendering": "canvas-drawImage",
+  "artDirection": "consistent shared rig, stylized feather detail; not photographic generated bitmap",
+  "skins": {
+    "warm": "warm-flight.svg",
+    "slate": "slate-flight.svg"
+  },
+  "fallback": "built-in Canvas bird"
+}

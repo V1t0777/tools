@@ -81,6 +81,8 @@ required_paths=(
   dist-secure/night-shift/index.html
   dist-secure/admin-night-shift/index.html
   dist-secure/flappy/index.html
+  dist-secure/flappy/assets/v3/warm-flight.svg
+  dist-secure/flappy/assets/v3/slate-flight.svg
   dist-secure/stack/index.html
   dist-secure/pictionary/index.html
   dist-secure/pictionary/app.js
