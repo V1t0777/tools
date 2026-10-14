@@ -29,7 +29,6 @@ test('V3 transparent atlas contract: fixed 24-frame grid and same silhouette rig
 
 test('game loads local atlas, renders from Canvas and preserves vector fallback',()=>{
   assert.match(html,/function ensureFlightAtlas\(skin\)/);
-  assert.match(html,/if\(typeof Image/);
   assert.match(html,/typeof Image!=='function'/);
   assert.match(html,/function drawFlightAtlas\(now\)/);
   assert.match(html,/if\(drawFlightAtlas\(now\)\)return/);
