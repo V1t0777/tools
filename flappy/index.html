@@ -350,6 +350,44 @@
   };
 
   var skyCache=null,skyCacheKey='',cloudSprite=null,pipeMaterials=null;
+  // V3: transparent, same-rig 24-frame animation atlases. Fail closed to the tested
+  // Canvas bird if the browser cannot load or decode the external art assets.
+  var flightAtlases={warm:null,slate:null};
+  var ATLAS_FRAME=240,ATLAS_COLS=6,ATLAS_COUNT=24;
+  function ensureFlightAtlas(skin){
+    if(flightAtlases[skin]||typeof Image!=='function')return;
+    var entry={ready:false,failed:false,image:null};
+    flightAtlases[skin]=entry;
+    var sprite=new Image();
+    entry.image=sprite;
+    sprite.onload=function(){
+      entry.ready=sprite.naturalWidth===1440&&sprite.naturalHeight===960;
+      entry.failed=!entry.ready;
+    };
+    sprite.onerror=function(){entry.failed=true;};
+    sprite.src='./assets/v3/'+skin+'-flight.svg';
+  }
+  function drawFlightAtlas(now){
+    var atlas=flightAtlases[birdSkin];
+    if(!atlas||!atlas.ready)return false;
+    var phase=bird.flapAge;
+    var index;
+    if(state==='ready'||state==='paused'||state==='over')index=0;
+    else if(phase<.42)index=Math.min(ATLAS_COUNT-1,Math.floor(phase/.42*ATLAS_COUNT));
+    else index=2; // Wings settle into a raised, low-drag glide pose.
+    var r=birdRadius(),scale=r*4.04;
+    ctx.save();
+    ctx.translate(bird.x,bird.y);
+    ctx.rotate(bird.rot);
+    var stretch=state==='running'?clamp(bird.vy/(H*.92),0,.03):0;
+    ctx.scale(1+bird.squash*.30-stretch*.30,1-bird.squash*.36+stretch);
+    ctx.drawImage(atlas.image,
+      (index%ATLAS_COLS)*ATLAS_FRAME,Math.floor(index/ATLAS_COLS)*ATLAS_FRAME,
+      ATLAS_FRAME,ATLAS_FRAME,
+      -scale*.50,-scale*.525,scale,scale);
+    ctx.restore();
+    return true;
+  }
   var skies={
     warm:{top:'#729bb7',mid:'#b4bbc2',bottom:'#efc49c',glow:'rgba(255,221,166,.38)',ridgeFar:'#9aaab5',ridgeMid:'#77959c',ridgeNear:'#426c65',ridgeFront:'#2d5550',forest:'#294b42',fog:'rgba(255,239,218,.19)',ground:'#243f34',edge:'#e0c18a'},
     slate:{top:'#172b50',mid:'#52617f',bottom:'#a08099',glow:'rgba(204,215,241,.20)',ridgeFar:'#667991',ridgeMid:'#405c75',ridgeNear:'#233f57',ridgeFront:'#183347',forest:'#102b3a',fog:'rgba(188,209,230,.14)',ground:'#1b3540',edge:'#9db9c9'}
@@ -611,6 +649,7 @@
     birdSkin=Math.random()<.5?'warm':'slate';
     if(document.body&&document.body.setAttribute)document.body.setAttribute('data-flight-skin',birdSkin);
     if(sceneLabel)sceneLabel.textContent=birdSkin==='warm'?'晨曦山谷 · 暖棕旅鸟':'暮蓝远山 · 板岩夜鸟';
+    ensureFlightAtlas(birdSkin);
     skyCache=null;skyCacheKey='';pipeMaterials=null;
   }
 
@@ -1031,6 +1070,7 @@
   }
 
   function drawBird(now){
+    if(drawFlightAtlas(now))return;
     var r=birdRadius(),skin=BIRD_SKINS[birdSkin];
     var t=bird.flapAge;
     // The same four stages (rest/up/down/glide) drive both character skins.
