@@ -197,6 +197,14 @@
       background:rgba(255,255,255,.08);color:#c9d0dc
     }
     .mode-badge.admin{background:rgba(132,177,255,.16);color:#bdd8ff}
+    .security-alert{
+      display:flex;align-items:flex-start;gap:10px;margin:-3px 0 14px;padding:12px 14px;
+      border:1px solid rgba(247,198,107,.25);border-radius:16px;
+      background:rgba(247,198,107,.09);color:#f4ddb0;
+      font-size:12px;line-height:1.65;
+    }
+    .security-alert-icon{flex:0 0 auto;font-size:16px;line-height:1.4}
+    .security-alert-message{min-width:0;overflow-wrap:anywhere}
 
     .today-card{
       padding:19px;border-radius:25px;
@@ -457,6 +465,11 @@
       <div id="modeBadge" class="mode-badge">只读</div>
     </div>
 
+    <div id="securityAlert" class="security-alert hidden" role="status" aria-live="polite">
+      <span class="security-alert-icon" aria-hidden="true">⚠️</span>
+      <span id="securityAlertText" class="security-alert-message"></span>
+    </div>
+
     <section class="today-card">
       <div class="today-label">今天</div>
       <div id="todayDate" class="today-date"></div>
@@ -609,6 +622,8 @@
   let myMemberId = null;
   let me = null;
   let isAdmin = false;
+  let enterAppPromise = null;
+  let securityAlertVersion = 0;
   let members = [];
   let staff = [];
   let types = [];
@@ -689,6 +704,7 @@
   }
 
   function showLogin() {
+    clearSecurityAlert();
     $("loginPage").classList.remove("hidden");
     $("deniedPage").classList.add("hidden");
     $("appPage").classList.add("hidden");
@@ -701,6 +717,7 @@
   }
 
   function showDenied() {
+    clearSecurityAlert();
     $("loginPage").classList.add("hidden");
     $("appPage").classList.add("hidden");
     $("deniedPage").classList.remove("hidden");
@@ -746,7 +763,38 @@
     }
   }
 
-  async function enterApp() {
+  // Coalesce simultaneous entry from session restore and the login form.
+  function enterApp() {
+    if (enterAppPromise) return enterAppPromise;
+    enterAppPromise = enterAppInternal().finally(() => { enterAppPromise = null; });
+    return enterAppPromise;
+  }
+
+  // Construct user-facing text from known alert kinds only; never echo raw provider data.
+  function formatSecurityAlert(alerts) {
+    if (!Array.isArray(alerts) || !alerts.length) return "";
+    const kinds = new Set(alerts.map(item => item?.type));
+    const labels = [
+      kinds.has("NEW_NETWORK") ? "新的网络环境" : null,
+      kinds.has("NEW_BROWSER") ? "新的浏览器环境" : null
+    ].filter(Boolean);
+    if (!labels.length) return "";
+    return "安全提醒：近期发现" + labels.join("及") +
+      "登录。如非本人操作，请尽快更改密码并退出其他设备。";
+  }
+
+  function displaySecurityAlert(alerts) {
+    const message = formatSecurityAlert(alerts);
+    $("securityAlertText").textContent = message;
+    $("securityAlert").classList.toggle("hidden", !message);
+  }
+
+  function clearSecurityAlert() {
+    securityAlertVersion++;
+    displaySecurityAlert([]);
+  }
+
+  async function enterAppInternal() {
     const {data:allowed,error:accessError} =
       await db.rpc("can_access_department_roster");
 
@@ -793,13 +841,13 @@
     populateStaffFilter();
     renderSubToolbar();
     showApp();
-    // Display a privacy-minimized alert; no raw IP, device fingerprint or email is returned.
-    db.rpc('toolbox_login_security_alerts').then(({data,error})=>{
-      if(error||!Array.isArray(data)||!data.length)return;
-      const kinds=new Set(data.map(e=>e.type));
-      const labels=[kinds.has('NEW_NETWORK')?'新的网络环境':null,kinds.has('NEW_BROWSER')?'新的浏览器环境':null].filter(Boolean);
-      $('modeText').textContent+=' · 安全提醒：近期发现'+labels.join('及')+'登录。如非本人操作，请尽快更改密码并退出其他设备。';
-    }).catch(()=>{});
+    clearSecurityAlert();
+    const alertVersion = securityAlertVersion;
+    // Preserve real alerts without duplicating text; ignore stale callbacks on logout.
+    db.rpc("toolbox_login_security_alerts").then(({data,error}) => {
+      if (alertVersion !== securityAlertVersion || error) return;
+      displaySecurityAlert(data);
+    }).catch(() => {});
 
     await Promise.all([
       loadMonth(),
