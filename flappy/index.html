@@ -370,9 +370,8 @@
   function drawFlightAtlas(now){
     var atlas=flightAtlases[birdSkin];
     if(!atlas||!atlas.ready)return false;
-    var phase=bird.flapAge;
     var index;
-    if(state==='ready'||state==='paused'||state==='over')index=0;
+    if(state==='ready'||state==='over')index=0;
     else if(bird.wingActive)index=Math.min(ATLAS_COUNT-1,Math.floor(bird.wingPhase*ATLAS_COUNT));
     else index=0; // Neutral wings: the final and first atlas frames are continuous.
     var r=birdRadius(),scale=r*4.04;
@@ -769,7 +768,8 @@
 
     bird.vy=Math.min(H*.96,bird.vy+H*2.45*dt);
     bird.y+=bird.vy*dt;
-    var targetRot=bird.vy<0?-0.38:clamp(bird.vy/(H*.78),0,1)*1.24;
+    // Restrained pitch for small-songbird flight; collision tumble remains separate.
+    var targetRot=bird.vy<0?-.30:clamp(bird.vy/(H*.84),0,1)*.62;
     bird.rot+=(targetRot-bird.rot)*Math.min(1,dt*8.5);
     bird.wing=Math.max(0,bird.wing-dt*6.5);
     // Every flap traverses the 24-pose closed loop; rapid taps request the next
