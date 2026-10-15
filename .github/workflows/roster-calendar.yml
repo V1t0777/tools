@@ -4,12 +4,14 @@ on:
     paths:
       - "admin-night-shift/index.html"
       - "tests/roster-calendar.test.mjs"
+      - "tests/roster-security-alert.test.mjs"
       - ".github/workflows/roster-calendar.yml"
   push:
     branches: [main]
     paths:
       - "admin-night-shift/index.html"
       - "tests/roster-calendar.test.mjs"
+      - "tests/roster-security-alert.test.mjs"
       - ".github/workflows/roster-calendar.yml"
 permissions:
   contents: read
@@ -20,4 +22,4 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Run calendar regression tests
-        run: node --test tests/roster-calendar.test.mjs
+        run: node --test tests/roster-calendar.test.mjs tests/roster-security-alert.test.mjs
