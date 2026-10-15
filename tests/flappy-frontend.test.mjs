@@ -40,7 +40,7 @@ function setup({auth=true,fetchImpl=async()=>{throw new Error('offline');},stora
   const context={window,document,navigator:{},localStorage,performance:{now:()=>1000},
     requestAnimationFrame(fn){if(render)rafQueue.push(fn);},setTimeout,clearTimeout,AbortController,fetch:fetchImpl,Intl,console};
   // Test-only closure access, not shipped in the game.
-  const instrumented=source.replace('  loadBest();loadPendingBest();restorePendingRuns();resetGame(true);',`  window.testApi={startGame,finishGame,openLeaderboard,closeLeaderboard,sendRun,submitOnlineRun,refreshLeaderboard,retryPendingSubmission,get active(){return activeRun;},get state(){return state;},get best(){return best;},get pendingBest(){return pendingBest;},set score(value){score=value;},drawBirdForSkin(value){birdSkin=value;drawBird(1000);},birdRadiusForTest(){return birdRadius();},skinName(value){return BIRD_SKINS[value].name;}};\n  loadBest();loadPendingBest();restorePendingRuns();resetGame(true);`);
+  const instrumented=source.replace('  loadBest();loadPendingBest();restorePendingRuns();resetGame(true);',`  window.testApi={startGame,finishGame,openLeaderboard,closeLeaderboard,sendRun,submitOnlineRun,refreshLeaderboard,retryPendingSubmission,get active(){return activeRun;},get state(){return state;},get best(){return best;},get pendingBest(){return pendingBest;},set score(value){score=value;},drawBirdForSkin(value){birdSkin=value;drawBird(1000);},birdRadiusForTest(){return birdRadius();},skinName(value){return BIRD_SKINS[value].name;},flapForTest(){flap();},get wingPhase(){return bird.wingPhase;},get wingActive(){return bird.wingActive;},get wingQueued(){return bird.wingQueued;},get wingTempo(){return bird.wingTempo;},get vy(){return bird.vy;}};\n  loadBest();loadPendingBest();restorePendingRuns();resetGame(true);`);
   vm.runInNewContext(instrumented,context);
   return {api:window.testApi,e:element,events,authChange,session,storage,
     tick(t){const callback=rafQueue.shift();if(!callback)throw new Error('Missing RAF callback');callback(t);},
@@ -154,4 +154,35 @@ test('warm traveler and slate night bird render from one geometric rig',()=>{
   assert.equal(warm.length,slate.length,'both skins use the same drawing geometry');
   assert.equal(scene.api.birdRadiusForTest(),radius,'a different skin cannot change collision radius');
   assert.match(html,/每局随机遇见暖棕旅鸟或板岩夜鸟/);
+});
+
+test('V3.1 repeated taps keep wing angle phase continuous while physical lift is immediate',()=>{
+  const scene=setup({render:true});
+  scene.tick(1000);
+  scene.api.startGame();
+  assert.equal(scene.api.wingActive,true,'the start action begins the first stroke');
+  scene.tick(1016);
+  scene.tick(1032);
+  const phaseBefore=scene.api.wingPhase;
+  const vyBefore=scene.api.vy;
+  assert.ok(phaseBefore>0 && phaseBefore<1);
+  scene.api.flapForTest();
+  assert.equal(scene.api.wingPhase,phaseBefore,'rapid input may not snap the wing back to pose zero');
+  assert.equal(scene.api.wingQueued,true,'one further stroke is scheduled');
+  assert.ok(scene.api.vy<vyBefore,'the upward physics impulse is applied immediately');
+  scene.tick(1048);
+  assert.ok(scene.api.wingPhase>phaseBefore,'wing motion continues forward from its existing pose');
+});
+
+test('V3.1 queued strokes settle to neutral without a restart or permanent flapping',()=>{
+  const scene=setup({render:true});
+  scene.tick(1000);
+  scene.api.startGame();
+  scene.tick(1016);
+  scene.api.flapForTest();
+  let t=1016;
+  for(let n=0;n<51;n++){t+=16;scene.tick(t);}
+  assert.equal(scene.api.wingQueued,false);
+  assert.equal(scene.api.wingActive,false,'one queued stroke must settle to neutral');
+  assert.equal(scene.api.wingPhase,0,'neutral matches the first/last visual pose');
 });

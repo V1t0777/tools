@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": "3.1",
   "type": "transparent-vector-sprite-atlas",
   "columns": 6,
   "rows": 4,
@@ -12,12 +12,21 @@
     "width": 1440,
     "height": 960
   },
-  "phaseSeconds": 0.42,
+  "phaseSeconds": 0.36,
   "rendering": "canvas-drawImage",
   "artDirection": "consistent shared rig, stylized feather detail; not photographic generated bitmap",
   "skins": {
     "warm": "warm-flight.svg",
     "slate": "slate-flight.svg"
   },
-  "fallback": "built-in Canvas bird"
+  "fallback": "built-in Canvas bird",
+  "motion": {
+    "nearShoulderRangeDeg": 42,
+    "wristFlexRangeDeg": 15,
+    "phaseIsContinuousOnTap": true,
+    "queuedStrokeLimit": 1,
+    "frame0Neutral": true,
+    "closedLoop": true,
+    "description": "Twenty-four coordinated poses with distinct shoulder and feather-wrist motion; visual motion does not alter the game physics."
+  }
 }

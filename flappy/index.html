@@ -308,7 +308,7 @@
 
   var W=360,H=600,dpr=1,groundY=530;
   var state='ready';
-  var bird={x:110,y:285,vy:0,rot:0,wing:0,squash:0,flapAge:1,tailLag:0};
+  var bird={x:110,y:285,vy:0,rot:0,wing:0,squash:0,flapAge:1,tailLag:0,wingPhase:0,wingActive:false,wingQueued:false,wingTempo:0};
   var birdSkin='warm';
   var sceneLabel=document.getElementById('sceneLabel');
   var pipes=[];
@@ -370,11 +370,10 @@
   function drawFlightAtlas(now){
     var atlas=flightAtlases[birdSkin];
     if(!atlas||!atlas.ready)return false;
-    var phase=bird.flapAge;
     var index;
-    if(state==='ready'||state==='paused'||state==='over')index=0;
-    else if(phase<.42)index=Math.min(ATLAS_COUNT-1,Math.floor(phase/.42*ATLAS_COUNT));
-    else index=2; // Wings settle into a raised, low-drag glide pose.
+    if(state==='ready'||state==='over')index=0;
+    else if(bird.wingActive)index=Math.min(ATLAS_COUNT-1,Math.floor(bird.wingPhase*ATLAS_COUNT));
+    else index=0; // Neutral wings: the final and first atlas frames are continuous.
     var r=birdRadius(),scale=r*4.04;
     ctx.save();
     ctx.translate(bird.x,bird.y);
@@ -657,6 +656,7 @@
     if(rerollSkin)pickBirdSkin();
     pipes=[];score=0;newRecord=false;elapsed=0;scroll=0;prevGapY=null;hitSlowUntil=0;groundHitAt=0;
     bird.x=W*.28;bird.y=H*.45;bird.vy=0;bird.rot=0;bird.wing=0;bird.squash=0;bird.flapAge=1;bird.tailLag=0;
+    bird.wingPhase=0;bird.wingActive=false;bird.wingQueued=false;bird.wingTempo=0;
     scoreEl.textContent='0';scoreEl.classList.add('hidden');newBestEl.classList.remove('show');
     resultLayer.classList.remove('active','personal-best');pauseLayer.classList.remove('active');
     pauseBtn.disabled=true;pauseBtn.textContent='Ⅱ';pauseBtn.classList.remove('active');
@@ -682,7 +682,12 @@
     if(state!=='running')return;
     var flapPower=H*.69;
     bird.vy=Math.min(bird.vy,0)*.12-flapPower;
-    bird.wing=1;bird.flapAge=0;
+    // Input applies physics immediately. An already moving wing never jumps to frame zero:
+    // queue at most one new power stroke, preserving continuous joint motion.
+    if(!bird.wingActive){bird.wingPhase=0;bird.wingActive=true;bird.wingQueued=false;}
+    else bird.wingQueued=true;
+    bird.wingTempo=Math.min(1,bird.wingTempo+.40);
+    bird.wing=1;bird.flapAge=bird.wingActive?bird.wingPhase*.35:1;
     bird.squash=.08;
     tone(370,.052,'sine',.016,315);
     airy(1100,.006,.047);
@@ -763,10 +768,22 @@
 
     bird.vy=Math.min(H*.96,bird.vy+H*2.45*dt);
     bird.y+=bird.vy*dt;
-    var targetRot=bird.vy<0?-0.38:clamp(bird.vy/(H*.78),0,1)*1.24;
+    // Restrained pitch for small-songbird flight; collision tumble remains separate.
+    var targetRot=bird.vy<0?-.30:clamp(bird.vy/(H*.84),0,1)*.62;
     bird.rot+=(targetRot-bird.rot)*Math.min(1,dt*8.5);
     bird.wing=Math.max(0,bird.wing-dt*6.5);
-    bird.flapAge=Math.min(1,bird.flapAge+dt);
+    // Every flap traverses the 24-pose closed loop; rapid taps request the next
+    // stroke without discarding the current joint angles or changing flight forces.
+    if(bird.wingActive){
+      var strokePeriod=.36-.035*bird.wingTempo;
+      var nextPhase=bird.wingPhase+dt/strokePeriod;
+      if(nextPhase>=1){
+        if(bird.wingQueued){bird.wingPhase=nextPhase-1;bird.wingQueued=false;}
+        else{bird.wingPhase=0;bird.wingActive=false;}
+      }else bird.wingPhase=nextPhase;
+    }
+    bird.wingTempo=Math.max(0,bird.wingTempo-dt*1.5);
+    bird.flapAge=bird.wingActive?bird.wingPhase*.35:1;
     bird.tailLag+=(clamp(bird.vy/(H*.8),-.55,.8)-bird.tailLag)*Math.min(1,dt*7.5);
     bird.squash=Math.max(0,bird.squash-dt*5.5);
 
@@ -1078,7 +1095,7 @@
     var flap=t<.065?t/.065:t<.18?1-(t-.065)/.115:t<.35?-.27*Math.sin((t-.18)/.17*Math.PI):0;
     var idle=state==='ready'&&!reduceMotion?Math.sin((now||0)*.005)*.065:0;
     var falling=state==='falling'?.20:clamp(bird.vy/(H*2),0,.15);
-    var wingAngle=-.09-flap*.93+idle+falling;
+    var wingAngle=-.09-flap*.43+idle+falling; // Fallback Canvas rig uses restrained wing sweep.
     ctx.save();
     ctx.translate(bird.x,bird.y);
     ctx.rotate(bird.rot);
