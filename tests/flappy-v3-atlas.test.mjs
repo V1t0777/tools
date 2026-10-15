@@ -72,6 +72,6 @@ test('V3.1 visual phase is decoupled from click-triggered physics',()=>{
   assert.match(html,/if\(!bird\.wingActive\)\{bird\.wingPhase=0/);
   assert.match(html,/else bird\.wingQueued=true/);
   assert.match(html,/bird\.wingPhase=nextPhase-1;bird\.wingQueued=false/);
-  assert.match(html,/bird\.wingActive\?bird\.wingPhase\*ATLAS_COUNT/);
+  assert.match(html,/Math\.floor\(bird\.wingPhase\*ATLAS_COUNT\)/);
   assert.doesNotMatch(html,/bird\.wing=1;bird\.flapAge=0/,'old immediate reset would cause a frame snap');
 });
