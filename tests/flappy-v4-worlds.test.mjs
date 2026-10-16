@@ -130,3 +130,18 @@ test('V4 cinematic art pass keeps soft sky lighting and self-contained clipped f
    assert.ok(Buffer.byteLength(far,'utf8')<=20000,'keep detailed far layer lightweight');
  }
 });
+
+test('V4 near canopy brushwork and crest facets remain clipped, lightweight and separate per world',()=>{
+  for(const theme of ['warm','slate']){
+    const near=read('flappy/assets/v4/'+theme+'/near.svg');
+    const mid=read('flappy/assets/v4/'+theme+'/mid.svg');
+    const treeCount=(near.match(/data-art-pass="pine-boughs-v1"/g)||[]).length;
+    assert.ok(treeCount>=55&&treeCount<=65,'all '+theme+' canopy silhouettes get the independent bough pass');
+    assert.match(near,/id="forest-broken-watercolor-glaze" clip-path="url\(#clip-rock-near\)"/);
+    assert.match(mid,/id="mid-rock-watercolor-facets" clip-path="url\(#clip-rock-mid\)"/);
+    assert.ok((mid.match(/fill-opacity=/g)||[]).length>=10);
+    assert.ok(Buffer.byteLength(near,'utf8')<100_000,'near layer bytes must remain bounded');
+    assert.ok(Buffer.byteLength(mid,'utf8')<24_000,'mid layer bytes must remain bounded');
+    assert.doesNotMatch(near+mid,/<(?:filter|script|animate|foreignObject|image)\b/i);
+  }
+});
