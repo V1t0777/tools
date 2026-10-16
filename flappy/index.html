@@ -390,7 +390,9 @@
   function drawCinematicLayer(layer){
     var image=cinematicWorld.layers[layer.id];
     if(layer.id==='sky'){
-      ctx.drawImage(image,0,0,W,H);
+      // Crop at fixed aspect instead of stretching the sun into an ellipse on phones.
+      var sw=Math.min(1600,W*1000/H),sx=Math.max(0,Math.min(1600-sw,1170-sw*.74));
+      ctx.drawImage(image,sx,0,sw,1000,0,0,W,H);
       return;
     }
     // Each art strip is designed to repeat at identical left/right boundaries.
