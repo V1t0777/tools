@@ -1,0 +1,94 @@
+name: Flappy V4 visual evidence (draft only)
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'flappy/**'
+      - '.github/workflows/flappy-v4-art-qa.yml'
+permissions:
+  contents: read
+jobs:
+  screenshot-draft:
+    # Generate reproducible evidence, never deploy or publish.
+    if: github.event.pull_request.draft && github.event.pull_request.number == 57
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout without saved credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify original V4 art exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          for theme in warm slate; do
+            for layer in sky far mid mist near; do
+              test -s "flappy/assets/v4/$theme/$layer.svg"
+            done
+          done
+          test -s flappy/review-v4.html
+      - name: Render responsive draft evidence with installed headless Chrome
+        shell: bash
+        run: |
+          set -euo pipefail
+          if command -v google-chrome >/dev/null; then
+            CHROME="$(command -v google-chrome)"
+          elif command -v chromium >/dev/null; then
+            CHROME="$(command -v chromium)"
+          else
+            echo "Neither Chrome nor Chromium is present on this runner." >&2
+            exit 1
+          fi
+          mkdir -p v4-art-qa
+          python3 -m http.server 8765 --bind 127.0.0.1 >v4-art-qa/server.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          python3 - <<'PY'
+          import time
+          import urllib.request
+          url="http://127.0.0.1:8765/flappy/review-v4.html"
+          for attempt in range(30):
+              try:
+                  with urllib.request.urlopen(url,timeout=1) as response:
+                      if response.status==200:
+                          break
+              except Exception:
+                  time.sleep(.3)
+          else:
+              raise SystemExit("local visual review server did not start")
+          PY
+          for theme in warm slate; do
+            for shape in "360 600" "390 844" "420 740" "320 568"; do
+              read -r W H <<<"$shape"
+              png="v4-art-qa/$theme-$W"x"$H.png"
+              "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+                --hide-scrollbars --force-device-scale-factor=1 \
+                --virtual-time-budget=2500 --window-size="$W,$H" \
+                "--screenshot=$png" \
+                "http://127.0.0.1:8765/flappy/review-v4.html#$theme" \
+                >/dev/null 2>v4-art-qa/chrome.log
+              test -s "$png"
+            done
+          done
+          python3 - <<'PY'
+          from pathlib import Path
+          import struct
+          for path in sorted(Path("v4-art-qa").glob("*.png")):
+              b=path.read_bytes()
+              if len(b)<2500 or b[:8]!=b"\x89PNG\r\n\x1a\n":
+                  raise SystemExit(f"Blank/invalid browser screenshot: {path}")
+              width,height=struct.unpack(">II",b[16:24])
+              if width<300 or height<500:
+                  raise SystemExit(f"Unexpected screenshot size: {path} {width}x{height}")
+              print(f"{path}: {width}x{height}, {len(b)} bytes")
+          if len(list(Path("v4-art-qa").glob("*.png")))!=8:
+              raise SystemExit("Expected exactly 8 world/viewport screenshots")
+          PY
+      - name: Keep screenshots as review artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: flappy-v4-draft-visual-pr57
+          path: v4-art-qa/*.png
+          retention-days: 7
+          if-no-files-found: error
