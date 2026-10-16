@@ -19,6 +19,8 @@ cp flappy/assets/v3/warm-flight.svg flappy/assets/v3/slate-flight.svg "$OUT/flap
 # V4 Alpha 1 original, self-contained cinematic art sample (no third-party URLs).
 mkdir -p "$OUT/flappy/assets/v4/warm"
 cp flappy/assets/v4/warm/{sky,far,mid,mist,near}.svg "$OUT/flappy/assets/v4/warm/"
+mkdir -p "$OUT/flappy/assets/v4/slate"
+cp flappy/assets/v4/slate/{sky,far,mid,mist,near}.svg "$OUT/flappy/assets/v4/slate/"
 
 cp games/index.html "$OUT/games/"
 cp stack/index.html "$OUT/stack/"
