@@ -366,7 +366,9 @@ test('V4 choosing another theme releases the old decoded world; stale decode can
   assert.equal(scene.api.worldLayerCountForTest('warm'),0);
   assert.equal(scene.api.cinematicSession,null);
   assert.ok(warm.every(img=>img.onload===null&&img.onerror===null),'old image handlers detached');
-  const slate=scene.imageObjects().filter(img=>img.src.includes('/v4/slate/'));
+  // The fixture intentionally retains historical fake images; only the latest five belong to the active world.
+  const slate=scene.imageObjects().filter(img=>img.src.includes('/v4/slate/')).slice(-5);
+  assert.equal(scene.api.worldLayerCountForTest('slate'),5);
   assert.equal(slate.length,5);
   slate.forEach(img=>img.onload());
   slate.forEach(img=>img.resolveDecode());await flush();
