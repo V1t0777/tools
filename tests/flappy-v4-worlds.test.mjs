@@ -110,3 +110,23 @@ test('V4 atmosphere animation stays behind pipes and does not affect physical or
   assert.match(html,/drawGround\(\);/);
   assert.match(html,/function collides\(\)/);
 });
+
+test('V4 cinematic art pass keeps soft sky lighting and self-contained clipped far-mountain textures',()=>{
+ for(const skin of ['warm','slate']){
+   const sky=read('flappy/assets/v4/'+skin+'/sky.svg');
+   const far=read('flappy/assets/v4/'+skin+'/far.svg');
+   assert.match(sky,/<g id="sky-painterly-cloud-banks"/);
+   assert.match(sky,/id="scattered-wisps"/);
+   assert.match(sky,/<g id="diffused-(?:sunlight|moonlight)"/);
+   const bank=sky.match(/<g id="sky-painterly-cloud-banks"[^>]*>([\s\S]*?)<\/g>/)?.[1];
+   assert.ok(bank,'missing separate high-altitude cloud group');
+   assert.equal((bank.match(/<path\b/g)||[]).length,16);
+   assert.match(far,/<clipPath id="far-terrain-clip">/);
+   assert.match(far,/<g id="far-rock-surface" clip-path="url\(#far-terrain-clip\)"/);
+   assert.ok((far.match(/stroke-opacity=/g)||[]).length>=110);
+   assert.doesNotMatch(sky+far,/<(?:script|animate|filter|foreignObject|image)\b/i);
+   assert.doesNotMatch(sky+far,/\b(?:href|src)\s*=\s*["']https?:/i);
+   assert.ok(Buffer.byteLength(sky,'utf8')<=6500,'keep per-scene sky render size bounded');
+   assert.ok(Buffer.byteLength(far,'utf8')<=20000,'keep detailed far layer lightweight');
+ }
+});
