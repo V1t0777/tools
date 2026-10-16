@@ -360,60 +360,70 @@
     {id:'mist',speed:.19},
     {id:'near',speed:.28}
   ];
-  var cinematicWorld={status:'idle',layers:{},remaining:0};
-  var cinematicSession=false;
-  function preloadCinematicWarm(){
-    if(cinematicWorld.status!=='idle'||typeof Image!=='function')return;
-    cinematicWorld.status='loading';
-    cinematicWorld.remaining=CINEMATIC_LAYERS.length;
+  var cinematicWorlds={
+    warm:{status:'idle',layers:{},remaining:0},
+    slate:{status:'idle',layers:{},remaining:0}
+  };
+  // A round selects its visual presentation exactly once, before play starts.
+  // A late asset completion must never swap the scenery mid-flight.
+  var cinematicSession=null;
+  function preloadCinematicWorld(skin){
+    var world=cinematicWorlds[skin];
+    if(!world||world.status!=='idle'||typeof Image!=='function')return;
+    world.status='loading';
+    world.remaining=CINEMATIC_LAYERS.length;
     for(var i=0;i<CINEMATIC_LAYERS.length;i++){
       (function(id){
         var picture=new Image();
-        cinematicWorld.layers[id]=picture;
+        world.layers[id]=picture;
         picture.onload=function(){
-          if(cinematicWorld.status!=='loading')return;
+          if(world.status!=='loading')return;
           if(picture.naturalWidth!==1600||picture.naturalHeight!==1000){
-            cinematicWorld.status='failed';
+            world.status='failed';
+            if(cinematicSession===skin)cinematicSession=null;
             return;
           }
-          cinematicWorld.remaining--;
-          if(cinematicWorld.remaining===0){
-            cinematicWorld.status='ready';
-            if(state==='ready'&&birdSkin==='warm')cinematicSession=true;
+          world.remaining--;
+          if(world.remaining===0){
+            world.status='ready';
+            if(state==='ready'&&birdSkin===skin)cinematicSession=skin;
           }
         };
-        picture.onerror=function(){cinematicWorld.status='failed';cinematicSession=false;};
-        picture.src='./assets/v4/warm/'+id+'.svg';
+        picture.onerror=function(){
+          world.status='failed';
+          if(cinematicSession===skin)cinematicSession=null;
+        };
+        picture.src='./assets/v4/'+skin+'/'+id+'.svg';
       })(CINEMATIC_LAYERS[i].id);
     }
   }
-  function drawCinematicLayer(layer){
-    var image=cinematicWorld.layers[layer.id];
+  function drawCinematicLayer(layer,world){
+    var image=world.layers[layer.id];
     if(layer.id==='sky'){
-      // Crop at fixed aspect instead of stretching the sun into an ellipse on phones.
-      var sw=Math.min(1600,W*1000/H),sx=Math.max(0,Math.min(1600-sw,1170-sw*.74));
+      // Keep the sun and moon circular on narrow screens; crop instead of stretching.
+      var sw=Math.min(1600,W*1000/H),anchor=birdSkin==='warm'?1170:1230;
+      var sx=Math.max(0,Math.min(1600-sw,anchor-sw*.74));
       ctx.drawImage(image,sx,0,sw,1000,0,0,W,H);
       return;
     }
-    // Each art strip is designed to repeat at identical left/right boundaries.
     var tileWidth=H*1.6;
     var dx=((scroll*layer.speed)%tileWidth+tileWidth)%tileWidth;
     for(var x=-dx;x<W;x+=tileWidth)ctx.drawImage(image,x,0,tileWidth,H);
   }
-  function drawCinematicWarm(){
-    if(birdSkin!=='warm'||!cinematicSession||cinematicWorld.status!=='ready')return false;
+  function drawCinematicWorld(){
+    var world=cinematicWorlds[birdSkin];
+    if(cinematicSession!==birdSkin||!world||world.status!=='ready')return false;
     try{
-      drawCinematicLayer(CINEMATIC_LAYERS[0]);
-      drawClouds(); // existing low-frequency clouds preserve gentle live parallax
-      drawCinematicLayer(CINEMATIC_LAYERS[1]);
-      drawCinematicLayer(CINEMATIC_LAYERS[2]);
-      if(!reduceMotion)drawCinematicLayer(CINEMATIC_LAYERS[3]);
-      drawCinematicLayer(CINEMATIC_LAYERS[4]);
+      drawCinematicLayer(CINEMATIC_LAYERS[0],world);
+      drawClouds();
+      drawCinematicLayer(CINEMATIC_LAYERS[1],world);
+      drawCinematicLayer(CINEMATIC_LAYERS[2],world);
+      if(!reduceMotion)drawCinematicLayer(CINEMATIC_LAYERS[3],world);
+      drawCinematicLayer(CINEMATIC_LAYERS[4],world);
       return true;
     }catch(error){
-      // Never show a mixed world or blank screen when a browser rejects a layer.
-      cinematicWorld.status='failed';
-      cinematicSession=false;
+      world.status='failed';
+      cinematicSession=null;
       return false;
     }
   }
@@ -716,7 +726,7 @@
     if(document.body&&document.body.setAttribute)document.body.setAttribute('data-flight-skin',birdSkin);
     if(sceneLabel)sceneLabel.textContent=birdSkin==='warm'?'晨曦山谷 · 暖棕旅鸟':'暮蓝远山 · 板岩夜鸟';
     ensureFlightAtlas(birdSkin);
-    if(birdSkin==='warm')preloadCinematicWarm();
+    preloadCinematicWorld(birdSkin);
     skyCache=null;skyCacheKey='';pipeMaterials=null;
   }
 
@@ -725,7 +735,7 @@
     pipes=[];score=0;newRecord=false;elapsed=0;scroll=0;prevGapY=null;hitSlowUntil=0;groundHitAt=0;
     bird.x=W*.28;bird.y=H*.45;bird.vy=0;bird.rot=0;bird.wing=0;bird.squash=0;bird.flapAge=1;bird.tailLag=0;
     bird.wingPhase=0;bird.wingActive=false;bird.wingQueued=false;bird.wingTempo=0;
-    cinematicSession=birdSkin==='warm'&&cinematicWorld.status==='ready';
+    cinematicSession=cinematicWorlds[birdSkin].status==='ready'?birdSkin:null;
     scoreEl.textContent='0';scoreEl.classList.add('hidden');newBestEl.classList.remove('show');
     resultLayer.classList.remove('active','personal-best');pauseLayer.classList.remove('active');
     pauseBtn.disabled=true;pauseBtn.textContent='Ⅱ';pauseBtn.classList.remove('active');
@@ -915,7 +925,7 @@
     if(state==='falling'&&now<hitSlowUntil&&!reduceMotion){
       var force=clamp((hitSlowUntil-now)/250,0,1);ctx.translate(Math.sin(now*.095)*1.6*force,Math.cos(now*.073)*.8*force);
     }
-    if(!drawCinematicWarm()){
+    if(!drawCinematicWorld()){
       drawBackground();
       drawClouds();
       drawRidges();
