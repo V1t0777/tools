@@ -44,5 +44,5 @@ test('V4 QA is preview-only and explicitly blocked from final release',()=>{
 test('V4 scenery renderer hides floating point tiling gaps on high-DPR displays',()=>{
   assert.match(game,/var overlap=\.75\/dpr/);
   assert.match(game,/tileWidth\+overlap,H/);
-  assert.match(game,/var dx=\(\(scroll\*layer\.speed\)\%tileWidth\+tileWidth\)\%tileWidth/);
+  assert.match(game,/var dx=\(\(scroll\*layer\.speed\+\(drift\|\|0\)\)\%tileWidth\+tileWidth\)\%tileWidth/);
 });
