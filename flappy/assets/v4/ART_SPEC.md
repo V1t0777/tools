@@ -75,7 +75,7 @@ Asset coordinate system: `viewBox="0 0 1600 1000"`. For each parallax image, dra
 - **Important art gate:** these remain handcrafted SVG technical layers. Texture-rich final painted art, visual browser captures, seam/contrast inspection and actual iPhone/Android testing are not yet complete. Draft PR stays unmerged.
 
 ## 2026-10-17 art-review preview infrastructure (temporary)
-- A draft-only `flappy/review-v4.html` page displays both authentic scene layer stacks in parallel. It provides four mobile crop dimensions, slider-controlled seam offset, optional automated scrolling, bird-and-column readability proxies and fog toggling.
+- A draft-only `flappy/review-v4.html` page shows both original scene layer stacks side by side. This security-minimal **script-free static art review** offers four crop dimensions, bird/stone-column readability proxies and a fog visibility toggle. Animated parallax and loop seams must be checked separately in the branch-preview game.
 - This page is **not** a game release or a substitute for actual game screenshots. The stone pillars are simple silhouettes for contrast comparison; game collision is untouched.
 - Alpha QA checks include matching horizon elevations, both-world asset readiness, independent world failure recovery, and high-DPR fractional tile overlap to avoid thin raster seams.
 - **MANDATORY REMOVAL BEFORE PRODUCTION:** remove `flappy/review-v4.html`, its copy command from `cloudflare-secure/build.sh`, the `dist-secure/flappy/review-v4.html` assertion in `scripts/security-check.sh`, and development-only QA test `tests/flappy-v4-review.test.mjs` (or rewrite tests for final permitted art routes).
