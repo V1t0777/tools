@@ -367,6 +367,28 @@
   // A round selects its visual presentation exactly once, before play starts.
   // A late asset completion must never swap the scenery mid-flight.
   var cinematicSession=null;
+  // Limit retained decoded scene textures to the currently selected world.
+  // 5 x 1600 x 1000 RGBA may occupy ~30.5 MiB on the GPU per full world.
+  // Replace the old session object so late decode callbacks cannot resurrect it.
+  function releaseInactiveCinematicWorld(activeSkin){
+    var names=['warm','slate'];
+    for(var i=0;i<names.length;i++){
+      var skin=names[i];
+      if(skin===activeSkin)continue;
+      var old=cinematicWorlds[skin];
+      if(old.status==='idle')continue;
+      old.status='evicted';
+      var keys=Object.keys(old.layers);
+      for(var j=0;j<keys.length;j++){
+        var image=old.layers[keys[j]];
+        if(image){image.onload=null;image.onerror=null;}
+      }
+      old.layers={};
+      old.remaining=0;
+      cinematicWorlds[skin]={status:'idle',layers:{},remaining:0};
+      if(cinematicSession===skin)cinematicSession=null;
+    }
+  }
   // Keep visual quality independent of obstacle speed, player inputs and scoring.
   // Memory hints are advisory; runtime downgrade is conservative and one-way.
   var deviceMemory=typeof navigator.deviceMemory==='number'?navigator.deviceMemory:8;
@@ -393,23 +415,37 @@
       (function(id){
         var picture=new Image();
         world.layers[id]=picture;
-        picture.onload=function(){
+        function failImage(){
           if(world.status!=='loading')return;
-          if(picture.naturalWidth!==1600||picture.naturalHeight!==1000){
-            world.status='failed';
-            if(cinematicSession===skin)cinematicSession=null;
-            return;
-          }
+          world.status='failed';
+          if(cinematicSession===skin)cinematicSession=null;
+        }
+        function markDecoded(){
+          // Image decode may settle after a world has been discarded or changed.
+          if(world.status!=='loading')return;
           world.remaining--;
           if(world.remaining===0){
             world.status='ready';
             if(state==='ready'&&birdSkin===skin)cinematicSession=skin;
           }
+        }
+        picture.onload=function(){
+          if(world.status!=='loading')return;
+          if(picture.naturalWidth!==1600||picture.naturalHeight!==1000){failImage();return;}
+          // onload may precede image decoding; avoid a first-frame SVG raster stall.
+          // Browsers without decode() use the tested legacy onload fallback.
+          if(typeof picture.decode==='function'){
+            try{
+              var pending=picture.decode();
+              if(pending&&typeof pending.then==='function'){
+                pending.then(markDecoded,failImage);
+                return;
+              }
+            }catch(error){failImage();return;}
+          }
+          markDecoded();
         };
-        picture.onerror=function(){
-          world.status='failed';
-          if(cinematicSession===skin)cinematicSession=null;
-        };
+        picture.onerror=failImage;
         picture.src='./assets/v4/'+skin+'/'+id+'.svg';
       })(CINEMATIC_LAYERS[i].id);
     }
@@ -753,7 +789,9 @@
   }
 
   function pickBirdSkin(){
-    birdSkin=Math.random()<.5?'warm':'slate';
+    var nextSkin=Math.random()<.5?'warm':'slate';
+    releaseInactiveCinematicWorld(nextSkin);
+    birdSkin=nextSkin;
     if(document.body&&document.body.setAttribute)document.body.setAttribute('data-flight-skin',birdSkin);
     if(sceneLabel)sceneLabel.textContent=birdSkin==='warm'?'晨曦山谷 · 暖棕旅鸟':'暮蓝远山 · 板岩夜鸟';
     ensureFlightAtlas(birdSkin);
