@@ -18,7 +18,7 @@ function extractGameScript(documentSource){
 }
 const source=extractGameScript(html);
 new vm.Script(source); // Syntax check independent of the DOM harness.
-function setup({auth=true,fetchImpl=async()=>{throw new Error('offline');},storage=new Map([['zhaoFlappyBest.v1','12']]),render=false,imageLoading=false}={}){
+function setup({auth=true,fetchImpl=async()=>{throw new Error('offline');},storage=new Map([['zhaoFlappyBest.v1','12']]),render=false,imageLoading=false,deviceMemory=8,saveData=false,reduceMotion=false}={}){
   const elements=new Map(),events={},rafQueue=[];let authChange,createdCanvases=0,drawImages=0;const paintedColors=[],drawnSources=[],imageObjects=[];
   const gradient={addColorStop(){}};
   const fakeCtx=new Proxy({createLinearGradient(){return gradient;},createRadialGradient(){return gradient;},drawImage(im){drawImages++;if(im&&im.src)drawnSources.push(im.src);}},
@@ -33,20 +33,20 @@ function setup({auth=true,fetchImpl=async()=>{throw new Error('offline');},stora
   }
   const session={user:{id:'u1'},access_token:'fake'};
   const toolbox={url:'https://example.test',key:'public',peekSession:()=>session,getSession:async()=>session,onAuthStateChange:fn=>{authChange=fn;},signIn:async()=>{},authMessage:e=>e.message};
-  const window={matchMedia:()=>({matches:false}),addEventListener(){},ToolboxAuth:auth?toolbox:undefined};
+  const window={matchMedia:()=>({matches:reduceMotion}),addEventListener(){},ToolboxAuth:auth?toolbox:undefined};
   const localStorage={getItem(key){return storage.has(key)?storage.get(key):null;},setItem(key,value){storage.set(key,String(value));}};
   const document={getElementById:element,addEventListener(t,fn){events[t]=fn;},body:{setAttribute(){}},
     createElement(tag){if(tag!=='canvas')throw new Error('Unexpected element');createdCanvases++;return {getContext(){return fakeCtx;}};}};
   function FakeImage(){this.onload=null;this.onerror=null;this.naturalWidth=1600;this.naturalHeight=1000;this.src='';imageObjects.push(this);}
-  const context={window,document,navigator:{},localStorage,performance:{now:()=>1000},
+  const context={window,document,navigator:{deviceMemory,connection:{saveData}},localStorage,performance:{now:()=>1000},
     requestAnimationFrame(fn){if(render)rafQueue.push(fn);},setTimeout,clearTimeout,AbortController,fetch:fetchImpl,Intl,console};
   if(imageLoading)context.Image=FakeImage;
   // Test-only closure access, not shipped in the game.
-  const instrumented=source.replace('  loadBest();loadPendingBest();restorePendingRuns();resetGame(true);',`  window.testApi={startGame,finishGame,openLeaderboard,closeLeaderboard,sendRun,submitOnlineRun,refreshLeaderboard,retryPendingSubmission,get active(){return activeRun;},get state(){return state;},get best(){return best;},get pendingBest(){return pendingBest;},set score(value){score=value;},drawBirdForSkin(value){birdSkin=value;drawBird(1000);},birdRadiusForTest(){return birdRadius();},skinName(value){return BIRD_SKINS[value].name;},flapForTest(){flap();},get wingPhase(){return bird.wingPhase;},get wingActive(){return bird.wingActive;},get wingQueued(){return bird.wingQueued;},get wingTempo(){return bird.wingTempo;},get vy(){return bird.vy;},forceWarmSample(){birdSkin='warm';preloadCinematicWorld('warm');resetGame(false);},forceSlateSample(){birdSkin='slate';preloadCinematicWorld('slate');resetGame(false);},get cinematicStatus(){return cinematicWorlds[birdSkin].status;},get cinematicSession(){return cinematicSession;},resetSample(){resetGame(false);},drawSample(){draw(1000);}};\n  loadBest();loadPendingBest();restorePendingRuns();resetGame(true);`);
+  const instrumented=source.replace('  loadBest();loadPendingBest();restorePendingRuns();resetGame(true);',`  window.testApi={startGame,finishGame,openLeaderboard,closeLeaderboard,sendRun,submitOnlineRun,refreshLeaderboard,retryPendingSubmission,get active(){return activeRun;},get state(){return state;},get best(){return best;},get pendingBest(){return pendingBest;},set score(value){score=value;},drawBirdForSkin(value){birdSkin=value;drawBird(1000);},birdRadiusForTest(){return birdRadius();},skinName(value){return BIRD_SKINS[value].name;},flapForTest(){flap();},get wingPhase(){return bird.wingPhase;},get wingActive(){return bird.wingActive;},get wingQueued(){return bird.wingQueued;},get wingTempo(){return bird.wingTempo;},get vy(){return bird.vy;},forceWarmSample(){birdSkin='warm';preloadCinematicWorld('warm');resetGame(false);},forceSlateSample(){birdSkin='slate';preloadCinematicWorld('slate');resetGame(false);},get cinematicStatus(){return cinematicWorlds[birdSkin].status;},get cinematicSession(){return cinematicSession;},resetSample(){resetGame(false);},drawSample(){draw(1000);},sampleFrameForTest(seconds){observeSceneryFrame(seconds);},get sceneryQuality(){return sceneryQuality;},get birdHitRadius(){return birdRadius();}};\n  loadBest();loadPendingBest();restorePendingRuns();resetGame(true);`);
   vm.runInNewContext(instrumented,context);
   return {api:window.testApi,e:element,events,authChange,session,storage,
     tick(t){const callback=rafQueue.shift();if(!callback)throw new Error('Missing RAF callback');callback(t);},
-    createdCanvases(){return createdCanvases;},drawImages(){return drawImages;},drawnSources(){return [...drawnSources]},imageObjects(){return [...imageObjects]},
+    createdCanvases(){return createdCanvases;},drawImages(){return drawImages;},drawnSources(){return [...drawnSources]},clearDrawnSources(){drawnSources.length=0;},imageObjects(){return [...imageObjects]},
     resetPaint(){paintedColors.length=0;},paintedColors(){return [...paintedColors]}};
 }
 const flush=()=>new Promise(r=>setImmediate(r));
@@ -270,4 +270,48 @@ test('V4 slate asset failure independently retains procedural twilight fallback'
   assert.equal(scene.api.cinematicSession,null);
   scene.api.drawSample();
   assert.ok(scene.paintedColors().includes('#667991'),'procedural slate ridges still render');
+});
+
+test('V4 reduced-motion, data saving and weak-memory hints use low-cost background without animated fog',()=>{
+  for(const opts of [{deviceMemory:2},{saveData:true},{reduceMotion:true}]){
+    const scene=setup({render:true,imageLoading:true,...opts});
+    scene.api.forceWarmSample();
+    scene.imageObjects().filter(im=>im.src.includes('/v4/warm/')).forEach(im=>im.onload());
+    assert.equal(scene.api.sceneryQuality,'low');
+    scene.clearDrawnSources();
+    scene.api.drawSample();
+    assert.ok(scene.drawnSources().some(src=>src.includes('/v4/warm/sky.svg')));
+    assert.ok(scene.drawnSources().some(src=>src.includes('/v4/warm/near.svg')));
+    assert.equal(scene.drawnSources().filter(src=>src.includes('/v4/warm/mist.svg')).length,0);
+  }
+});
+
+test('V4 high/medium fog layers use bounded image draws and preserve gameplay collision geometry',()=>{
+  for(const [memory,expected] of [[8,2],[4,1]]){
+    const scene=setup({render:true,imageLoading:true,deviceMemory:memory});
+    scene.api.forceSlateSample();
+    scene.imageObjects().filter(im=>im.src.includes('/v4/slate/')).forEach(im=>im.onload());
+    assert.equal(scene.api.sceneryQuality,memory===8?'high':'medium');
+    const radius=scene.api.birdHitRadius;
+    scene.clearDrawnSources();scene.api.drawSample();
+    // Rendering in the fixture uses one 1600:1000 wide tile per effect on the standard portrait canvas.
+    assert.equal(scene.drawnSources().filter(src=>src.includes('/v4/slate/mist.svg')).length,expected);
+    assert.equal(scene.api.birdHitRadius,radius);
+  }
+});
+
+test('V4 a sustained slow frame sample reduces only scenery quality; tapping still applies immediate lift',()=>{
+  const scene=setup({render:true,imageLoading:true,deviceMemory:8});
+  scene.api.forceWarmSample();
+  scene.imageObjects().filter(im=>im.src.includes('/v4/warm/')).forEach(im=>im.onload());
+  scene.api.startGame();
+  assert.equal(scene.api.sceneryQuality,'high');
+  const radius=scene.api.birdHitRadius,vy=scene.api.vy;
+  for(let i=0;i<210;i++)scene.api.sampleFrameForTest(.028);
+  assert.equal(scene.api.sceneryQuality,'low');
+  assert.equal(scene.api.birdHitRadius,radius);
+  scene.api.flapForTest();
+  assert.ok(scene.api.vy<=vy,'input retains its immediate upward response');
+  scene.clearDrawnSources();scene.api.drawSample();
+  assert.equal(scene.drawnSources().filter(src=>src.includes('/v4/warm/mist.svg')).length,0);
 });
