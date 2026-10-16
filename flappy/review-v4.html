@@ -52,6 +52,21 @@ header p{max-width:760px;margin:0 0 16px}
 .note{margin:12px 2px 0;font-size:12px}
 aside{font-size:12px;color:#a5b8c9;line-height:1.8;margin-top:20px}
 a{color:#9acde2}
+/* Evidence capture mode: hash-select a single original world at the exact
+   browser viewport ratio. No JavaScript, downloaded libraries or external data.
+   Unfragmented links retain the interactive, side-by-side art review. */
+body:has(.world:target) main{padding:0;max-width:none;margin:0}
+body:has(.world:target) header,
+body:has(.world:target) aside,
+body:has(.world:target) .options>input,
+body:has(.world:target) .options>label[for]{display:none}
+body:has(.world:target) .options{padding:0;margin:0;border:0;background:none;border-radius:0;display:block}
+body:has(.world:target) .worlds{display:block}
+body:has(.world:target) .world:not(:target){display:none}
+body:has(.world:target) .world:target{padding:0;border:0;border-radius:0;background:none}
+body:has(.world:target) .world h2,
+body:has(.world:target) .world .note{display:none}
+body:has(.world:target) .frame{width:100vw;height:100dvh;aspect-ratio:auto;border-radius:0}
 @media(max-width:670px){.worlds{grid-template-columns:1fr}main{padding:17px 12px 34px}}
 </style>
 </head>
