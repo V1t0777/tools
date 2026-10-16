@@ -59,16 +59,20 @@ jobs:
               raise SystemExit("local visual review server did not start")
           PY
           for theme in warm slate; do
-            for shape in "360 600" "390 844" "420 740" "320 568"; do
-              read -r W H <<<"$shape"
-              png="v4-art-qa/$theme-$W"x"$H.png"
-              "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
-                --hide-scrollbars --force-device-scale-factor=1 \
-                --virtual-time-budget=2500 --window-size="$W,$H" \
-                "--screenshot=$png" \
-                "http://127.0.0.1:8765/flappy/review-v4.html#$theme" \
-                >/dev/null 2>v4-art-qa/chrome.log
-              test -s "$png"
+            for view in scene seam; do
+              fragment="$theme"
+              if [[ "$view" == seam ]]; then fragment="$theme-seam"; fi
+              for shape in "360 600" "390 844" "420 740" "320 568"; do
+                read -r W H <<<"$shape"
+                png="v4-art-qa/$view-$theme-$W"x"$H.png"
+                "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+                  --hide-scrollbars --force-device-scale-factor=1 \
+                  --virtual-time-budget=2200 --window-size="$W,$H" \
+                  "--screenshot=$png" \
+                  "http://127.0.0.1:8765/flappy/review-v4.html#$fragment" \
+                  >/dev/null 2>v4-art-qa/chrome.log
+                test -s "$png"
+              done
             done
           done
           python3 - <<'PY'
@@ -86,10 +90,10 @@ jobs:
               if (width,height)!=(expected_width,expected_height):
                   raise SystemExit(f"Wrong mobile capture dimensions: {path} {width}x{height}")
               print(f"{path}: {width}x{height}, {len(b)} bytes")
-          if len(list(Path("v4-art-qa").glob("*.png")))!=8:
-              raise SystemExit("Expected exactly 8 world/viewport screenshots")
+          if len(list(Path("v4-art-qa").glob("*.png")))!=16:
+              raise SystemExit("Expected exactly 16 scene/seam mobile screenshots")
           PY
-      - name: Keep 8 scene screenshots and diagnostics
+      - name: Keep 16 scene/seam screenshots and diagnostics
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
