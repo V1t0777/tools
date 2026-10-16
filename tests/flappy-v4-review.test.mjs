@@ -78,3 +78,24 @@ test('V4 screenshot target mode is viewport-accurate while regular review remain
   assert.match(html,/body:has\(\.world:target\) header,/);
   assert.doesNotMatch(html,/<script\b/i);
 });
+
+test('V4 browser evidence shows actual repeating layer joins at mid-screen without script',()=>{
+  for(const theme of ['warm','slate']){
+    assert.match(html,new RegExp('id="'+theme+'-seam"'));
+    const segment=html.split('id="'+theme+'-seam"')[1]?.split('</section>')[0];
+    assert.ok(segment,'missing seam proof for '+theme);
+    for(const layer of ['far','mid','mist','near']){
+      const filename='./assets/v4/'+theme+'/'+layer+'.svg';
+      assert.equal(segment.split('src="'+filename+'"').length-1,2,'each '+layer+' must appear as two joined copies');
+    }
+  }
+  assert.match(html,/img\.first\{left:calc\(50% - 160dvh\)\}/);
+  assert.match(html,/img\.second\{left:50%\}/);
+  assert.match(html,/body:has\(\.seamworld:target\) \.seamworld:target\{display:block\}/);
+  assert.match(html,/body:has\(\.seamworld:target\) \.options,/);
+  assert.doesNotMatch(html,/<script\b/i);
+  const workflow=read('.github/workflows/flappy-v4-art-qa.yml');
+  assert.match(workflow,/for view in scene seam/);
+  assert.match(workflow,/fragment="\$theme-seam"/);
+  assert.match(workflow,/exactly 16 scene\/seam mobile screenshots/);
+});
