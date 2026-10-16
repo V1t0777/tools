@@ -42,7 +42,7 @@ function setup({auth=true,fetchImpl=async()=>{throw new Error('offline');},stora
     requestAnimationFrame(fn){if(render)rafQueue.push(fn);},setTimeout,clearTimeout,AbortController,fetch:fetchImpl,Intl,console};
   if(imageLoading)context.Image=FakeImage;
   // Test-only closure access, not shipped in the game.
-  const instrumented=source.replace('  loadBest();loadPendingBest();restorePendingRuns();resetGame(true);',`  window.testApi={startGame,finishGame,openLeaderboard,closeLeaderboard,sendRun,submitOnlineRun,refreshLeaderboard,retryPendingSubmission,get active(){return activeRun;},get state(){return state;},get best(){return best;},get pendingBest(){return pendingBest;},set score(value){score=value;},drawBirdForSkin(value){birdSkin=value;drawBird(1000);},birdRadiusForTest(){return birdRadius();},skinName(value){return BIRD_SKINS[value].name;},flapForTest(){flap();},get wingPhase(){return bird.wingPhase;},get wingActive(){return bird.wingActive;},get wingQueued(){return bird.wingQueued;},get wingTempo(){return bird.wingTempo;},get vy(){return bird.vy;},forceWarmSample(){birdSkin='warm';preloadCinematicWarm();resetGame(false);},get cinematicStatus(){return cinematicWorld.status;},get cinematicSession(){return cinematicSession;},resetSample(){resetGame(false);},drawSample(){draw(1000);}};\n  loadBest();loadPendingBest();restorePendingRuns();resetGame(true);`);
+  const instrumented=source.replace('  loadBest();loadPendingBest();restorePendingRuns();resetGame(true);',`  window.testApi={startGame,finishGame,openLeaderboard,closeLeaderboard,sendRun,submitOnlineRun,refreshLeaderboard,retryPendingSubmission,get active(){return activeRun;},get state(){return state;},get best(){return best;},get pendingBest(){return pendingBest;},set score(value){score=value;},drawBirdForSkin(value){birdSkin=value;drawBird(1000);},birdRadiusForTest(){return birdRadius();},skinName(value){return BIRD_SKINS[value].name;},flapForTest(){flap();},get wingPhase(){return bird.wingPhase;},get wingActive(){return bird.wingActive;},get wingQueued(){return bird.wingQueued;},get wingTempo(){return bird.wingTempo;},get vy(){return bird.vy;},forceWarmSample(){birdSkin='warm';preloadCinematicWorld('warm');resetGame(false);},forceSlateSample(){birdSkin='slate';preloadCinematicWorld('slate');resetGame(false);},get cinematicStatus(){return cinematicWorlds[birdSkin].status;},get cinematicSession(){return cinematicSession;},resetSample(){resetGame(false);},drawSample(){draw(1000);}};\n  loadBest();loadPendingBest();restorePendingRuns();resetGame(true);`);
   vm.runInNewContext(instrumented,context);
   return {api:window.testApi,e:element,events,authChange,session,storage,
     tick(t){const callback=rafQueue.shift();if(!callback)throw new Error('Missing RAF callback');callback(t);},
@@ -195,13 +195,13 @@ test('V4 warm assets activate atomically only after all five images finish loadi
   const images=scene.imageObjects().filter(im=>im.src.includes('/v4/warm/'));
   assert.equal(images.length,5);
   assert.equal(scene.api.cinematicStatus,'loading');
-  assert.equal(scene.api.cinematicSession,false);
+  assert.equal(scene.api.cinematicSession,null);
   for(let i=0;i<4;i++)images[i].onload();
   assert.equal(scene.api.cinematicStatus,'loading');
   assert.equal(scene.api.cinematicSession,false);
   images[4].onload();
   assert.equal(scene.api.cinematicStatus,'ready');
-  assert.equal(scene.api.cinematicSession,true);
+  assert.equal(scene.api.cinematicSession,'warm');
   scene.api.drawSample();
   const rendered=scene.drawnSources();
   for(const id of ['sky','far','mid','mist','near'])
@@ -228,7 +228,46 @@ test('V4 late loading during an ongoing game cannot switch the background mid-ru
   const images=scene.imageObjects().filter(im=>im.src.includes('/v4/warm/'));
   images.forEach(im=>im.onload());
   assert.equal(scene.api.cinematicStatus,'ready');
-  assert.equal(scene.api.cinematicSession,false,'ongoing run retains chosen background mode');
+  assert.equal(scene.api.cinematicSession,null,'ongoing run retains chosen background mode');
   scene.api.resetSample();
-  assert.equal(scene.api.cinematicSession,true,'next round may use the completed sample');
+  assert.equal(scene.api.cinematicSession,'warm','next round may use the completed sample');
+});
+
+test('V4 slate world is independently loaded, rendered and available without warm assets',()=>{
+  const scene=setup({render:true,imageLoading:true});
+  scene.api.forceSlateSample();
+  const images=scene.imageObjects().filter(im=>im.src.includes('/v4/slate/'));
+  assert.equal(images.length,5);
+  images.forEach(im=>im.onload());
+  assert.equal(scene.api.cinematicStatus,'ready');
+  assert.equal(scene.api.cinematicSession,'slate');
+  scene.api.drawSample();
+  for(const id of ['sky','far','mid','mist','near'])
+    assert.ok(scene.drawnSources().some(src=>src.endsWith('/v4/slate/'+id+'.svg')),'missing slate '+id);
+  assert.ok(!scene.drawnSources().some(src=>src.includes('/v4/warm/')),'must not draw warm world');
+});
+
+test('V4 late completion of previous world does not overwrite newly selected world',()=>{
+  const scene=setup({render:true,imageLoading:true});
+  scene.api.forceWarmSample();
+  const warm=scene.imageObjects().filter(im=>im.src.includes('/v4/warm/'));
+  scene.api.forceSlateSample();
+  const slate=scene.imageObjects().filter(im=>im.src.includes('/v4/slate/'));
+  assert.equal(warm.length,5);
+  assert.equal(slate.length,5);
+  warm.forEach(im=>im.onload());
+  assert.equal(scene.api.cinematicSession,null,'warm late completion cannot hijack slate selection');
+  slate.forEach(im=>im.onload());
+  assert.equal(scene.api.cinematicSession,'slate');
+});
+
+test('V4 slate asset failure independently retains procedural twilight fallback',()=>{
+  const scene=setup({render:true,imageLoading:true});
+  scene.api.forceSlateSample();
+  const slate=scene.imageObjects().filter(im=>im.src.includes('/v4/slate/'));
+  slate[0].onload();slate[2].onerror(new Error('bad sprite'));
+  assert.equal(scene.api.cinematicStatus,'failed');
+  assert.equal(scene.api.cinematicSession,null);
+  scene.api.drawSample();
+  assert.ok(scene.paintedColors().includes('#667991'),'procedural slate ridges still render');
 });
