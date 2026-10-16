@@ -67,6 +67,25 @@ body:has(.world:target) .world:target{padding:0;border:0;border-radius:0;backgro
 body:has(.world:target) .world h2,
 body:has(.world:target) .world .note{display:none}
 body:has(.world:target) .frame{width:100vw;height:100dvh;aspect-ratio:auto;border-radius:0}
+/* Direct edge-join evidence: the center line is the physical point where the
+   same 1600:1000 panoramic strip repeats. Both halves use the same source art.
+   The sky is non-tiling and intentionally omitted from seam comparisons. */
+.seamworld{display:none}
+.seamframe{position:relative;isolation:isolate;height:100dvh;width:100vw;overflow:hidden}
+.seamframe.warm{background:linear-gradient(#9eb9ba,#e5c9ae)}
+.seamframe.slate{background:linear-gradient(#314967,#a5a0b1)}
+.seamframe img{position:absolute;height:100%;width:auto;max-width:none;pointer-events:none;user-select:none}
+.seamframe img.first{left:calc(50% - 160dvh)}
+.seamframe img.second{left:50%}
+.seamframe img.far{z-index:1}
+.seamframe img.mid{z-index:2}
+.seamframe img.mist{z-index:3;opacity:.7}
+.seamframe img.near{z-index:4}
+body:has(.seamworld:target) main{max-width:none;margin:0;padding:0}
+body:has(.seamworld:target) header,
+body:has(.seamworld:target) .options,
+body:has(.seamworld:target) aside{display:none}
+body:has(.seamworld:target) .seamworld:target{display:block}
 @media(max-width:670px){.worlds{grid-template-columns:1fr}main{padding:17px 12px 34px}}
 </style>
 </head>
@@ -106,6 +125,26 @@ body:has(.world:target) .frame{width:100vw;height:100dvh;aspect-ratio:auto;borde
 </div><p class="note">独立山谷图层与空间层次；需要实机截图审核，当前不是最终手绘纹理。</p></article>
 </div>
 </section>
+<section class="seamworld" id="warm-seam" aria-label="warm 地貌图层无缝循环边界审阅"><div class="seamframe warm">
+<img class="first far" src="./assets/v4/warm/far.svg" alt="" decoding="async">
+<img class="second far" src="./assets/v4/warm/far.svg" alt="" decoding="async">
+<img class="first mid" src="./assets/v4/warm/mid.svg" alt="" decoding="async">
+<img class="second mid" src="./assets/v4/warm/mid.svg" alt="" decoding="async">
+<img class="first mist" src="./assets/v4/warm/mist.svg" alt="" decoding="async">
+<img class="second mist" src="./assets/v4/warm/mist.svg" alt="" decoding="async">
+<img class="first near" src="./assets/v4/warm/near.svg" alt="" decoding="async">
+<img class="second near" src="./assets/v4/warm/near.svg" alt="" decoding="async">
+</div></section>
+<section class="seamworld" id="slate-seam" aria-label="slate 地貌图层无缝循环边界审阅"><div class="seamframe slate">
+<img class="first far" src="./assets/v4/slate/far.svg" alt="" decoding="async">
+<img class="second far" src="./assets/v4/slate/far.svg" alt="" decoding="async">
+<img class="first mid" src="./assets/v4/slate/mid.svg" alt="" decoding="async">
+<img class="second mid" src="./assets/v4/slate/mid.svg" alt="" decoding="async">
+<img class="first mist" src="./assets/v4/slate/mist.svg" alt="" decoding="async">
+<img class="second mist" src="./assets/v4/slate/mist.svg" alt="" decoding="async">
+<img class="first near" src="./assets/v4/slate/near.svg" alt="" decoding="async">
+<img class="second near" src="./assets/v4/slate/near.svg" alt="" decoding="async">
+</div></section>
 <aside>安全说明：验收页不执行脚本，不加载第三方资源，也不访问数据库或登录信息。请检查暖棕和板岩两套背景中角色、石柱是否始终突出；正式发布前会移除本验收页面，并另行完成动态接缝、性能和高精度材质的实机验收。</aside>
 </main>
 </body>
