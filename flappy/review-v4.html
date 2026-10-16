@@ -20,14 +20,17 @@ header p{max-width:760px;margin:0 0 16px}
 .world{min-width:0;background:#172336;border:1px solid #304358;padding:13px;border-radius:17px}
 .world h2{font-size:16px;margin:0 0 12px;font-weight:650}
 .frame{position:relative;isolation:isolate;width:100%;aspect-ratio:360/600;overflow:hidden;background:#21374b;border-radius:13px;contain:paint}
-.layer{position:absolute;max-width:none;width:auto;height:100%;top:0;left:50%;transform:translateX(-50%);pointer-events:none;user-select:none}
-.layer.sky{z-index:0}
+.layer{position:absolute;max-width:none;width:auto;height:100%;top:0;left:0;transform:none;pointer-events:none;user-select:none}
+.layer.sky{z-index:0;left:74%}
 .layer.far{z-index:1}
 .layer.mid{z-index:2}
 .layer.mist{z-index:3;opacity:.7}
 .layer.near{z-index:4}
-.warm .layer.sky{transform:translateX(-72%)}
-.slate .layer.sky{transform:translateX(-75%)}
+/* Match the live Canvas sky crop: sx = lightX - 0.74 * visibleSourceWidth.
+   For a 1600px-wide image at 100% scene height, the world-space light
+   anchors (1170 / 1230) become 73.125% / 76.875% image offsets. */
+.warm .layer.sky{transform:translateX(-73.125%)}
+.slate .layer.sky{transform:translateX(-76.875%)}
 .guides{position:absolute;z-index:5;inset:0;display:none;pointer-events:none}
 .pipe{position:absolute;left:68%;width:14%;background:linear-gradient(90deg,#526365,#abafa1 46%,#536466);box-shadow:0 0 0 1px #d1d6d1}
 .slate .pipe{background:linear-gradient(90deg,#283e58,#889eb2 50%,#30475c)}
