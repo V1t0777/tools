@@ -16,6 +16,10 @@ header p{max-width:760px;margin:0 0 16px}
 .options{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;border:1px solid #2f4155;background:#152336;padding:14px;border-radius:16px;margin-bottom:19px}
 .options label{font-size:12px;color:#dbe8f4;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
 .options input{accent-color:#8dc5da}
+.options>input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.options>label[for]{padding:7px 9px;border:1px solid #43566b;border-radius:10px;min-height:34px;user-select:none}
+.options>input:checked+label{background:#274457;color:#e7f7ff;border-color:#739fb8}
+.options>input:focus-visible+label{outline:2px solid #a9d5e6;outline-offset:3px}
 .worlds{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
 .world{min-width:0;background:#172336;border:1px solid #304358;padding:13px;border-radius:17px}
 .world h2{font-size:16px;margin:0 0 12px;font-weight:650}
@@ -58,12 +62,12 @@ a{color:#9acde2}
 <p>无 JavaScript 的五层场景对比，供不同屏幕比例的裁切、层次与可读性检查。真实滚动与碰撞请在相同开发分支的游戏页面单独验收。</p>
 </header>
 <section class="options" aria-label="美术验收选项">
-<label><input type="radio" id="s360" name="size" checked>360 × 600</label>
-<label><input type="radio" id="s390" name="size">390 × 844</label>
-<label><input type="radio" id="s420" name="size">420 × 740</label>
-<label><input type="radio" id="s320" name="size">320 × 568</label>
-<label><input type="checkbox" id="guides" checked>小鸟与管道可读性参考</label>
-<label><input type="checkbox" id="fog" checked>谷雾图层</label>
+<input type="radio" id="s360" name="size" checked><label for="s360">360 × 600</label>
+<input type="radio" id="s390" name="size"><label for="s390">390 × 844</label>
+<input type="radio" id="s420" name="size"><label for="s420">420 × 740</label>
+<input type="radio" id="s320" name="size"><label for="s320">320 × 568</label>
+<input type="checkbox" id="guides" checked><label for="guides">小鸟与管道可读性参考</label>
+<input type="checkbox" id="fog" checked><label for="fog">谷雾图层</label>
 <div class="worlds">
 <article class="world warm">
 <h2>晨曦山谷 · 暖棕旅鸟</h2>
