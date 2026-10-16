@@ -50,7 +50,7 @@ test('V4 static comparison mirrors scene strip origin and Canvas solar anchor cr
  assert.match(html,/\.warm \.layer\.sky\{transform:translateX\(-73\.125%\)\}/);
  assert.match(html,/\.slate \.layer\.sky\{transform:translateX\(-76\.875%\)\}/);
  assert.match(game,/anchor=birdSkin==='warm'\?1170:1230/);
- assert.match(game,/var sx=Math\.max\(0,Math\.min\(1600-sw,anchor-sw\*\.74\)\)/);
+ assert.match(game,/var sx=Math\.max\(0,Math\.min\(1600-sw,anchor-sw\*\.89\)\)/);
 });
 
 test('V4 native inputs are actual sibling selectors, not nested inside labels',()=>{
