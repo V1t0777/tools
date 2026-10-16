@@ -18,7 +18,7 @@ function extractGameScript(documentSource){
 }
 const source=extractGameScript(html);
 new vm.Script(source); // Syntax check independent of the DOM harness.
-function setup({auth=true,fetchImpl=async()=>{throw new Error('offline');},storage=new Map([['zhaoFlappyBest.v1','12']]),render=false,imageLoading=false,deviceMemory=8,saveData=false,reduceMotion=false}={}){
+function setup({auth=true,fetchImpl=async()=>{throw new Error('offline');},storage=new Map([['zhaoFlappyBest.v1','12']]),render=false,imageLoading=false,imageDecoding=false,deviceMemory=8,saveData=false,reduceMotion=false}={}){
   const elements=new Map(),events={},rafQueue=[];let authChange,createdCanvases=0,drawImages=0;const paintedColors=[],drawnSources=[],imageObjects=[];
   const gradient={addColorStop(){}};
   const fakeCtx=new Proxy({createLinearGradient(){return gradient;},createRadialGradient(){return gradient;},drawImage(im){drawImages++;if(im&&im.src)drawnSources.push(im.src);}},
@@ -37,12 +37,16 @@ function setup({auth=true,fetchImpl=async()=>{throw new Error('offline');},stora
   const localStorage={getItem(key){return storage.has(key)?storage.get(key):null;},setItem(key,value){storage.set(key,String(value));}};
   const document={getElementById:element,addEventListener(t,fn){events[t]=fn;},body:{setAttribute(){}},
     createElement(tag){if(tag!=='canvas')throw new Error('Unexpected element');createdCanvases++;return {getContext(){return fakeCtx;}};}};
-  function FakeImage(){this.onload=null;this.onerror=null;this.naturalWidth=1600;this.naturalHeight=1000;this.src='';imageObjects.push(this);}
+  function FakeImage(){
+    this.onload=null;this.onerror=null;this.naturalWidth=1600;this.naturalHeight=1000;this.src='';
+    if(imageDecoding)this.decode=()=>new Promise((resolve,reject)=>{this.resolveDecode=resolve;this.rejectDecode=reject;});
+    imageObjects.push(this);
+  }
   const context={window,document,navigator:{deviceMemory,connection:{saveData}},localStorage,performance:{now:()=>1000},
     requestAnimationFrame(fn){if(render)rafQueue.push(fn);},setTimeout,clearTimeout,AbortController,fetch:fetchImpl,Intl,console};
   if(imageLoading)context.Image=FakeImage;
   // Test-only closure access, not shipped in the game.
-  const instrumented=source.replace('  loadBest();loadPendingBest();restorePendingRuns();resetGame(true);',`  window.testApi={startGame,finishGame,openLeaderboard,closeLeaderboard,sendRun,submitOnlineRun,refreshLeaderboard,retryPendingSubmission,get active(){return activeRun;},get state(){return state;},get best(){return best;},get pendingBest(){return pendingBest;},set score(value){score=value;},drawBirdForSkin(value){birdSkin=value;drawBird(1000);},birdRadiusForTest(){return birdRadius();},skinName(value){return BIRD_SKINS[value].name;},flapForTest(){flap();},get wingPhase(){return bird.wingPhase;},get wingActive(){return bird.wingActive;},get wingQueued(){return bird.wingQueued;},get wingTempo(){return bird.wingTempo;},get vy(){return bird.vy;},forceWarmSample(){birdSkin='warm';preloadCinematicWorld('warm');resetGame(false);},forceSlateSample(){birdSkin='slate';preloadCinematicWorld('slate');resetGame(false);},get cinematicStatus(){return cinematicWorlds[birdSkin].status;},get cinematicSession(){return cinematicSession;},resetSample(){resetGame(false);},drawSample(){draw(1000);},sampleFrameForTest(seconds){observeSceneryFrame(seconds);},get sceneryQuality(){return sceneryQuality;},get birdHitRadius(){return birdRadius();}};\n  loadBest();loadPendingBest();restorePendingRuns();resetGame(true);`);
+  const instrumented=source.replace('  loadBest();loadPendingBest();restorePendingRuns();resetGame(true);',`  window.testApi={startGame,finishGame,openLeaderboard,closeLeaderboard,sendRun,submitOnlineRun,refreshLeaderboard,retryPendingSubmission,get active(){return activeRun;},get state(){return state;},get best(){return best;},get pendingBest(){return pendingBest;},set score(value){score=value;},drawBirdForSkin(value){birdSkin=value;drawBird(1000);},birdRadiusForTest(){return birdRadius();},skinName(value){return BIRD_SKINS[value].name;},flapForTest(){flap();},get wingPhase(){return bird.wingPhase;},get wingActive(){return bird.wingActive;},get wingQueued(){return bird.wingQueued;},get wingTempo(){return bird.wingTempo;},get vy(){return bird.vy;},forceWarmSample(){birdSkin='warm';preloadCinematicWorld('warm');resetGame(false);},forceSlateSample(){birdSkin='slate';preloadCinematicWorld('slate');resetGame(false);},selectVisualWorldForTest(skin){releaseInactiveCinematicWorld(skin);birdSkin=skin;preloadCinematicWorld(skin);resetGame(false);},worldStatusForTest(skin){return cinematicWorlds[skin].status;},worldLayerCountForTest(skin){return Object.keys(cinematicWorlds[skin].layers).length;},get cinematicStatus(){return cinematicWorlds[birdSkin].status;},get cinematicSession(){return cinematicSession;},resetSample(){resetGame(false);},drawSample(){draw(1000);},sampleFrameForTest(seconds){observeSceneryFrame(seconds);},get sceneryQuality(){return sceneryQuality;},get birdHitRadius(){return birdRadius();}};\n  loadBest();loadPendingBest();restorePendingRuns();resetGame(true);`);
   vm.runInNewContext(instrumented,context);
   return {api:window.testApi,e:element,events,authChange,session,storage,
     tick(t){const callback=rafQueue.shift();if(!callback)throw new Error('Missing RAF callback');callback(t);},
@@ -314,4 +318,61 @@ test('V4 a sustained slow frame sample reduces only scenery quality; tapping sti
   assert.ok(scene.api.vy<=vy,'input retains its immediate upward response');
   scene.clearDrawnSources();scene.api.drawSample();
   assert.equal(scene.drawnSources().filter(src=>src.includes('/v4/warm/mist.svg')).length,0);
+});
+
+test('V4 image onload cannot activate the world before all SVGs complete decoding',async()=>{
+  const scene=setup({render:true,imageLoading:true,imageDecoding:true});
+  scene.api.selectVisualWorldForTest('warm');
+  const images=scene.imageObjects().filter(img=>img.src.includes('/v4/warm/'));
+  assert.equal(images.length,5);
+  images.forEach(img=>img.onload());
+  assert.equal(scene.api.cinematicStatus,'loading');
+  assert.equal(scene.api.cinematicSession,null);
+  images.slice(0,4).forEach(img=>img.resolveDecode());
+  await flush();
+  assert.equal(scene.api.cinematicStatus,'loading','partial decoding must not activate the scene');
+  images[4].resolveDecode();await flush();
+  assert.equal(scene.api.cinematicStatus,'ready');
+  assert.equal(scene.api.cinematicSession,'warm');
+});
+
+test('V4 decode rejection retains the procedural fallback and does not partially render',async()=>{
+  const scene=setup({render:true,imageLoading:true,imageDecoding:true});
+  scene.api.selectVisualWorldForTest('slate');
+  const images=scene.imageObjects().filter(img=>img.src.includes('/v4/slate/'));
+  assert.equal(images.length,5);
+  images.forEach(img=>img.onload());
+  images[0].resolveDecode();
+  images[1].rejectDecode(new Error('SVG decode unavailable'));
+  images.slice(2).forEach(img=>img.resolveDecode());
+  await flush();
+  assert.equal(scene.api.cinematicStatus,'failed');
+  assert.equal(scene.api.cinematicSession,null);
+  scene.clearDrawnSources();scene.api.drawSample();
+  assert.equal(scene.drawnSources().some(src=>src.includes('/v4/slate/')),false);
+});
+
+test('V4 choosing another theme releases the old decoded world; stale decode cannot revive it',async()=>{
+  const scene=setup({render:true,imageLoading:true,imageDecoding:true});
+  scene.api.selectVisualWorldForTest('warm');
+  const warm=scene.imageObjects().filter(img=>img.src.includes('/v4/warm/'));
+  assert.equal(warm.length,5);
+  warm.forEach(img=>img.onload());
+  warm.forEach(img=>img.resolveDecode());await flush();
+  assert.equal(scene.api.worldStatusForTest('warm'),'ready');
+  assert.equal(scene.api.worldLayerCountForTest('warm'),5);
+  scene.api.selectVisualWorldForTest('slate');
+  assert.equal(scene.api.worldStatusForTest('warm'),'idle','inactive world must be evicted');
+  assert.equal(scene.api.worldLayerCountForTest('warm'),0);
+  assert.equal(scene.api.cinematicSession,null);
+  assert.ok(warm.every(img=>img.onload===null&&img.onerror===null),'old image handlers detached');
+  const slate=scene.imageObjects().filter(img=>img.src.includes('/v4/slate/'));
+  assert.equal(slate.length,5);
+  slate.forEach(img=>img.onload());
+  slate.forEach(img=>img.resolveDecode());await flush();
+  assert.equal(scene.api.cinematicSession,'slate');
+  scene.api.selectVisualWorldForTest('warm');
+  assert.equal(scene.api.worldLayerCountForTest('slate'),0);
+  const reloaded=scene.imageObjects().filter(img=>img.src.includes('/v4/warm/'));
+  assert.equal(reloaded.length,10,'returning to previously evicted theme reloads its 5 layers');
 });
