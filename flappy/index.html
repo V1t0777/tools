@@ -350,6 +350,71 @@
   };
 
   var skyCache=null,skyCacheKey='',cloudSprite=null,pipeMaterials=null;
+
+  // V4 Alpha 1: warm-world technical art sample. Never blend partially loaded scenery.
+  // Slate uses the proven V3 procedural scene until its own complete art is approved.
+  var CINEMATIC_LAYERS=[
+    {id:'sky',speed:0},
+    {id:'far',speed:.045},
+    {id:'mid',speed:.12},
+    {id:'mist',speed:.19},
+    {id:'near',speed:.28}
+  ];
+  var cinematicWorld={status:'idle',layers:{},remaining:0};
+  var cinematicSession=false;
+  function preloadCinematicWarm(){
+    if(cinematicWorld.status!=='idle'||typeof Image!=='function')return;
+    cinematicWorld.status='loading';
+    cinematicWorld.remaining=CINEMATIC_LAYERS.length;
+    for(var i=0;i<CINEMATIC_LAYERS.length;i++){
+      (function(id){
+        var picture=new Image();
+        cinematicWorld.layers[id]=picture;
+        picture.onload=function(){
+          if(cinematicWorld.status!=='loading')return;
+          if(picture.naturalWidth!==1600||picture.naturalHeight!==1000){
+            cinematicWorld.status='failed';
+            return;
+          }
+          cinematicWorld.remaining--;
+          if(cinematicWorld.remaining===0){
+            cinematicWorld.status='ready';
+            if(state==='ready'&&birdSkin==='warm')cinematicSession=true;
+          }
+        };
+        picture.onerror=function(){cinematicWorld.status='failed';cinematicSession=false;};
+        picture.src='./assets/v4/warm/'+id+'.svg';
+      })(CINEMATIC_LAYERS[i].id);
+    }
+  }
+  function drawCinematicLayer(layer){
+    var image=cinematicWorld.layers[layer.id];
+    if(layer.id==='sky'){
+      ctx.drawImage(image,0,0,W,H);
+      return;
+    }
+    // Each art strip is designed to repeat at identical left/right boundaries.
+    var tileWidth=H*1.6;
+    var dx=((scroll*layer.speed)%tileWidth+tileWidth)%tileWidth;
+    for(var x=-dx;x<W;x+=tileWidth)ctx.drawImage(image,x,0,tileWidth,H);
+  }
+  function drawCinematicWarm(){
+    if(birdSkin!=='warm'||!cinematicSession||cinematicWorld.status!=='ready')return false;
+    try{
+      drawCinematicLayer(CINEMATIC_LAYERS[0]);
+      drawClouds(); // existing low-frequency clouds preserve gentle live parallax
+      drawCinematicLayer(CINEMATIC_LAYERS[1]);
+      drawCinematicLayer(CINEMATIC_LAYERS[2]);
+      if(!reduceMotion)drawCinematicLayer(CINEMATIC_LAYERS[3]);
+      drawCinematicLayer(CINEMATIC_LAYERS[4]);
+      return true;
+    }catch(error){
+      // Never show a mixed world or blank screen when a browser rejects a layer.
+      cinematicWorld.status='failed';
+      cinematicSession=false;
+      return false;
+    }
+  }
   // V3: transparent, same-rig 24-frame animation atlases. Fail closed to the tested
   // Canvas bird if the browser cannot load or decode the external art assets.
   var flightAtlases={warm:null,slate:null};
@@ -649,6 +714,7 @@
     if(document.body&&document.body.setAttribute)document.body.setAttribute('data-flight-skin',birdSkin);
     if(sceneLabel)sceneLabel.textContent=birdSkin==='warm'?'晨曦山谷 · 暖棕旅鸟':'暮蓝远山 · 板岩夜鸟';
     ensureFlightAtlas(birdSkin);
+    if(birdSkin==='warm')preloadCinematicWarm();
     skyCache=null;skyCacheKey='';pipeMaterials=null;
   }
 
@@ -657,6 +723,7 @@
     pipes=[];score=0;newRecord=false;elapsed=0;scroll=0;prevGapY=null;hitSlowUntil=0;groundHitAt=0;
     bird.x=W*.28;bird.y=H*.45;bird.vy=0;bird.rot=0;bird.wing=0;bird.squash=0;bird.flapAge=1;bird.tailLag=0;
     bird.wingPhase=0;bird.wingActive=false;bird.wingQueued=false;bird.wingTempo=0;
+    cinematicSession=birdSkin==='warm'&&cinematicWorld.status==='ready';
     scoreEl.textContent='0';scoreEl.classList.add('hidden');newBestEl.classList.remove('show');
     resultLayer.classList.remove('active','personal-best');pauseLayer.classList.remove('active');
     pauseBtn.disabled=true;pauseBtn.textContent='Ⅱ';pauseBtn.classList.remove('active');
@@ -846,9 +913,11 @@
     if(state==='falling'&&now<hitSlowUntil&&!reduceMotion){
       var force=clamp((hitSlowUntil-now)/250,0,1);ctx.translate(Math.sin(now*.095)*1.6*force,Math.cos(now*.073)*.8*force);
     }
-    drawBackground();
-    drawClouds();
-    drawRidges();
+    if(!drawCinematicWarm()){
+      drawBackground();
+      drawClouds();
+      drawRidges();
+    }
     drawPipes();
     drawGround();
     drawAirflow();
