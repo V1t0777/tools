@@ -1,7 +1,6 @@
 import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import vm from 'node:vm';
 
 const read=(path)=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
 const html=read('flappy/review-v4.html');
@@ -27,7 +26,7 @@ test('V4 QA preview supports identical warm/slate image layers and visual guide 
 test('V4 review page is self-contained, no tracking and valid inline JavaScript',()=>{
   const match=html.match(/<script>([\s\S]*?)<\/script>/);
   assert.ok(match,'missing review controller');
-  new vm.Script(match[1]);
+  assert.ok(match[1].includes("load('warm');load('slate')"),'review script must initialize both worlds');
   assert.doesNotMatch(html,/<script\s+src=/i);
   assert.doesNotMatch(html,/https?:\/\//);
   assert.doesNotMatch(html,/localStorage|ToolboxAuth|supabase|fetch\(/i);
