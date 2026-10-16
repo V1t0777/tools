@@ -425,7 +425,10 @@
     }
     var tileWidth=H*1.6;
     var dx=((scroll*layer.speed+(drift||0))%tileWidth+tileWidth)%tileWidth;
-    for(var x=-dx;x<W;x+=tileWidth)ctx.drawImage(image,x,0,tileWidth,H);
+    // Cover the subpixel anti-alias boundary of adjacent images without changing
+    // the world scroll factor or introducing a visible stretched seam.
+    var overlap=.75/dpr;
+    for(var x=-dx;x<W;x+=tileWidth)ctx.drawImage(image,x,0,tileWidth+overlap,H);
   }
   function drawCinematicWorld(){
     var world=cinematicWorlds[birdSkin];
