@@ -78,3 +78,35 @@ test('V4 seam smoke audit: terrain joins at matching elevation; mist stays withi
     }
   }
 });
+
+test('V4 refined rocks and forest use clipped deterministic textures, with no GPU filters or active SVG features',()=>{
+  for(const theme of ['warm','slate']){
+    for(const layer of ['mid','near']){
+      const svg=read('flappy/assets/v4/'+theme+'/'+layer+'.svg');
+      assert.match(svg,new RegExp('<clipPath id="clip-rock-'+layer+'">'));
+      assert.match(svg,new RegExp('<g clip-path="url\\(#clip-rock-'+layer+'\\)">'));
+      assert.doesNotMatch(svg,/<(?:filter|script|animate|foreignObject|image)\b/i);
+      assert.doesNotMatch(svg,/\bfeTurbulence\b/);
+      const detail=(svg.match(/stroke-opacity=/g)||[]).length;
+      assert.ok(detail>45,theme+'/'+layer+' requires material microdetails');
+    }
+  }
+});
+
+test('V4 atmosphere animation stays behind pipes and does not affect physical or scoring mechanics',()=>{
+  const start=html.indexOf('  function drawCinematicWorld(){');
+  const end=html.indexOf('  // V3:',start);
+  assert.ok(start>0&&end>start);
+  const body=html.slice(start,end);
+  assert.match(body,/sceneryQuality!=='low'/);
+  assert.match(body,/if\(sceneryQuality==='high'\)/);
+  assert.match(body,/Math\.sin\(elapsed\*\.38\)/);
+  assert.match(body,/ctx\.restore\(\)/);
+  assert.match(html,/function observeSceneryFrame\(rawSeconds\)/);
+  assert.match(html,/if\(sceneryWarmup<120\)/);
+  assert.match(html,/scenerySlowFrames>=40/);
+  assert.match(html,/drawCinematicWorld\(\)/);
+  assert.match(html,/drawPipes\(\);/);
+  assert.match(html,/drawGround\(\);/);
+  assert.match(html,/function collides\(\)/);
+});
