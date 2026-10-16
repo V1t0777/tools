@@ -1,6 +1,6 @@
 # Flappy V4.0 — Cinematic Worlds Production Specification
 
-Status: **IN DEVELOPMENT / NOT FOR RELEASE**. The `main` branch and production Cloudflare environment must remain unchanged until **both** worlds and their performance / accessibility tests are accepted.
+Status: **ALPHA 2 ENGINEERING SAMPLE / NOT FOR RELEASE**. The `main` branch and production Cloudflare environment must remain unchanged until **both** worlds and their performance / accessibility tests are accepted.
 
 ## Art direction and gameplay contract
 
@@ -46,9 +46,20 @@ Asset coordinate system: `viewBox="0 0 1600 1000"`. For each parallax image, dra
 
 - [x] **Alpha 1 engineering sample:** Dawn Valley self-contained five-layer SVG kit; loading, repeat rendering, fallback, basic tests.
 - [ ] Alpha 1 art approval: visual comparison to high-fidelity reference, pixel-level seam inspection, device screenshot review.
-- [ ] Alpha 2: equally refined custom slate world assets.
+- [x] **Alpha 2 engineering sample:** original, independently composed blue-hour slate sky, jagged ridges, mist and conifers; both worlds share an atomic renderer with per-theme failure fallback.
+- [x] **Basic seam/safety regression:** tile edge altitude alignment, fog bounds, cross-theme load races and build isolation.
+- [ ] Alpha 2 art review: compare dawn/twilight compositions with the original cinematic references, refine painted surface texture, manually inspect animated seams at different screen ratios.
+- [ ] High-fidelity final art pass: replace temporary SVG engineering art with professionally finished original material layers after visual approval.
 - [ ] Beta 1: cloud/fog dynamics and tasteful shared world lighting.
 - [ ] Beta 2: mobile performance measurements, quality fallback, accessibility and playability regression.
 - [ ] Release: all checks pass, final user approval, protected-branch PR merge and Cloudflare production verification.
 
 *This is an art/engineering starter kit, not a claim that the final painted cinematic artwork is already complete.*
+
+## 2026-10-17 progress — design safeguards
+
+- Original slate layers: `slate/{sky,far,mid,mist,near}.svg` and corresponding `manifest.json` (distinct mountain shapes, moonlit atmosphere and rock coloration).
+- Each of the two worlds is independently and atomically loaded. Completing an old theme's images cannot switch a newer theme. A failed layer returns to the V3 procedural renderer.
+- Background is fixed for the current run, including when image loading finishes during play. A subsequent run can select the completed world.
+- Basic geometric seam assertions are in Node CI, but **do not replace** visual seam and contrast inspection with actual rendered screenshots on devices.
+- Quality grades, texture production, real mobile FPS measurements and accessibility checks remain pending. The PR must remain Draft and must not be merged.
