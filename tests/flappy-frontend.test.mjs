@@ -198,7 +198,7 @@ test('V4 warm assets activate atomically only after all five images finish loadi
   assert.equal(scene.api.cinematicSession,null);
   for(let i=0;i<4;i++)images[i].onload();
   assert.equal(scene.api.cinematicStatus,'loading');
-  assert.equal(scene.api.cinematicSession,false);
+  assert.equal(scene.api.cinematicSession,null);
   images[4].onload();
   assert.equal(scene.api.cinematicStatus,'ready');
   assert.equal(scene.api.cinematicSession,'warm');
@@ -215,7 +215,7 @@ test('V4 an unavailable background layer rejects the entire sample and retains V
   images[0].onload();images[1].onerror(new Error('404'));
   for(let i=2;i<images.length;i++)images[i].onload();
   assert.equal(scene.api.cinematicStatus,'failed');
-  assert.equal(scene.api.cinematicSession,false);
+  assert.equal(scene.api.cinematicSession,null);
   scene.resetPaint();scene.api.drawSample();
   assert.ok(scene.paintedColors().some(c=>c==='#9aaab5'||c==='#667991'||c==='#426c65'),
     'V3 ridges must still render if a new layer fails');
