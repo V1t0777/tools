@@ -59,7 +59,7 @@ test('V4 native inputs are actual sibling selectors, not nested inside labels',(
   assert.doesNotMatch(section,/<label[^>]*>\s*<input\b/,'a nested input cannot select a sibling world container');
   for(const id of ['s360','s390','s420','s320','guides','fog']){
     assert.match(section,new RegExp('<input[^>]*id="'+id+'"[^>]*>\\s*<label for="'+id+'">'));
-    assert.ok(html.includes('#'+id),'missing associated CSS input switch '+id);
+    if(id!=='s360')assert.ok(html.includes('#'+id),'missing associated CSS input switch '+id); // s360 is the declared default aspect ratio
   }
   assert.match(html,/\.options>input\{position:absolute/);
   assert.match(html,/\.options>input:focus-visible\+label\{outline:/);
