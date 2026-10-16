@@ -367,6 +367,23 @@
   // A round selects its visual presentation exactly once, before play starts.
   // A late asset completion must never swap the scenery mid-flight.
   var cinematicSession=null;
+  // Keep visual quality independent of obstacle speed, player inputs and scoring.
+  // Memory hints are advisory; runtime downgrade is conservative and one-way.
+  var deviceMemory=typeof navigator.deviceMemory==='number'?navigator.deviceMemory:8;
+  var netHints=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
+  var sceneryQuality=reduceMotion||(netHints&&netHints.saveData)||deviceMemory<=2?'low':deviceMemory<=4?'medium':'high';
+  var sceneryWarmup=0,scenerySamples=0,scenerySlowFrames=0;
+  function observeSceneryFrame(rawSeconds){
+    if(!cinematicSession||state!=='running'||sceneryQuality==='low'||rawSeconds<=0||rawSeconds>.12)return;
+    if(sceneryWarmup<120){sceneryWarmup++;return;}
+    scenerySamples++;
+    if(rawSeconds>.023)scenerySlowFrames++;
+    if(scenerySamples>=90){
+      if(scenerySlowFrames>=40)sceneryQuality='low';
+      else if(scenerySlowFrames>=22&&sceneryQuality==='high')sceneryQuality='medium';
+      scenerySamples=0;scenerySlowFrames=0;
+    }
+  }
   function preloadCinematicWorld(skin){
     var world=cinematicWorlds[skin];
     if(!world||world.status!=='idle'||typeof Image!=='function')return;
@@ -397,7 +414,7 @@
       })(CINEMATIC_LAYERS[i].id);
     }
   }
-  function drawCinematicLayer(layer,world){
+  function drawCinematicLayer(layer,world,drift){
     var image=world.layers[layer.id];
     if(layer.id==='sky'){
       // Keep the sun and moon circular on narrow screens; crop instead of stretching.
@@ -407,7 +424,7 @@
       return;
     }
     var tileWidth=H*1.6;
-    var dx=((scroll*layer.speed)%tileWidth+tileWidth)%tileWidth;
+    var dx=((scroll*layer.speed+(drift||0))%tileWidth+tileWidth)%tileWidth;
     for(var x=-dx;x<W;x+=tileWidth)ctx.drawImage(image,x,0,tileWidth,H);
   }
   function drawCinematicWorld(){
@@ -415,10 +432,21 @@
     if(cinematicSession!==birdSkin||!world||world.status!=='ready')return false;
     try{
       drawCinematicLayer(CINEMATIC_LAYERS[0],world);
-      drawClouds();
+      if(!reduceMotion&&sceneryQuality!=='low')drawClouds();
       drawCinematicLayer(CINEMATIC_LAYERS[1],world);
       drawCinematicLayer(CINEMATIC_LAYERS[2],world);
-      if(!reduceMotion)drawCinematicLayer(CINEMATIC_LAYERS[3],world);
+      // Restrained slow fog: two subtly different scroll phases, no billboards,
+      // particles or flashes. Motion is disabled by reduced-motion/low detail.
+      if(!reduceMotion&&sceneryQuality!=='low'){
+        ctx.save();
+        ctx.globalAlpha=.66+.045*Math.sin(elapsed*.38);
+        drawCinematicLayer(CINEMATIC_LAYERS[3],world,elapsed*1.3);
+        if(sceneryQuality==='high'){
+          ctx.globalAlpha=.09;
+          drawCinematicLayer(CINEMATIC_LAYERS[3],world,H*.27-elapsed*.8);
+        }
+        ctx.restore();
+      }
       drawCinematicLayer(CINEMATIC_LAYERS[4],world);
       return true;
     }catch(error){
@@ -1329,7 +1357,9 @@
 
   function frame(t){
     if(!lastTime)lastTime=t;
-    var dt=Math.min(.033,(t-lastTime)/1000);lastTime=t;
+    var rawDt=(t-lastTime)/1000;
+    var dt=Math.min(.033,rawDt);lastTime=t;
+    observeSceneryFrame(rawDt);
     update(dt,t);draw(t);raf=requestAnimationFrame(frame);
   }
 
