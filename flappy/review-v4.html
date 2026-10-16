@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>V4 背景美术验收台（开发预览）</title>
+<style>
+:root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif}
+*{box-sizing:border-box}body{margin:0;background:#0a111c;color:#eff4f8}
+main{max-width:1120px;margin:0 auto;padding:22px 16px 54px}
+header{display:flex;gap:18px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;margin-bottom:18px}
+h1{margin:0;font-size:clamp(22px,3vw,32px);letter-spacing:-.03em}
+header p{margin:8px 0;color:#9badbf;font-size:13px;line-height:1.6;max-width:760px}
+.tag{font-size:11px;border:1px solid #8f754e;color:#f8daa4;background:#372a1c;padding:7px 11px;border-radius:99px;white-space:nowrap}
+.panel{background:#141f2d;border:1px solid #2b3b4e;border-radius:17px;padding:13px;margin-bottom:17px}
+.controls{display:flex;gap:13px 24px;align-items:end;flex-wrap:wrap}
+label{font-size:12px;color:#c9d8e7;display:grid;gap:7px}
+select,input[type=range]{accent-color:#85bfd3}
+select{color:#e9f4ff;background:#142332;border:1px solid #4a6074;border-radius:9px;padding:7px;min-height:36px}
+input[type=range]{min-width:190px}
+.check{display:flex;gap:8px;align-items:center;padding-bottom:7px}
+.check input{width:16px;height:16px}
+.worlds{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start}
+article{background:#131e2a;border:1px solid #2a4151;border-radius:19px;padding:11px;min-width:0}
+article h2{font-size:16px;font-weight:650;margin:4px 0 9px;letter-spacing:-.01em}
+.frame{display:flex;justify-content:center;align-items:start;overflow:hidden;border-radius:13px;background:#203346}
+canvas{display:block;width:100%;max-width:450px;height:auto;touch-action:none}
+.status{min-height:18px;font-size:12px;color:#aec0c9;padding:10px 2px 1px}
+.meta{font-size:12px;color:#9badbf;line-height:1.75;margin-top:17px}
+a{color:#9acde2}a:hover{color:#fff}
+@media(max-width:660px){.worlds{grid-template-columns:1fr;gap:12px}.panel{padding:12px}main{padding:16px 12px 30px}}
+</style>
+</head>
+<body>
+<main>
+<header>
+<div><h1>V4 · Cinematic Worlds</h1>
+<p>开发预览专用的双主题视觉验收台：同屏检查真实背景图层、屏幕比例、横向循环与飞行通道对比。小鸟和石柱仅用于可读性参考，不作为碰撞与帧率实测依据。</p></div>
+<span class="tag">DRAFT · 禁止正式发布</span>
+</header>
+<div class="panel controls">
+<label>屏幕比例
+<select id="shape">
+<option value="360,600">常见手机 · 360 × 600</option>
+<option value="390,844">高屏占比 · 390 × 844</option>
+<option value="420,740">大屏手机 · 420 × 740</option>
+<option value="320,568">小屏设备 · 320 × 568</option>
+</select>
+</label>
+<label>水平滚动位置 <span id="position">0</span>
+<input id="scroll" type="range" min="0" max="12800" value="0" step="1">
+</label>
+<label class="check"><input id="playing" type="checkbox"> 自动播放</label>
+<label class="check"><input id="guides" type="checkbox" checked> 显示角色与石柱可读性参考</label>
+<label class="check"><input id="fog" type="checkbox" checked> 柔和动态雾气</label>
+</div>
+<div class="worlds">
+<article><h2>晨曦山谷 · 暖棕旅鸟</h2><div class="frame"><canvas id="warm" width="360" height="600" aria-label="晨曦山谷逐层视差画面"></canvas></div><div class="status" id="warmState" role="status">正在加载五层背景…</div></article>
+<article><h2>暮蓝远山 · 板岩夜鸟</h2><div class="frame"><canvas id="slate" width="360" height="600" aria-label="暮蓝远山逐层视差画面"></canvas></div><div class="status" id="slateState" role="status">正在加载五层背景…</div></article>
+</div>
+<p class="meta">验收方法：拖动滚动滑块至两端，再使用自动播放至少一分钟检查景物边界；切换四种屏幕比例，确认太阳与月亮没有拉伸、鸟及石柱持续清晰；关闭雾气后对比景深效果。本页面仅在 V4 开发预览构建中暂时保留，正式合并前须移除。真实手机性能仍需在游戏页面另外测量。</p>
+</main>
+<script>
+(function(){
+'use strict';
+var layers=[['sky',0],['far',.045],['mid',.12],['mist',.19],['near',.28]];
+var views={},scroll=0,playing=false,guides=true,fog=true,elapsed=0,last=0;
+var shape=document.getElementById('shape'),control=document.getElementById('scroll'),position=document.getElementById('position');
+function clamp(v,low,high){return Math.max(low,Math.min(high,v));}
+function load(theme){
+ var item={canvas:document.getElementById(theme),images:{},ready:false,failed:false,waiting:layers.length,bird:null};
+ views[theme]=item;
+ for(var i=0;i<layers.length;i++){
+  (function(id){
+   var img=new Image();
+   item.images[id]=img;
+   img.onload=function(){
+    if(item.failed)return;
+    if(img.naturalWidth!==1600||img.naturalHeight!==1000){failure(theme);return;}
+    item.waiting--;
+    if(!item.waiting){item.ready=true;document.getElementById(theme+'State').textContent='五层加载完成 · 可进行人工视觉验收';render();}
+   };
+   img.onerror=function(){failure(theme);};
+   img.src='./assets/v4/'+theme+'/'+id+'.svg';
+  })(layers[i][0]);
+ }
+ var sprite=new Image();
+ item.bird=sprite;
+ sprite.onload=function(){render();};
+ sprite.onerror=function(){item.bird=null;};
+ sprite.src='./assets/v3/'+theme+'-flight.svg';
+}
+function failure(theme){views[theme].failed=true;document.getElementById(theme+'State').textContent='背景加载失败：请检查开发预览资源是否完整';}
+function paintImage(ctx,item,layer,W,H){
+ var img=item.images[layer[0]];
+ if(layer[0]==='sky'){
+  var sw=Math.min(1600,W*1000/H),anchor=item.canvas.id==='warm'?1170:1230;
+  var sx=clamp(anchor-sw*.74,0,1600-sw);
+  ctx.drawImage(img,sx,0,sw,1000,0,0,W,H);
+  return;
+ }
+ var tw=H*1.6,drift=layer[0]==='mist'&&fog?elapsed*1.3:0;
+ var offset=(scroll*layer[1]+drift)%tw;
+ for(var x=-offset;x<W;x+=tw)ctx.drawImage(img,x,0,tw+.7,H);
+}
+function paintGuides(ctx,item,W,H){
+ var gy=H*.885,px=W*.66,pw=Math.max(37,W*.125),gap=H*.255,gapCenter=H*.47;
+ ctx.save();
+ var fill=ctx.createLinearGradient(px,0,px+pw,0);
+ if(item.canvas.id==='warm'){fill.addColorStop(0,'#667265');fill.addColorStop(.5,'#b3aa91');fill.addColorStop(1,'#67776d');}
+ else{fill.addColorStop(0,'#293a4b');fill.addColorStop(.5,'#8794a0');fill.addColorStop(1,'#324a5e');}
+ ctx.fillStyle=fill;ctx.strokeStyle='rgba(255,255,255,.6)';ctx.lineWidth=1.5;
+ var top=gapCenter-gap*.5,bottom=gapCenter+gap*.5;
+ ctx.fillRect(px,0,pw,top);ctx.fillRect(px,bottom,pw,gy-bottom);
+ ctx.strokeRect(px,0,pw,top);ctx.strokeRect(px,bottom,pw,gy-bottom);
+ ctx.fillStyle='rgba(21,41,40,.72)';ctx.fillRect(0,gy,W,H-gy);
+ var bx=W*.28,by=H*.45,r=Math.max(13,W*.052);
+ if(item.bird&&item.bird.complete&&item.bird.naturalWidth===1440){
+  var size=r*4.04;ctx.drawImage(item.bird,0,0,240,240,bx-size*.5,by-size*.525,size,size);
+ }else{
+  ctx.fillStyle=item.canvas.id==='warm'?'#c59464':'#879caf';
+  ctx.beginPath();ctx.arc(bx,by,r,0,Math.PI*2);ctx.fill();
+ }
+ ctx.restore();
+}
+function render(){
+ for(var key of ['warm','slate']){
+  var item=views[key];if(!item)continue;
+  var c=item.canvas,ctx=c.getContext('2d'),W=c.width,H=c.height;
+  ctx.clearRect(0,0,W,H);
+  if(!item.ready){ctx.fillStyle='#23374c';ctx.fillRect(0,0,W,H);continue;}
+  for(var i=0;i<layers.length;i++){
+   var layer=layers[i];
+   if(layer[0]==='mist'&&!fog)continue;
+   ctx.save();
+   if(layer[0]==='mist'&&fog)ctx.globalAlpha=.66+.045*Math.sin(elapsed*.38);
+   paintImage(ctx,item,layer,W,H);
+   ctx.restore();
+  }
+  if(guides)paintGuides(ctx,item,W,H);
+ }
+}
+function resize(){
+ var values=shape.value.split(',').map(Number);
+ for(var key of ['warm','slate']){
+  var canvas=views[key].canvas;
+  canvas.width=values[0];canvas.height=values[1];
+ }
+ render();
+}
+shape.addEventListener('change',resize);
+control.addEventListener('input',function(){scroll=Number(control.value);position.textContent=String(Math.round(scroll));render();});
+document.getElementById('playing').addEventListener('change',function(e){playing=e.target.checked;last=0;});
+document.getElementById('guides').addEventListener('change',function(e){guides=e.target.checked;render();});
+document.getElementById('fog').addEventListener('change',function(e){fog=e.target.checked;render();});
+function tick(t){
+ if(!last)last=t;
+ var dt=Math.min(.05,Math.max(0,(t-last)/1000));last=t;
+ if(playing){scroll=(scroll+160*dt)%12800;control.value=String(Math.floor(scroll));position.textContent=String(Math.floor(scroll));elapsed+=dt;render();}
+ requestAnimationFrame(tick);
+}
+load('warm');load('slate');resize();requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>
