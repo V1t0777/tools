@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" role="img" aria-label="Blue Hour Range original cinematic background layer"><defs>
+<linearGradient id="stoneF" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#8293a5"/><stop offset=".38" stop-color="#7388a0"/><stop offset="1" stop-color="#526a81"/></linearGradient>
+<linearGradient id="stoneB" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#73889d"/><stop offset="1" stop-color="#516b7f"/></linearGradient>
+<linearGradient id="deepfog" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#c8d2de" stop-opacity="0"/><stop offset="1" stop-color="#aebdca" stop-opacity=".28"/></linearGradient>
+</defs>
+<path d="M0 604 L104 582 L153 565 L209 553 L262 486 L287 539 L332 504 L378 465 L413 534 L451 546 L509 519 L563 535 L620 566 L665 556 L733 532 L784 508 L845 456 L869 519 L911 485 L954 443 L986 519 L1050 538 L1095 560 L1176 554 L1223 499 L1254 541 L1308 473 L1345 518 L1426 542 L1481 568 L1539 586 L1600 604 L1600 1000 L0 1000Z" fill="url(#stoneF)"/>
+<path d="M262 486 L287 539 L300 563 L267 548 L234 552 Z M378 465 L413 534 L426 553 L387 531 L360 546 Z M845 456 L869 519 L892 541 L846 525 L818 548 Z M954 443 L986 519 L1008 542 L957 524 L917 539 Z M1308 473 L1345 518 L1368 553 L1308 526 L1290 544Z" fill="#c3c6d0" opacity=".36"/>
+<path d="M254 499 L282 547 L277 559 M361 488 L392 534 M822 482 L849 522 M936 467 L966 517 M1305 493 L1323 521" fill="none" stroke="#e2dce0" stroke-opacity=".24" stroke-width="3"/>
+<path d="M0 682 C95 660 206 643 296 664 S491 641 598 652 S817 615 939 650 S1142 624 1226 657 S1420 646 1600 682 L1600 1000 L0 1000Z" fill="url(#stoneB)"/>
+<path d="M0 588 Q367 555 809 584 T1600 588 L1600 840 L0 840Z" fill="url(#deepfog)" opacity=".58"/></svg>
