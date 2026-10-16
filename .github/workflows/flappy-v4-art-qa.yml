@@ -78,16 +78,18 @@ jobs:
               b=path.read_bytes()
               if b[:8]!=b"\x89PNG\r\n\x1a\n":
                   raise SystemExit(f"Invalid PNG signature: {path}; size={len(b)}")
-              if len(b)<2500:
+              if len(b)<20000:
                   raise SystemExit(f"Suspiciously small screenshot: {path}; size={len(b)}; see uploaded diagnostics")
               width,height=struct.unpack(">II",b[16:24])
-              if width<300 or height<500:
-                  raise SystemExit(f"Unexpected screenshot size: {path} {width}x{height}")
+              label=path.stem.split("-")[-1]
+              expected_width,expected_height=map(int,label.split("x"))
+              if (width,height)!=(expected_width,expected_height):
+                  raise SystemExit(f"Wrong mobile capture dimensions: {path} {width}x{height}")
               print(f"{path}: {width}x{height}, {len(b)} bytes")
           if len(list(Path("v4-art-qa").glob("*.png")))!=8:
               raise SystemExit("Expected exactly 8 world/viewport screenshots")
           PY
-      - name: Keep screenshots and diagnostics even if validation fails
+      - name: Keep 8 scene screenshots and diagnostics
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
