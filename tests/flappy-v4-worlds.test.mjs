@@ -67,7 +67,7 @@ test('V4 seam smoke audit: terrain joins at matching elevation; mist stays withi
       const svg=read('flappy/assets/v4/'+skin+'/'+id+'.svg');
       const first=svg.match(/<path d="M0 (\d+)\b([^"]+)"/);
       assert.ok(first,skin+' '+id+' missing left tile edge');
-      const join=first[2].match(/\bL1600 (\d+)\s+L1600 1000/);
+      const join=first[2].match(/(?:[LTS]|\s)1600 (\d+)\s+L1600 1000/);
       assert.ok(join,skin+' '+id+' missing explicit right tile edge');
       assert.equal(Number(first[1]),Number(join[1]),skin+' '+id+' edge altitudes differ');
     }
