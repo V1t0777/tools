@@ -145,3 +145,16 @@ test('V4 near canopy brushwork and crest facets remain clipped, lightweight and 
     assert.doesNotMatch(near+mid,/<(?:filter|script|animate|foreignObject|image)\b/i);
   }
 });
+
+test('V4 repeating layers must not contain left-to-right paint gradients that create vertical tile seams',()=>{
+  for(const theme of ['warm','slate']){
+    for(const layer of ['far','mid','mist','near']){
+      const source=read('flappy/assets/v4/'+theme+'/'+layer+'.svg');
+      for(const [tag] of source.matchAll(/<linearGradient\b[^>]*>/g)){
+        const x1=tag.match(/\bx1="([^"]+)"/)?.[1]??'0';
+        const x2=tag.match(/\bx2="([^"]+)"/)?.[1]??'0';
+        assert.equal(x1,x2,theme+'/'+layer+' has a non-seamless horizontal gradient: '+tag);
+      }
+    }
+  }
+});
