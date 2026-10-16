@@ -419,7 +419,7 @@
     if(layer.id==='sky'){
       // Keep the sun and moon circular on narrow screens; crop instead of stretching.
       var sw=Math.min(1600,W*1000/H),anchor=birdSkin==='warm'?1170:1230;
-      var sx=Math.max(0,Math.min(1600-sw,anchor-sw*.74));
+      var sx=Math.max(0,Math.min(1600-sw,anchor-sw*.89));
       ctx.drawImage(image,sx,0,sw,1000,0,0,W,H);
       return;
     }
