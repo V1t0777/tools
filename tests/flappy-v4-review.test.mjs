@@ -69,3 +69,12 @@ test('V4 native inputs are actual sibling selectors, not nested inside labels',(
   assert.match(html,/#guides:checked~\.worlds \.guides\{display:block\}/);
   assert.match(html,/#fog:not\(:checked\)~\.worlds \.layer\.mist\{display:none\}/);
 });
+
+test('V4 screenshot target mode is viewport-accurate while regular review remains multi-world',()=>{
+  for(const theme of ['warm','slate'])
+    assert.match(html,new RegExp('<article class="world '+theme+'" id="'+theme+'">'));
+  assert.match(html,/body:has\(\.world:target\) \.world:not\(:target\)\{display:none\}/);
+  assert.match(html,/body:has\(\.world:target\) \.frame\{width:100vw;height:100dvh;aspect-ratio:auto/);
+  assert.match(html,/body:has\(\.world:target\) header,/);
+  assert.doesNotMatch(html,/<script\b/i);
+});
