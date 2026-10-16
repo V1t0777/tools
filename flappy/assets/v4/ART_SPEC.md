@@ -50,8 +50,10 @@ Asset coordinate system: `viewBox="0 0 1600 1000"`. For each parallax image, dra
 - [x] **Basic seam/safety regression:** tile edge altitude alignment, fog bounds, cross-theme load races and build isolation.
 - [ ] Alpha 2 art review: compare dawn/twilight compositions with the original cinematic references, refine painted surface texture, manually inspect animated seams at different screen ratios.
 - [ ] High-fidelity final art pass: replace temporary SVG engineering art with professionally finished original material layers after visual approval.
-- [ ] Beta 1: cloud/fog dynamics and tasteful shared world lighting.
-- [ ] Beta 2: mobile performance measurements, quality fallback, accessibility and playability regression.
+- [x] **Beta 1 atmosphere engineering:** restrained dual-phase valley mist, existing slow clouds, material detail constrained to landforms; honors reduced-motion and quality tiers.
+- [ ] Beta 1 artistic QA: visually inspect atmospheric motion, lighting realism and foreground readability in browser captures; tune if intrusive.
+- [x] **Beta 2 quality-policy implementation:** memory and data-saving hints with high/medium/low scenery tiers; sustained slow frames downgrade only scenery draw complexity.
+- [ ] Beta 2 **real-device performance verification:** collect frame-time distributions, decoded-image memory, warm/cold scene load times, and contrast/screenshot evidence from real phones.
 - [ ] Release: all checks pass, final user approval, protected-branch PR merge and Cloudflare production verification.
 
 *This is an art/engineering starter kit, not a claim that the final painted cinematic artwork is already complete.*
@@ -63,3 +65,11 @@ Asset coordinate system: `viewBox="0 0 1600 1000"`. For each parallax image, dra
 - Background is fixed for the current run, including when image loading finishes during play. A subsequent run can select the completed world.
 - Basic geometric seam assertions are in Node CI, but **do not replace** visual seam and contrast inspection with actual rendered screenshots on devices.
 - Quality grades, texture production, real mobile FPS measurements and accessibility checks remain pending. The PR must remain Draft and must not be merged.
+
+## 2026-10-17 Beta 1/2 technical increment
+
+- Atmospheric motion is restrained: in the high tier, mist uses a slower base drift and a second translucent phase-offset pass; in medium, one pass; in low and reduced-motion, neither dynamic cloud/fog pass is rendered.
+- Both themed midground and foreground scenes receive deterministic, clipped microtexture: rock strata, restrained edge glints, and very small moss/boulder marks. All material lives inside terrain silhouettes with no external SVG media, script, animated SVG or expensive noise filters.
+- `navigator.deviceMemory` and `saveData` help pick initial quality where browser hints exist. A separate, bounded frame-time observer may downgrade *only* scenery after sustained slow-frame evidence. Missing browser hints assume high quality; quality never affects collision, physics, scoring or authentication.
+- A quality tier should not be claimed as a measured FPS guarantee; native device verification is still mandatory.
+- **Important art gate:** these remain handcrafted SVG technical layers. Texture-rich final painted art, visual browser captures, seam/contrast inspection and actual iPhone/Android testing are not yet complete. Draft PR stays unmerged.
