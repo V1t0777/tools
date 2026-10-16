@@ -88,3 +88,16 @@ Asset coordinate system: `viewBox="0 0 1600 1000"`. For each parallax image, dra
 - Added deterministic bounding checks: near-layer compressed source budget below **100 KB per SVG**, mid below **24 KB**, new facets remain in clipped terrain, and no SVG scripts, live filters, external images or runtime GPU shaders are used.
 - GitHub Actions browser capture produced **8 PNG screenshots** at mobile viewports 320×568, 360×600, 390×844 and 420×740 after the artwork changes (run `38949341322`).
 - **Honest visual assessment:** this noticeably improves layering, not yet photorealistic or high-resolution painted realism. The base ridge shapes remain stylized. True final textured original art, moving-game seam inspection and physical device performance are still release blockers.
+
+## 2026-10-17 Alpha 4 — memory discipline, raster-first readiness and seam evidence
+
+**Memory and loading**
+- `Image.onload` does not imply decoded raster content. On browsers implementing `HTMLImageElement.decode()`, all five SVG layers must finish asynchronous decode before V4 becomes active; a rejected decode invokes complete V3 fallback. Browsers without `decode()` continue using the guarded `onload` path.
+- On randomized theme selection, the inactive world is discarded (image handlers detached, texture references removed, stale session invalidated); only the current five-layer world is retained by the application. Typical worst-case uncompressed RGBA surface budget is approximately **5 × 1600 × 1000 × 4 = 32,000,000 bytes (~30.5 MiB)** for one full world, *excluding browser overhead, bird atlases and other buffers*. Real GPU use is device-specific and **not measured**.
+- VM regressions now explicitly cover partial async decoding, rejected SVG decoding, inactive theme eviction and a return to the previously discarded theme.
+
+**Repeatable edge-join checks**
+- Temporary script-free art reviewer provides `#warm-seam` and `#slate-seam` to draw each tiled layer twice, meeting exactly at the viewport center. The draft-only GitHub Actions Chrome job captures **16 PNGs** (two worlds × four viewport sizes × normal-scene / center-seam).
+- Actual browser screenshot inspection found a discontinuity in the forest/midground repeat joins caused by **horizontal gradient endpoints that did not match**. Warm midground and both worlds' foreground glaze gradients were changed to vertical-only fades; tests now reject nonmatching `x1`/`x2` for repeating-layer linear gradients.
+- For 390×844 Chrome seam screenshots, a *diagnostic*, nonperceptual metric measured mean absolute adjacent-RGB-column change at the exact center join, restricted to image rows 65%–90%: **warm 6.06 → 0.81; slate 2.25 → 0.77** (unit: mean 8-bit channel difference per adjacent column). This is evidence that this specific seam artifact was reduced, *not* proof of zero seams at all camera positions.
+- Files and screenshot runs are kept on the Draft PR, not added to `main`. True live in-game panning, image raster quality, frame-time and memory verification on iOS/Android are still pending.
