@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" role="img" aria-label="Dawn Valley V4 cinematic background art"><defs><linearGradient id="mid" x1="0" y1="0" x2=".2" y2="1"><stop stop-color="#779a97"/><stop offset=".5" stop-color="#6b9189"/><stop offset="1" stop-color="#557d73"/></linearGradient>
+<linearGradient id="midSh" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="#678681"/><stop offset="1" stop-color="#416c68"/></linearGradient></defs>
+<path d="M0 705 L70 684 L145 652 L208 662 L295 603 L357 629 L430 600 L503 653 L551 634 L616 604 L699 647 L777 640 L846 577 L918 602 L989 645 L1060 612 L1117 637 L1187 597 L1250 622 L1310 649 L1387 619 L1455 650 L1523 681 L1600 705 L1600 1000 L0 1000Z" fill="url(#mid)"/>
+<path d="M295 603 L357 629 L331 650 L306 654 L279 675 L244 686Z M846 577 L918 602 L908 643 L857 657 L813 690 L798 667Z M1187 597 L1250 622 L1240 661 L1189 678 L1160 691 L1135 657Z" fill="url(#midSh)" opacity=".54"/>
+<path d="M274 649 L295 613 L305 638 M829 635 L847 590 L861 631 M1177 642 L1186 609 L1202 637 M429 617 L443 627 L471 638" fill="none" stroke="#e8d4b5" stroke-width="3" opacity=".3"/>
+<path d="M0 765 C102 739 176 733 278 746 C392 762 442 689 556 719 C670 750 772 711 875 713 C980 727 1063 756 1145 718 C1262 668 1337 744 1417 731 C1513 714 1546 739 1600 765 L1600 1000 L0 1000Z" fill="url(#midSh)"/>
+<path d="M0 768 Q440 759 800 777 T1600 768" fill="none" stroke="#e5d7bd" stroke-width="12" stroke-opacity=".12"/></svg>
