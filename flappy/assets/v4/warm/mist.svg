@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" role="img" aria-label="Dawn Valley V4 cinematic background art"><defs>
+<linearGradient id="mistA" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#f9eadc" stop-opacity="0"/><stop offset=".4" stop-color="#f5e9dc" stop-opacity=".31"/><stop offset=".65" stop-color="#f9f0e7" stop-opacity=".22"/><stop offset="1" stop-color="#fbf1e7" stop-opacity="0"/></linearGradient>
+<radialGradient id="mistB"><stop stop-color="#fff1dc" stop-opacity=".23"/><stop offset="1" stop-color="#fff1dc" stop-opacity="0"/></radialGradient>
+</defs>
+<rect x="0" y="558" width="1600" height="138" fill="url(#mistA)"/>
+<ellipse cx="340" cy="687" rx="352" ry="56" fill="url(#mistB)"/>
+<ellipse cx="990" cy="695" rx="460" ry="69" fill="url(#mistB)"/>
+<ellipse cx="1450" cy="632" rx="260" ry="44" fill="url(#mistB)"/>
+<path d="M0 622 C230 599 417 647 637 618 S1057 620 1233 613 S1474 627 1600 622" fill="none" stroke="#fff5e8" stroke-width="20" stroke-opacity=".075"/></svg>
