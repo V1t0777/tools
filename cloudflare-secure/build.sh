@@ -13,6 +13,8 @@ cp night-shift/index.html "$OUT/night-shift/"
 cp admin-night-shift/index.html "$OUT/admin-night-shift/"
 cp beads/index.html beads/app.js beads/style.css beads/mard-palette.js "$OUT/beads/"
 cp flappy/index.html "$OUT/flappy/"
+# Temporary V4 visual QA page — remove before final production merge.
+cp flappy/review-v4.html "$OUT/flappy/"
 # Only the approved, self-hosted V3 bird atlases enter the authenticated artifact.
 mkdir -p "$OUT/flappy/assets/v3"
 cp flappy/assets/v3/warm-flight.svg flappy/assets/v3/slate-flight.svg "$OUT/flappy/assets/v3/"
