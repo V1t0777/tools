@@ -18,10 +18,10 @@ function extractGameScript(documentSource){
 }
 const source=extractGameScript(html);
 new vm.Script(source); // Syntax check independent of the DOM harness.
-function setup({auth=true,fetchImpl=async()=>{throw new Error('offline');},storage=new Map([['zhaoFlappyBest.v1','12']]),render=false}={}){
-  const elements=new Map(),events={},rafQueue=[];let authChange,createdCanvases=0,drawImages=0;const paintedColors=[];
+function setup({auth=true,fetchImpl=async()=>{throw new Error('offline');},storage=new Map([['zhaoFlappyBest.v1','12']]),render=false,imageLoading=false}={}){
+  const elements=new Map(),events={},rafQueue=[];let authChange,createdCanvases=0,drawImages=0;const paintedColors=[],drawnSources=[],imageObjects=[];
   const gradient={addColorStop(){}};
-  const fakeCtx=new Proxy({createLinearGradient(){return gradient;},createRadialGradient(){return gradient;},drawImage(){drawImages++;}},
+  const fakeCtx=new Proxy({createLinearGradient(){return gradient;},createRadialGradient(){return gradient;},drawImage(im){drawImages++;if(im&&im.src)drawnSources.push(im.src);}},
     {get(target,key){return target[key]??(()=>{});},set(target,key,value){if(key==='fillStyle'&&typeof value==='string')paintedColors.push(value);target[key]=value;return true;}});
   function element(id){
     if(elements.has(id))return elements.get(id);
@@ -37,14 +37,16 @@ function setup({auth=true,fetchImpl=async()=>{throw new Error('offline');},stora
   const localStorage={getItem(key){return storage.has(key)?storage.get(key):null;},setItem(key,value){storage.set(key,String(value));}};
   const document={getElementById:element,addEventListener(t,fn){events[t]=fn;},body:{setAttribute(){}},
     createElement(tag){if(tag!=='canvas')throw new Error('Unexpected element');createdCanvases++;return {getContext(){return fakeCtx;}};}};
+  function FakeImage(){this.onload=null;this.onerror=null;this.naturalWidth=1600;this.naturalHeight=1000;this.src='';imageObjects.push(this);}
   const context={window,document,navigator:{},localStorage,performance:{now:()=>1000},
     requestAnimationFrame(fn){if(render)rafQueue.push(fn);},setTimeout,clearTimeout,AbortController,fetch:fetchImpl,Intl,console};
+  if(imageLoading)context.Image=FakeImage;
   // Test-only closure access, not shipped in the game.
-  const instrumented=source.replace('  loadBest();loadPendingBest();restorePendingRuns();resetGame(true);',`  window.testApi={startGame,finishGame,openLeaderboard,closeLeaderboard,sendRun,submitOnlineRun,refreshLeaderboard,retryPendingSubmission,get active(){return activeRun;},get state(){return state;},get best(){return best;},get pendingBest(){return pendingBest;},set score(value){score=value;},drawBirdForSkin(value){birdSkin=value;drawBird(1000);},birdRadiusForTest(){return birdRadius();},skinName(value){return BIRD_SKINS[value].name;},flapForTest(){flap();},get wingPhase(){return bird.wingPhase;},get wingActive(){return bird.wingActive;},get wingQueued(){return bird.wingQueued;},get wingTempo(){return bird.wingTempo;},get vy(){return bird.vy;}};\n  loadBest();loadPendingBest();restorePendingRuns();resetGame(true);`);
+  const instrumented=source.replace('  loadBest();loadPendingBest();restorePendingRuns();resetGame(true);',`  window.testApi={startGame,finishGame,openLeaderboard,closeLeaderboard,sendRun,submitOnlineRun,refreshLeaderboard,retryPendingSubmission,get active(){return activeRun;},get state(){return state;},get best(){return best;},get pendingBest(){return pendingBest;},set score(value){score=value;},drawBirdForSkin(value){birdSkin=value;drawBird(1000);},birdRadiusForTest(){return birdRadius();},skinName(value){return BIRD_SKINS[value].name;},flapForTest(){flap();},get wingPhase(){return bird.wingPhase;},get wingActive(){return bird.wingActive;},get wingQueued(){return bird.wingQueued;},get wingTempo(){return bird.wingTempo;},get vy(){return bird.vy;},forceWarmSample(){birdSkin='warm';preloadCinematicWarm();resetGame(false);},get cinematicStatus(){return cinematicWorld.status;},get cinematicSession(){return cinematicSession;},resetSample(){resetGame(false);},drawSample(){draw(1000);}};\n  loadBest();loadPendingBest();restorePendingRuns();resetGame(true);`);
   vm.runInNewContext(instrumented,context);
   return {api:window.testApi,e:element,events,authChange,session,storage,
     tick(t){const callback=rafQueue.shift();if(!callback)throw new Error('Missing RAF callback');callback(t);},
-    createdCanvases(){return createdCanvases;},drawImages(){return drawImages;},
+    createdCanvases(){return createdCanvases;},drawImages(){return drawImages;},drawnSources(){return [...drawnSources]},imageObjects(){return [...imageObjects]},
     resetPaint(){paintedColors.length=0;},paintedColors(){return [...paintedColors]}};
 }
 const flush=()=>new Promise(r=>setImmediate(r));
@@ -185,4 +187,48 @@ test('V3.1 queued strokes settle to neutral without a restart or permanent flapp
   assert.equal(scene.api.wingQueued,false);
   assert.equal(scene.api.wingActive,false,'one queued stroke must settle to neutral');
   assert.equal(scene.api.wingPhase,0,'neutral matches the first/last visual pose');
+});
+
+test('V4 warm assets activate atomically only after all five images finish loading',()=>{
+  const scene=setup({render:true,imageLoading:true});
+  scene.api.forceWarmSample();
+  const images=scene.imageObjects().filter(im=>im.src.includes('/v4/warm/'));
+  assert.equal(images.length,5);
+  assert.equal(scene.api.cinematicStatus,'loading');
+  assert.equal(scene.api.cinematicSession,false);
+  for(let i=0;i<4;i++)images[i].onload();
+  assert.equal(scene.api.cinematicStatus,'loading');
+  assert.equal(scene.api.cinematicSession,false);
+  images[4].onload();
+  assert.equal(scene.api.cinematicStatus,'ready');
+  assert.equal(scene.api.cinematicSession,true);
+  scene.api.drawSample();
+  const rendered=scene.drawnSources();
+  for(const id of ['sky','far','mid','mist','near'])
+    assert.ok(rendered.some(src=>src.endsWith('/v4/warm/'+id+'.svg')),'render missing '+id);
+});
+
+test('V4 an unavailable background layer rejects the entire sample and retains V3 drawing',()=>{
+  const scene=setup({render:true,imageLoading:true});
+  scene.api.forceWarmSample();
+  const images=scene.imageObjects().filter(im=>im.src.includes('/v4/warm/'));
+  images[0].onload();images[1].onerror(new Error('404'));
+  for(let i=2;i<images.length;i++)images[i].onload();
+  assert.equal(scene.api.cinematicStatus,'failed');
+  assert.equal(scene.api.cinematicSession,false);
+  scene.resetPaint();scene.api.drawSample();
+  assert.ok(scene.paintedColors().some(c=>c==='#9aaab5'||c==='#667991'||c==='#426c65'),
+    'V3 ridges must still render if a new layer fails');
+});
+
+test('V4 late loading during an ongoing game cannot switch the background mid-run',()=>{
+  const scene=setup({render:true,imageLoading:true});
+  scene.api.forceWarmSample();
+  scene.api.startGame();
+  const images=scene.imageObjects().filter(im=>im.src.includes('/v4/warm/'));
+  images.forEach(im=>im.onload());
+  assert.equal(scene.api.cinematicStatus,'ready');
+  assert.equal(scene.api.cinematicSession,false,'ongoing run retains chosen background mode');
+  scene.api.resetSample();
+  assert.equal(scene.api.cinematicSession,true,'next round may use the completed sample');
 });
