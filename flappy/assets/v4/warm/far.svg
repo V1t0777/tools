@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" role="img" aria-label="Dawn Valley V4 cinematic background art"><defs>
+<linearGradient id="farA" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#a2b6ba"/><stop offset=".62" stop-color="#a6b3b5"/><stop offset="1" stop-color="#bbc6bd"/></linearGradient>
+<linearGradient id="farB" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#8fa5aa"/><stop offset="1" stop-color="#98aca9"/></linearGradient>
+<linearGradient id="fog" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#fff0db" stop-opacity="0"/><stop offset=".75" stop-color="#efe9dd" stop-opacity=".34"/><stop offset="1" stop-color="#efe9dd" stop-opacity=".23"/></linearGradient></defs>
+<path d="M0 597 L87 573 L144 569 L229 530 L295 506 L363 544 L418 524 L499 490 L563 533 L634 510 L704 542 L753 535 L830 501 L914 520 L979 475 L1046 511 L1118 489 L1184 527 L1240 533 L1306 495 L1390 542 L1446 522 L1530 575 L1600 597 L1600 1000 L0 1000 Z" fill="url(#farA)"/>
+<path d="M229 530 L295 506 L363 544 L340 539 L298 525 L260 537 Z M914 520 L979 475 L1046 511 L1010 507 L979 489 L950 514 Z M1240 533 L1306 495 L1390 542 L1341 531 L1306 513 L1272 526 Z" fill="#f4e8cf" opacity=".33"/>
+<path d="M0 666 C129 624 174 616 247 631 S441 590 521 605 S704 632 825 599 S1011 614 1091 623 S1303 591 1430 625 S1549 636 1600 666 L1600 1000 L0 1000Z" fill="url(#farB)"/>
+<path d="M0 592 Q460 570 800 594 T1600 592 L1600 760 L0 760Z" fill="url(#fog)" opacity=".7"/>
+<path d="M0 690 Q370 672 680 683 T1600 690" fill="none" stroke="#ebe8d8" stroke-opacity=".17" stroke-width="12"/></svg>
