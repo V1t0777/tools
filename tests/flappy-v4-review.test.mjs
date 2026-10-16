@@ -52,3 +52,20 @@ test('V4 static comparison mirrors scene strip origin and Canvas solar anchor cr
  assert.match(game,/anchor=birdSkin==='warm'\?1170:1230/);
  assert.match(game,/var sx=Math\.max\(0,Math\.min\(1600-sw,anchor-sw\*\.74\)\)/);
 });
+
+test('V4 native inputs are actual sibling selectors, not nested inside labels',()=>{
+  const section=html.split('<section class="options"')[1]?.split('<div class="worlds">')[0];
+  assert.ok(section,'missing native CSS controls section');
+  assert.doesNotMatch(section,/<label[^>]*>\s*<input\b/,'a nested input cannot select a sibling world container');
+  for(const id of ['s360','s390','s420','s320','guides','fog']){
+    assert.match(section,new RegExp('<input[^>]*id="'+id+'"[^>]*>\\s*<label for="'+id+'">'));
+    assert.ok(html.includes('#'+id),'missing associated CSS input switch '+id);
+  }
+  assert.match(html,/\.options>input\{position:absolute/);
+  assert.match(html,/\.options>input:focus-visible\+label\{outline:/);
+  assert.match(html,/#s390:checked~\.worlds \.frame\{aspect-ratio:390\/844\}/);
+  assert.match(html,/#s420:checked~\.worlds \.frame\{aspect-ratio:420\/740\}/);
+  assert.match(html,/#s320:checked~\.worlds \.frame\{aspect-ratio:320\/568\}/);
+  assert.match(html,/#guides:checked~\.worlds \.guides\{display:block\}/);
+  assert.match(html,/#fog:not\(:checked\)~\.worlds \.layer\.mist\{display:none\}/);
+});
