@@ -43,7 +43,7 @@ test('V4 worlds use an atomic loader and block mid-flight scene changes',()=>{
   assert.match(html,/if\(!drawCinematicWorld\(\)\)\{/);
   assert.match(html,/drawBackground\(\);\s*drawClouds\(\);\s*drawRidges\(\)/);
   assert.match(html,/cinematicSession=cinematicWorlds\[birdSkin\]\.status==='ready'\?birdSkin:null/);
-  assert.match(html,/if\(!reduceMotion\)drawCinematicLayer\(CINEMATIC_LAYERS\[3\],world\)/);
+  assert.match(html,/if\(!reduceMotion&&sceneryQuality!=='low'\)/);
   assert.match(html,/else if\(state==='running'\)flap\(\)/);
   assert.match(html,/function collides\(\)/);
   const script=html.split('<script>')[1]?.split('</script>')[0];
