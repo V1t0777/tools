@@ -1,0 +1,54 @@
+# Flappy V4.0 — Cinematic Worlds Production Specification
+
+Status: **IN DEVELOPMENT / NOT FOR RELEASE**. The `main` branch and production Cloudflare environment must remain unchanged until **both** worlds and their performance / accessibility tests are accepted.
+
+## Art direction and gameplay contract
+
+- **Warm traveler → Dawn Valley** (`warm`). Misty blue-grey sky, muted apricot sunrise, atmospherically separated alpine ridges, restrained pine forest, weathered sandstone pipes.
+- **Slate bird → Blue-Hour Range** (`slate`). Cool twilight, restrained moonlight, jagged ridges and dark conifers, weathered slate pipes.
+- Same silhouette scale, camera, visual hierarchy and overall production quality across worlds; avoid tinting the warm art into a cheap imitation of a night scene.
+- The playable corridor is the center of the canvas. No high-contrast tree, glowing particle or opaque foreground may occlude a bird or pipe.
+- Gameplay state, spawn timing, hitboxes, physical lift, leaderboard, Supabase authentication and accessibility interactions are **out of scope**.
+
+## World layer contract
+
+The scene is drawn **behind pipes and ground**, from back to front. Static SVGs are valid as the stage-2 technical sample: they are original, self-contained, un-scripted and all but `sky` must retain a genuinely transparent canvas. Final painted/WebP assets can later replace these sources under the same contract.
+
+| ID | Content | Intended scroll factor | Alpha | Tile rule |
+| --- | --- | ---: | --- | --- |
+| sky | sunrise gradient, soft sun, faint upper cloud banks | 0 | opaque | stretch to canvas, no horizontal wrap |
+| far | distant, fog-softened alpine ridge silhouette | 0.045 | transparent | left and right horizon endpoints coincide |
+| mid | structured alpine ridges with selective shade | 0.12 | transparent | left and right silhouette endpoints coincide |
+| mist | narrow low-contrast bands between depths | 0.19 | transparent | seamless side edges, motion can be reduced |
+| near | partial forest/rock silhouette below main flight lane | 0.28 | transparent | seamless side edges |
+
+Asset coordinate system: `viewBox="0 0 1600 1000"`. For each parallax image, draw it at height `H`; tile width = `H * 1.6`. The physical ground starts at approximately 88.5% of `H`; all non-opaque layers may extend below it, hidden by the ground renderer. For each repeatable layer, both edges must meet at a visually matching altitude/color with no abrupt vertical seam.
+
+## Rendering / loading
+
+- Load **only** the selected world. The first sample is warm only; while the slate sample is incomplete, slate uses the existing V3.1 procedure-generated background.
+- Use a two-phase loader with per-image `load`/`error` resolution. **No partial world** may render while any required layer is pending/failed.
+- Avoid re-creating images or gradients inside the render loop. `drawImage()` only; preserve old rendering functions as fallback.
+- Clamp DPR according to existing game policy. On reduced-motion / low quality, render fewer transparent overlays; gameplay scrolling remains correct.
+- Respect the existing CSP (`img-src 'self' data:`) and Cloudflare explicit allowlist. No external CDNs, tracking, texture scripts, filters requiring GPU post-processing, or shader execution.
+
+## Visual QA before release
+
+1. Large/small mobile portrait widths and landscape cropping.
+2. No seams after 100+ seconds of repeated scrolling at different game speeds.
+3. The bird and stone-pipe edges remain distinguishable at sunrise and in the darker twilight set.
+4. Cold-start image loading, offline/404/error fallback (single missing layer → complete old-scene fallback).
+5. A/B quality profiles: no overload on mid-range phones and no visible black image flashes.
+6. Idle, active, paused, hit and score progression.
+7. Automated tests and repository security gates green; actual device frame-time and memory sampling, not invented benchmark numbers.
+
+## Milestones
+
+- [x] **Alpha 1 engineering sample:** Dawn Valley self-contained five-layer SVG kit; loading, repeat rendering, fallback, basic tests.
+- [ ] Alpha 1 art approval: visual comparison to high-fidelity reference, pixel-level seam inspection, device screenshot review.
+- [ ] Alpha 2: equally refined custom slate world assets.
+- [ ] Beta 1: cloud/fog dynamics and tasteful shared world lighting.
+- [ ] Beta 2: mobile performance measurements, quality fallback, accessibility and playability regression.
+- [ ] Release: all checks pass, final user approval, protected-branch PR merge and Cloudflare production verification.
+
+*This is an art/engineering starter kit, not a claim that the final painted cinematic artwork is already complete.*
