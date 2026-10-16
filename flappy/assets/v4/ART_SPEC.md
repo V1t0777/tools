@@ -80,3 +80,11 @@ Asset coordinate system: `viewBox="0 0 1600 1000"`. For each parallax image, dra
 - Alpha QA checks include matching horizon elevations, both-world asset readiness, independent world failure recovery, and high-DPR fractional tile overlap to avoid thin raster seams.
 - **MANDATORY REMOVAL BEFORE PRODUCTION:** remove `flappy/review-v4.html`, its copy command from `cloudflare-secure/build.sh`, the `dist-secure/flappy/review-v4.html` assertion in `scripts/security-check.sh`, and development-only QA test `tests/flappy-v4-review.test.mjs` (or rewrite tests for final permitted art routes).
 - Perform browser screenshots at the specified aspect ratios and a full scrolling scene before marking art gate complete. Do not claim screenshots or measured device FPS from Node contract tests.
+
+## 2026-10-17 Alpha 3: hand-shaped scene brushwork — completed on Draft PR #57
+
+- Both pine forests now have a separate shoulder/branchlet and canopy-glazing pass: **58** warm and **63** slate bough overlays; avoid adding detached opaque sprites in the playable lane. The underlying original tree silhouettes and collision-free placement remain.
+- Both mountain midgrounds now use **five light-facing crest facets with neighboring shadow and rock-scoring lines**; all of the strokes are limited by the corresponding terrain silhouette.
+- Added deterministic bounding checks: near-layer compressed source budget below **100 KB per SVG**, mid below **24 KB**, new facets remain in clipped terrain, and no SVG scripts, live filters, external images or runtime GPU shaders are used.
+- GitHub Actions browser capture produced **8 PNG screenshots** at mobile viewports 320×568, 360×600, 390×844 and 420×740 after the artwork changes (run `38949341322`).
+- **Honest visual assessment:** this noticeably improves layering, not yet photorealistic or high-resolution painted realism. The base ridge shapes remain stylized. True final textured original art, moving-game seam inspection and physical device performance are still release blockers.
