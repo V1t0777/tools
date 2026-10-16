@@ -43,3 +43,12 @@ test('V4 rendering uses a minimal high-DPR tile overlap, including atmosphere dr
  assert.match(game,/tileWidth\+overlap,H/);
  assert.match(game,/var dx=\(\(scroll\*layer\.speed\+\(drift\|\|0\)\)\%tileWidth\+tileWidth\)\%tileWidth/);
 });
+
+test('V4 static comparison mirrors scene strip origin and Canvas solar anchor crops',()=>{
+ assert.match(html,/\.layer\{[^}]*left:0;transform:none/);
+ assert.match(html,/\.layer\.sky\{[^}]*left:74%/);
+ assert.match(html,/\.warm \.layer\.sky\{transform:translateX\(-73\.125%\)\}/);
+ assert.match(html,/\.slate \.layer\.sky\{transform:translateX\(-76\.875%\)\}/);
+ assert.match(game,/anchor=birdSkin==='warm'\?1170:1230/);
+ assert.match(game,/var sx=Math\.max\(0,Math\.min\(1600-sw,anchor-sw\*\.74\)\)/);
+});
