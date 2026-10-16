@@ -60,3 +60,21 @@ test('V4 both art kits ship only through the Cloudflare secure build',()=>{
   }
   assert.doesNotMatch(read('scripts/build-public.sh'),/cp .*flappy\//);
 });
+
+test('V4 seam smoke audit: terrain joins at matching elevation; mist stays within the repeating tile',()=>{
+  for(const skin of ['warm','slate']){
+    for(const id of ['far','mid','near']){
+      const svg=read('flappy/assets/v4/'+skin+'/'+id+'.svg');
+      const first=svg.match(/<path d="M0 (\d+)\b([^"]+)"/);
+      assert.ok(first,skin+' '+id+' missing left tile edge');
+      const join=first[2].match(/\bL1600 (\d+)\s+L1600 1000/);
+      assert.ok(join,skin+' '+id+' missing explicit right tile edge');
+      assert.equal(Number(first[1]),Number(join[1]),skin+' '+id+' edge altitudes differ');
+    }
+    const mist=read('flappy/assets/v4/'+skin+'/mist.svg');
+    for(const ell of mist.matchAll(/<ellipse\b[^>]*cx="(\d+)"[^>]*rx="(\d+)"[^>]*>/g)){
+      const x=Number(ell[1]),r=Number(ell[2]);
+      assert.ok(x-r>=0&&x+r<=1600,skin+' fog ellipse crosses a non-matching tile edge');
+    }
+  }
+});
