@@ -35,7 +35,7 @@ test('V4 alpha 2 has two distinct five-layer self-hosted SVG worlds',()=>{
 test('V4 worlds use an atomic loader and block mid-flight scene changes',()=>{
   assert.match(html,/var cinematicWorlds=\{/);
   assert.match(html,/function preloadCinematicWorld\(skin\)/);
-  assert.match(html,/picture\.src='\.\/assets\/v4\/'+skin+'\/'+id+'\.svg'/);
+  assert.ok(html.includes("picture.src='./assets/v4/'+skin+'/'+id+'.svg'"));
   assert.match(html,/world\.remaining=CINEMATIC_LAYERS\.length/);
   assert.match(html,/if\(world\.remaining===0\)/);
   assert.match(html,/world\.status='failed'/);
