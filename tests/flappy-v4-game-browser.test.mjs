@@ -253,3 +253,12 @@ test('V4 Alpha 20 true Canvas 320-pixel legibility and atlas evidence is Draft-o
  assert.doesNotMatch(game,/contrastProbe|compositeReadability|contrastQa|headless-narrow-readability/);
  assert.doesNotMatch(builder,/contrastProbe|compositeReadability|headless-narrow-readability/);
 });
+
+
+test('Alpha 21 keeps narrow warm-near improvement guard inside the Draft browser harness',()=>{
+ assert.match(probe,/Alpha 21 narrow warm-near seam regression/);
+ assert.match(probe,/sample\.seamMeanRgbDelta<=3\.25/);
+ assert.match(probe,/skin==='warm'&&width===320&&height===568&&layer==='near'/);
+ assert.doesNotMatch(game,/Alpha 21 narrow warm-near seam regression/);
+ assert.doesNotMatch(builder,/Alpha 21 narrow warm-near seam regression/);
+});
