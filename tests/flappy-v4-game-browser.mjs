@@ -42,6 +42,10 @@ function visualFixture(){
     '    var qa=window.__v4GameQa;',
     '    if(qa){',
     '      qa.frames++;',
+    '      var wall=performance.now();',
+    '      if(qa.previousWall>0){var wallGap=wall-qa.previousWall;',
+    '        if(wallGap>0&&wallGap<1000)qa.wallFrameIntervals.push(Math.round(wallGap*100)/100);}',
+    '      qa.previousWall=wall;',
     '      if(qa.previousStamp>0){var interval=t-qa.previousStamp;',
     '        if(interval>0&&interval<1000)qa.frameIntervals.push(Math.round(interval*100)/100);}',
     '      qa.previousStamp=t;',
@@ -127,6 +131,7 @@ function visualFixture(){
     'latestPointerAt:null,pendingFlap:null,latencySamples:[],audioTimes:[],',
     'yMin:99999,yMax:-99999,collisionSeen:false,gameOverSeen:false,',
     'frames:0,frameIntervals:[],previousStamp:0,started:false,',
+    'wallFrameIntervals:[],previousWall:0,',
     'createdAt:performance.now(),readyMs:null,scrollOffset:0,',
     'drawState:"not-started",pipeCount:0,world:null};',
     'window.addEventListener("pointerdown",()=>{',
@@ -281,11 +286,16 @@ try{
     // Snapshot pre-interaction frames independently: shifting a long task into
     // the ready screen must be visible in the evidence, not reported as free.
     const preTapFrames=JSON.parse(await read(
-      'JSON.stringify((()=>{const a=window.__v4GameQa.frameIntervals.slice(20).filter(v=>v>0);'+
-      'const ordered=a.slice().sort((a,b)=>a-b);return {'+
+      'JSON.stringify((()=>{const q=window.__v4GameQa;'+
+      'const a=q.frameIntervals.slice(20).filter(v=>v>0);'+
+      'const wall=q.wallFrameIntervals.slice(20).filter(v=>v>0);'+
+      'const ordered=a.slice().sort((a,b)=>a-b);const w=wall.slice().sort((a,b)=>a-b);return {'+
       'samples:a.length,maxMs:a.length?Math.max(...a):null,'+
       'p95Ms:ordered[Math.floor(Math.max(0,ordered.length-1)*.95)]??null,'+
-      'slow24ms:a.filter(v=>v>24).length,slow40ms:a.filter(v=>v>40).length};})())'));
+      'slow24ms:a.filter(v=>v>24).length,slow40ms:a.filter(v=>v>40).length,'+
+      'wallSamples:wall.length,wallMaxMs:wall.length?Math.max(...wall):null,'+
+      'wallP95Ms:w[Math.floor(Math.max(0,w.length-1)*.95)]??null,'+
+      'wallSlow24ms:wall.filter(v=>v>24).length,wallSlow40ms:wall.filter(v=>v>40).length};})())'));
     assert.ok(preTapFrames.samples>=15,'Cannot assess pre-tap frame stability');
     const press={x:width*.28,y:height*.45,button:'left',clickCount:1};
     await cdp('Input.dispatchMouseEvent',{...press,type:'mousePressed'});
@@ -334,6 +344,7 @@ try{
       'physicsMs='+qa.firstInput.pointerToPhysicsMs,
       'drawMs='+qa.firstInput.pointerToDrawMs,'audioMs='+qa.firstAudioInitMs,
       'preTapMaxMs='+preTapFrames.maxMs,'preTapSlowFrames='+preTapFrames.slow24ms,
+      'wallMaxMs='+preTapFrames.wallMaxMs,'wallSlowFrames='+preTapFrames.wallSlow40ms,
       'readyMs='+readyElapsedMs);
   }else{
   for(const skin of ['warm','slate']){
