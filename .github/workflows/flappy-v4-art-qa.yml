@@ -193,4 +193,5 @@ jobs:
             v4-art-qa/server.log
             v4-art-qa/chrome.log
           retention-days: 7
-          if-no-files-found: error
+          # Preserve the actual Chrome exception as the cause if capture stopped early.
+          if-no-files-found: warn
