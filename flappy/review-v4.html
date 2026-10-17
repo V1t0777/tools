@@ -30,6 +30,8 @@ header p{max-width:760px;margin:0 0 16px}
 .layer.far-pilot{display:none}
 #paint-pilot:checked~.worlds .warm .far-base{display:none}
 #paint-pilot:checked~.worlds .warm .far-pilot{display:block}
+#paint-pilot:checked~.worlds .slate .far-base{display:none}
+#paint-pilot:checked~.worlds .slate .far-pilot{display:block}
 /* Alpha 24 pilot layer is QA opt-in, never a default runtime image. */
 .layer.mid{z-index:2}
 .layer.mist{z-index:3;opacity:.7}
@@ -101,6 +103,8 @@ body:has(.phase-anchor:target) .frame{width:100vw;height:100dvh;aspect-ratio:aut
 .phase-anchor:is(#warm-glide,#slate-glide):target~.frame .bird{background-position:0% 100%}
 #warm-pilot:target~.frame .far-base{display:none}
 #warm-pilot:target~.frame .far-pilot{display:block}
+#slate-pilot:target~.frame .far-base{display:none}
+#slate-pilot:target~.frame .far-pilot{display:block}
 /* Automated screenshot capture uses no JavaScript and exercises real atlas rows. */
 .seamworld{display:none}
 .seamframe{position:relative;isolation:isolate;height:100dvh;width:100vw;overflow:hidden}
@@ -125,7 +129,7 @@ body:has(.seamworld:target) .seamworld:target{display:block}
 <main>
 <header><span class="tag">DRAFT · 静态安全验收页 · 不代表正式发布</span>
 <h1>V4 Cinematic Worlds · 双主题对比</h1>
-<p>无 JavaScript 的五层场景对比。角色使用游戏中的透明 24 帧图集（帧 0、6、12、18 可切换）。暖色远景可单独切换 Alpha 24 绘景母版试制层，默认仍为原始 SVG。试制图层不在游戏运行时使用；石柱仍为布局参考，不是正式 Canvas 材质。</p>
+<p>无 JavaScript 的五层场景对比。角色使用游戏中的透明 24 帧图集（帧 0、6、12、18 可切换）。两套远山均可切换 Alpha 24/25 绘景母版试制层，默认仍为原始 SVG。试制图层不在游戏运行时使用；石柱仍为布局参考，不是正式 Canvas 材质。</p>
 </header>
 <section class="options" aria-label="美术验收选项">
 <input type="radio" id="s360" name="size" checked><label for="s360">360 × 600</label>
@@ -134,7 +138,7 @@ body:has(.seamworld:target) .seamworld:target{display:block}
 <input type="radio" id="s320" name="size"><label for="s320">320 × 568</label>
 <input type="checkbox" id="guides" checked><label for="guides">角色与障碍参考</label>
 <input type="checkbox" id="fog" checked><label for="fog">谷雾图层</label>
-<input type="checkbox" id="paint-pilot"><label for="paint-pilot">暖色远景原画试制 A/B（非正式资源）</label>
+<input type="checkbox" id="paint-pilot"><label for="paint-pilot">双世界远山原画试制 A/B（非正式资源）</label>
 <input type="radio" id="wing-rest" name="wing" checked><label for="wing-rest">羽翼 0 · 休止</label>
 <input type="radio" id="wing-power" name="wing"><label for="wing-power">羽翼 6 · 发力</label>
 <input type="radio" id="wing-recovery" name="wing"><label for="wing-recovery">羽翼 12 · 回收</label>
@@ -154,10 +158,12 @@ body:has(.seamworld:target) .seamworld:target{display:block}
 </div><p class="note">独立山谷图层与空间层次；需要实机截图审核，当前不是最终手绘纹理。</p></article>
 <article class="world slate" id="slate">
 <h2>暮蓝远山 · 板岩夜鸟</h2>
+<span class="phase-anchor" id="slate-pilot" aria-hidden="true"></span>
 <span class="phase-anchor" id="slate-power" aria-hidden="true"></span><span class="phase-anchor" id="slate-recovery" aria-hidden="true"></span><span class="phase-anchor" id="slate-glide" aria-hidden="true"></span>
 <div class="frame" role="img" aria-label="暮蓝远山 · 板岩夜鸟五层背景静态美术预览">
 <img class="layer sky" src="./assets/v4/slate/sky.svg" alt="" loading="eager" decoding="async">
-<img class="layer far" src="./assets/v4/slate/far.svg" alt="" loading="eager" decoding="async">
+<img class="layer far far-base" src="./assets/v4/slate/far.svg" alt="" loading="eager" decoding="async">
+<img class="layer far far-pilot" src="./assets/v4/pilot/slate/far.svg" alt="" loading="eager" decoding="async">
 <img class="layer mid" src="./assets/v4/slate/mid.svg" alt="" loading="eager" decoding="async">
 <img class="layer mist" src="./assets/v4/slate/mist.svg" alt="" loading="eager" decoding="async">
 <img class="layer near" src="./assets/v4/slate/near.svg" alt="" loading="eager" decoding="async">
@@ -165,6 +171,14 @@ body:has(.seamworld:target) .seamworld:target{display:block}
 </div><p class="note">独立山谷图层与空间层次；需要实机截图审核，当前不是最终手绘纹理。</p></article>
 </div>
 </section>
+<section class="seamworld pilot-seamworld" id="warm-pilot-seam" aria-label="warm original far painting pilot seamless tile visual evidence"><div class="seamframe warm">
+<img class="first far" src="./assets/v4/pilot/warm/far.svg" alt="" decoding="async">
+<img class="second far" src="./assets/v4/pilot/warm/far.svg" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="slate-pilot-seam" aria-label="slate original far painting pilot seamless tile visual evidence"><div class="seamframe slate">
+<img class="first far" src="./assets/v4/pilot/slate/far.svg" alt="" decoding="async">
+<img class="second far" src="./assets/v4/pilot/slate/far.svg" alt="" decoding="async">
+</div></section>
 <section class="seamworld" id="warm-seam" aria-label="warm 地貌图层无缝循环边界审阅"><div class="seamframe warm">
 <img class="first far" src="./assets/v4/warm/far.svg" alt="" decoding="async">
 <img class="second far" src="./assets/v4/warm/far.svg" alt="" decoding="async">
