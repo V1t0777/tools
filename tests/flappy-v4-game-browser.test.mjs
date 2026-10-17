@@ -195,3 +195,21 @@ test('V4 browser QA allows one clean-profile retry for Chrome debugging startup 
  assert.match(probe,/No gameplay or audio assertion is retried after page navigation/);
  assert.match(probe,/Chrome did not expose debugger after bounded startup retry/);
 });
+
+
+test('Actual-game tile-join sampling captures all parallax layers with direct Canvas pixels, not only static reviewer images',()=>{
+ assert.match(probe,/seamQa\.seamTarget===layer\.id/);
+ assert.match(probe,/ctx\.getImageData\(joinPx-9,row0,19,row1-row0\)/);
+ assert.match(probe,/sampledBeforeGameplayOverlays:true/);
+ assert.match(probe,/seamMeanRgbDelta:/);
+ assert.match(probe,/adjacentControlRgbDelta:/);
+ assert.match(probe,/for\(const \[layer,speed\] of \[\['far',\.045\],\['mid',\.12\],\['near',\.28\]\]\)/);
+ assert.match(probe,/const targetScroll=\(tileWidth-expectedX\)\/speed/);
+ assert.match(probe,/assert\.equal\(seamAudit\.results\.length,12\)/);
+ assert.match(probe,/headless-seam-metrics\.json/);
+ assert.match(probe,/seam-game-/);
+ assert.match(workflow,/test -s v4-game-qa\/headless-seam-metrics\.json/);
+ assert.match(workflow,/seam-game-\*\.png/);
+ assert.doesNotMatch(game,/seamQa|seamTarget|seamResult|sampledBeforeGameplayOverlays/);
+ assert.doesNotMatch(builder,/headless-seam-metrics|seam-game/);
+});
