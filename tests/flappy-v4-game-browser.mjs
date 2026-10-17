@@ -40,6 +40,13 @@ function visualFixture(){
     "      if(qa.mode==='live'){",
     "        qa.state=state;qa.world=cinematicSession;qa.pipeCount=pipes.length;",
     "        qa.birdY=bird.y;qa.birdVy=bird.vy;qa.observedScroll=scroll;",
+    "        qa.birdX=bird.x;qa.groundY=groundY;qa.birdWingPhase=bird.wingPhase;",
+    "        qa.pipeData=pipes.map(function(p){return {x:p.x,gapY:p.gapY,gap:p.gap};});",
+    "        if(state==='running'&&bird.wingActive){",
+    "          if(qa.previousWingPhase>=0&&bird.wingPhase<qa.previousWingPhase-.4&&qa.previousWingPhase<.7)",
+    "            qa.unexpectedWingResets++;",
+    "          qa.previousWingPhase=bird.wingPhase;",
+    "        }else qa.previousWingPhase=-1;",
     "        if(state==='running'){qa.runningFrames++;",
     "          qa.yMin=Math.min(qa.yMin,bird.y);qa.yMax=Math.max(qa.yMax,bird.y);",
     "          if(qa.previousState!=='running')qa.startCount++;",
@@ -71,6 +78,7 @@ function visualFixture(){
     'window.__v4GameQa={skin:qaArgs.get("skin")==="slate"?"slate":"warm",',
     'mode:qaArgs.get("mode")==="live"?"live":"stabilized",pointerdowns:0,',
     'state:"ready",previousState:"ready",startCount:0,runningFrames:0,',
+    'previousWingPhase:-1,unexpectedWingResets:0,pipeData:[],',
     'yMin:99999,yMax:-99999,collisionSeen:false,gameOverSeen:false,',
     'frames:0,frameIntervals:[],previousStamp:0,started:false,',
     'createdAt:performance.now(),readyMs:null,scrollOffset:0,',
@@ -141,6 +149,8 @@ const metricExpression=[
   'return {skin:q.skin,mode:q.mode,scene:q.world,started:q.started,state:q.mode==="live"?q.state:q.drawState,',
   'pointerdowns:q.pointerdowns,startCount:q.startCount,collisionSeen:q.collisionSeen,',
   'gameOverSeen:q.gameOverSeen,runningFrames:q.runningFrames,',
+  'unexpectedWingResets:q.unexpectedWingResets,birdY:q.birdY,birdVy:q.birdVy,',
+  'birdX:q.birdX,groundY:q.groundY,pipeData:q.pipeData,',
   'birdYSpan:q.yMin===99999?null:Math.round((q.yMax-q.yMin)*10)/10,',
   'frames:q.frames,pipeCount:q.pipeCount,scroll:Math.round(q.observedScroll||0),',
   'imageDecodeReadyMs:q.readyMs===null?null:Math.round(q.readyMs),',
@@ -250,6 +260,59 @@ try{
       'birdMotion='+afterDeath.birdYSpan);
   }
   assert.equal(interactive.results.length,2);
+  // Closed-loop long run. The QA controller only READS bird/pipe state,
+  // and acts through genuine CDP pointerdowns. It must never set bird physics,
+  // disable collisions, change scrolling or skip the game state machine.
+  const endurance={kind:'Continuous normal-physics input pacing',
+    disclaimer:'Headless desktop Chromium with mobile viewport; this is NOT iPhone/Android latency, performance or manual gameplay.',
+    results:[]};
+  for(const skin of ['warm','slate']){
+    const width=360,height=600;
+    await cdp('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:true});
+    await cdp('Page.navigate',{url:'http://127.0.0.1:'+port+'/flappy/qa-game.html?skin='+skin+'&mode=live'});
+    await until('Boolean(window.__v4GameQa&&window.__v4GameQa.mode==="live"&&window.__v4GameQa.state==="ready"&&window.__v4GameQa.world===window.__v4GameQa.skin&&window.__v4GameQa.frames>20)');
+    const tap=async()=>{
+      const pointer={x:width*.28,y:height*.45,button:'left',clickCount:1};
+      await cdp('Input.dispatchMouseEvent',{...pointer,type:'mousePressed'});
+      await cdp('Input.dispatchMouseEvent',{...pointer,type:'mouseReleased'});
+    };
+    await tap();
+    await until('window.__v4GameQa.state==="running"&&window.__v4GameQa.pointerdowns>=1');
+    let lastTap=Date.now(),turns=0,observed=[],final;
+    const deadline=Date.now()+6200;
+    while(Date.now()<deadline){
+      const snap=JSON.parse(await read(metricExpression));
+      observed.push({timeMs:Date.now(),state:snap.state,y:snap.birdY,
+        vy:snap.birdVy,scroll:snap.scroll,wingResets:snap.unexpectedWingResets});
+      if(snap.state!=='running'){final=snap;break;}
+      const approaching=(snap.pipeData||[]).filter(p=>p.x+p.gap*.0>=snap.birdX-20)
+        .sort((a,b)=>a.x-b.x)[0];
+      const target=Math.min(height*.58,Math.max(height*.33,approaching?approaching.gapY+5:height*.45));
+      if(snap.birdY>target+8&&snap.birdVy>0&&Date.now()-lastTap>280){
+        await tap();lastTap=Date.now();turns++;
+      }
+      await sleep(75);
+    }
+    if(!final)final=JSON.parse(await read(metricExpression));
+    const record={skin,realPointerFlaps:turns+1,durationMs:observed.length?
+      observed.at(-1).timeMs-observed[0].timeMs:0,
+      startScroll:observed[0]?.scroll,endScroll:final.scroll,
+      state:final.state,unexpectedWingResets:final.unexpectedWingResets,
+      intervalP95Ms:final.frameIntervalsMs.p95,
+      samples:observed.length,birdYSpan:final.birdYSpan,
+      collisionSeen:final.collisionSeen,scoreInferred:undefined};
+    endurance.results.push(record);
+    console.log('ENDURANCE',skin,'durationMs',record.durationMs,
+      'clicks',record.realPointerFlaps,'scroll',record.endScroll,
+      'state',record.state,'wingResets',record.unexpectedWingResets);
+    assert.ok(record.durationMs>2500,'Too-short continuous flight in '+skin);
+    assert.ok(record.realPointerFlaps>=4,'Need repeated real taps, '+skin);
+    assert.equal(record.unexpectedWingResets,0,'Wing animation jumped backward mid-stroke');
+    assert.ok(record.endScroll-record.startScroll>220,'Backdrop did not move during repeated gameplay');
+    assert.equal(final.scene,skin,'Cinematic theme changed unexpectedly during continuous play');
+  }
+  writeFileSync(join(output,'headless-endurance-metrics.json'),JSON.stringify(endurance,null,2)+'\n');
+
   writeFileSync(join(output,'headless-live-input-metrics.json'),JSON.stringify(interactive,null,2)+'\n');
 
   writeFileSync(join(output,'headless-game-metrics.json'),JSON.stringify(evidence,null,2)+'\n');
