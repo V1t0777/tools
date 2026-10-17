@@ -120,3 +120,21 @@ test('V4 first-tap A/B compares sound-on with sound-off using unchanged source, 
   assert.match(workflow,/test -s v4-game-qa\/headless-audio-ab-metrics\.json/);
   assert.doesNotMatch(game,/headless-audio-ab-metrics|__v4GameQa/);
 });
+
+test('V4 fresh-process first-tap A/B uses the original game with a unique Chrome profile and exactly one actual input',()=>{
+  assert.match(probe,/V4_COLD_CASE/);
+  assert.match(probe,/coldCaseParts/);
+  assert.match(probe,/if\(coldCaseParts\)\{/);
+  assert.match(probe,/const profile=mkdtempSync/);
+  assert.match(probe,/remote-debugging-port=0/);
+  assert.match(probe,/user-data-dir='\+profile/);
+  assert.match(probe,/qa\.clicks,1/);
+  assert.match(probe,/qa\.sceneStatus,'ready'/);
+  assert.match(probe,/qa\.loadedLayers,5/);
+  assert.match(probe,/headless-audio-ab-metrics\.json/);
+  assert.match(probe,/cold-firsttap\.json/);
+  assert.match(probe,/if\(sound==='on'\)assert\.ok\(qa\.audioCalls>=1/);
+  assert.match(probe,/else assert\.equal\(qa\.audioCalls,0/);
+  assert.match(probe,/Runner OS\/audio backend remains shared/);
+  assert.doesNotMatch(game,/V4_COLD_CASE|cold-firsttap\.json|__v4GameQa/);
+});
