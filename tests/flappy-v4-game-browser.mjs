@@ -161,14 +161,14 @@ const port=server.address().port;
 let profile=mkdtempSync(join(tmpdir(),'flappy-v4-cdp-'));
 let stderr='';
 function launchChrome(){
-  const process=spawn(process.env.CHROME||'chromium',[
+  const child=spawn(process.env.CHROME||'chromium',[
     '--headless=new','--no-sandbox','--disable-dev-shm-usage',
     '--disable-background-networking','--no-first-run',
     '--remote-debugging-port=0','--remote-allow-origins=*',
     '--user-data-dir='+profile,'about:blank'
   ],{stdio:['ignore','ignore','pipe']});
-  process.stderr.on('data',b=>{stderr=(stderr+b.toString()).slice(-20000);});
-  return process;
+  child.stderr.on('data',b=>{stderr=(stderr+b.toString()).slice(-20000);});
+  return child;
 }
 let browser=launchChrome();
 let ws=null,id=0;
