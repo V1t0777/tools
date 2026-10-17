@@ -41,6 +41,11 @@ function visualFixture(){
     "        qa.state=state;qa.world=cinematicSession;qa.pipeCount=pipes.length;",
     "        qa.birdY=bird.y;qa.birdVy=bird.vy;qa.observedScroll=scroll;",
     "        qa.birdX=bird.x;qa.groundY=groundY;qa.birdWingPhase=bird.wingPhase;",
+    "        qa.score=score;qa.quality=sceneryQuality;",
+    "        qa.worldStatus=cinematicWorlds[birdSkin].status;",
+    "        qa.activeWorldLayers=Object.keys(cinematicWorlds[birdSkin].layers).length;",
+    "        if(qa.lastWorld!==null&&qa.lastWorld!==cinematicSession)qa.worldTransitions++;",
+    "        qa.lastWorld=cinematicSession;",
     "        qa.pipeData=pipes.map(function(p){return {x:p.x,gapY:p.gapY,gap:p.gap};});",
     "        if(state==='running'&&bird.wingActive){",
     "          if(qa.previousWingPhase>=0&&bird.wingPhase<qa.previousWingPhase-.4&&qa.previousWingPhase<.7)",
@@ -79,6 +84,7 @@ function visualFixture(){
     'mode:qaArgs.get("mode")==="live"?"live":"stabilized",pointerdowns:0,',
     'state:"ready",previousState:"ready",startCount:0,runningFrames:0,',
     'previousWingPhase:-1,unexpectedWingResets:0,pipeData:[],',
+    'lastWorld:null,worldTransitions:0,activeWorldLayers:0,',
     'yMin:99999,yMax:-99999,collisionSeen:false,gameOverSeen:false,',
     'frames:0,frameIntervals:[],previousStamp:0,started:false,',
     'createdAt:performance.now(),readyMs:null,scrollOffset:0,',
@@ -151,6 +157,8 @@ const metricExpression=[
   'gameOverSeen:q.gameOverSeen,runningFrames:q.runningFrames,',
   'unexpectedWingResets:q.unexpectedWingResets,birdY:q.birdY,birdVy:q.birdVy,',
   'birdX:q.birdX,groundY:q.groundY,pipeData:q.pipeData,',
+  'score:q.score,quality:q.quality,worldStatus:q.worldStatus,',
+  'worldTransitions:q.worldTransitions,activeWorldLayers:q.activeWorldLayers,',
   'birdYSpan:q.yMin===99999?null:Math.round((q.yMax-q.yMin)*10)/10,',
   'frames:q.frames,pipeCount:q.pipeCount,scroll:Math.round(q.observedScroll||0),',
   'imageDecodeReadyMs:q.readyMs===null?null:Math.round(q.readyMs),',
@@ -312,6 +320,84 @@ try{
     assert.equal(final.scene,skin,'Cinematic theme changed unexpectedly during continuous play');
   }
   writeFileSync(join(output,'headless-endurance-metrics.json'),JSON.stringify(endurance,null,2)+'\n');
+  // 30+ seconds of NORMAL physics across multiple play/death/restart cycles.
+  // Different natural/random pipe placements are observed, not injected; no
+  // collision overrides, bird writes, score writes or scroll writes here.
+  const multiRound={kind:'Multi-round Chrome input/obstacle/scene retention stress',
+    disclaimer:'Two real 16s windows on headless desktop Chrome. NOT a single 30s surviving flight, nor a physical phone benchmark.',
+    results:[]};
+  for(const skin of ['warm','slate']){
+    const width=360,height=600;
+    await cdp('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:true});
+    await cdp('Page.navigate',{url:'http://127.0.0.1:'+port+'/flappy/qa-game.html?skin='+skin+'&mode=live'});
+    await until('Boolean(window.__v4GameQa&&window.__v4GameQa.mode==="live"&&window.__v4GameQa.state==="ready"&&window.__v4GameQa.world===window.__v4GameQa.skin&&window.__v4GameQa.frames>20)');
+    const tap=async()=>{
+      const pointer={x:width*.28,y:height*.45,button:'left',clickCount:1};
+      await cdp('Input.dispatchMouseEvent',{...pointer,type:'mousePressed'});
+      await cdp('Input.dispatchMouseEvent',{...pointer,type:'mouseReleased'});
+    };
+    const began=Date.now(),untilTime=began+16000;
+    let roundStartedAt=0,lastTap=0,starts=0,taps=0,collisions=0,lastState='ready';
+    let cumulativeScroll=0,priorScroll=0,highestScroll=0,lowestLayers=Infinity;
+    let maxWingResets=0,maxTransitions=0,samples=0,maxFrameGap=0,maxScore=0;
+    const heights=new Set(),rounds=[];
+    while(Date.now()<untilTime){
+      const q=JSON.parse(await read(metricExpression));
+      assert.equal(q.scene,skin,'V4 world changed/disappeared during stress run');
+      assert.equal(q.worldStatus,'ready','Scene texture unexpectedly unavailable');
+      lowestLayers=Math.min(lowestLayers,q.activeWorldLayers);
+      maxWingResets=Math.max(maxWingResets,q.unexpectedWingResets);
+      maxTransitions=Math.max(maxTransitions,q.worldTransitions);
+      maxFrameGap=Math.max(maxFrameGap,q.frameIntervalsMs.max||0);
+      maxScore=Math.max(maxScore,q.score||0);
+      for(const p of q.pipeData||[])heights.add(Math.round(p.gapY/12)*12);
+      if(q.state==='running'){
+        const move=Math.max(0,q.scroll-priorScroll);
+        if(lastState==='running')cumulativeScroll+=move;
+        highestScroll=Math.max(highestScroll,q.scroll);
+        const activeTime=Date.now()-roundStartedAt;
+        // Repeated physical clicks for the first ~1.5s of each round, then
+        // let ordinary gravity and collision end it naturally.
+        if(activeTime<1550&&q.birdY>height*.42&&q.birdVy>0&&Date.now()-lastTap>250){
+          await tap();taps++;lastTap=Date.now();
+        }
+      }else if(q.state==='ready'||q.state==='over'){
+        if(lastState==='falling'||lastState==='over')collisions+=q.state==='over'&&lastState!=='over'?1:0;
+        await tap();taps++;lastTap=Date.now();
+        starts++;roundStartedAt=Date.now();priorScroll=0;
+        rounds.push({index:starts,startedAtMs:roundStartedAt-began,sourceState:q.state});
+      }
+      if(q.state==='running')priorScroll=q.scroll;
+      lastState=q.state;
+      samples++;
+      await sleep(90);
+    }
+    const last=JSON.parse(await read(metricExpression));
+    const record={skin,durationMs:Date.now()-began,observations:samples,
+      startedRounds:starts,physicalPointerInputs:taps,normalCollisions:collisions,
+      observedObstacleHeightBands:heights.size,maxScore,
+      cumulativeScroll:Math.round(cumulativeScroll),highestScroll:Math.round(highestScroll),
+      activeWorldMinimumLayers:lowestLayers,sceneSwitches:maxTransitions,
+      unexpectedWingResets:maxWingResets,maxObservedFrameIntervalMs:maxFrameGap,
+      frameIntervalP95Ms:last.frameIntervalsMs.p95,endedState:last.state,
+      rounds};
+    multiRound.results.push(record);
+    console.log('MULTIROUND',skin,'seconds',Math.round(record.durationMs/1000),
+      'starts',starts,'inputs',taps,'gapBands',heights.size,'scroll',record.cumulativeScroll,
+      'maxFrame',maxFrameGap);
+    assert.ok(record.durationMs>=15500,'Multi-round browser ran less than 15.5s');
+    assert.ok(starts>=3,'Expected at least 3 natural rounds in '+skin);
+    assert.ok(taps>=5,'Insufficient genuine input events in '+skin);
+    assert.ok(record.cumulativeScroll>100,'Real multi-round gameplay did not scroll');
+    assert.ok(record.observedObstacleHeightBands>=2,'Pipe gaps were not varied');
+    assert.equal(record.activeWorldMinimumLayers,5,'Background textures evicted during gameplay');
+    assert.equal(record.sceneSwitches,0,'Cinematic world replaced unexpectedly');
+    assert.equal(record.unexpectedWingResets,0,'Unexpected jump in wing animation');
+  }
+  assert.ok(multiRound.results.reduce((sum,r)=>sum+r.durationMs,0)>=31000,
+    'Need at least 31 aggregate seconds with unmodified physics');
+  writeFileSync(join(output,'headless-multiround-metrics.json'),JSON.stringify(multiRound,null,2)+'\n');
+
 
   writeFileSync(join(output,'headless-live-input-metrics.json'),JSON.stringify(interactive,null,2)+'\n');
 
