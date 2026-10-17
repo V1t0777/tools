@@ -63,6 +63,21 @@ function visualFixture(){
     '    }'
   ].join('\n');
   s=once(s,'  function frame(t){',frameHook);
+  s=once(s,'  function flap(){',
+    '  function flap(){if(window.__v4GameQa?.mode==="live"&&state==="running"){'+
+    'var q=window.__v4GameQa;var at=performance.now();'+
+    'q.pendingFlap={fromPointer:Math.max(0,at-(q.latestPointerAt??at)),at};}');
+  // Snapshot when the original game draw() returned. This is an in-browser
+  // timing proxy, not measured screen photon latency or device touch lag.
+  s=once(s,'    update(dt,t);draw(t);raf=requestAnimationFrame(frame);',
+    '    update(dt,t);draw(t);'+
+    'if(window.__v4GameQa?.mode==="live"&&window.__v4GameQa.pendingFlap){'+
+    'var qa=window.__v4GameQa,impulse=qa.pendingFlap;'+
+    'var end=performance.now();qa.latencySamples.push({'+
+    'pointerToPhysicsMs:Math.round(impulse.fromPointer*100)/100,'+
+    'physicsToDrawMs:Math.round(Math.max(0,end-impulse.at)*100)/100,'+
+    'pointerToDrawMs:Math.round((Math.max(0,end-impulse.at)+impulse.fromPointer)*100)/100});'+
+    'qa.pendingFlap=null;}raf=requestAnimationFrame(frame);');
   s=once(s,'  function collides(){',
     '  function collides(){if(window.__v4GameQa?.mode===\'stabilized\')return false; // QA-only collision suppression');
   const head=[
@@ -85,11 +100,14 @@ function visualFixture(){
     'state:"ready",previousState:"ready",startCount:0,runningFrames:0,',
     'previousWingPhase:-1,unexpectedWingResets:0,pipeData:[],',
     'lastWorld:null,worldTransitions:0,activeWorldLayers:0,',
+    'latestPointerAt:null,pendingFlap:null,latencySamples:[],',
     'yMin:99999,yMax:-99999,collisionSeen:false,gameOverSeen:false,',
     'frames:0,frameIntervals:[],previousStamp:0,started:false,',
     'createdAt:performance.now(),readyMs:null,scrollOffset:0,',
     'drawState:"not-started",pipeCount:0,world:null};',
-    'window.addEventListener("pointerdown",()=>window.__v4GameQa.pointerdowns++);',
+    'window.addEventListener("pointerdown",()=>{',
+    'const q=window.__v4GameQa;q.pointerdowns++;q.latestPointerAt=performance.now();',
+    '},true);',
     '</script>',
     '</head>'
   ].join('\n');
@@ -148,6 +166,9 @@ const metricExpression=[
   'JSON.stringify((()=>{',
   'const q=window.__v4GameQa;if(!q)return null;',
   'const list=q.frameIntervals.filter(n=>n>0).slice(-240).sort((a,b)=>a-b);',
+  'const lag=q.latencySamples.slice(-120);',
+  'const p2d=lag.map(x=>x.pointerToDrawMs).sort((a,b)=>a-b);',
+  'const p2p=lag.map(x=>x.pointerToPhysicsMs).sort((a,b)=>a-b);',
   'const assetEntries=performance.getEntriesByType("resource").filter(x=>x.name.includes("/assets/v4/"));',
   'const assets=assetEntries.map(x=>({file:x.name.split("/").slice(-2).join("/"),',
   'durationMs:Math.round(x.duration*100)/100,transferBytes:x.transferSize||0}));',
@@ -165,7 +186,12 @@ const metricExpression=[
   'canvasCssSize:{width:Math.round(rect.width),height:Math.round(rect.height)},',
   'frameIntervalsMs:{samples:list.length,median:list[Math.floor((list.length-1)*.5)]||null,',
   'p95:list[Math.floor((list.length-1)*.95)]||null,max:list[list.length-1]||null},',
-  'loadedLayers:assets.length,assets};',
+  'loadedLayers:assets.length,',
+  'inputResponse:{samples:lag.length,',
+  'pointerToPhysicsP95Ms:p2p[Math.floor(Math.max(0,p2p.length-1)*.95)]||null,',
+  'pointerToDrawP50Ms:p2d[Math.floor(Math.max(0,p2d.length-1)*.5)]||null,',
+  'pointerToDrawP95Ms:p2d[Math.floor(Math.max(0,p2d.length-1)*.95)]||null,',
+  'worstMs:p2d[p2d.length-1]||null},assets};',
   '})())'
 ].join('');
 const evidence={kind:'Draft-only real Flappy browser renderer evidence',
@@ -394,6 +420,9 @@ try{
     assert.ok(record.durationMs>=15500,'Multi-round browser ran less than 15.5s');
     assert.ok(starts>=3,'Expected at least 3 natural rounds in '+skin);
     assert.ok(taps>=5,'Insufficient genuine input events in '+skin);
+    assert.ok(last.inputResponse.samples>=3,'Need a measurable click-to-draw sample');
+    assert.ok(last.inputResponse.worstMs>=0&&last.inputResponse.worstMs<1500,
+      'Invalid browser click-to-Canvas timing');
     assert.ok(record.cumulativeScroll>100,'Real multi-round gameplay did not scroll');
     assert.ok(record.observedObstacleHeightBands>=2,'Pipe gaps were not varied');
     assert.equal(record.activeWorldMinimumLayers,5,'Background textures evicted during gameplay');
