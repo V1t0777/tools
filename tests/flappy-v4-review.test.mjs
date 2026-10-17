@@ -97,7 +97,7 @@ test('V4 browser evidence shows actual repeating layer joins at mid-screen witho
   const workflow=read('.github/workflows/flappy-v4-art-qa.yml');
   assert.match(workflow,/for view in scene seam/);
   assert.match(workflow,/fragment="\$theme-seam"/);
-  assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count\)!=\(8,8,12,4,2,2\)/);
+  assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count\)!=\(8,8,12,4,4,2,4,4,2\)/);
   assert.match(workflow,/for phase in power recovery glide/);
   assert.match(workflow,/review-v4\.html#\$theme-\$phase/);
 });
@@ -159,4 +159,24 @@ test('Alpha 25 second world has true opt-in independently painted far and a two-
  }
  assert.doesNotMatch(html,/<script\b/i);
  assert.doesNotMatch(game,/slate-pilot|pilot\/slate\/far|far-master-pilot/);
+});
+
+
+test('Alpha 26 two middle-distance originals toggle independently or paired in no-script reviewer',()=>{
+ assert.match(html,/id="paint-mid-pilot"/);
+ assert.match(html,/#paint-mid-pilot:checked~\.worlds \.world \.mid-base\{display:none\}/);
+ assert.match(html,/#paint-mid-pilot:checked~\.worlds \.world \.mid-pilot\{display:block\}/);
+ for(const theme of ['warm','slate']){
+   assert.match(html,new RegExp('id="'+theme+'-mid-pilot"'));
+   assert.match(html,new RegExp('id="'+theme+'-stack-pilot"'));
+   assert.match(html,new RegExp('class="layer mid mid-base" src="\\./assets/v4/'+theme+'/mid\\.svg"'));
+   assert.match(html,new RegExp('class="layer mid mid-pilot" src="\\./assets/v4/pilot/'+theme+'/mid\\.svg"'));
+   const section=html.split('id="'+theme+'-mid-pilot-seam"')[1]?.split('</section>')[0];
+   assert.ok(section,'Each mid painting needs an isolated repeating-tile comparison');
+   assert.equal(section.split('src="./assets/v4/pilot/'+theme+'/mid.svg"').length-1,2);
+ }
+ assert.match(html,/#warm-mid-pilot:target~\.frame \.mid-base/);
+ assert.match(html,/#slate-stack-pilot:target~\.frame \.far-pilot/);
+ assert.doesNotMatch(html,/<script\b/i);
+ assert.doesNotMatch(game,/pilot\/warm\/mid|pilot\/slate\/mid|stack-pilot/);
 });
