@@ -138,3 +138,18 @@ test('V4 fresh-process first-tap A/B uses the original game with a unique Chrome
   assert.match(probe,/Runner OS\/audio backend remains shared/);
   assert.doesNotMatch(game,/V4_COLD_CASE|cold-firsttap\.json|__v4GameQa/);
 });
+
+test('V4 draft CI runs eight independent cold browser invocations before warmed game captures',()=>{
+  assert.match(workflow,/name: Capture isolated Chrome-process first-tap audio A\/B/);
+  assert.match(workflow,/Every invocation starts its OWN Chrome process/);
+  assert.match(workflow,/V4_COLD_CASE="\$spec" node tests\/flappy-v4-game-browser\.mjs/);
+  assert.match(workflow,/for spec in/);
+  assert.match(workflow,/warm:on:1/);
+  assert.match(workflow,/slate:off:2/);
+  assert.match(workflow,/len\(files\)==8/);
+  assert.match(workflow,/cold-process-summary\.json/);
+  assert.match(workflow,/name: flappy-v4-draft-cold-audio-pr57/);
+  assert.ok(workflow.indexOf('Capture isolated Chrome-process first-tap audio A/B') <
+            workflow.indexOf('Capture actual Flappy game Canvas'));
+  assert.doesNotMatch(game,/V4_COLD_CASE|cold-process-summary|headless-audio-ab-metrics/);
+});
