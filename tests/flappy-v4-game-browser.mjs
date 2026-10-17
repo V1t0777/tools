@@ -454,6 +454,15 @@ try{
         // perceptual review of screenshots and must not be auto-approved.
         assert.ok(sample.seamMeanRgbDelta<12,
           'Visible-width discontinuity in actual game layer '+skin+'/'+layer+': '+sample.seamMeanRgbDelta);
+        // Alpha 21 retained only the proven periodic crest fix.
+        // Deliberately reject future near-edge art that reproduces the earlier
+        // 320px warm seam (>3.42) even when the general <12 guard passes.
+        // This is an environment-specific regression threshold, not an aesthetic grade.
+        if(skin==='warm'&&width===320&&height===568&&layer==='near'){
+          assert.ok(sample.seamMeanRgbDelta<=3.25,
+            'Alpha 21 narrow warm-near seam regression: '+sample.seamMeanRgbDelta+
+            ' exceeds source baseline 3.42 minus 0.17 safety margin');
+        }
         const screenshot=await cdp('Page.captureScreenshot',
           {format:'png',captureBeyondViewport:false,fromSurface:true});
         const png=Buffer.from(screenshot.result.data,'base64');
