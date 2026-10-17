@@ -64,3 +64,19 @@ test('V4 sustained real-pointer QA checks continuous wing motion without disabli
   assert.match(workflow,/test -s v4-game-qa\/headless-endurance-metrics\.json/);
   assert.doesNotMatch(game,/headless-endurance-metrics|__v4GameQa/);
 });
+
+test('V4 multi-round exercise retains real collisions and original randomized pipe layouts for 30+ seconds',()=>{
+  assert.match(probe,/kind:'Multi-round Chrome input\/obstacle\/scene retention stress'/);
+  assert.match(probe,/began\+16000/);
+  assert.match(probe,/state==='ready'\|\|q\.state==='over'/);
+  assert.match(probe,/physicalPointerInputs:taps/);
+  assert.match(probe,/normalCollisions:collisions/);
+  assert.match(probe,/observedObstacleHeightBands:heights\.size/);
+  assert.match(probe,/activeWorldMinimumLayers:lowestLayers/);
+  assert.match(probe,/cumulativeScroll>100/);
+  assert.match(probe,/sceneSwitches,0/);
+  assert.match(probe,/headless-multiround-metrics\.json/);
+  assert.match(probe,/>=31000/);
+  assert.match(workflow,/test -s v4-game-qa\/headless-multiround-metrics\.json/);
+  assert.doesNotMatch(game,/headless-multiround-metrics|__v4GameQa/);
+});
