@@ -182,6 +182,24 @@ jobs:
               done
             done
           done
+          # Alpha 23: compare ORIGINAL atlas frames 0/6/12/18 in the same art scene.
+          # Frame 0 is captured by scene-theme-{320,390} already; this adds 6/12/18.
+          # Every fragment is a CSS-only :target selector. No page JavaScript.
+          for theme in warm slate; do
+            for phase in power recovery glide; do
+              for shape in "320 568" "390 844"; do
+                read -r W H <<<"$shape"
+                png="v4-art-qa/pose-$theme-$phase-$W"x"$H.png"
+                "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+                  --hide-scrollbars --force-device-scale-factor=1 \
+                  --virtual-time-budget=2200 --window-size="$W,$H" \
+                  "--screenshot=$png" \
+                  "http://127.0.0.1:8765/flappy/review-v4.html#$theme-$phase" \
+                  >/dev/null 2>v4-art-qa/chrome.log
+                test -s "$png"
+              done
+            done
+          done
           python3 - <<'PY'
           from pathlib import Path
           import struct
@@ -197,8 +215,11 @@ jobs:
               if (width,height)!=(expected_width,expected_height):
                   raise SystemExit(f"Wrong mobile capture dimensions: {path} {width}x{height}")
               print(f"{path}: {width}x{height}, {len(b)} bytes")
-          if len(list(Path("v4-art-qa").glob("*.png")))!=16:
-              raise SystemExit("Expected exactly 16 scene/seam mobile screenshots")
+          scene_count=len(list(Path("v4-art-qa").glob("scene-*.png")))
+          seam_count=len(list(Path("v4-art-qa").glob("seam-*.png")))
+          pose_count=len(list(Path("v4-art-qa").glob("pose-*.png")))
+          if (scene_count,seam_count,pose_count)!=(8,8,12):
+              raise SystemExit(f"Expected 8 scenes, 8 seams, 12 authentic atlas pose captures, got {(scene_count,seam_count,pose_count)}")
           PY
       - name: Keep isolated cold-audio A/B screenshots and measurements
         if: always()
@@ -226,7 +247,7 @@ jobs:
             v4-game-qa/headless-narrow-readability.json
           retention-days: 7
           if-no-files-found: warn
-      - name: Keep 16 scene/seam screenshots and diagnostics
+      - name: Keep 16 scene/seam screenshots, 12 atlas poses and diagnostics
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
