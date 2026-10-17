@@ -105,3 +105,18 @@ test('V4 browser evidence measures cold audio initialization without changing sh
   assert.match(workflow,/headless-multiround-metrics\.json/);
   assert.doesNotMatch(game,/originalInitAudio|audioTimes|__v4GameQa/);
 });
+
+test('V4 first-tap A/B compares sound-on with sound-off using unchanged source, real pointer events and separate reloads',()=>{
+  assert.match(probe,/kind:'Counterbalanced first-tap sound-on vs sound-off Chrome diagnostic'/);
+  assert.match(probe,/qaArgs\.get\("sound"\)==="off"\?"off":"on"/);
+  assert.match(probe,/localStorage\.setItem\("zhaoFlappySound\.v1"/);
+  assert.match(probe,/const order=\[\['warm','off'\],\['warm','on'\]/);
+  assert.match(probe,/\['slate','on'\],\['slate','off'\]/);
+  assert.match(probe,/audioAb\.scenarios\.length,8/);
+  assert.match(probe,/totalAudioCalls,0/);
+  assert.match(probe,/totalAudioCalls>=1/);
+  assert.match(probe,/headless-audio-ab-metrics\.json/);
+  assert.match(probe,/Browser process is reused/);
+  assert.match(workflow,/test -s v4-game-qa\/headless-audio-ab-metrics\.json/);
+  assert.doesNotMatch(game,/headless-audio-ab-metrics|__v4GameQa/);
+});
