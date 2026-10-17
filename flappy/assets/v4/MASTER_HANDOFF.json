@@ -163,10 +163,23 @@
       "renderer_swap_enabled": false,
       "art_direction_approved": false,
       "notes": "Alpha 24 first one-of-ten original hand-composed painterly study. Raster-painted editable PSD/KRA masters and physical device signoff still not delivered. Compare original vs pilot only in Draft review-v4.html #warm / #warm-pilot."
+    },
+    {
+      "theme": "slate",
+      "layer": "far",
+      "source_master_path": "masters/slate/far-master-pilot.svg",
+      "preview_asset_path": "pilot/slate/far.svg",
+      "authoring_type": "editable_vector_gouache_study",
+      "authored_source_size": "3200x2000",
+      "preview_display_size": "1600x1000",
+      "production_asset": false,
+      "renderer_swap_enabled": false,
+      "art_direction_approved": false,
+      "notes": "Alpha 25 unique blue-hour distant mountain study; own long jagged ridge, pale moonlit scree and sparse pigment. Paired A/B and seam proof in Draft review only. This is NOT final high-resolution raster master art."
     }
   ],
   "pilot_completion": {
-    "completed_studies": 1,
+    "completed_studies": 2,
     "total_layer_targets": 10,
     "completed_final_masters": 0
   }
