@@ -158,3 +158,20 @@ test('V4 repeating layers must not contain left-to-right paint gradients that cr
     }
   }
 });
+
+test('V4 broad midrange pigment washes are visible-scale, clipped, theme-distinct and safe to tile',()=>{
+ const captures=[];
+ for(const theme of ['warm','slate']){
+   const art=read('flappy/assets/v4/'+theme+'/mid.svg');
+   const section=art.match(/<g id="mid-large-pigment-washes-v1" clip-path="url\(#clip-rock-mid\)">([\s\S]*?)<\/g>/);
+   assert.ok(section,theme+' missing broad painted rock facets');
+   const passes=section[1].match(/<path\b/g)||[];
+   assert.ok(passes.length>=17,'need foreground-scale painting rather than tiny strokes');
+   assert.ok((section[1].match(/fill-opacity=/g)||[]).length>=16);
+   assert.ok(/stroke-width="9"/.test(section[1]),'require a large dry-brush edge');
+   assert.doesNotMatch(section[1],/<(?:filter|image|script|animate|foreignObject)\b/i);
+   assert.ok(Buffer.byteLength(art,'utf8')<24_000,'keep the original layer budget');
+   captures.push(section[1]);
+ }
+ assert.notEqual(captures[0],captures[1],'two worlds need different mountains and pigments');
+});
