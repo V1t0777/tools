@@ -97,7 +97,7 @@ test('V4 browser evidence shows actual repeating layer joins at mid-screen witho
   const workflow=read('.github/workflows/flappy-v4-art-qa.yml');
   assert.match(workflow,/for view in scene seam/);
   assert.match(workflow,/fragment="\$theme-seam"/);
-  assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count\)!=\(8,8,12,2\)/);
+  assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count\)!=\(8,8,12,2,1\)/);
   assert.match(workflow,/for phase in power recovery glide/);
   assert.match(workflow,/review-v4\.html#\$theme-\$phase/);
 });
@@ -130,4 +130,14 @@ test('Alpha 24 warm far painting is opt-in only in a no-script, draft art compar
  assert.match(html,/#paint-pilot:checked~\.worlds \.warm \.far-pilot\{display:block\}/);
  assert.doesNotMatch(game,/warm-pilot|far-master-pilot|pilot\/warm\/far/);
  assert.doesNotMatch(html,/<script\b/i);
+});
+
+
+test('Alpha 24 master/source target files remain isolated from the game by review hashes',()=>{
+ const workflow=read('.github/workflows/flappy-v4-art-qa.yml');
+ assert.match(workflow,/master-warm-far-3200x2000\.png/);
+ assert.match(workflow,/--window-size="3200,2000"/);
+ assert.match(html,/id="paint-pilot"/);
+ assert.match(html,/id="warm-pilot"/);
+ assert.doesNotMatch(game,/pilot\/warm\/far|warm-pilot|far-master-pilot/);
 });
