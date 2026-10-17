@@ -440,3 +440,52 @@ test('Alpha 23 production art master handoff manifest is complete but never fals
    'No release gate may be pre-approved by an engineering art handoff');
  assert.match(manifest.performance_note,/not guaranteed device budgets/);
 });
+
+
+test('Alpha 24 edited 2x master and 1x derivative are exact, safe non-shipping painterly pilot twins',()=>{
+ const master=read('flappy/assets/v4/masters/warm/far-master-pilot.svg');
+ const runtime=read('flappy/assets/v4/pilot/warm/far.svg');
+ assert.match(master,/width="3200" height="2000" viewBox="0 0 3200 2000"/);
+ assert.match(runtime,/width="1600" height="1000" viewBox="0 0 1600 1000"/);
+ assert.match(runtime,/<g transform="scale\(\.5\)">/);
+ for(const src of [master,runtime]){
+   assert.doesNotMatch(src,/<(?:script|image|filter|foreignObject|animate|use)\b/i);
+   assert.doesNotMatch(src,/\b(?:href|src)\s*=/i);
+   assert.match(src,/id="far-painted-base"/);
+   assert.match(src,/id="dawn-ridge-edge"/);
+   assert.match(src,/id="large-gouache-landforms"/);
+   assert.match(src,/id="hand-broken-pigment"/);
+   assert.equal((src.match(/data-gouache="/g)||[]).length,12);
+   assert.equal((src.match(/data-brush="/g)||[]).length,12);
+   assert.equal((src.match(/data-grain="/g)||[]).length,7);
+   assert.equal((src.match(/<linearGradient\b/g)||[]).length,3);
+   for(const grad of src.matchAll(/<linearGradient\b[^>]*>/g))
+     assert.match(grad[0],/x1="0" y1="0" x2="0" y2="1"/,'tile-safe vertical pigment gradient');
+   assert.ok(Buffer.byteLength(src,'utf8')<16_000,'small lossless SVG pilot only');
+ }
+ const old='id="far-painted-terrain"';
+ const replacement='id="pilot-far-painted-terrain"';
+ const sourceBody=master.slice(master.indexOf('<title>'),master.lastIndexOf('</svg>'))
+   .replaceAll(old,replacement).replaceAll('url(#far-painted-terrain)','url(#pilot-far-painted-terrain)');
+ const scaledBody=runtime.slice(runtime.indexOf('<g transform="scale(.5)">')+
+   '<g transform="scale(.5)">'.length,runtime.lastIndexOf('</g>'));
+ assert.equal(scaledBody.trim(),sourceBody.trim(),
+   'runtime pilot must contain identical authored master geometry, not a separately improvised substitute');
+ const boundary=/M0 1194 C60 1194 125 1141 202 1137[\s\S]*?C3102 1165 3145 1194 3200 1194/;
+ assert.match(master,boundary,'terrain copy has matched horizontal wrap tangents');
+ assert.equal((master.match(/M0 1194 C60 1194 125 1141 202 1137/g)||[]).length,2,
+   'foreground clip and base share exact high-resolution terrain outline');
+ const manifest=JSON.parse(read('flappy/assets/v4/MASTER_HANDOFF.json'));
+ assert.equal(manifest.pilot_completion.completed_studies,1);
+ assert.equal(manifest.pilot_completion.total_layer_targets,10);
+ assert.equal(manifest.pilot_completion.completed_final_masters,0);
+ assert.equal(manifest.pilots.length,1);
+ const pilot=manifest.pilots[0];
+ assert.equal(pilot.source_master_path,'masters/warm/far-master-pilot.svg');
+ assert.equal(pilot.preview_asset_path,'pilot/warm/far.svg');
+ assert.equal(pilot.renderer_swap_enabled,false);
+ assert.equal(pilot.production_asset,false);
+ assert.equal(pilot.art_direction_approved,false);
+ assert.ok(Object.values(manifest.release_gates).every(v=>v===false));
+ assert.doesNotMatch(html,/far-master-pilot|pilot\/warm\/far\.svg/);
+});
