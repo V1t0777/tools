@@ -293,3 +293,33 @@ test('V4 Alpha 18 skyline directional atmospheric bounce stays subtle, original 
  }
  assert.notEqual(samples[0],samples[1],'moonlight is not a tinted copy of warm sunlight');
 });
+
+
+test('V4 Alpha 19 feather silhouette and stone edge readability preserve the physical collision geometry',()=>{
+ const atlases=[];
+ for(const theme of ['warm','slate']){
+   const svg=read('flappy/assets/v3/'+theme+'-flight.svg');
+   assert.match(svg,/viewBox="0 0 1440 960"/);
+   const frames=[...svg.matchAll(/data-frame="(\d+)"/g)].map(m=>Number(m[1]));
+   assert.deepEqual(frames,Array.from({length:24},(_,i)=>i),'24 continuous wing frames retained');
+   const contour=(svg.match(/fill="url\(#body-grad\)" stroke="[^"]+" stroke-opacity="\.52" stroke-width="2\.15"/g)||[]).length;
+   const breast=(svg.match(/fill="url\(#breast-grad\)" stroke="[^"]+" stroke-opacity="\.17" stroke-width="1\.55"/g)||[]).length;
+   assert.equal(contour,24,'all 24 body outlines share the same gentle treatment');
+   assert.equal(breast,24,'all 24 breast panels share the same subtle edge');
+   assert.doesNotMatch(svg,/<(?:filter|script|animate|foreignObject|image)\b/i);
+   assert.doesNotMatch(svg,/\b(?:href|src)\s*=\s*["']https?:/i);
+   assert.ok(Buffer.byteLength(svg,'utf8')<265_000,'no extra raster image or large sprite');
+   atlases.push([...svg.matchAll(/data-joint="([^"]+)" data-angle="([^"]+)"/g)]
+     .map(x=>x[1]+':'+x[2]));
+ }
+ assert.deepEqual(atlases[0],atlases[1],'warm and slate wing skeleton/phase must stay identical');
+ const p=html.slice(html.indexOf('  function drawPipePart('),html.indexOf('  function drawPipes(){'));
+ assert.ok(p.length>1000&&p.length<6000);
+ assert.match(p,/ctx\.fillRect\(1\.2,1,Math\.min\(1\.6,w\*\.029\),Math\.max\(0,h-2\)\)/);
+ assert.match(p,/ctx\.fillRect\(w-2\.8,1,1\.6,Math\.max\(0,h-2\)\)/);
+ assert.match(p,/roundedRect\(\.65,capY\+\.65,w-1\.3,capH-1\.3,5\.3\);ctx\.stroke\(\)/);
+ assert.match(html,/function collides\(\)/);
+ assert.match(html,/var pw=pipeWidth\(\)/);
+ assert.match(html,/function birdRadius\(\)\{return Math\.max\(13,W\*\.043\);\}/);
+ assert.match(html,/function pipeWidth\(\)\{return clamp\(W\*\.155,48,68\);\}/);
+});
