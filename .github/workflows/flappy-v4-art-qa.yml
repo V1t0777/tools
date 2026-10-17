@@ -102,6 +102,7 @@ jobs:
           else
             export CHROME="$(command -v chromium)"
           fi
+          node --check tests/flappy-v4-game-browser.mjs
           node tests/flappy-v4-game-browser.mjs v4-game-qa
           test -s v4-game-qa/headless-game-metrics.json
           test -s v4-game-qa/headless-live-input-metrics.json
