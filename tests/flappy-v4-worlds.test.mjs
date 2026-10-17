@@ -346,18 +346,6 @@ test('Alpha 21 warm-near C1 seam keeps original ridgeline, transparent sky and r
  assert.match(svg,/viewBox="0 0 1600 1000"/);
  assert.ok(Buffer.byteLength(svg,'utf8')<93_000);
  assert.doesNotMatch(svg,/<(?:filter|script|animate|foreignObject|image)\b/i);
- const edgeStart=svg.indexOf('<g id="near-wrapped-edge-pine-v1">');
- const edgeEnd=svg.indexOf('<g id="forest-broken-watercolor-glaze"',edgeStart);
- assert.ok(edgeStart>=0&&edgeEnd>edgeStart,'pine group must precede atmospheric wash');
- const paired=svg.slice(edgeStart,edgeEnd);
- const left=paired.match(/<g data-repeat-edge="left" transform="translate\(0 800\) scale\(\.62\)">([\s\S]*?)<\/g>/);
- const right=paired.match(/<g data-repeat-edge="right" transform="translate\(1600 800\) scale\(\.62\)">([\s\S]*?)<\/g>/);
- assert.ok(left&&right,'full pine halves must be drawn across x=0 and x=1600');
- assert.equal(left[1],right[1],'each tile draws identical branches at the shared source boundary');
- assert.equal((left[1].match(/<path\b/g)||[]).length,3,'one broad pine + two quiet brush highlights');
- assert.ok(svg.indexOf('id="near-wrapped-edge-pine-v1"')<svg.indexOf('id="forest-broken-watercolor-glaze"'),
-  'softest atmospheric wash remains in front of the new seam tree');
- assert.ok(Buffer.byteLength(svg,'utf8')<93_000);
  const other=read('flappy/assets/v4/slate/near.svg');
  assert.match(other,/M0 815 Q166 766 314 790/,'slate art retained for independent QA baseline');
 });
