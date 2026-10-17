@@ -28,6 +28,8 @@ jobs:
             done
           done
           test -s flappy/review-v4.html
+          test -s flappy/assets/v4/masters/warm/far-master-pilot.svg
+          test -s flappy/assets/v4/pilot/warm/far.svg
       - name: Capture isolated Chrome-process first-tap audio A/B
         shell: bash
         run: |
@@ -200,6 +202,20 @@ jobs:
               done
             done
           done
+          # Alpha 24 source-painted A/B: same original scene, only warm/far layer
+          # changes through a QA-only CSS :target route; no game runtime swap.
+          for shape in "320 568" "390 844"; do
+            read -r W H <<<"$shape"
+            png="v4-art-qa/pilot-warm-far-$W"x"$H.png"
+            "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+              --hide-scrollbars --force-device-scale-factor=1 \
+              --virtual-time-budget=2200 --window-size="$W,$H" \
+              "--screenshot=$png" \
+              "http://127.0.0.1:8765/flappy/review-v4.html#warm-pilot" \
+              >/dev/null 2>v4-art-qa/chrome.log
+            test -s "$png"
+            ! cmp -s "$png" "v4-art-qa/scene-warm-$W"x"$H.png"
+          done
           python3 - <<'PY'
           from pathlib import Path
           import struct
@@ -218,8 +234,9 @@ jobs:
           scene_count=len(list(Path("v4-art-qa").glob("scene-*.png")))
           seam_count=len(list(Path("v4-art-qa").glob("seam-*.png")))
           pose_count=len(list(Path("v4-art-qa").glob("pose-*.png")))
-          if (scene_count,seam_count,pose_count)!=(8,8,12):
-              raise SystemExit(f"Expected 8 scenes, 8 seams, 12 authentic atlas pose captures, got {(scene_count,seam_count,pose_count)}")
+          pilot_count=len(list(Path("v4-art-qa").glob("pilot-warm-far-*.png")))
+          if (scene_count,seam_count,pose_count,pilot_count)!=(8,8,12,2):
+              raise SystemExit(f"Expected 8 scenes, 8 seams, 12 authentic atlas poses and 2 isolated painted-layer A/B captures, got {(scene_count,seam_count,pose_count,pilot_count)}")
           PY
       - name: Keep isolated cold-audio A/B screenshots and measurements
         if: always()
@@ -247,7 +264,7 @@ jobs:
             v4-game-qa/headless-narrow-readability.json
           retention-days: 7
           if-no-files-found: warn
-      - name: Keep 16 scene/seam screenshots, 12 atlas poses and diagnostics
+      - name: Keep 16 scenes/seams, 12 atlas poses, 2 painted pilot A/B and diagnostics
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
