@@ -316,6 +316,8 @@
   var lastTime=0,raf=0,elapsed=0,scroll=0,prevGapY=null;
   var hitSlowUntil=0,groundHitAt=0;
   var audioCtx=null,noiseBuffer=null,soundOn=true,audioConstructionFailed=false;
+  // Experimental V4: Chrome-only, no-sound idle allocation (NO resume until user gesture).
+  var AUDIO_IDLE_PRIME=true;
   var SOUND_KEY='zhaoFlappySound.v1';
   try{soundOn=localStorage.getItem(SOUND_KEY)!=='off';}catch(e){}
   var BEST_KEY='zhaoFlappyBest.v1';
@@ -736,6 +738,27 @@
   }
   function retryPendingSubmission(){pendingRuns.slice().forEach(function(run){if(!run.busy&&run.attempts<2)sendRun(run);});}
 
+  function primeAudioAtIdle(){
+    // Never start sound or resume a context outside an explicit user gesture.
+    // Safari/WebKit are excluded until actual first-tap audio is device-tested.
+    if(!AUDIO_IDLE_PRIME||!soundOn||audioCtx||audioConstructionFailed||state!=='ready')return;
+    if(document.hidden||!window.requestIdleCallback)return;
+    var brands=navigator.userAgentData&&navigator.userAgentData.brands;
+    if(!brands||!brands.some(function(entry){return entry.brand==='Chromium';}))return;
+    if(navigator.connection&&navigator.connection.saveData)return;
+    if(typeof navigator.deviceMemory==='number'&&navigator.deviceMemory<=2)return;
+    var AC=window.AudioContext||window.webkitAudioContext;
+    if(!AC)return;
+    window.requestIdleCallback(function(deadline){
+      if(!soundOn||audioCtx||state!=='ready'||document.hidden)return;
+      if(deadline&&typeof deadline.timeRemaining==='function'&&deadline.timeRemaining()<10)return;
+      try{audioCtx=new AC();}
+      catch(error){
+        // Idle-time creation may be denied by policy; retry inside a real tap.
+        // Unlike a failed user-triggered initialization, do NOT latch failure.
+      }
+    });
+  }
   function initAudio(){
     if(!soundOn||audioConstructionFailed)return null;
     if(!audioCtx){
@@ -1471,7 +1494,8 @@
     if(e.target.closest&&e.target.closest('input,textarea,button,a,[contenteditable]'))return;
     if(e.key==='p'||e.key==='P'||e.key==='Escape'){e.preventDefault();togglePause();return;}
     if(e.key===' '||e.key==='ArrowUp'||e.key==='w'||e.key==='W'){
-      e.preventDefault();initAudio();
+      // Keyboard flight has the same physics-first behavior as pointer input.
+      e.preventDefault();
       if(state==='ready'||state==='over')startGame();
       else if(state==='running')flap();
     }
@@ -1490,6 +1514,7 @@
   loadBest();loadPendingBest();restorePendingRuns();resetGame(true);state='ready';readyLayer.classList.remove('hidden');
   refreshLeaderboard(true).then(retryPendingSubmission);
   requestAnimationFrame(resize);raf=requestAnimationFrame(frame);
+  primeAudioAtIdle();
 })();
 </script>
 
