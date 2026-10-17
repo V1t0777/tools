@@ -39,9 +39,18 @@ header p{max-width:760px;margin:0 0 16px}
 .pipe{position:absolute;left:68%;width:14%;background:linear-gradient(90deg,#526365,#abafa1 46%,#536466);box-shadow:0 0 0 1px #d1d6d1}
 .slate .pipe{background:linear-gradient(90deg,#283e58,#889eb2 50%,#30475c)}
 .pipe.top{top:0;height:30%}.pipe.bottom{top:61%;bottom:11.5%}
-.bird{position:absolute;left:25%;top:42%;width:9%;aspect-ratio:1;border-radius:50%;background:#c18e60;box-shadow:0 0 0 2px rgba(22,32,40,.55)}
-.slate .bird{background:#829bad}
-.bird:after{content:"";position:absolute;top:39%;left:96%;border-left:9px solid #6c5a45;border-top:4px solid transparent;border-bottom:4px solid transparent}
+/* Alpha 23: the SAME passive 6x4 / 24-frame transparent atlas as the real game.
+   Nominal game draw size = birdRadius() * 4.04; r=max(13, width*.043).
+   Actual Canvas composition is still checked independently, not claimed by CSS. */
+.bird{position:absolute;left:25%;top:42%;width:max(52.52px,17.372%);aspect-ratio:1;
+  transform:translate(-50%,-52.5%);border:0;border-radius:0;box-shadow:none;
+  background-image:url("./assets/v3/warm-flight.svg");background-repeat:no-repeat;
+  background-size:600% 400%;background-position:0% 0%;image-rendering:auto;pointer-events:none}
+.slate .bird{background-image:url("./assets/v3/slate-flight.svg")}
+#wing-rest:checked~.worlds .bird{background-position:0% 0%}
+#wing-power:checked~.worlds .bird{background-position:0% 33.333333%}
+#wing-recovery:checked~.worlds .bird{background-position:0% 66.666667%}
+#wing-glide:checked~.worlds .bird{background-position:0% 100%}
 .ground{position:absolute;bottom:0;left:0;right:0;height:11.5%;background:rgba(28,52,47,.83);border-top:2px solid rgba(219,212,165,.5)}
 .slate .ground{background:rgba(21,42,60,.89)}
 #s390:checked~.worlds .frame{aspect-ratio:390/844}
@@ -93,15 +102,19 @@ body:has(.seamworld:target) .seamworld:target{display:block}
 <main>
 <header><span class="tag">DRAFT · 静态安全验收页 · 不代表正式发布</span>
 <h1>V4 Cinematic Worlds · 双主题对比</h1>
-<p>无 JavaScript 的五层场景对比，供不同屏幕比例的裁切、层次与可读性检查。真实滚动与碰撞请在相同开发分支的游戏页面单独验收。</p>
+<p>无 JavaScript 的五层场景对比。角色直接使用游戏中的透明 24 帧图集（帧 0、6、12、18 可切换）；石柱仍为布局参考，不是正式 Canvas 材质。真实滚动、碰撞和管道请在相同开发分支的游戏画面中验收。</p>
 </header>
 <section class="options" aria-label="美术验收选项">
 <input type="radio" id="s360" name="size" checked><label for="s360">360 × 600</label>
 <input type="radio" id="s390" name="size"><label for="s390">390 × 844</label>
 <input type="radio" id="s420" name="size"><label for="s420">420 × 740</label>
 <input type="radio" id="s320" name="size"><label for="s320">320 × 568</label>
-<input type="checkbox" id="guides" checked><label for="guides">小鸟与管道可读性参考</label>
+<input type="checkbox" id="guides" checked><label for="guides">角色与障碍参考</label>
 <input type="checkbox" id="fog" checked><label for="fog">谷雾图层</label>
+<input type="radio" id="wing-rest" name="wing" checked><label for="wing-rest">羽翼 0 · 休止</label>
+<input type="radio" id="wing-power" name="wing"><label for="wing-power">羽翼 6 · 发力</label>
+<input type="radio" id="wing-recovery" name="wing"><label for="wing-recovery">羽翼 12 · 回收</label>
+<input type="radio" id="wing-glide" name="wing"><label for="wing-glide">羽翼 18 · 滑翔</label>
 <div class="worlds">
 <article class="world warm" id="warm">
 <h2>晨曦山谷 · 暖棕旅鸟</h2>
@@ -145,7 +158,7 @@ body:has(.seamworld:target) .seamworld:target{display:block}
 <img class="first near" src="./assets/v4/slate/near.svg" alt="" decoding="async">
 <img class="second near" src="./assets/v4/slate/near.svg" alt="" decoding="async">
 </div></section>
-<aside>安全说明：验收页不执行脚本，不加载第三方资源，也不访问数据库或登录信息。请检查暖棕和板岩两套背景中角色、石柱是否始终突出；正式发布前会移除本验收页面，并另行完成动态接缝、性能和高精度材质的实机验收。</aside>
+<aside>验收说明：此页面无脚本、无第三方资源、无登录/数据库访问。真实小鸟取自游戏的 1440×960、6 列×4 行透明原始 24 帧 SVG 图集；四个选项为第 0、6、12、18 帧。静态石柱仅提示视觉占位和开口，形状与光影不等于游戏 Canvas 石柱。正式发布前须在真实游戏截图中审核管道、完整扑翼、动态接缝和移动端设备，且移除本开发页。</aside>
 </main>
 </body>
 </html>
