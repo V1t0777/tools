@@ -161,7 +161,9 @@ test('V4 idle prime experiment remains isolated from production debug controls',
   assert.match(game,/function primeAudioAtIdle\(\)/);
   assert.match(game,/navigator\.userAgentData&&navigator\.userAgentData\.brands/);
   assert.match(game,/entry\.brand==='Chromium'/);
-  assert.match(game,/requestIdleCallback\(function\(deadline\)/);
+  assert.match(game,/function primeOnIdle\(deadline\)/);
+  assert.match(game,/budgetRetries\+\+<3/);
+  assert.match(game,/requestIdleCallback\(primeOnIdle\)/);
   assert.match(game,/state!=='ready'\|\|document\.hidden/);
   assert.match(probe,/AUDIO_IDLE_PRIME=window\.__v4GameQa\.prewarm/);
   assert.match(probe,/primeSuccess/);
