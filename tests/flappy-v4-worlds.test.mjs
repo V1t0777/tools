@@ -228,3 +228,33 @@ test('V4 distant mountain broad pigment passes are readable-scale, clipped, inde
  }
  assert.notEqual(palettes[0],palettes[1],'night art is separately painted, not palette-tinted copy');
 });
+
+
+test('V4 far-to-mid atmospheric color bridge uses clipped muted pigments with no tile-edge flashes',()=>{
+ const palettes=[];
+ for(const theme of ['warm','slate']){
+   const mid=read('flappy/assets/v4/'+theme+'/mid.svg');
+   const group=mid.match(/<g id="mid-far-light-bridge-v1" clip-path="url\(#clip-rock-mid\)">([\s\S]*?)<\/g>/);
+   assert.ok(group,theme+' lacks the far-to-mid light bridge');
+   const glazes=[...group[1].matchAll(/<path data-bridge="glaze-(\d+)"[^>]*\/>/g)];
+   const edges=[...group[1].matchAll(/<path data-bridge="dry-light-(\d+)"[^>]*\/>/g)];
+   assert.equal(glazes.length,7,'seven coherent source-scale light passes');
+   assert.equal(edges.length,4,'four broad low-contrast dry edges');
+   for(const [idx,entry] of glazes.entries()){
+     assert.equal(Number(entry[1]),idx+1);
+     assert.match(entry[0],/fill-opacity="\.(?:1[0-4])"/);
+   }
+   for(const [idx,entry] of edges.entries()){
+     assert.equal(Number(entry[1]),idx+1);
+     assert.match(entry[0],/stroke-width="(?:10|11|12)"/);
+   }
+   assert.ok(mid.indexOf('mid-far-light-bridge-v1')<mid.indexOf('mid-rock-watercolor-facets'),
+     'lighting bridge belongs beneath detailed marks');
+   assert.doesNotMatch(group[1],/<(?:script|filter|animate|foreignObject|image)\b|\b(?:href|src)=/i);
+   assert.ok(Buffer.byteLength(mid,'utf8')<24_000,'retain mobile mid-layer budget');
+   assert.ok(!/<path[^>]+d="M(?:0|1600) /.test(group[1]),
+     'new light is inset rather than an edge-discontinuous shape');
+   palettes.push(group[1]);
+ }
+ assert.notEqual(palettes[0],palettes[1],'twilight needs independent lunar lighting');
+});
