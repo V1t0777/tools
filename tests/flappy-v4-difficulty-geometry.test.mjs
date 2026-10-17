@@ -23,7 +23,7 @@ function difficulty(score,W,H){
  return {
   speed:W*(.41+capped*.0028),
   gap:Math.max(H*.205,H*.255-capped*.85),
-  spacing:Math.max(W*.50,W*.60-capped*.0018)
+  spacing:Math.max(W*.50,W*.60-capped*.0018*W)
  };
 }
 function sampleGap(previous,d,H,W,groundY,random){
