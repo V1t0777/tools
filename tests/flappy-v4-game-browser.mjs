@@ -20,6 +20,12 @@ function visualFixture(){
   let s=original;
   s=once(s,'<script src="../shared/toolbox-auth.js?v=20261008-security"></script>','');
   s=once(s,"var nextSkin=Math.random()<.5?'warm':'slate';","var nextSkin=window.__v4GameQa.skin;");
+  // Compare new idle priming against the exact same game with QA-only flag disabled.
+  s=once(s,'var AUDIO_IDLE_PRIME=true;','var AUDIO_IDLE_PRIME=window.__v4GameQa.prewarm;');
+  s=once(s,'      try{audioCtx=new AC();}\n      catch(error){\n        // Idle-time creation',
+    '      try{var qaStartedAt=performance.now();audioCtx=new AC();'+
+    'var qa=window.__v4GameQa;if(qa){qa.primeSuccess=true;qa.primedAudioMs=Math.round((performance.now()-qaStartedAt)*100)/100;}}'+
+    '\n      catch(error){\n        // Idle-time creation');
   // Time synchronous audio startup independently of first-game Canvas paint.
   // This is injected into the localhost QA response only, never shipped.
   s=once(s,'  function initAudio(){','  function originalInitAudio(){');
@@ -109,6 +115,7 @@ function visualFixture(){
     'try{localStorage.setItem("zhaoFlappySound.v1",qaArgs.get("sound")==="off"?"off":"on");}catch(e){}',
     'window.__v4GameQa={skin:qaArgs.get("skin")==="slate"?"slate":"warm",',
     'sound:qaArgs.get("sound")==="off"?"off":"on",',
+    'prewarm:qaArgs.get("prime")!=="control",primeSuccess:false,primedAudioMs:null,',
     'mode:qaArgs.get("mode")==="live"?"live":"stabilized",pointerdowns:0,',
     'state:"ready",previousState:"ready",startCount:0,runningFrames:0,',
     'previousWingPhase:-1,unexpectedWingResets:0,pipeData:[],',
@@ -222,8 +229,8 @@ const metricExpression=[
 ].join('');
 // Every V4_COLD_CASE invocation creates a unique Chrome process and profile.
 const coldCase=process.env.V4_COLD_CASE||'';
-const coldCaseParts=/^(warm|slate):(on|off):([12])$/.exec(coldCase);
-if(coldCase&&!coldCaseParts)throw new Error('Invalid V4_COLD_CASE; expected theme:sound:repetition');
+const coldCaseParts=/^(warm|slate):(on|off):([12]):(prime|control)$/.exec(coldCase);
+if(coldCase&&!coldCaseParts)throw new Error('Invalid V4_COLD_CASE; expected theme:sound:repetition:prime|control');
 const evidence={kind:'Draft-only real Flappy browser renderer evidence',
   disclaimer:'Headless Chromium frame intervals are NOT iPhone/Android FPS or input latency measurements.',
   createdAt:new Date().toISOString(),samples:[]};
@@ -257,26 +264,33 @@ try{
   if(coldCaseParts){
     // First page navigation in a completely fresh Chrome process/profile.
     // No earlier renderer screenshots or A/B cases run in this process.
-    const [,skin,sound,repetition]=coldCaseParts;
+    const [,skin,sound,repetition,variant]=coldCaseParts;
     const width=360,height=600;
     await cdp('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:true});
     const navStart=Date.now();
     await cdp('Page.navigate',{url:'http://127.0.0.1:'+port+
-      '/flappy/qa-game.html?skin='+skin+'&mode=live&sound='+sound});
+      '/flappy/qa-game.html?skin='+skin+'&mode=live&sound='+sound+'&prime='+variant});
     await until('Boolean(window.__v4GameQa&&window.__v4GameQa.mode==="live"&&window.__v4GameQa.state==="ready"&&window.__v4GameQa.world===window.__v4GameQa.skin&&window.__v4GameQa.frames>20)');
     const readyElapsedMs=Date.now()-navStart;
+    // Give rIC a chance to allocate audio, but keep control cases otherwise identical.
+    await sleep(900);
     const press={x:width*.28,y:height*.45,button:'left',clickCount:1};
     await cdp('Input.dispatchMouseEvent',{...press,type:'mousePressed'});
     await cdp('Input.dispatchMouseEvent',{...press,type:'mouseReleased'});
     await until('Boolean(window.__v4GameQa&&window.__v4GameQa.latencySamples.length>=1)');
     const qa=JSON.parse(await read('JSON.stringify((()=>{const q=window.__v4GameQa;return {'+
-      'theme:q.skin,sound:q.sound,mode:q.mode,clicks:q.pointerdowns,starts:q.startCount,'+
+      'theme:q.skin,sound:q.sound,prewarm:q.prewarm,'+
+      'primeSuccess:q.primeSuccess,primedAudioMs:q.primedAudioMs,'+
+      'mode:q.mode,clicks:q.pointerdowns,starts:q.startCount,'+
       'firstInput:q.latencySamples[0],audioCalls:q.audioTimes.length,'+
       'firstAudioInitMs:q.audioTimes.length?q.audioTimes[0]:null,'+
       'background:q.world,loadedLayers:q.activeWorldLayers,'+
       'sceneStatus:q.worldStatus,frameCount:q.frames};})())'));
     assert.equal(qa.theme,skin);
     assert.equal(qa.sound,sound);
+    assert.equal(qa.prewarm,variant==='prime');
+    if(variant==='control')assert.equal(qa.primeSuccess,false);
+    if(sound==='off')assert.equal(qa.primeSuccess,false,'Muted cannot prewarm');
     assert.equal(qa.mode,'live');
     assert.equal(qa.clicks,1);
     assert.ok(qa.starts>=1,'Actual game input did not start the bird');
@@ -291,14 +305,14 @@ try{
       {format:'png',captureBeyondViewport:false,fromSurface:true});
     const png=Buffer.from(screenshot.result.data,'base64');
     assert.ok(png.length>12000&&png.subarray(0,8).toString('hex')==='89504e470d0a1a0a');
-    writeFileSync(join(output,'first-tap-'+skin+'-'+sound+'-rep'+repetition+'.png'),png);
+    writeFileSync(join(output,'first-tap-'+skin+'-'+sound+'-rep'+repetition+'-'+variant+'.png'),png);
     const result={kind:'Fresh Chrome process/profile first-click on/off comparison',
       disclaimer:'Runner OS/audio backend remains shared across separate processes; no iOS/Android touch-to-photon proof.',
-      theme:skin,sound,repetition:Number(repetition),readyElapsedMs,
+      theme:skin,sound,variant,repetition:Number(repetition),readyElapsedMs,
       browserProfile:'unique temporary profile',processId:browser.pid,
       screenshotBytes:png.length,...qa};
     writeFileSync(join(output,'cold-firsttap.json'),JSON.stringify(result,null,2)+'\n');
-    console.log('COLD PROCESS',skin,sound,repetition,
+    console.log('COLD PROCESS',skin,sound,repetition,variant,'primed='+qa.primeSuccess,
       'physicsMs='+qa.firstInput.pointerToPhysicsMs,
       'drawMs='+qa.firstInput.pointerToDrawMs,'audioMs='+qa.firstAudioInitMs,
       'readyMs='+readyElapsedMs);
