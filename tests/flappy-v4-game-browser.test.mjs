@@ -50,3 +50,17 @@ test('V4 normal input QA keeps genuine gravity and collision on, then restarts v
   assert.match(workflow,/live-\*\.png/);
   assert.ok(!game.includes("if(window.__v4GameQa"),'production collisions must not be modified');
 });
+
+test('V4 sustained real-pointer QA checks continuous wing motion without disabling physical gameplay',()=>{
+  assert.match(probe,/Closed-loop long run/);
+  assert.match(probe,/realPointerFlaps:turns\+1/);
+  assert.match(probe,/headless-endurance-metrics\.json/);
+  assert.match(probe,/unexpectedWingResets/);
+  assert.match(probe,/bird\.wingPhase<qa\.previousWingPhase-\.4/);
+  assert.match(probe,/Input\.dispatchMouseEvent/);
+  assert.match(probe,/snap\.birdY>target\+8&&snap\.birdVy>0/);
+  assert.match(probe,/record\.endScroll-record\.startScroll>220/);
+  assert.match(probe,/assert\.equal\(record\.unexpectedWingResets,0/);
+  assert.match(workflow,/test -s v4-game-qa\/headless-endurance-metrics\.json/);
+  assert.doesNotMatch(game,/headless-endurance-metrics|__v4GameQa/);
+});
