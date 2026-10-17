@@ -84,6 +84,8 @@ test('V4 multi-round exercise retains real collisions and original randomized pi
 test('V4 draft-only QA distinguishes browser pointer-to-physics from next Canvas draw',()=>{
   assert.match(probe,/latestPointerAt=performance\.now\(\)/);
   assert.match(probe,/q\.pendingFlap=\{fromPointer:/);
+  assert.match(probe,/physics timestamp belongs AFTER bird\.vy is updated/);
+  assert.match(probe,/bird\.vy=Math\.min\(bird\.vy,0\)\*\.12-flapPower/);
   assert.match(probe,/qa\.latencySamples\.push\(/);
   assert.match(probe,/pointerToPhysicsMs:/);
   assert.match(probe,/physicsToDrawMs:/);
