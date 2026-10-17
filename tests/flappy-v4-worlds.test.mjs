@@ -539,3 +539,20 @@ test('Alpha 25 slate editable 3200px mountain master and 1600px derivative are i
  assert.ok(Object.values(manifest.release_gates).every(x=>x===false));
  assert.doesNotMatch(html,/pilot\/slate\/far|slate-pilot|far-master-pilot/);
 });
+
+
+test('Alpha 25 pilot ridge-only highlights must never stroke image frame edges',()=>{
+ for(const theme of ['warm','slate']){
+   for(const filename of ['masters/'+theme+'/far-master-pilot.svg','pilot/'+theme+'/far.svg']){
+     const source=read('flappy/assets/v4/'+filename);
+     const crest=source.match(/<path id="(?:dawn|slate)-ridge-edge" d="([^"]+)" fill="none"/);
+     assert.ok(crest,filename+' must have a separate unfilled ridge highlight');
+     assert.ok(crest[1].endsWith(theme==='warm'?' 3200 1194':' 3200 1242'),
+       filename+' ridge brush must end ON its top silhouette without tracing viewport borders');
+     assert.doesNotMatch(crest[1],/\bL3200 2000\b|\bL0 2000\b/,
+       'Do not paint the full-height repeated image edge as a bright line');
+     assert.ok(source.includes('L3200 2000 L0 2000Z'),
+       'The filled ridge silhouette still extends fully to the ground');
+   }
+ }
+});
