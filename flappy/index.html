@@ -753,15 +753,22 @@
     if(typeof navigator.deviceMemory==='number'&&navigator.deviceMemory<=2)return;
     var AC=window.AudioContext||window.webkitAudioContext;
     if(!AC)return;
-    window.requestIdleCallback(function(deadline){
+    var budgetRetries=0;
+    function primeOnIdle(deadline){
       if(!soundOn||audioCtx||state!=='ready'||document.hidden)return;
-      if(deadline&&typeof deadline.timeRemaining==='function'&&deadline.timeRemaining()<10)return;
+      // Animated Canvas rarely leaves 10ms idle, even on a fast runner.
+      // Give three additional idle slices a chance, without forcing a timeout.
+      if(deadline&&typeof deadline.timeRemaining==='function'&&deadline.timeRemaining()<5){
+        if(budgetRetries++<3)window.requestIdleCallback(primeOnIdle);
+        return;
+      }
       try{audioCtx=new AC();}
       catch(error){
         // Idle-time creation may be denied by policy; retry inside a real tap.
         // Unlike a failed user-triggered initialization, do NOT latch failure.
       }
-    });
+    }
+    window.requestIdleCallback(primeOnIdle);
   }
   function initAudio(){
     if(!soundOn||audioConstructionFailed)return null;
