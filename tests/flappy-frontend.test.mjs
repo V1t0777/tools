@@ -18,7 +18,7 @@ function extractGameScript(documentSource){
 }
 const source=extractGameScript(html);
 new vm.Script(source); // Syntax check independent of the DOM harness.
-function setup({auth=true,fetchImpl=async()=>{throw new Error('offline');},storage=new Map([['zhaoFlappyBest.v1','12']]),render=false,imageLoading=false,imageDecoding=false,deviceMemory=8,saveData=false,reduceMotion=false}={}){
+function setup({auth=true,fetchImpl=async()=>{throw new Error('offline');},storage=new Map([['zhaoFlappyBest.v1','12']]),render=false,imageLoading=false,imageDecoding=false,deviceMemory=8,saveData=false,reduceMotion=false,audioConstructor=null}={}){
   const elements=new Map(),events={},rafQueue=[];let authChange,createdCanvases=0,drawImages=0;const paintedColors=[],drawnSources=[],imageObjects=[];
   const gradient={addColorStop(){}};
   const fakeCtx=new Proxy({createLinearGradient(){return gradient;},createRadialGradient(){return gradient;},drawImage(im){drawImages++;if(im&&im.src)drawnSources.push(im.src);}},
@@ -33,7 +33,7 @@ function setup({auth=true,fetchImpl=async()=>{throw new Error('offline');},stora
   }
   const session={user:{id:'u1'},access_token:'fake'};
   const toolbox={url:'https://example.test',key:'public',peekSession:()=>session,getSession:async()=>session,onAuthStateChange:fn=>{authChange=fn;},signIn:async()=>{},authMessage:e=>e.message};
-  const window={matchMedia:()=>({matches:reduceMotion}),addEventListener(){},ToolboxAuth:auth?toolbox:undefined};
+  const window={matchMedia:()=>({matches:reduceMotion}),addEventListener(){},ToolboxAuth:auth?toolbox:undefined,AudioContext:audioConstructor||undefined};
   const localStorage={getItem(key){return storage.has(key)?storage.get(key):null;},setItem(key,value){storage.set(key,String(value));}};
   const document={getElementById:element,addEventListener(t,fn){events[t]=fn;},body:{setAttribute(){}},
     createElement(tag){if(tag!=='canvas')throw new Error('Unexpected element');createdCanvases++;return {getContext(){return fakeCtx;}};}};
@@ -377,4 +377,46 @@ test('V4 choosing another theme releases the old decoded world; stale decode can
   assert.equal(scene.api.worldLayerCountForTest('slate'),0);
   const reloaded=scene.imageObjects().filter(img=>img.src.includes('/v4/warm/'));
   assert.equal(reloaded.length,10,'returning to previously evicted theme reloads its 5 layers');
+});
+
+test('First pointer tap applies vertical lift before synchronous AudioContext construction',()=>{
+  let scene,created=0,velocityAtAudioCreation=null,tones=0;
+  const parameter=()=>({setValueAtTime(){},exponentialRampToValueAtTime(){},linearRampToValueAtTime(){}});
+  function AudioContextStub(){
+    created++;velocityAtAudioCreation=scene.api.vy;
+    this.state='running';this.currentTime=1;this.sampleRate=44100;
+    this.destination={};
+    this.createOscillator=()=>{tones++;return {frequency:parameter(),connect(){},start(){},stop(){}};};
+    this.createGain=()=>({gain:parameter(),connect(){}});
+    this.createBuffer=()=>({getChannelData:()=>new Float32Array(8)});
+    this.createBufferSource=()=>({connect(){},start(){},stop(){}});
+    this.createBiquadFilter=()=>({frequency:{value:0},connect(){}});
+  }
+  scene=setup({audioConstructor:AudioContextStub});
+  scene.e('stage').listeners.pointerdown({target:{closest:()=>null},preventDefault(){}});
+  assert.equal(scene.api.state,'running');
+  assert.ok(scene.api.vy<0,'first tap must apply impulse');
+  assert.ok(velocityAtAudioCreation<0,'slow audio construction must follow the impulse');
+  assert.equal(created,1,'a single audio context must be reused by tone and airy');
+  assert.ok(tones>=1,'first flap still schedules sound in the same user gesture');
+});
+
+test('AudioContext permission/constructor failures cannot block the first flight',()=>{
+  let attempts=0,scene;
+  function BlockedAudioContext(){
+    attempts++;
+    assert.ok(scene.api.vy<0,'bird impulse precedes rejected audio initialization');
+    throw new Error('Audio output unavailable');
+  }
+  scene=setup({audioConstructor:BlockedAudioContext});
+  scene.e('stage').listeners.pointerdown({target:{closest:()=>null},preventDefault(){}});
+  assert.equal(scene.api.state,'running');
+  assert.ok(scene.api.vy<0);
+  assert.equal(attempts,1);
+  scene.api.flapForTest();
+  assert.equal(attempts,1,'repeated flaps must not retry a throwing constructor');
+  scene.e('soundBtn').listeners.click({stopPropagation(){}});
+  scene.e('soundBtn').listeners.click({stopPropagation(){}});
+  assert.equal(attempts,2,'explicit sound re-enable may retry audio initialization');
+  assert.equal(scene.api.state,'running','failed sound retries must not crash game');
 });
