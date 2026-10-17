@@ -352,3 +352,20 @@ test('Alpha 26 middle painting evidence is 12 added Draft-only PNGs, never live-
  assert.doesNotMatch(game,/pilot\/slate\/mid|pilot\/warm\/mid|mid-master-pilot|stack-pilot/);
  assert.doesNotMatch(builder,/pilot\/slate\/mid|pilot\/warm\/mid|mid-master-pilot|stack-pilot/);
 });
+
+
+test('Alpha 26 painting seam PNG decode and actual RGB checks reject hand-painted tile edge defects',()=>{
+ const audit=read('tests/flappy-v4-pilot-seam-check.py');
+ assert.match(audit,/import zlib/);
+ assert.match(audit,/def png_rgb\(path: Path\):/);
+ assert.match(audit,/def seam_audit\(path: Path\):/);
+ assert.match(audit,/zlib\.crc32\(kind \+ value\)/);
+ assert.match(audit,/filtertype == 4/);
+ assert.match(audit,/pilot-mid-seam-\{theme\}-320x568\.png/);
+ assert.match(audit,/pilot-seam-\{theme\}-320x568\.png/);
+ assert.match(audit,/mean <= 4\.0 and mean <= reference \+ 2\.25/);
+ assert.match(audit,/if not all\(row\["passes"\] for row in reports\):/);
+ assert.match(workflow,/python3 tests\/flappy-v4-pilot-seam-check\.py v4-art-qa/);
+ assert.match(workflow,/v4-art-qa\/headless-painted-pilot-seams\.json/);
+ assert.doesNotMatch(game,/flappy-v4-pilot-seam-check\.py|headless-painted-pilot-seams/);
+});
