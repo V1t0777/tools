@@ -54,7 +54,7 @@ function visualFixture(){
     '        qa.started=true;qa.startedAt=t;qa.readyMs=performance.now()-qa.createdAt;',
     '      }',
     "      if(qa.mode==='stabilized'&&qa.started){bird.y=H*.45;bird.vy=0;",
-    '        scroll=qa.scrollOffset+(t-qa.startedAt)*.21;',
+    '        scroll=qa.scrollOffset+(qa.seamTarget?0:(t-qa.startedAt)*.21);',
     '        qa.drawState=state;qa.world=cinematicSession;',
     '        qa.observedScroll=scroll;qa.pipeCount=pipes.length;',
     '      }',
@@ -403,8 +403,9 @@ try{
 
       // Force the genuine renderer's far/mid/near tile joins into the flight
       // viewport: 0/960 scroll positions never reach the 1600-source tile edge.
-      // The only fixture change is the QA viewport scroll offset. The renderer
-      // and five loaded art layers remain exactly the same game sources.
+      // In this TEST-ONLY stabilized capture, freeze automatic drift during each
+      // seam probe; otherwise elapsed time moves near's join off-screen.
+      // Real game parallax, gameplay physics and production code are unchanged.
       for(const [layer,speed] of [['far',.045],['mid',.12],['near',.28]]){
         const tileWidth=height*1.6,expectedX=width*.52;
         const targetScroll=(tileWidth-expectedX)/speed;
@@ -414,7 +415,7 @@ try{
         await sleep(300);
         const sample=JSON.parse(await read('JSON.stringify(window.__v4GameQa.seamResult)'));
         assert.ok(sample&&sample.layer===layer,'Missing sampled game-canvas tile join: '+skin+'/'+layer);
-        assert.ok(sample.seamX>width*.15&&sample.seamX<width*.84,'Seam probe missed viewport center');
+        assert.ok(Math.abs(sample.seamX-expectedX)<3,'Seam probe failed to hold expected target (x='+sample.seamX+', desired='+expectedX+')');
         assert.ok(sample.sampleChannels>100&&sample.sampledBeforeGameplayOverlays);
         assert.ok(Number.isFinite(sample.seamMeanRgbDelta)&&Number.isFinite(sample.adjacentControlRgbDelta));
         // Loose regression guard for prominent gaps; subtle boundaries require
