@@ -6,7 +6,7 @@
 <path d="M0 815 Q166 766 314 790 T637 780 T953 752 T1291 780 T1600 815 L1600 1000 L0 1000Z" fill="url(#darkForest)"/>
 <path d="M0 815 Q166 766 314 790 T637 780 T953 752 T1291 780 T1600 815" stroke="#a5b6c6" stroke-opacity=".12" stroke-width="2" fill="none"/><g id="near-broad-canopy-pigment-v1" clip-path="url(#clip-rock-near)">
 <!-- Layered, mobile-visible open-pigment canopy below the pine boughs. -->
-<path data-pigment="gouache-1" d="M2.6 833.0 C23.6 771.7 84.0 800.7 106 789.7 C145.6 812.7 200.4 832.7 209.4 833 C187.4 864.9 121.4 897.6 106 886.6 C62.0 877.6 -3.4 859.8 2.6 833Z" fill="#91a9b7" fill-opacity="0.16"/>
+<path data-pigment="gouache-1" transform="translate(60 0)" d="M2.6 833.0 C23.6 771.7 84.0 800.7 106 789.7 C145.6 812.7 200.4 832.7 209.4 833 C187.4 864.9 121.4 897.6 106 886.6 C62.0 877.6 -3.4 859.8 2.6 833Z" fill="#91a9b7" fill-opacity="0.16"/>
 <path data-pigment="gouache-2" d="M179.1 862.0 C200.1 840.1 266.4 833.1 290 822.1 C332.5 845.1 391.9 865.1 400.9 862 C378.9 891.5 306.5 900.4 290 911.4 C242.8 902.4 173.1 886.7 179.1 862Z" fill="#537c8d" fill-opacity="0.105"/>
 <path data-pigment="gouache-3" d="M351.9 811.0 C372.9 741.3 442.5 770.3 467 759.3 C511.1 782.3 573.1 802.3 582.1 811 C560.1 849.1 484.1 886.0 467 875.0 C418.0 866.0 345.9 843.0 351.9 811Z" fill="#15394c" fill-opacity="0.21"/>
 <path data-pigment="gouache-4" d="M565.9 847.0 C586.9 819.2 644.7 812.2 666 801.2 C704.3 824.2 757.1 844.2 766.1 847 C744.1 880.8 680.9 892.7 666 903.7 C623.4 894.7 559.9 875.3 565.9 847Z" fill="#a7b4b5" fill-opacity="0.12"/>
