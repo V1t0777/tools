@@ -258,3 +258,38 @@ test('V4 far-to-mid atmospheric color bridge uses clipped muted pigments with no
  }
  assert.notEqual(palettes[0],palettes[1],'twilight needs independent lunar lighting');
 });
+
+
+test('V4 Alpha 18 skyline directional atmospheric bounce stays subtle, original and CSP-safe',()=>{
+ const samples=[];
+ for(const theme of ['warm','slate']){
+   const art=read('flappy/assets/v4/'+theme+'/sky.svg');
+   const group=art.match(/<g id="sky-horizon-backscatter-v1">([\s\S]*?)<\/g>/);
+   assert.ok(group,theme+' missing large-scale directional atmospheric pass');
+   assert.match(art,/<radialGradient id="sky-horizon-glow-v1">/);
+   const glows=[...group[1].matchAll(/<ellipse data-atmos="valley-glow-(\d+)"[^>]*\/>/g)];
+   const shelves=[...group[1].matchAll(/<path data-atmos="haze-shelf-(\d+)"[^>]*\/>/g)];
+   assert.equal(glows.length,2);
+   assert.equal(shelves.length,3);
+   assert.ok(glows.every((match,i)=>Number(match[1])===i+1));
+   assert.ok(shelves.every((match,i)=>Number(match[1])===i+1));
+   // Minimize clutter in the central bird lane: tint stays nearly invisible
+   // while retaining a localized horizon field behind the mountain masks.
+   for(const [,tag] of shelves){
+     const opacity=Number(tag.match(/stroke-opacity="([^"]+)"/)?.[1]);
+     assert.ok(opacity>0&&opacity<=.1,'high-contrast cloud stroke could obscure gameplay');
+     assert.match(tag,/stroke-width="(?:31|33|39|43|46|48)"/);
+   }
+   for(const [,tag] of glows){
+     const opacity=Number(tag.match(/opacity="([^"]+)"/)?.[1]);
+     assert.ok(opacity>=.25&&opacity<=.6,'sky bloom must be controlled');
+   }
+   assert.ok(art.indexOf('id="sky-horizon-backscatter-v1"')<
+     art.indexOf('id="sky-painterly-cloud-banks"'),'aerial glow goes below wisps');
+   assert.ok(Buffer.byteLength(art,'utf8')<6500,'no large sky textures');
+   assert.doesNotMatch(art,/<(?:filter|image|script|animate|foreignObject)\b/i);
+   assert.doesNotMatch(art,/\b(?:href|src)\s*=\s*["']https?:/i);
+   samples.push(group[1]);
+ }
+ assert.notEqual(samples[0],samples[1],'moonlight is not a tinted copy of warm sunlight');
+});
