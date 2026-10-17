@@ -101,9 +101,30 @@ jobs:
           test -s v4-game-qa/headless-multiround-metrics.json
           test -s v4-game-qa/headless-audio-ab-metrics.json
           test -s v4-game-qa/headless-seam-metrics.json
-          test "$(find v4-game-qa -maxdepth 1 -name 'seam-game-*.png' | wc -l)" -eq 12
-          test "$(find v4-game-qa -maxdepth 1 -name 'game-*.png' | wc -l)" -eq 8
+          test -s v4-game-qa/headless-narrow-readability.json
+          test "$(find v4-game-qa -maxdepth 1 -name 'seam-game-*.png' | wc -l)" -eq 18
+          test "$(find v4-game-qa -maxdepth 1 -name 'game-*.png' | wc -l)" -eq 12
           test "$(find v4-game-qa -maxdepth 1 -name 'live-*.png' | wc -l)" -eq 2
+          # Real game and QA-only color evidence must cover the narrow layout;
+          # RGB deltas are diagnostic values, never interpreted as WCAG grades.
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('v4-game-qa')
+          report=json.loads((root/'headless-narrow-readability.json').read_text())
+          captures=report['captures']
+          assert len(captures)==12
+          assert sorted({row['viewport'] for row in captures})==['320x568','360x600','390x844']
+          assert len([row for row in captures if row['viewport']=='320x568'])==4
+          for row in captures:
+              assert row['originalAtlasDecoded'] and row['birdAtlasReady']
+              assert row['nominalBirdDiameterCssPx']>=26
+              for field in ('centerRgbDelta','breastRgbDelta'):
+                  assert isinstance(row[field],(float,int)) and 0<=row[field]<=255
+              assert (root/row['filename']).is_file()
+          assert len(json.loads((root/'headless-seam-metrics.json').read_text())['results'])==18
+          print('Alpha 20: 12 true Canvas captures, 18 layer joins, 4 narrow-layout records verified')
+          PY
       - name: Render responsive draft evidence with installed headless Chrome
         shell: bash
         run: |
@@ -192,6 +213,7 @@ jobs:
             v4-game-qa/headless-multiround-metrics.json
             v4-game-qa/headless-audio-ab-metrics.json
             v4-game-qa/headless-seam-metrics.json
+            v4-game-qa/headless-narrow-readability.json
           retention-days: 7
           if-no-files-found: warn
       - name: Keep 16 scene/seam screenshots and diagnostics
