@@ -288,8 +288,8 @@ test('Alpha 23 no-script real atlas pose capture expands draft-only evidence saf
  assert.match(workflow,/pose-\$theme-\$phase-\$W/);
  assert.match(workflow,/review-v4\.html#\$theme-\$phase/);
  assert.match(workflow,/scene_count=len\(list\(Path\("v4-art-qa"\)\.glob\("scene-\*\.png"\)\)\)/);
- assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count\)!=\(8,8,12,2\)/);
- assert.match(workflow,/Keep 16 scenes\/seams, 12 atlas poses, 2 painted pilot A\/B/);
+ assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count\)!=\(8,8,12,2,1\)/);
+ assert.match(workflow,/Keep 16 scenes\/seams, 12 poses, 2 painted A\/B, 1 master PNG/);
  assert.match(workflow,/if: github\.event\.pull_request\.draft && github\.event\.pull_request\.number == 57/);
  assert.doesNotMatch(game,/phase-anchor|review-v4\.html|pose-\$theme-\$phase/);
  assert.doesNotMatch(builder,/phase-anchor|pose-\$theme-\$phase/);
@@ -305,4 +305,14 @@ test('Alpha 24 painted master pilot is never loaded into the real game and has e
  assert.match(workflow,/pilot_count=len\(list\(Path\("v4-art-qa"\)\.glob\("pilot-warm-far-\*\.png"\)\)\)/);
  assert.doesNotMatch(game,/pilot\/warm\/far\.svg|far-master-pilot\.svg|warm-pilot/);
  assert.doesNotMatch(builder,/pilot\/warm\/far\.svg|far-master-pilot\.svg|warm-pilot/);
+});
+
+
+test('Alpha 24 master raster proof remains an expiring Draft-only evidence file',()=>{
+ assert.match(workflow,/--window-size="3200,2000"/);
+ assert.match(workflow,/master-warm-far-3200x2000\.png/);
+ assert.match(workflow,/masters\/warm\/far-master-pilot\.svg/);
+ assert.match(workflow,/master_count=len\(list\(Path\("v4-art-qa"\)\.glob\("master-\*\.png"\)\)\)/);
+ assert.match(workflow,/retention-days: 7/);
+ assert.doesNotMatch(game,/master-warm-far|far-master-pilot|pilot\/warm\/far/);
 });
