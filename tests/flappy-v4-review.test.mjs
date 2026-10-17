@@ -97,7 +97,7 @@ test('V4 browser evidence shows actual repeating layer joins at mid-screen witho
   const workflow=read('.github/workflows/flappy-v4-art-qa.yml');
   assert.match(workflow,/for view in scene seam/);
   assert.match(workflow,/fragment="\$theme-seam"/);
-  assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count\)!=\(8,8,12,2,1\)/);
+  assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count\)!=\(8,8,12,4,2,2\)/);
   assert.match(workflow,/for phase in power recovery glide/);
   assert.match(workflow,/review-v4\.html#\$theme-\$phase/);
 });
@@ -140,4 +140,23 @@ test('Alpha 24 master/source target files remain isolated from the game by revie
  assert.match(html,/id="paint-pilot"/);
  assert.match(html,/id="warm-pilot"/);
  assert.doesNotMatch(game,/pilot\/warm\/far|warm-pilot|far-master-pilot/);
+});
+
+
+test('Alpha 25 second world has true opt-in independently painted far and a two-copy seam proof',()=>{
+ assert.match(html,/class="layer far far-base" src="\.\/assets\/v4\/slate\/far\.svg"/);
+ assert.match(html,/class="layer far far-pilot" src="\.\/assets\/v4\/pilot\/slate\/far\.svg"/);
+ assert.match(html,/id="slate-pilot"/);
+ assert.match(html,/#slate-pilot:target~\.frame \.far-base\{display:none\}/);
+ assert.match(html,/#slate-pilot:target~\.frame \.far-pilot\{display:block\}/);
+ assert.match(html,/#paint-pilot:checked~\.worlds \.slate \.far-base\{display:none\}/);
+ assert.match(html,/#paint-pilot:checked~\.worlds \.slate \.far-pilot\{display:block\}/);
+ for(const theme of ['warm','slate']){
+   const section=html.split('id="'+theme+'-pilot-seam"')[1]?.split('</section>')[0];
+   assert.ok(section,'pilot painterly seam reviewer missing for '+theme);
+   assert.equal(section.split('src="./assets/v4/pilot/'+theme+'/far.svg"').length-1,2,
+     'identical original painted far must be repeated twice with no extra overlay');
+ }
+ assert.doesNotMatch(html,/<script\b/i);
+ assert.doesNotMatch(game,/slate-pilot|pilot\/slate\/far|far-master-pilot/);
 });
