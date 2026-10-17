@@ -205,7 +205,7 @@ test('Actual-game tile-join sampling captures all parallax layers with direct Ca
  assert.match(probe,/adjacentControlRgbDelta:/);
  assert.match(probe,/for\(const \[layer,speed\] of \[\['far',\.045\],\['mid',\.12\],\['near',\.28\]\]\)/);
  assert.match(probe,/const targetScroll=\(tileWidth-expectedX\)\/speed/);
- assert.match(probe,/assert\.equal\(seamAudit\.results\.length,12\)/);
+ assert.match(probe,/assert\.equal\(seamAudit\.results\.length,18\)/);
  assert.match(probe,/headless-seam-metrics\.json/);
  assert.match(probe,/seam-game-/);
  assert.match(workflow,/test -s v4-game-qa\/headless-seam-metrics\.json/);
@@ -225,4 +225,30 @@ test('V4 Alpha 19 diagnostic separation is sampled only by the Draft browser har
  assert.match(probe,/not perceptual contrast or WCAG/);
  assert.doesNotMatch(game,/visualSeparation|pipeInnerVsNearby|birdCenterVsNearby/);
  assert.doesNotMatch(builder,/visualSeparation|pipeInnerVsNearby/);
+});
+
+
+test('V4 Alpha 20 true Canvas 320-pixel legibility and atlas evidence is Draft-only',()=>{
+ assert.match(probe,/for\(const \[width,height\] of \[\[390,844\],\[360,600\],\[320,568\]\]\)/);
+ assert.match(probe,/qa\.atlasReady=!!\(flightAtlases\[birdSkin\]&&flightAtlases\[birdSkin\]\.ready\)/);
+ assert.match(probe,/window\.__v4GameQa\.atlasReady/);
+ assert.match(probe,/contrastQa\.mode==='stabilized'&&contrastQa\.contrastProbe/);
+ assert.match(probe,/one-shot \*matched-position\* backdrop\/bird readback/);
+ assert.match(probe,/backgroundCenter:contrastRgb\(aX,aY\)/);
+ assert.match(probe,/backgroundBreast:contrastRgb\(aX\+r\*\.37,aY\+r\*\.28\)/);
+ assert.match(probe,/centerRgbDelta:rgbDelta\(center,contrastBefore\.backgroundCenter\)/);
+ assert.match(probe,/breastRgbDelta:rgbDelta\(breast,contrastBefore\.backgroundBreast\)/);
+ assert.match(probe,/assert\.equal\(evidence\.samples\.length,12\)/);
+ assert.match(probe,/assert\.equal\(seamAudit\.results\.length,18\)/);
+ assert.match(probe,/headless-narrow-readability\.json/);
+ assert.match(probe,/const narrowReadability=/);
+ assert.match(probe,/assert\.equal\(narrowReadability\.captures\.filter\(x=>x\.viewport==='320x568'\)\.length,4\)/);
+ assert.match(workflow,/test -s v4-game-qa\/headless-narrow-readability\.json/);
+ assert.match(workflow,/seam-game-\*\.png' \| wc -l\)" -eq 18/);
+ assert.match(workflow,/game-\*\.png' \| wc -l\)" -eq 12/);
+ assert.match(workflow,/v4-game-qa\/headless-narrow-readability\.json/);
+ assert.match(probe,/NOT WCAG, visible edge detection, Android\/iOS hardware proof/);
+ // Never embed the sampling hook or QA debug state in the production game.
+ assert.doesNotMatch(game,/contrastProbe|compositeReadability|contrastQa|headless-narrow-readability/);
+ assert.doesNotMatch(builder,/contrastProbe|compositeReadability|headless-narrow-readability/);
 });
