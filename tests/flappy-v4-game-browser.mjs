@@ -103,6 +103,7 @@ function visualFixture(){
     'qa.pendingFlap=null;}raf=requestAnimationFrame(frame);');
   s=once(s,'  function collides(){',
     '  function collides(){if(window.__v4GameQa?.mode===\'stabilized\')return false; // QA-only collision suppression');
+  s=once(s,"    for(var x=-dx;x<W;x+=tileWidth)ctx.drawImage(image,x,0,tileWidth+overlap,H);","    for(var x=-dx;x<W;x+=tileWidth)ctx.drawImage(image,x,0,tileWidth+overlap,H);\n    // Draft QA only: sample the *actual* composited game Canvas immediately\n    // after this repeatable parallax layer, before bird, pipes and ground.\n    var seamQa=window.__v4GameQa;\n    if(seamQa&&seamQa.seamTarget===layer.id){\n      var joinPx=Math.round((tileWidth-dx)*dpr);\n      var row0=Math.floor(H*.60*dpr),row1=Math.floor(H*.85*dpr);\n      if(joinPx>11&&joinPx<ctx.canvas.width-11&&row1>row0){\n        var strip=ctx.getImageData(joinPx-9,row0,19,row1-row0);\n        var seamSum=0,controlSum=0,channelCount=0;\n        for(var row=0;row<strip.height;row+=3){\n          var line=row*19*4;\n          for(var channel=0;channel<3;channel++){\n            seamSum+=Math.abs(strip.data[line+8*4+channel]-strip.data[line+9*4+channel]);\n            controlSum+=(\n              Math.abs(strip.data[line+2*4+channel]-strip.data[line+3*4+channel])+\n              Math.abs(strip.data[line+15*4+channel]-strip.data[line+16*4+channel]))*.5;\n            channelCount++;\n          }\n        }\n        seamQa.seamResult={layer:layer.id,\n          seamX:Math.round(joinPx/dpr*10)/10,\n          seamMeanRgbDelta:Math.round(seamSum/channelCount*100)/100,\n          adjacentControlRgbDelta:Math.round(controlSum/channelCount*100)/100,\n          sampleChannels:channelCount,\n          sampledBeforeGameplayOverlays:true};\n      }\n    }");
   const head=[
     '<style id="v4-game-qa-only">',
     'html,body{margin:0!important;padding:0!important;overflow:hidden!important;min-height:0!important}',
@@ -371,6 +372,9 @@ try{
       'wallMaxMs='+preTapFrames.wallMaxMs,'wallSlowFrames='+preTapFrames.wallSlow40ms,
       'readyMs='+readyElapsedMs);
   }else{
+  const seamAudit={kind:'True game-canvas parallax join sampling before pipe/bird overlays',
+    disclaimer:'QA-only stabilized scroll and Chromium pixel deltas; not a physical-device seam, FPS or gameplay benchmark.',
+    results:[]};
   for(const skin of ['warm','slate']){
     for(const [width,height] of [[390,844],[360,600]]){
       await cdp('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:true});
@@ -396,9 +400,43 @@ try{
         console.log('Actual Canvas screenshot',filename,'frameP95Ms',record.frameIntervalsMs.p95,
           'decodedReadyMs',record.imageDecodeReadyMs);
       }
+
+      // Force the genuine renderer's far/mid/near tile joins into the flight
+      // viewport: 0/960 scroll positions never reach the 1600-source tile edge.
+      // The only fixture change is the QA viewport scroll offset. The renderer
+      // and five loaded art layers remain exactly the same game sources.
+      for(const [layer,speed] of [['far',.045],['mid',.12],['near',.28]]){
+        const tileWidth=height*1.6,expectedX=width*.52;
+        const targetScroll=(tileWidth-expectedX)/speed;
+        await read('window.__v4GameQa.seamTarget='+JSON.stringify(layer)+
+          ';window.__v4GameQa.seamResult=null;'+
+          'window.__v4GameQa.scrollOffset='+targetScroll);
+        await sleep(300);
+        const sample=JSON.parse(await read('JSON.stringify(window.__v4GameQa.seamResult)'));
+        assert.ok(sample&&sample.layer===layer,'Missing sampled game-canvas tile join: '+skin+'/'+layer);
+        assert.ok(sample.seamX>width*.15&&sample.seamX<width*.84,'Seam probe missed viewport center');
+        assert.ok(sample.sampleChannels>100&&sample.sampledBeforeGameplayOverlays);
+        assert.ok(Number.isFinite(sample.seamMeanRgbDelta)&&Number.isFinite(sample.adjacentControlRgbDelta));
+        // Loose regression guard for prominent gaps; subtle boundaries require
+        // perceptual review of screenshots and must not be auto-approved.
+        assert.ok(sample.seamMeanRgbDelta<12,
+          'Visible-width discontinuity in actual game layer '+skin+'/'+layer+': '+sample.seamMeanRgbDelta);
+        const screenshot=await cdp('Page.captureScreenshot',
+          {format:'png',captureBeyondViewport:false,fromSurface:true});
+        const png=Buffer.from(screenshot.result.data,'base64');
+        assert.ok(png.length>12000&&png.subarray(0,8).toString('hex')==='89504e470d0a1a0a');
+        const filename='seam-game-'+skin+'-'+layer+'-'+width+'x'+height+'.png';
+        writeFileSync(join(output,filename),png);
+        seamAudit.results.push({theme:skin,layer,viewport:width+'x'+height,
+          targetScroll:Math.round(targetScroll),...sample,filename,pngBytes:png.length});
+        console.log('Real game layer seam',filename,'seamDelta',sample.seamMeanRgbDelta,
+          'adjacentControl',sample.adjacentControlRgbDelta);
+        await read('window.__v4GameQa.seamTarget=null');
+      }
     }
   }
   assert.equal(evidence.samples.length,8);
+  assert.equal(seamAudit.results.length,12);
   // A second, independent pass uses the unmodified physics, hit detection,
   // state transitions, and actual browser pointer events. No auto-flapping,
   // no camera freeze, no collision suppression and no gameplay internals called.
@@ -635,6 +673,7 @@ try{
 
 
 
+  writeFileSync(join(output,'headless-seam-metrics.json'),JSON.stringify(seamAudit,null,2)+'\n');
   writeFileSync(join(output,'headless-live-input-metrics.json'),JSON.stringify(interactive,null,2)+'\n');
 
   writeFileSync(join(output,'headless-game-metrics.json'),JSON.stringify(evidence,null,2)+'\n');
