@@ -22,8 +22,8 @@ function visualFixture(){
   s=once(s,"var nextSkin=Math.random()<.5?'warm':'slate';","var nextSkin=window.__v4GameQa.skin;");
   // Compare new idle priming against the exact same game with QA-only flag disabled.
   s=once(s,'var AUDIO_IDLE_PRIME=true;','var AUDIO_IDLE_PRIME=window.__v4GameQa.prewarm;');
-  s=once(s,'    window.requestIdleCallback(function(deadline){',
-    '    window.requestIdleCallback(function(deadline){'+
+  s=once(s,'    function primeOnIdle(deadline){',
+    '    function primeOnIdle(deadline){'+
     'var qa=window.__v4GameQa;if(qa){qa.primeCallbackRan=true;qa.idleBudgetMs=deadline&&typeof deadline.timeRemaining==="function"?Math.round(deadline.timeRemaining()):null;}');
   s=once(s,'      try{audioCtx=new AC();}\n      catch(error){\n        // Idle-time creation',
     '      try{var qaStartedAt=performance.now();audioCtx=new AC();'+
