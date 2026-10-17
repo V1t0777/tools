@@ -473,8 +473,8 @@ test('Alpha 24 edited 2x master and 1x derivative are exact, safe non-shipping p
    'runtime pilot must contain identical authored master geometry, not a separately improvised substitute');
  const boundary=/M0 1194 C60 1194 125 1141 202 1137[\s\S]*?C3102 1165 3145 1194 3200 1194/;
  assert.match(master,boundary,'terrain copy has matched horizontal wrap tangents');
- assert.equal((master.match(/M0 1194 C60 1194 125 1141 202 1137/g)||[]).length,2,
-   'foreground clip and base share exact high-resolution terrain outline');
+ assert.equal((master.match(/M0 1194 C60 1194 125 1141 202 1137/g)||[]).length,3,
+   'terrain clip, filled silhouette and crest contour all share the same high-resolution ridge');
  const manifest=JSON.parse(read('flappy/assets/v4/MASTER_HANDOFF.json'));
  assert.equal(manifest.pilot_completion.completed_studies,1);
  assert.equal(manifest.pilot_completion.total_layer_targets,10);
