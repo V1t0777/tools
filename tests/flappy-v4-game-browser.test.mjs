@@ -221,7 +221,8 @@ test('V4 Alpha 19 diagnostic separation is sampled only by the Draft browser har
  assert.match(probe,/pipeInnerVsNearby:difference\(pipeFront,pipeNearby\)/);
  assert.match(probe,/readable\.getImageData\(px,py,1,1\)/);
  assert.match(probe,/qa\.birdX=bird\.x;qa\.birdY=bird\.y;/);
- assert.match(probe,/visualSeparation,assets/);
+ assert.match(probe,/visualSeparation,/);
+ assert.match(probe,/compositeReadability:q\.compositeReadability,atlasReady:q\.atlasReady,assets/);
  assert.match(probe,/not perceptual contrast or WCAG/);
  assert.doesNotMatch(game,/visualSeparation|pipeInnerVsNearby|birdCenterVsNearby/);
  assert.doesNotMatch(builder,/visualSeparation|pipeInnerVsNearby/);
