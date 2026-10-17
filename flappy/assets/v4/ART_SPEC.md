@@ -121,3 +121,15 @@ Asset coordinate system: `viewBox="0 0 1600 1000"`. For each parallax image, dra
 - Also exports `live-warm-normal-flight.png` and `live-slate-normal-flight.png`, in addition to 8 previously stabilized art captures. All are actual Canvas renders with the original bird and pipes.
 - Added a read-only, draft-only CI artifact requirement for 2 live screenshots and JSON metrics, plus `node --check` and source-isolation regression rules to prevent the test-only collision override from ever reaching the shipped game.
 - This is **browser automation at an emulated mobile viewport, not a physical-device benchmark**, a long-duration uninterrupted survival test, or evidence of final painterly art acceptance. Pending: extended genuine gameplay under repeated physical tap events, progressive scenery comparison on an actual running game, and iOS/Android touch/thermal/memory measurements.
+
+## 2026-10-17 Alpha 7 — repeated physical pointer events and real parallax endurance
+
+- Extended the **local, test-only** Chromium CDP harness with an input-pacing run that **does not** freeze the bird, bypass normal collision, alter gravity, advance scroll artificially or call internal flap methods. The controller reads bird position, velocity and approaching real pipe geometry; it issues browser `Input.dispatchMouseEvent` mouse/pointer events only when a flap is needed.
+- Both scenes completed the >=2.5s gameplay-scroll / >=4 genuine-pointer-input contract. First successful draft-only Chrome run `39001708946` (commit `54ca54e2`), artifact `flappy-v4-draft-real-game-pr57`:
+  - **warm:** 12 pointerdown flaps, 6,172ms continuous normal-physics gameplay, scroll **22→954** (~932px), still `running`, **0 detected abnormal wing phase resets**.
+  - **slate:** 7 pointerdown flaps, 3,900ms gameplay, scroll **22→589** (~567px), ended in normal `falling` collision, **0 detected abnormal wing phase resets**.
+  - Both used a **360×600 mobile viewport** in *desktop/headless Chromium*, not physical touch input. These observations neither establish indefinite survival nor that players will have a certain score, FPS or low touch latency.
+- Test-only instrumentation checks a backwards wing-phase jump beyond the natural 24-frame loop, with exact start/over/restart checks from Alpha 6 retained. It also verifies that the cinematic world remains selected and real scroll progresses.
+- Evidence JSON: `headless-endurance-metrics.json` (includes runtime and cursor tap count), alongside `headless-live-input-metrics.json` and existing eight real-game PNGs. Source isolation checks still assert that **no QA hooks appear in production game HTML**.
+- CI headless frame-interval p95 around 16.7ms; largest single raw frame interval was **166.7ms** in one 390×844 warm art capture. This is an observable CI outlier, not a device benchmark. No runtime FPS promises are made.
+- **Unresolved**: prolonged (30–60s) all-world randomized pipe survival and gameplay transition stress tests, repeatability across controlled random seeds, memory after many restarts, finished cinematic painted art and real iOS/Android performance and input-latency testing.
