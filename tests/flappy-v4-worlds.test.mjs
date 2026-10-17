@@ -382,3 +382,28 @@ test('V4 Alpha 22 valley-value grouping is broad, distinct, clipped and safe on 
  }
  assert.notEqual(themePasses[0],themePasses[1],'dawn and blue-hour light must be independently painted');
 });
+
+
+test('Alpha 23 reviewer displays true atlas wing poses rather than a mock circle',()=>{
+ const page=read('flappy/review-v4.html');
+ assert.match(page,/background-image:url\("\.\/assets\/v3\/warm-flight\.svg"\)/);
+ assert.match(page,/\.slate \.bird\{background-image:url\("\.\/assets\/v3\/slate-flight\.svg"\)\}/);
+ assert.match(page,/background-size:600% 400%/);
+ assert.match(page,/width:max\(52\.52px,17\.372%\)/);
+ assert.match(page,/transform:translate\(-50%,-52\.5%\)/);
+ for(const n of ['rest','power','recovery','glide']){
+   assert.match(page,new RegExp('id="wing-'+n+'" name="wing"'));
+ }
+ for(const theme of ['warm','slate']){
+   for(const phase of ['power','recovery','glide']){
+     assert.match(page,new RegExp('class="phase-anchor" id="'+theme+'-'+phase+'"'));
+     assert.match(page,new RegExp('#'+theme+'-'+phase));
+   }
+ }
+ for(const pos of ['0% 0%','0% 33.333333%','0% 66.666667%','0% 100%']){
+   assert.ok(page.includes('background-position:'+pos),'Missing atlas row '+pos);
+ }
+ assert.doesNotMatch(page,/<script\b|border-radius:50%;background:#c18e60|\.bird:after\{/i);
+ assert.match(page,/石柱仍为布局参考，不是正式 Canvas 材质/);
+ assert.ok(page.length<16000,'QA reviewer stays small and low-complexity');
+});
