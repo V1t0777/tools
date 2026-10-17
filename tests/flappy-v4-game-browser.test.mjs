@@ -280,3 +280,17 @@ test('Alpha 22 luminance diagnostics remain one-shot, bounded and strictly Draft
  assert.doesNotMatch(game,/function linearChannel|centerLinearLuminanceGap|luminanceSummary/);
  assert.doesNotMatch(builder,/centerLinearLuminanceGap|luminanceSummary/);
 });
+
+
+test('Alpha 23 no-script real atlas pose capture expands draft-only evidence safely',()=>{
+ assert.match(workflow,/for phase in power recovery glide/);
+ assert.match(workflow,/for shape in "320 568" "390 844"/);
+ assert.match(workflow,/pose-\$theme-\$phase-\$W/);
+ assert.match(workflow,/review-v4\.html#\$theme-\$phase/);
+ assert.match(workflow,/scene_count=len\(list\(Path\("v4-art-qa"\)\.glob\("scene-\*\.png"\)\)\)/);
+ assert.match(workflow,/if \(scene_count,seam_count,pose_count\)!=\(8,8,12\)/);
+ assert.match(workflow,/Keep 16 scene\/seam screenshots, 12 atlas poses/);
+ assert.match(workflow,/if: github\.event\.pull_request\.draft && github\.event\.pull_request\.number == 57/);
+ assert.doesNotMatch(game,/phase-anchor|review-v4\.html|pose-\$theme-\$phase/);
+ assert.doesNotMatch(builder,/phase-anchor|pose-\$theme-\$phase/);
+});
