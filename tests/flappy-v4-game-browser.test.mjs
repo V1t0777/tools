@@ -93,3 +93,13 @@ test('V4 draft-only QA distinguishes browser pointer-to-physics from next Canvas
   assert.match(probe,/This is an in-browser/);
   assert.doesNotMatch(game,/pendingFlap|latestPointerAt|latencySamples|__v4GameQa/);
 });
+
+test('V4 browser evidence measures cold audio initialization without changing shipped AudioContext code',()=>{
+  assert.match(probe,/originalInitAudio/);
+  assert.match(probe,/audioTimes\.push/);
+  assert.match(probe,/audioInitialization:\{calls:audio\.length/);
+  assert.match(probe,/maxSynchronousMs/);
+  assert.match(probe,/inputResponse:last\.inputResponse/);
+  assert.match(workflow,/headless-multiround-metrics\.json/);
+  assert.doesNotMatch(game,/originalInitAudio|audioTimes|__v4GameQa/);
+});
