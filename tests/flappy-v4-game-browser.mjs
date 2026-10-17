@@ -58,6 +58,8 @@ function visualFixture(){
     '        qa.drawState=state;qa.world=cinematicSession;',
     '        qa.observedScroll=scroll;qa.pipeCount=pipes.length;',
     '        qa.birdX=bird.x;qa.birdY=bird.y;',
+    '        qa.atlasReady=!!(flightAtlases[birdSkin]&&flightAtlases[birdSkin].ready);',
+    '        qa.birdRadius=birdRadius();',
     '        qa.pipeData=pipes.map(p=>({x:p.x,gapY:p.gapY,gap:p.gap}));',
     '      }',
     "      if(qa.mode==='live'){",
@@ -106,6 +108,8 @@ function visualFixture(){
   s=once(s,'  function collides(){',
     '  function collides(){if(window.__v4GameQa?.mode===\'stabilized\')return false; // QA-only collision suppression');
   s=once(s,"    for(var x=-dx;x<W;x+=tileWidth)ctx.drawImage(image,x,0,tileWidth+overlap,H);","    for(var x=-dx;x<W;x+=tileWidth)ctx.drawImage(image,x,0,tileWidth+overlap,H);\n    // Draft QA only: sample the *actual* composited game Canvas immediately\n    // after this repeatable parallax layer, before bird, pipes and ground.\n    var seamQa=window.__v4GameQa;\n    if(seamQa&&seamQa.seamTarget===layer.id){\n      var joinPx=Math.round((tileWidth-dx)*dpr);\n      var row0=Math.floor(H*.60*dpr),row1=Math.floor(H*.85*dpr);\n      if(joinPx>11&&joinPx<ctx.canvas.width-11&&row1>row0){\n        var strip=ctx.getImageData(joinPx-9,row0,19,row1-row0);\n        var seamSum=0,controlSum=0,channelCount=0;\n        for(var row=0;row<strip.height;row+=3){\n          var line=row*19*4;\n          for(var channel=0;channel<3;channel++){\n            seamSum+=Math.abs(strip.data[line+8*4+channel]-strip.data[line+9*4+channel]);\n            controlSum+=(\n              Math.abs(strip.data[line+2*4+channel]-strip.data[line+3*4+channel])+\n              Math.abs(strip.data[line+15*4+channel]-strip.data[line+16*4+channel]))*.5;\n            channelCount++;\n          }\n        }\n        seamQa.seamResult={layer:layer.id,\n          seamX:Math.round(joinPx/dpr*10)/10,\n          seamMeanRgbDelta:Math.round(seamSum/channelCount*100)/100,\n          adjacentControlRgbDelta:Math.round(controlSum/channelCount*100)/100,\n          sampleChannels:channelCount,\n          sampledBeforeGameplayOverlays:true};\n      }\n    }");
+  // Inject only into the localhost, in-memory QA game copy, never shipped.
+  s=once(s,"    drawPipes();\n    drawGround();\n    drawAirflow();\n    drawBird(now);","    // Alpha 20: QA-only one-shot *matched-position* backdrop/bird readback.\n    // Single source-game frame; no synthetic background, CSS halos or game physics changes.\n    var contrastQa=window.__v4GameQa,contrastBefore=null;\n    if(contrastQa&&contrastQa.mode==='stabilized'&&contrastQa.contrastProbe){\n      contrastQa.contrastProbe=false;\n      var r=birdRadius(),aX=bird.x,aY=bird.y;\n      function contrastRgb(x,y){\n        var px=Math.round(x*dpr),py=Math.round(y*dpr);\n        if(px<1||py<1||px>=ctx.canvas.width-1||py>=ctx.canvas.height-1)return null;\n        var rgba=ctx.getImageData(px,py,1,1).data;\n        return [rgba[0],rgba[1],rgba[2]];\n      }\n      contrastBefore={radius:r,\n        backgroundCenter:contrastRgb(aX,aY),\n        backgroundBreast:contrastRgb(aX+r*.37,aY+r*.28)};\n    }\n    drawPipes();\n    drawGround();\n    drawAirflow();\n    drawBird(now);\n    if(contrastBefore){\n      var center=contrastRgb(bird.x,bird.y),\n        breast=contrastRgb(bird.x+contrastBefore.radius*.37,bird.y+contrastBefore.radius*.28);\n      function rgbDelta(a,b){\n        return a&&b?Math.round((Math.abs(a[0]-b[0])+Math.abs(a[1]-b[1])+Math.abs(a[2]-b[2]))/3*100)/100:null;\n      }\n      contrastQa.compositeReadability={\n        method:'one-shot matched-position composite before obstacles vs after full bird drawing',\n        birdAtlasReady:!!(flightAtlases[birdSkin]&&flightAtlases[birdSkin].ready),\n        centerRgb:center,underBirdCenterRgb:contrastBefore.backgroundCenter,\n        breastRgb:breast,underBreastRgb:contrastBefore.backgroundBreast,\n        centerRgbDelta:rgbDelta(center,contrastBefore.backgroundCenter),\n        breastRgbDelta:rgbDelta(breast,contrastBefore.backgroundBreast),\n        nominalBirdDiameterCssPx:Math.round(2*contrastBefore.radius*10)/10,\n        caveat:'not luminance/WCAG; collision-free stabilized QA, desktop Chromium'};\n    }");
   const head=[
     '<style id="v4-game-qa-only">',
     'html,body{margin:0!important;padding:0!important;overflow:hidden!important;min-height:0!important}',
@@ -136,7 +140,8 @@ function visualFixture(){
     'frames:0,frameIntervals:[],previousStamp:0,started:false,',
     'wallFrameIntervals:[],previousWall:0,',
     'createdAt:performance.now(),readyMs:null,scrollOffset:0,',
-    'drawState:"not-started",pipeCount:0,world:null};',
+    'drawState:"not-started",pipeCount:0,world:null,',
+    'contrastProbe:false,compositeReadability:null,atlasReady:false};',
     'window.addEventListener("pointerdown",()=>{',
     'const q=window.__v4GameQa;q.pointerdowns++;q.latestPointerAt=performance.now();',
     '},true);',
@@ -255,7 +260,8 @@ const metricExpression=[
   'pointerToDrawP95Ms:p2d[Math.floor(Math.max(0,p2d.length-1)*.95)]||null,',
   'worstMs:p2d[p2d.length-1]||null},',
   'audioInitialization:{calls:audio.length,firstMs:audio[0]??null,',
-  'maxSynchronousMs:audio.length?Math.max(...audio):null},visualSeparation,assets};',
+  'maxSynchronousMs:audio.length?Math.max(...audio):null},visualSeparation,',
+  'compositeReadability:q.compositeReadability,atlasReady:q.atlasReady,assets};',
   '})())'
 ].join('');
 // Every V4_COLD_CASE invocation creates a unique Chrome process and profile.
@@ -393,12 +399,13 @@ try{
     disclaimer:'QA-only stabilized scroll and Chromium pixel deltas; not a physical-device seam, FPS or gameplay benchmark.',
     results:[]};
   for(const skin of ['warm','slate']){
-    for(const [width,height] of [[390,844],[360,600]]){
+    for(const [width,height] of [[390,844],[360,600],[320,568]]){
       await cdp('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:true});
       await cdp('Page.navigate',{url:'http://127.0.0.1:'+port+'/flappy/qa-game.html?skin='+skin});
-      await until('Boolean(window.__v4GameQa&&window.__v4GameQa.started&&window.__v4GameQa.world===window.__v4GameQa.skin&&window.__v4GameQa.frames>45)');
+      await until('Boolean(window.__v4GameQa&&window.__v4GameQa.started&&window.__v4GameQa.world===window.__v4GameQa.skin&&window.__v4GameQa.frames>45&&window.__v4GameQa.atlasReady)');
       for(const offset of [0,960]){
-        await read('window.__v4GameQa.scrollOffset='+offset);
+        await read('window.__v4GameQa.scrollOffset='+offset+
+          ';window.__v4GameQa.contrastProbe=true;window.__v4GameQa.compositeReadability=null');
         await sleep(420);
         const record=JSON.parse(await read(metricExpression));
         assert.equal(record.scene,skin,'Must show real V4 layers, not fallback');
@@ -406,6 +413,14 @@ try{
         assert.ok(record.pipeCount>=1,'Actual obstacle pipes must exist');
         assert.ok(record.canvasCssSize.width>=width-5,'Game Canvas did not fill viewport');
         assert.ok(record.frameIntervalsMs.samples>=20,'No usable frames recorded');
+        assert.equal(record.atlasReady,true,'24-frame bird atlas has not decoded');
+        assert.ok(record.compositeReadability?.birdAtlasReady,'Missing matched-position bird probe');
+        assert.ok(record.compositeReadability.nominalBirdDiameterCssPx>=26);
+        for(const name of ['centerRgbDelta','breastRgbDelta']){
+          assert.ok(Number.isFinite(record.compositeReadability[name])&&
+            record.compositeReadability[name]>=0&&record.compositeReadability[name]<=255,
+            'Invalid pixel readback '+skin+'/'+width+' '+name);
+        }
         const screenshot=await cdp('Page.captureScreenshot',
           {format:'png',captureBeyondViewport:false,fromSurface:true});
         const png=Buffer.from(screenshot.result.data,'base64');
@@ -453,8 +468,8 @@ try{
       }
     }
   }
-  assert.equal(evidence.samples.length,8);
-  assert.equal(seamAudit.results.length,12);
+  assert.equal(evidence.samples.length,12);
+  assert.equal(seamAudit.results.length,18);
   // A second, independent pass uses the unmodified physics, hit detection,
   // state transitions, and actual browser pointer events. No auto-flapping,
   // no camera freeze, no collision suppression and no gameplay internals called.
@@ -692,10 +707,22 @@ try{
 
 
   writeFileSync(join(output,'headless-seam-metrics.json'),JSON.stringify(seamAudit,null,2)+'\n');
+  const narrowReadability={
+    kind:'Alpha 20 actual source-game 320px and larger viewport atlas/backdrop sampling',
+    disclaimer:'Rendered desktop Chromium mobile emulation, one-shot RGB only; NOT WCAG, visible edge detection, Android/iOS hardware proof, or human art approval.',
+    captures:evidence.samples.map(sample=>({
+      theme:sample.skin,viewport:sample.canvasCssSize.width+'x'+sample.canvasCssSize.height,
+      scrollOffset:sample.offset,filename:sample.filename,
+      originalAtlasDecoded:sample.atlasReady, ...sample.compositeReadability}))
+  };
+  assert.equal(narrowReadability.captures.length,12);
+  assert.equal(narrowReadability.captures.filter(x=>x.viewport==='320x568').length,4);
+  writeFileSync(join(output,'headless-narrow-readability.json'),JSON.stringify(narrowReadability,null,2)+'\n');
+
   writeFileSync(join(output,'headless-live-input-metrics.json'),JSON.stringify(interactive,null,2)+'\n');
 
   writeFileSync(join(output,'headless-game-metrics.json'),JSON.stringify(evidence,null,2)+'\n');
-  console.log('Completed eight actual-game captures; metrics are CI-headless only, not a mobile-device benchmark.');
+  console.log('Completed twelve actual-game captures including 320px; metrics are desktop Chromium QA only.');
   }
 }finally{
   if(ws)ws.close();
