@@ -175,3 +175,28 @@ test('V4 broad midrange pigment washes are visible-scale, clipped, theme-distinc
  }
  assert.notEqual(captures[0],captures[1],'two worlds need different mountains and pigments');
 });
+
+test('V4 near-scene painted canopy masses remain broad, softly layered, clipped and seamless at repeat edges',()=>{
+ const before=[];
+ for(const theme of ['warm','slate']){
+   const svg=read('flappy/assets/v4/'+theme+'/near.svg');
+   const section=svg.match(/<g id="near-broad-canopy-pigment-v1" clip-path="url\(#clip-rock-near\)">([\s\S]*?)<\/g>/);
+   assert.ok(section,'missing large-scale painted canopy layer for '+theme);
+   const content=section[1];
+   const gouache=[...content.matchAll(/<path data-pigment="gouache-(\d+)"[^>]+\/>/g)];
+   const edges=[...content.matchAll(/<path data-pigment="broken-edge-(\d+)"[^>]+\/>/g)];
+   assert.equal(gouache.length,12,'need 12 original, legible broad color masses');
+   assert.equal(edges.length,12,'need 12 broken dry-brush canopy edges');
+   assert.ok(gouache.every(m=>/fill-opacity="0?\.[0-9]+"/.test(m[0])),'keep pigment washes translucent');
+   assert.ok(edges.every(m=>/stroke-width="(?:[7-9]|1[0-3])"/.test(m[0])),'stroke texture must be visible at phone size');
+   assert.ok(svg.indexOf('id="near-broad-canopy-pigment-v1"')<
+             svg.indexOf('<g transform="translate('),'canopy wash must remain below silhouettes');
+   assert.ok(/data-pigment="gouache-1" transform="translate\(60 0\)"/.test(content),
+     'first broad wash needs safe padding from left tile edge');
+   assert.doesNotMatch(content,/<(?:script|image|foreignObject|filter|animate)\b/i);
+   assert.doesNotMatch(content,/\b(?:href|src)=/i);
+   assert.ok(Buffer.byteLength(svg,'utf8')<100_000,'near scenery stays within decoded-art budget');
+   before.push(content);
+ }
+ assert.notEqual(before[0],before[1],'warm and slate palettes should be hand-authored separately');
+});
