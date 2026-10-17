@@ -278,6 +278,15 @@ try{
     const readyElapsedMs=Date.now()-navStart;
     // Give rIC a chance to allocate audio, but keep control cases otherwise identical.
     await sleep(900);
+    // Snapshot pre-interaction frames independently: shifting a long task into
+    // the ready screen must be visible in the evidence, not reported as free.
+    const preTapFrames=JSON.parse(await read(
+      'JSON.stringify((()=>{const a=window.__v4GameQa.frameIntervals.slice(20).filter(v=>v>0);'+
+      'const ordered=a.slice().sort((a,b)=>a-b);return {'+
+      'samples:a.length,maxMs:a.length?Math.max(...a):null,'+
+      'p95Ms:ordered[Math.floor(Math.max(0,ordered.length-1)*.95)]??null,'+
+      'slow24ms:a.filter(v=>v>24).length,slow40ms:a.filter(v=>v>40).length};})())'));
+    assert.ok(preTapFrames.samples>=15,'Cannot assess pre-tap frame stability');
     const press={x:width*.28,y:height*.45,button:'left',clickCount:1};
     await cdp('Input.dispatchMouseEvent',{...press,type:'mousePressed'});
     await cdp('Input.dispatchMouseEvent',{...press,type:'mouseReleased'});
@@ -316,7 +325,7 @@ try{
     writeFileSync(join(output,'first-tap-'+skin+'-'+sound+'-rep'+repetition+'-'+variant+'.png'),png);
     const result={kind:'Fresh Chrome process/profile first-click on/off comparison',
       disclaimer:'Runner OS/audio backend remains shared across separate processes; no iOS/Android touch-to-photon proof.',
-      theme:skin,sound,variant,repetition:Number(repetition),readyElapsedMs,
+      theme:skin,sound,variant,repetition:Number(repetition),readyElapsedMs,preTapFrames,
       browserProfile:'unique temporary profile',processId:browser.pid,
       screenshotBytes:png.length,...qa};
     writeFileSync(join(output,'cold-firsttap.json'),JSON.stringify(result,null,2)+'\n');
@@ -324,6 +333,7 @@ try{
       'idleRan='+qa.primeCallbackRan,'idleBudget='+qa.idleBudgetMs,
       'physicsMs='+qa.firstInput.pointerToPhysicsMs,
       'drawMs='+qa.firstInput.pointerToDrawMs,'audioMs='+qa.firstAudioInitMs,
+      'preTapMaxMs='+preTapFrames.maxMs,'preTapSlowFrames='+preTapFrames.slow24ms,
       'readyMs='+readyElapsedMs);
   }else{
   for(const skin of ['warm','slate']){
