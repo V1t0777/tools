@@ -79,6 +79,23 @@ body:has(.world:target) .frame{width:100vw;height:100dvh;aspect-ratio:auto;borde
 /* Direct edge-join evidence: the center line is the physical point where the
    same 1600:1000 panoramic strip repeats. Both halves use the same source art.
    The sky is non-tiling and intentionally omitted from seam comparisons. */
+.phase-anchor{position:absolute;width:0;height:0;overflow:hidden;pointer-events:none}
+body:has(.phase-anchor:target) main{padding:0;max-width:none;margin:0}
+body:has(.phase-anchor:target) header,
+body:has(.phase-anchor:target) aside,
+body:has(.phase-anchor:target) .options>input,
+body:has(.phase-anchor:target) .options>label[for]{display:none}
+body:has(.phase-anchor:target) .options{padding:0;margin:0;border:0;background:none;border-radius:0;display:block}
+body:has(.phase-anchor:target) .worlds{display:block}
+body:has(.phase-anchor:target) .world:not(:has(.phase-anchor:target)){display:none}
+body:has(.phase-anchor:target) .world:has(.phase-anchor:target){padding:0;border:0;border-radius:0;background:none}
+body:has(.phase-anchor:target) .world:has(.phase-anchor:target) h2,
+body:has(.phase-anchor:target) .world:has(.phase-anchor:target) .note{display:none}
+body:has(.phase-anchor:target) .frame{width:100vw;height:100dvh;aspect-ratio:auto;border-radius:0}
+.phase-anchor[id$="-power"]:target~.frame .bird{background-position:0% 33.333333%}
+.phase-anchor[id$="-recovery"]:target~.frame .bird{background-position:0% 66.666667%}
+.phase-anchor[id$="-glide"]:target~.frame .bird{background-position:0% 100%}
+/* Automated screenshot capture uses no JavaScript and exercises real atlas rows. */
 .seamworld{display:none}
 .seamframe{position:relative;isolation:isolate;height:100dvh;width:100vw;overflow:hidden}
 .seamframe.warm{background:linear-gradient(#9eb9ba,#e5c9ae)}
@@ -118,6 +135,7 @@ body:has(.seamworld:target) .seamworld:target{display:block}
 <div class="worlds">
 <article class="world warm" id="warm">
 <h2>晨曦山谷 · 暖棕旅鸟</h2>
+<span class="phase-anchor" id="warm-power" aria-hidden="true"></span><span class="phase-anchor" id="warm-recovery" aria-hidden="true"></span><span class="phase-anchor" id="warm-glide" aria-hidden="true"></span>
 <div class="frame" role="img" aria-label="晨曦山谷 · 暖棕旅鸟五层背景静态美术预览">
 <img class="layer sky" src="./assets/v4/warm/sky.svg" alt="" loading="eager" decoding="async">
 <img class="layer far" src="./assets/v4/warm/far.svg" alt="" loading="eager" decoding="async">
@@ -128,6 +146,7 @@ body:has(.seamworld:target) .seamworld:target{display:block}
 </div><p class="note">独立山谷图层与空间层次；需要实机截图审核，当前不是最终手绘纹理。</p></article>
 <article class="world slate" id="slate">
 <h2>暮蓝远山 · 板岩夜鸟</h2>
+<span class="phase-anchor" id="slate-power" aria-hidden="true"></span><span class="phase-anchor" id="slate-recovery" aria-hidden="true"></span><span class="phase-anchor" id="slate-glide" aria-hidden="true"></span>
 <div class="frame" role="img" aria-label="暮蓝远山 · 板岩夜鸟五层背景静态美术预览">
 <img class="layer sky" src="./assets/v4/slate/sky.svg" alt="" loading="eager" decoding="async">
 <img class="layer far" src="./assets/v4/slate/far.svg" alt="" loading="eager" decoding="async">
