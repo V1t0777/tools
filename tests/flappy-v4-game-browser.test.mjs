@@ -125,7 +125,7 @@ test('V4 fresh-process first-tap A/B uses the original game with a unique Chrome
   assert.match(probe,/V4_COLD_CASE/);
   assert.match(probe,/coldCaseParts/);
   assert.match(probe,/if\(coldCaseParts\)\{/);
-  assert.match(probe,/const profile=mkdtempSync/);
+  assert.match(probe,/let profile=mkdtempSync/);
   assert.match(probe,/remote-debugging-port=0/);
   assert.match(probe,/user-data-dir='\+profile/);
   assert.match(probe,/qa\.clicks,1/);
@@ -184,4 +184,12 @@ test('V4 fresh-process comparison records ready-screen long frames as well as ta
   assert.match(probe,/wallSlow40ms/);
   assert.match(probe,/readyElapsedMs,preTapFrames/);
   assert.doesNotMatch(game,/preTapFrames|slow24ms|__v4GameQa/);
+});
+
+test('V4 browser QA allows one clean-profile retry for Chrome debugging startup only',()=>{
+ assert.match(probe,/function launchChrome\(\)/);
+ assert.match(probe,/attempt<2&&\!debuggerPort/);
+ assert.match(probe,/profile=mkdtempSync/);
+ assert.match(probe,/No gameplay or audio assertion is retried after page navigation/);
+ assert.match(probe,/Chrome did not expose debugger after bounded startup retry/);
 });
