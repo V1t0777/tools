@@ -104,7 +104,9 @@ jobs:
           fi
           node tests/flappy-v4-game-browser.mjs v4-game-qa
           test -s v4-game-qa/headless-game-metrics.json
+          test -s v4-game-qa/headless-live-input-metrics.json
           test "$(find v4-game-qa -maxdepth 1 -name 'game-*.png' | wc -l)" -eq 8
+          test "$(find v4-game-qa -maxdepth 1 -name 'live-*.png' | wc -l)" -eq 2
       - name: Keep actual-game screenshots and headless metrics
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -113,6 +115,7 @@ jobs:
           path: |
             v4-game-qa/*.png
             v4-game-qa/headless-game-metrics.json
+            v4-game-qa/headless-live-input-metrics.json
           retention-days: 7
           if-no-files-found: warn
       - name: Keep 16 scene/seam screenshots and diagnostics
