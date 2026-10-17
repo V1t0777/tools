@@ -178,6 +178,10 @@ test('V4 fresh-process comparison records ready-screen long frames as well as ta
   assert.match(probe,/slow24ms:a\.filter\(v=>v>24\)\.length/);
   assert.match(probe,/slow40ms:a\.filter\(v=>v>40\)\.length/);
   assert.match(probe,/preTapFrames\.samples>=15/);
+  assert.match(probe,/wallFrameIntervals/);
+  assert.match(probe,/performance\.now\(\)/);
+  assert.match(probe,/wallMaxMs/);
+  assert.match(probe,/wallSlow40ms/);
   assert.match(probe,/readyElapsedMs,preTapFrames/);
   assert.doesNotMatch(game,/preTapFrames|slow24ms|__v4GameQa/);
 });
