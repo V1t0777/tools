@@ -92,9 +92,9 @@ body:has(.phase-anchor:target) .world:has(.phase-anchor:target){padding:0;border
 body:has(.phase-anchor:target) .world:has(.phase-anchor:target) h2,
 body:has(.phase-anchor:target) .world:has(.phase-anchor:target) .note{display:none}
 body:has(.phase-anchor:target) .frame{width:100vw;height:100dvh;aspect-ratio:auto;border-radius:0}
-.phase-anchor[id$="-power"]:target~.frame .bird{background-position:0% 33.333333%}
-.phase-anchor[id$="-recovery"]:target~.frame .bird{background-position:0% 66.666667%}
-.phase-anchor[id$="-glide"]:target~.frame .bird{background-position:0% 100%}
+.phase-anchor:is(#warm-power,#slate-power):target~.frame .bird{background-position:0% 33.333333%}
+.phase-anchor:is(#warm-recovery,#slate-recovery):target~.frame .bird{background-position:0% 66.666667%}
+.phase-anchor:is(#warm-glide,#slate-glide):target~.frame .bird{background-position:0% 100%}
 /* Automated screenshot capture uses no JavaScript and exercises real atlas rows. */
 .seamworld{display:none}
 .seamframe{position:relative;isolation:isolate;height:100dvh;width:100vw;overflow:hidden}
