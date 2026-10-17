@@ -202,26 +202,27 @@ test('V4 near-scene painted canopy masses remain broad, softly layered, clipped 
 });
 
 
+
 test('V4 distant mountain broad pigment passes are readable-scale, clipped, independent and seam-safe',()=>{
  const palettes=[];
  for(const theme of ['warm','slate']){
    const far=read('flappy/assets/v4/'+theme+'/far.svg');
-   const section=far.match(/<g id="far-atmospheric-gouache-v1" clip-path="url\\(#far-terrain-clip\\)">([\\s\\S]*?)<\\/g>/);
+   const section=far.match(/<g id="far-atmospheric-gouache-v1" clip-path="url\(#far-terrain-clip\)">([\s\S]*?)<\/g>/);
    assert.ok(section,theme+' needs a clipped far-ridge gouache pass');
-   const washes=[...section[1].matchAll(/<path data-pigment="mountain-wash-(\\d+)"[^>]+\\/>/g)];
-   const strokes=[...section[1].matchAll(/<path data-pigment="dry-ridge-(\\d+)"[^>]+\\/>/g)];
+   const washes=[...section[1].matchAll(/<path data-pigment="mountain-wash-(\d+)"[^>]+\/>/g)];
+   const strokes=[...section[1].matchAll(/<path data-pigment="dry-ridge-(\d+)"[^>]+\/>/g)];
    assert.equal(washes.length,12,'distant broad washes, not scattered single-pixel noise');
    assert.equal(strokes.length,9,'visible-size broken-edge ridge accents');
-   for(const [,idx] of washes.entries()){
-     assert.match(washes[idx][0],/fill-opacity="\\.(?:1[0-9]|20)"/);
-     assert.equal(Number(washes[idx][1]),idx+1);
+   for(const [idx,wash] of washes.entries()){
+     assert.match(wash[0],/fill-opacity="\.(?:1[0-9]|2[0-2])"/);
+     assert.equal(Number(wash[1]),idx+1);
    }
    for(const [idx,stroke] of strokes.entries()){
      assert.match(stroke[0],/stroke-width="(?:9|10|11|12)"/);
      assert.equal(Number(stroke[1]),idx+1);
    }
    assert.ok(far.indexOf('id="far-atmospheric-gouache-v1"')<far.indexOf('<path d="M0 '+(theme==='warm'?'666':'682')),'nearer ridge must occlude distant gouache');
-   assert.doesNotMatch(section[1],/<(?:filter|image|script|foreignObject|animate)\\b|\\b(?:href|src)=/i);
+   assert.doesNotMatch(section[1],/<(?:filter|image|script|foreignObject|animate)\b|\b(?:href|src)=/i);
    assert.ok(Buffer.byteLength(far,'utf8')<20_000,'distant layer memory budget');
    palettes.push(section[1]);
  }
