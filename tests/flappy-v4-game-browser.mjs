@@ -27,7 +27,7 @@ function visualFixture(){
     '  function initAudio(){var at=performance.now();'+
     'var result=originalInitAudio();var q=window.__v4GameQa;'+
     'if(q)q.audioTimes.push(Math.round((performance.now()-at)*100)/100);'+
-    'return result;}\\n  function tone(');
+    'return result;}  function tone(');
   const frameHook=[
     '  function frame(t){',
     '    var qa=window.__v4GameQa;',
@@ -148,6 +148,7 @@ let stderr='';
 browser.stderr.on('data',b=>{stderr=(stderr+b.toString()).slice(-20000);});
 let ws=null,id=0;
 const requests=new Map();
+const browserExceptions=[];
 function cdp(method,params={}){
   assert.ok(ws&&ws.readyState===WebSocket.OPEN,'Chrome CDP disconnected');
   const number=++id;
@@ -168,7 +169,13 @@ async function until(expr,timeout=18000){
     try{if(await read(expr))return;}catch{}
     await sleep(160);
   }
-  throw new Error('Timed out waiting for actual V4 game assets: '+expr);
+  let diagnostics;
+  try{
+    diagnostics=await read('JSON.stringify({title:document.title,qa:window.__v4GameQa||null,canvas:!!document.querySelector("#canvas"),ready:document.readyState})');
+  }catch(e){diagnostics=String(e);}
+  throw new Error('Timed out waiting for actual V4 game assets: '+expr+
+    ' | browser state: '+String(diagnostics).slice(0,900)+
+    ' | JS exceptions: '+browserExceptions.slice(-3).join(' | '));
 }
 const metricExpression=[
   'JSON.stringify((()=>{',
@@ -224,6 +231,11 @@ try{
   await new Promise((ok,fail)=>{ws.onopen=ok;ws.onerror=()=>fail(new Error('Cannot connect to Chrome debugger'));});
   ws.onmessage=msg=>{
     let packet;try{packet=JSON.parse(msg.data);}catch{return;}
+    if(packet.method==='Runtime.exceptionThrown'){
+      browserExceptions.push(String(packet.params?.exceptionDetails?.text||'Script error')+
+        ': '+String(packet.params?.exceptionDetails?.exception?.description||'').slice(0,300));
+      if(browserExceptions.length>12)browserExceptions.shift();
+    }
     if(!packet.id)return;
     const wait=requests.get(packet.id);if(!wait)return;
     requests.delete(packet.id);clearTimeout(wait.timeout);
