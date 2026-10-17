@@ -217,6 +217,10 @@ const metricExpression=[
   'maxSynchronousMs:audio.length?Math.max(...audio):null},assets};',
   '})())'
 ].join('');
+// Every V4_COLD_CASE invocation creates a unique Chrome process and profile.
+const coldCase=process.env.V4_COLD_CASE||'';
+const coldCaseParts=/^(warm|slate):(on|off):([12])$/.exec(coldCase);
+if(coldCase&&!coldCaseParts)throw new Error('Invalid V4_COLD_CASE; expected theme:sound:repetition');
 const evidence={kind:'Draft-only real Flappy browser renderer evidence',
   disclaimer:'Headless Chromium frame intervals are NOT iPhone/Android FPS or input latency measurements.',
   createdAt:new Date().toISOString(),samples:[]};
@@ -247,6 +251,55 @@ try{
     if(packet.error)wait.fail(new Error(packet.error.message));else wait.ok(packet);
   };
   await cdp('Page.enable');await cdp('Runtime.enable');
+  if(coldCaseParts){
+    // First page navigation in a completely fresh Chrome process/profile.
+    // No earlier renderer screenshots or A/B cases run in this process.
+    const [,skin,sound,repetition]=coldCaseParts;
+    const width=360,height=600;
+    await cdp('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:true});
+    const navStart=Date.now();
+    await cdp('Page.navigate',{url:'http://127.0.0.1:'+port+
+      '/flappy/qa-game.html?skin='+skin+'&mode=live&sound='+sound});
+    await until('Boolean(window.__v4GameQa&&window.__v4GameQa.mode==="live"&&window.__v4GameQa.state==="ready"&&window.__v4GameQa.world===window.__v4GameQa.skin&&window.__v4GameQa.frames>20)');
+    const readyElapsedMs=Date.now()-navStart;
+    const press={x:width*.28,y:height*.45,button:'left',clickCount:1};
+    await cdp('Input.dispatchMouseEvent',{...press,type:'mousePressed'});
+    await cdp('Input.dispatchMouseEvent',{...press,type:'mouseReleased'});
+    await until('Boolean(window.__v4GameQa&&window.__v4GameQa.latencySamples.length>=1)');
+    const qa=JSON.parse(await read('JSON.stringify((()=>{const q=window.__v4GameQa;return {'+
+      'theme:q.skin,sound:q.sound,mode:q.mode,clicks:q.pointerdowns,starts:q.startCount,'+
+      'firstInput:q.latencySamples[0],audioCalls:q.audioTimes.length,'+
+      'firstAudioInitMs:q.audioTimes.length?q.audioTimes[0]:null,'+
+      'background:q.world,loadedLayers:Object.keys(cinematicWorlds[q.skin].layers).length,'+
+      'sceneStatus:cinematicWorlds[q.skin].status,frameCount:q.frames};})())'));
+    assert.equal(qa.theme,skin);
+    assert.equal(qa.sound,sound);
+    assert.equal(qa.mode,'live');
+    assert.equal(qa.clicks,1);
+    assert.ok(qa.starts>=1,'Actual game input did not start the bird');
+    assert.equal(qa.background,skin);
+    assert.equal(qa.sceneStatus,'ready');
+    assert.equal(qa.loadedLayers,5);
+    assert.ok(qa.firstInput?.pointerToPhysicsMs>=0);
+    assert.ok(qa.firstInput.pointerToDrawMs>=qa.firstInput.pointerToPhysicsMs);
+    if(sound==='on')assert.ok(qa.audioCalls>=1,'Audio-on case never initialized audio');
+    else assert.equal(qa.audioCalls,0,'Audio-off case unexpectedly initialized audio');
+    const screenshot=await cdp('Page.captureScreenshot',
+      {format:'png',captureBeyondViewport:false,fromSurface:true});
+    const png=Buffer.from(screenshot.result.data,'base64');
+    assert.ok(png.length>12000&&png.subarray(0,8).toString('hex')==='89504e470d0a1a0a');
+    writeFileSync(join(output,'first-tap-'+skin+'-'+sound+'-rep'+repetition+'.png'),png);
+    const result={kind:'Fresh Chrome process/profile first-click on/off comparison',
+      disclaimer:'Runner OS/audio backend remains shared across separate processes; no iOS/Android touch-to-photon proof.',
+      theme:skin,sound,repetition:Number(repetition),readyElapsedMs,
+      browserProfile:'unique temporary profile',processId:browser.pid,
+      screenshotBytes:png.length,...qa};
+    writeFileSync(join(output,'cold-firsttap.json'),JSON.stringify(result,null,2)+'\n');
+    console.log('COLD PROCESS',skin,sound,repetition,
+      'physicsMs='+qa.firstInput.pointerToPhysicsMs,
+      'drawMs='+qa.firstInput.pointerToDrawMs,'audioMs='+qa.firstAudioInitMs,
+      'readyMs='+readyElapsedMs);
+  }else{
   for(const skin of ['warm','slate']){
     for(const [width,height] of [[390,844],[360,600]]){
       await cdp('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:true});
@@ -515,6 +568,7 @@ try{
 
   writeFileSync(join(output,'headless-game-metrics.json'),JSON.stringify(evidence,null,2)+'\n');
   console.log('Completed eight actual-game captures; metrics are CI-headless only, not a mobile-device benchmark.');
+  }
 }finally{
   if(ws)ws.close();
   browser.kill('SIGTERM');
