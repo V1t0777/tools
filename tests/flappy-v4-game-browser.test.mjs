@@ -262,3 +262,21 @@ test('Alpha 21 keeps narrow warm-near improvement guard inside the Draft browser
  assert.doesNotMatch(game,/Alpha 21 narrow warm-near seam regression/);
  assert.doesNotMatch(builder,/Alpha 21 narrow warm-near seam regression/);
 });
+
+
+test('Alpha 22 luminance diagnostics remain one-shot, bounded and strictly Draft-only',()=>{
+ assert.match(probe,/function linearChannel\(v\)\{v=v\/255/);
+ assert.match(probe,/v<=\.04045\?v\/12\.92:Math\.pow\(\(v\+\.055\)\/1\.055,2\.4\)/);
+ assert.match(probe,/function luminance\(rgb\)/);
+ assert.match(probe,/\.2126\*linearChannel\(rgb\[0\]\)/);
+ assert.match(probe,/\.7152\*linearChannel\(rgb\[1\]\)/);
+ assert.match(probe,/\.0722\*linearChannel\(rgb\[2\]\)/);
+ assert.match(probe,/centerLinearLuminanceGap:luminanceGap\(center,contrastBefore\.backgroundCenter\)/);
+ assert.match(probe,/breastLinearLuminanceGap:luminanceGap\(breast,contrastBefore\.backgroundBreast\)/);
+ assert.match(probe,/narrowReadability\.luminanceSummary=\['warm','slate'\]\.map/);
+ assert.match(probe,/minCenterGap:Math\.min\(\.\.\.values\)/);
+ assert.match(probe,/for\(const name of \['centerLinearLuminance','underCenterLinearLuminance'/);
+ assert.match(probe,/NOT WCAG, outline legibility, human perception or hardware verification/);
+ assert.doesNotMatch(game,/function linearChannel|centerLinearLuminanceGap|luminanceSummary/);
+ assert.doesNotMatch(builder,/centerLinearLuminanceGap|luminanceSummary/);
+});
