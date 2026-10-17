@@ -122,7 +122,17 @@ jobs:
               for field in ('centerRgbDelta','breastRgbDelta'):
                   assert isinstance(row[field],(float,int)) and 0<=row[field]<=255
               assert (root/row['filename']).is_file()
+              for field in ('centerLinearLuminance','underCenterLinearLuminance',
+                            'breastLinearLuminance','underBreastLinearLuminance',
+                            'centerLinearLuminanceGap','breastLinearLuminanceGap'):
+                  assert isinstance(row[field],(float,int)) and 0<=row[field]<=1,(row['theme'],row['viewport'],field,row.get(field))
           assert len(json.loads((root/'headless-seam-metrics.json').read_text())['results'])==18
+          summaries=report['luminanceSummary']
+          assert {entry['theme'] for entry in summaries}=={'warm','slate'}
+          for entry in summaries:
+              assert entry['positions']==6
+              assert 0<=entry['minCenterGap']<=entry['maxCenterGap']<=1
+          print('Alpha 22: 12 luminance + RGB sample pairs across two scenes and three viewports verified')
           print('Alpha 20: 12 true Canvas captures, 18 layer joins, 4 narrow-layout records verified')
           PY
       - name: Render responsive draft evidence with installed headless Chrome
