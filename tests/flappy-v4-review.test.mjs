@@ -97,5 +97,23 @@ test('V4 browser evidence shows actual repeating layer joins at mid-screen witho
   const workflow=read('.github/workflows/flappy-v4-art-qa.yml');
   assert.match(workflow,/for view in scene seam/);
   assert.match(workflow,/fragment="\$theme-seam"/);
-  assert.match(workflow,/exactly 16 scene\/seam mobile screenshots/);
+  assert.match(workflow,/if \(scene_count,seam_count,pose_count\)!=\(8,8,12\)/);
+  assert.match(workflow,/for phase in power recovery glide/);
+  assert.match(workflow,/review-v4\.html#\$theme-\$phase/);
+});
+
+
+test('Alpha 23 authentic wing atlas reviewer and CSS-only pose hashes do not fake the hero',()=>{
+ assert.match(html,/background-image:url\("\.\/assets\/v3\/warm-flight\.svg"\)/);
+ assert.match(html,/\.slate \.bird\{background-image:url\("\.\/assets\/v3\/slate-flight\.svg"\)\}/);
+ assert.match(html,/background-size:600% 400%/);
+ assert.match(html,/#wing-rest:checked~\.worlds \.bird/);
+ for(const theme of ['warm','slate']){
+   for(const pose of ['power','recovery','glide'])
+     assert.ok(html.includes('id="'+theme+'-'+pose+'"'));
+ }
+ assert.match(html,/body:has\(\.phase-anchor:target\) \.frame\{width:100vw;height:100dvh/);
+ assert.match(html,/石柱仍为布局参考，不是正式 Canvas 材质/);
+ assert.doesNotMatch(html,/\.bird:after\{|border-radius:50%;background:#c18e60/);
+ assert.doesNotMatch(html,/<script\b/i);
 });
