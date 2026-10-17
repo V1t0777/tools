@@ -42,10 +42,13 @@ jobs:
           fi
           node --check tests/flappy-v4-game-browser.mjs
           # Every invocation starts its OWN Chrome process and clean profile.
+          # Order interleaves treatment/control; keep QA-only browser artifact isolated.
           # Alternate sound state and skin to reduce fixed test-order bias.
           for spec in \
-            "warm:off:1" "warm:on:1" "slate:on:1" "slate:off:1" \
-            "slate:off:2" "slate:on:2" "warm:on:2" "warm:off:2"; do
+            "warm:off:1:prime" "warm:on:1:control" "warm:on:1:prime" "warm:off:1:control" \
+            "slate:on:1:prime" "slate:off:1:control" "slate:on:1:control" "slate:off:1:prime" \
+            "slate:off:2:prime" "slate:on:2:control" "slate:on:2:prime" "slate:off:2:control" \
+            "warm:on:2:prime" "warm:off:2:control" "warm:on:2:control" "warm:off:2:prime"; do
             directory="${spec//:/-}"
             V4_COLD_CASE="$spec" node tests/flappy-v4-game-browser.mjs "v4-cold-qa/$directory"
           done
@@ -54,26 +57,31 @@ jobs:
           from pathlib import Path
           root=Path("v4-cold-qa")
           files=sorted(root.glob("*/cold-firsttap.json"))
-          assert len(files)==8, f"Expected 8 independent cold-process reports, found {len(files)}"
+          assert len(files)==16, f"Expected 16 independent cold-process reports, found {len(files)}"
           cases=[json.loads(p.read_text()) for p in files]
-          combinations={(c['theme'],c['sound'],c['repetition']) for c in cases}
-          assert len(combinations)==8
+          combinations={(c['theme'],c['sound'],c['repetition'],c['variant']) for c in cases}
+          assert len(combinations)==16
           assert len({c['processId'] for c in cases})>=1
           for item in cases:
               assert item['clicks']==1 and item['starts']>=1
               assert item['sceneStatus']=='ready' and item['loadedLayers']==5
               assert item['firstInput']['pointerToPhysicsMs']>=0
               assert item['firstInput']['pointerToDrawMs']>=item['firstInput']['pointerToPhysicsMs']
-              assert item['audioCalls']>=1 if item['sound']=='on' else item['audioCalls']==0
+              if item['sound']=='on':
+                  assert item['audioCalls']>=1
+              else:
+                  assert item['audioCalls']==0 and not item['primeSuccess']
+              if item['variant']=='control':
+                  assert not item['primeSuccess']
               filename=root/("-".join([item['theme'],item['sound'],str(item['repetition'])])) / (
-                  f"first-tap-{item['theme']}-{item['sound']}-rep{item['repetition']}.png")
+                  f"first-tap-{item['theme']}-{item['sound']}-rep{item['repetition']}-{item['variant']}.png")
               assert filename.is_file() and filename.stat().st_size>12000
-              print("FRESH FIRST TAP",item['theme'],item['sound'],item['repetition'],
+              print("FRESH FIRST TAP",item['theme'],item['sound'],item['repetition'],item['variant'],
                     "appliedPhysicsMs",item['firstInput']['pointerToPhysicsMs'],
                     "drawMs",item['firstInput']['pointerToDrawMs'],
                     "audioMs",item['firstAudioInitMs'])
           (root/"cold-process-summary.json").write_text(
-              json.dumps({"method":"8 individual Chrome processes and clean profiles, shared runner OS",
+              json.dumps({"method":"16 individual Chrome processes and clean profiles: idle-prime on/off crossed with sound on/off, shared runner OS",
                           "cases":cases},ensure_ascii=False,indent=2)+"\n")
           PY
       - name: Capture actual Flappy game Canvas (not the static art reviewer)
