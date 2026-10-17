@@ -22,6 +22,9 @@ function visualFixture(){
   s=once(s,"var nextSkin=Math.random()<.5?'warm':'slate';","var nextSkin=window.__v4GameQa.skin;");
   // Compare new idle priming against the exact same game with QA-only flag disabled.
   s=once(s,'var AUDIO_IDLE_PRIME=true;','var AUDIO_IDLE_PRIME=window.__v4GameQa.prewarm;');
+  s=once(s,'    window.requestIdleCallback(function(deadline){',
+    '    window.requestIdleCallback(function(deadline){'+
+    'var qa=window.__v4GameQa;if(qa){qa.primeCallbackRan=true;qa.idleBudgetMs=deadline&&typeof deadline.timeRemaining==="function"?Math.round(deadline.timeRemaining()):null;}');
   s=once(s,'      try{audioCtx=new AC();}\n      catch(error){\n        // Idle-time creation',
     '      try{var qaStartedAt=performance.now();audioCtx=new AC();'+
     'var qa=window.__v4GameQa;if(qa){qa.primeSuccess=true;qa.primedAudioMs=Math.round((performance.now()-qaStartedAt)*100)/100;}}'+
@@ -116,6 +119,7 @@ function visualFixture(){
     'window.__v4GameQa={skin:qaArgs.get("skin")==="slate"?"slate":"warm",',
     'sound:qaArgs.get("sound")==="off"?"off":"on",',
     'prewarm:qaArgs.get("prime")!=="control",primeSuccess:false,primedAudioMs:null,',
+    'primeCallbackRan:false,idleBudgetMs:null,',
     'mode:qaArgs.get("mode")==="live"?"live":"stabilized",pointerdowns:0,',
     'state:"ready",previousState:"ready",startCount:0,runningFrames:0,',
     'previousWingPhase:-1,unexpectedWingResets:0,pipeData:[],',
@@ -281,6 +285,10 @@ try{
     const qa=JSON.parse(await read('JSON.stringify((()=>{const q=window.__v4GameQa;return {'+
       'theme:q.skin,sound:q.sound,prewarm:q.prewarm,'+
       'primeSuccess:q.primeSuccess,primedAudioMs:q.primedAudioMs,'+
+      'primeCallbackRan:q.primeCallbackRan,idleBudgetMs:q.idleBudgetMs,'+
+      'ua:navigator.userAgent.slice(0,180),'+
+      'chromiumBrands:navigator.userAgentData?.brands?.map(x=>x.brand)??null,'+
+      'idleAPI:typeof window.requestIdleCallback==="function",'+
       'mode:q.mode,clicks:q.pointerdowns,starts:q.startCount,'+
       'firstInput:q.latencySamples[0],audioCalls:q.audioTimes.length,'+
       'firstAudioInitMs:q.audioTimes.length?q.audioTimes[0]:null,'+
@@ -313,6 +321,7 @@ try{
       screenshotBytes:png.length,...qa};
     writeFileSync(join(output,'cold-firsttap.json'),JSON.stringify(result,null,2)+'\n');
     console.log('COLD PROCESS',skin,sound,repetition,variant,'primed='+qa.primeSuccess,
+      'idleRan='+qa.primeCallbackRan,'idleBudget='+qa.idleBudgetMs,
       'physicsMs='+qa.firstInput.pointerToPhysicsMs,
       'drawMs='+qa.firstInput.pointerToDrawMs,'audioMs='+qa.firstAudioInitMs,
       'readyMs='+readyElapsedMs);
