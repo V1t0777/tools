@@ -597,8 +597,23 @@ try{
   }
 }finally{
   if(ws)ws.close();
-  browser.kill('SIGTERM');
+  // Wait for Chrome to release its asynchronously written profile files.
+  // A fixed 200ms delay races with Chrome shutdown in independent-process QA.
+  if(browser.exitCode===null&&browser.signalCode===null){
+    const closed=new Promise(resolve=>browser.once('close',resolve));
+    browser.kill('SIGTERM');
+    await Promise.race([closed,sleep(2500)]);
+    if(browser.exitCode===null&&browser.signalCode===null){
+      browser.kill('SIGKILL');
+      await Promise.race([closed,sleep(1200)]);
+    }
+  }
   server.close();
-  await sleep(200);
-  rmSync(profile,{recursive:true,force:true,maxRetries:3});
+  try{
+    rmSync(profile,{recursive:true,force:true,maxRetries:12,retryDelay:250});
+  }catch(error){
+    // Test evidence is already complete; a runner-isolated temp cleanup race
+    // should be visible but not be mistaken for gameplay failure.
+    console.warn('Chrome temporary profile cleanup:',String(error));
+  }
 }
