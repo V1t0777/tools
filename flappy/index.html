@@ -315,7 +315,7 @@
   var score=0,best=0,newRecord=false;
   var lastTime=0,raf=0,elapsed=0,scroll=0,prevGapY=null;
   var hitSlowUntil=0,groundHitAt=0;
-  var audioCtx=null,noiseBuffer=null,soundOn=true;
+  var audioCtx=null,noiseBuffer=null,soundOn=true,audioConstructionFailed=false;
   var SOUND_KEY='zhaoFlappySound.v1';
   try{soundOn=localStorage.getItem(SOUND_KEY)!=='off';}catch(e){}
   var BEST_KEY='zhaoFlappyBest.v1';
@@ -737,12 +737,26 @@
   function retryPendingSubmission(){pendingRuns.slice().forEach(function(run){if(!run.busy&&run.attempts<2)sendRun(run);});}
 
   function initAudio(){
-    if(!soundOn)return null;
+    if(!soundOn||audioConstructionFailed)return null;
     if(!audioCtx){
       var AC=window.AudioContext||window.webkitAudioContext;
-      if(AC)audioCtx=new AC();
+      if(AC){
+        try{audioCtx=new AC();}
+        catch(error){
+          // Audio must never prevent a click from starting or moving the bird.
+          // Retry on a later explicit sound-enable gesture.
+          audioConstructionFailed=true;
+          return null;
+        }
+      }
     }
-    if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();
+    if(audioCtx&&audioCtx.state==='suspended'){
+      try{
+        var pendingResume=audioCtx.resume();
+        if(pendingResume&&typeof pendingResume.catch==='function')
+          pendingResume.catch(function(){});
+      }catch(error){/* A later user gesture may be allowed to resume audio. */}
+    }
     return audioCtx;
   }
   function tone(freq,dur,type,vol,endFreq){
@@ -1407,7 +1421,9 @@
   function handleAction(e){
     if(e&&e.target&&e.target.closest&&e.target.closest('button,a'))return;
     if(e)e.preventDefault();
-    initAudio();
+    // Give the bird its physics impulse before costly Web Audio cold-start.
+    // flap() still initializes sound synchronously within this pointer gesture,
+    // preserving iOS Safari's user-activation requirements.
     if(state==='ready'||state==='over')startGame();
     else if(state==='running')flap();
   }
@@ -1421,7 +1437,10 @@
   soundBtn.addEventListener('click',function(e){
     e.stopPropagation();soundOn=!soundOn;soundBtn.textContent=soundOn?'♪':'×';soundBtn.classList.toggle('active',!soundOn);
     try{localStorage.setItem(SOUND_KEY,soundOn?'on':'off');}catch(error){}
-    if(soundOn){initAudio();tone(520,.05,'sine',.02);}
+    if(soundOn){
+      audioConstructionFailed=false;
+      tone(520,.05,'sine',.02);
+    }
   });
   leaderboardBtn.addEventListener('click',function(e){e.stopPropagation();openLeaderboard();});
   leaderboardClose.addEventListener('click',closeLeaderboard);
