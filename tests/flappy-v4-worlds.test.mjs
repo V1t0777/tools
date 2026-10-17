@@ -476,10 +476,10 @@ test('Alpha 24 edited 2x master and 1x derivative are exact, safe non-shipping p
  assert.equal((master.match(/M0 1194 C60 1194 125 1141 202 1137/g)||[]).length,3,
    'terrain clip, filled silhouette and crest contour all share the same high-resolution ridge');
  const manifest=JSON.parse(read('flappy/assets/v4/MASTER_HANDOFF.json'));
- assert.equal(manifest.pilot_completion.completed_studies,1);
+ assert.equal(manifest.pilot_completion.completed_studies,2);
  assert.equal(manifest.pilot_completion.total_layer_targets,10);
  assert.equal(manifest.pilot_completion.completed_final_masters,0);
- assert.equal(manifest.pilots.length,1);
+ assert.equal(manifest.pilots.length,2);
  const pilot=manifest.pilots[0];
  assert.equal(pilot.source_master_path,'masters/warm/far-master-pilot.svg');
  assert.equal(pilot.preview_asset_path,'pilot/warm/far.svg');
@@ -488,4 +488,54 @@ test('Alpha 24 edited 2x master and 1x derivative are exact, safe non-shipping p
  assert.equal(pilot.art_direction_approved,false);
  assert.ok(Object.values(manifest.release_gates).every(v=>v===false));
  assert.doesNotMatch(html,/far-master-pilot|pilot\/warm\/far\.svg/);
+});
+
+
+test('Alpha 25 slate editable 3200px mountain master and 1600px derivative are identical painterly geometry',()=>{
+ const master=read('flappy/assets/v4/masters/slate/far-master-pilot.svg');
+ const preview=read('flappy/assets/v4/pilot/slate/far.svg');
+ const warmMaster=read('flappy/assets/v4/masters/warm/far-master-pilot.svg');
+ assert.match(master,/width="3200" height="2000" viewBox="0 0 3200 2000"/);
+ assert.match(preview,/width="1600" height="1000" viewBox="0 0 1600 1000"/);
+ assert.match(preview,/<g transform="scale\(\.5\)">/);
+ for(const svg of [master,preview]){
+   assert.match(svg,/id="far-painted-base"/);
+   assert.match(svg,/id="slate-ridge-edge"/);
+   assert.match(svg,/id="large-gouache-landforms"/);
+   assert.match(svg,/id="hand-broken-pigment"/);
+   assert.equal((svg.match(/data-gouache="/g)||[]).length,12);
+   assert.equal((svg.match(/data-brush="/g)||[]).length,12);
+   assert.equal((svg.match(/data-grain="/g)||[]).length,7);
+   assert.equal((svg.match(/<linearGradient\b/g)||[]).length,3);
+   for(const g of svg.matchAll(/<linearGradient\b[^>]*>/g))
+     assert.match(g[0],/x1="0" y1="0" x2="0" y2="1"/);
+   assert.doesNotMatch(svg,/<(?:script|image|filter|foreignObject|animate|use)\b|\b(?:href|src)\s*=/i);
+   assert.ok(Buffer.byteLength(svg,'utf8')<16000);
+ }
+ assert.equal((master.match(/M0 1242 C48 1242 112 1204 194 1174/g)||[]).length,3,
+   'Far silhouette, terrain clip and pale edge must be exactly aligned');
+ assert.match(master,/C3161 1223 3182 1242 3200 1242/);
+ const rewritten=master.slice(master.indexOf('<title>'),master.lastIndexOf('</svg>'))
+  .replaceAll('id="far-painted-terrain"','id="pilot-far-painted-terrain"')
+  .replaceAll('url(#far-painted-terrain)','url(#pilot-far-painted-terrain)');
+ const derived=preview.slice(preview.indexOf('<g transform="scale(.5)">')+
+   '<g transform="scale(.5)">'.length,preview.lastIndexOf('</g>'));
+ assert.equal(derived.trim(),rewritten.trim(),
+   'Every brushstroke in the 1600px preview must originate in its editable source');
+ assert.notEqual(master.slice(master.indexOf('<title>')),warmMaster.slice(warmMaster.indexOf('<title>')),
+   'Blue-hour ridge cannot be a renamed warm valley painting');
+ const manifest=JSON.parse(read('flappy/assets/v4/MASTER_HANDOFF.json'));
+ assert.deepEqual(manifest.pilots.map(p=>p.theme),['warm','slate']);
+ assert.deepEqual(manifest.pilots.map(p=>p.layer),['far','far']);
+ assert.equal(manifest.pilot_completion.completed_studies,2);
+ assert.equal(manifest.pilot_completion.total_layer_targets,10);
+ assert.equal(manifest.pilot_completion.completed_final_masters,0);
+ const slate=manifest.pilots[1];
+ assert.equal(slate.source_master_path,'masters/slate/far-master-pilot.svg');
+ assert.equal(slate.preview_asset_path,'pilot/slate/far.svg');
+ assert.equal(slate.production_asset,false);
+ assert.equal(slate.renderer_swap_enabled,false);
+ assert.equal(slate.art_direction_approved,false);
+ assert.ok(Object.values(manifest.release_gates).every(x=>x===false));
+ assert.doesNotMatch(html,/pilot\/slate\/far|slate-pilot|far-master-pilot/);
 });
