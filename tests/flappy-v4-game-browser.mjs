@@ -71,8 +71,10 @@ function visualFixture(){
     '    }'
   ].join('\n');
   s=once(s,'  function frame(t){',frameHook);
-  s=once(s,'  function flap(){',
-    '  function flap(){if(window.__v4GameQa?.mode==="live"&&state==="running"){'+
+  // The physics timestamp belongs AFTER bird.vy is updated, not at flap() entry.
+  s=once(s,'    bird.vy=Math.min(bird.vy,0)*.12-flapPower;',
+    '    bird.vy=Math.min(bird.vy,0)*.12-flapPower;'+
+    'if(window.__v4GameQa?.mode==="live"&&state==="running"){'+
     'var q=window.__v4GameQa;var at=performance.now();'+
     'q.pendingFlap={fromPointer:Math.max(0,at-(q.latestPointerAt??at)),at};}');
   // Snapshot when the original game draw() returned. This is an in-browser
