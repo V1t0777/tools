@@ -97,7 +97,7 @@ test('V4 browser evidence shows actual repeating layer joins at mid-screen witho
   const workflow=read('.github/workflows/flappy-v4-art-qa.yml');
   assert.match(workflow,/for view in scene seam/);
   assert.match(workflow,/fragment="\$theme-seam"/);
-  assert.match(workflow,/if \(scene_count,seam_count,pose_count\)!=\(8,8,12\)/);
+  assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count\)!=\(8,8,12,2\)/);
   assert.match(workflow,/for phase in power recovery glide/);
   assert.match(workflow,/review-v4\.html#\$theme-\$phase/);
 });
@@ -115,5 +115,19 @@ test('Alpha 23 authentic wing atlas reviewer and CSS-only pose hashes do not fak
  assert.match(html,/body:has\(\.phase-anchor:target\) \.frame\{width:100vw;height:100dvh/);
  assert.match(html,/石柱仍为布局参考，不是正式 Canvas 材质/);
  assert.doesNotMatch(html,/\.bird:after\{|border-radius:50%;background:#c18e60/);
+ assert.doesNotMatch(html,/<script\b/i);
+});
+
+
+test('Alpha 24 warm far painting is opt-in only in a no-script, draft art comparison route',()=>{
+ assert.match(html,/id="paint-pilot"/);
+ assert.match(html,/id="warm-pilot"/);
+ assert.match(html,/class="layer far far-base" src="\.\/assets\/v4\/warm\/far\.svg"/);
+ assert.match(html,/class="layer far far-pilot" src="\.\/assets\/v4\/pilot\/warm\/far\.svg"/);
+ assert.match(html,/#warm-pilot:target~\.frame \.far-base\{display:none\}/);
+ assert.match(html,/#warm-pilot:target~\.frame \.far-pilot\{display:block\}/);
+ assert.match(html,/#paint-pilot:checked~\.worlds \.warm \.far-base\{display:none\}/);
+ assert.match(html,/#paint-pilot:checked~\.worlds \.warm \.far-pilot\{display:block\}/);
+ assert.doesNotMatch(game,/warm-pilot|far-master-pilot|pilot\/warm\/far/);
  assert.doesNotMatch(html,/<script\b/i);
 });
