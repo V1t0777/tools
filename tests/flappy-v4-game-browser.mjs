@@ -20,6 +20,14 @@ function visualFixture(){
   let s=original;
   s=once(s,'<script src="../shared/toolbox-auth.js?v=20261008-security"></script>','');
   s=once(s,"var nextSkin=Math.random()<.5?'warm':'slate';","var nextSkin=window.__v4GameQa.skin;");
+  // Time synchronous audio startup independently of first-game Canvas paint.
+  // This is injected into the localhost QA response only, never shipped.
+  s=once(s,'  function initAudio(){','  function originalInitAudio(){');
+  s=once(s,'  function tone(',
+    '  function initAudio(){var at=performance.now();'+
+    'var result=originalInitAudio();var q=window.__v4GameQa;'+
+    'if(q)q.audioTimes.push(Math.round((performance.now()-at)*100)/100);'+
+    'return result;}\\n  function tone(');
   const frameHook=[
     '  function frame(t){',
     '    var qa=window.__v4GameQa;',
@@ -100,7 +108,7 @@ function visualFixture(){
     'state:"ready",previousState:"ready",startCount:0,runningFrames:0,',
     'previousWingPhase:-1,unexpectedWingResets:0,pipeData:[],',
     'lastWorld:null,worldTransitions:0,activeWorldLayers:0,',
-    'latestPointerAt:null,pendingFlap:null,latencySamples:[],',
+    'latestPointerAt:null,pendingFlap:null,latencySamples:[],audioTimes:[],',
     'yMin:99999,yMax:-99999,collisionSeen:false,gameOverSeen:false,',
     'frames:0,frameIntervals:[],previousStamp:0,started:false,',
     'createdAt:performance.now(),readyMs:null,scrollOffset:0,',
@@ -169,6 +177,7 @@ const metricExpression=[
   'const lag=q.latencySamples.slice(-120);',
   'const p2d=lag.map(x=>x.pointerToDrawMs).sort((a,b)=>a-b);',
   'const p2p=lag.map(x=>x.pointerToPhysicsMs).sort((a,b)=>a-b);',
+  'const audio=q.audioTimes;',
   'const assetEntries=performance.getEntriesByType("resource").filter(x=>x.name.includes("/assets/v4/"));',
   'const assets=assetEntries.map(x=>({file:x.name.split("/").slice(-2).join("/"),',
   'durationMs:Math.round(x.duration*100)/100,transferBytes:x.transferSize||0}));',
@@ -191,7 +200,9 @@ const metricExpression=[
   'pointerToPhysicsP95Ms:p2p[Math.floor(Math.max(0,p2p.length-1)*.95)]||null,',
   'pointerToDrawP50Ms:p2d[Math.floor(Math.max(0,p2d.length-1)*.5)]||null,',
   'pointerToDrawP95Ms:p2d[Math.floor(Math.max(0,p2d.length-1)*.95)]||null,',
-  'worstMs:p2d[p2d.length-1]||null},assets};',
+  'worstMs:p2d[p2d.length-1]||null},',
+  'audioInitialization:{calls:audio.length,firstMs:audio[0]??null,',
+  'maxSynchronousMs:audio.length?Math.max(...audio):null},assets};',
   '})())'
 ].join('');
 const evidence={kind:'Draft-only real Flappy browser renderer evidence',
@@ -411,7 +422,9 @@ try{
       cumulativeScroll:Math.round(cumulativeScroll),highestScroll:Math.round(highestScroll),
       activeWorldMinimumLayers:lowestLayers,sceneSwitches:maxTransitions,
       unexpectedWingResets:maxWingResets,maxObservedFrameIntervalMs:maxFrameGap,
-      frameIntervalP95Ms:last.frameIntervalsMs.p95,endedState:last.state,
+      frameIntervalP95Ms:last.frameIntervalsMs.p95,
+      inputResponse:last.inputResponse,audioInitialization:last.audioInitialization,
+      endedState:last.state,
       rounds};
     multiRound.results.push(record);
     console.log('MULTIROUND',skin,'seconds',Math.round(record.durationMs/1000),
