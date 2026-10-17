@@ -73,7 +73,7 @@ jobs:
                   assert item['audioCalls']==0 and not item['primeSuccess']
               if item['variant']=='control':
                   assert not item['primeSuccess']
-              filename=root/("-".join([item['theme'],item['sound'],str(item['repetition'])])) / (
+              filename=root/("-".join([item['theme'],item['sound'],str(item['repetition']),item['variant']])) / (
                   f"first-tap-{item['theme']}-{item['sound']}-rep{item['repetition']}-{item['variant']}.png")
               assert filename.is_file() and filename.stat().st_size>12000
               print("FRESH FIRST TAP",item['theme'],item['sound'],item['repetition'],item['variant'],
