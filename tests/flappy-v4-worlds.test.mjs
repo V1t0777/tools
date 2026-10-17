@@ -323,3 +323,29 @@ test('V4 Alpha 19 feather silhouette and stone edge readability preserve the phy
  assert.match(html,/function birdRadius\(\)\{return Math\.max\(13,W\*\.043\);\}/);
  assert.match(html,/function pipeWidth\(\)\{return clamp\(W\*\.155,48,68\);\}/);
 });
+
+
+test('Alpha 21 warm-near C1 seam keeps original ridgeline, transparent sky and repeat tangents',()=>{
+ const svg=read('flappy/assets/v4/warm/near.svg');
+ const ridge='M0 800 C24 800 34 790 52 785 C123 770 209 760 306 766 S492 739 599 753 S792 766 896 737 S1116 767 1227 744 S1482 750 1548 785 C1578 800 1590 800 1600 800';
+ assert.equal(svg.split(ridge).length-1,3,
+   'clip, opacity-filled terrain and top contour must reuse same periodic geometry');
+ const clip=svg.match(/<clipPath id="clip-rock-near"><path d="([^"]+)"/);
+ assert.ok(clip&&clip[1].startsWith(ridge),'terrain clip must match repeatable silhouette');
+ assert.match(svg,/<path d="M0 800 C24 800 34 790 52 785[^"]+" fill="url\(#forestGrad\)" opacity="\.94"\/>/);
+ assert.match(svg,/<path d="M0 800 C24 800 34 790 52 785[^"]+" fill="none" stroke="#b9c09c" stroke-opacity="\.16" stroke-width="3"\/>/);
+ // First and last tangent control points share y=800 with the endpoint.
+ // C1 seamlessness avoids a sharp kink without changing the source 1600x1000 bounds.
+ const start=svg.match(/M0 (\d+) C(\d+) (\d+) (\d+) (\d+) (\d+) (\d+)/);
+ const end=svg.match(/C(\d+) (\d+) (\d+) (\d+) 1600 (\d+) L1600 1000/);
+ assert.ok(start&&end);
+ assert.equal(Number(start[1]),800);
+ assert.equal(Number(start[3]),800,'left tangent must be horizontal at the wrap');
+ assert.equal(Number(end[4]),800,'right final cubic handle must be horizontal');
+ assert.equal(Number(end[5]),800,'repeat endpoints share identical y');
+ assert.match(svg,/viewBox="0 0 1600 1000"/);
+ assert.ok(Buffer.byteLength(svg,'utf8')<93_000);
+ assert.doesNotMatch(svg,/<(?:filter|script|animate|foreignObject|image)\b/i);
+ const other=read('flappy/assets/v4/slate/near.svg');
+ assert.match(other,/M0 815 Q166 766 314 790/,'slate art retained for independent QA baseline');
+});
