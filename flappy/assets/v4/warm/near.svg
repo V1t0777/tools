@@ -4,7 +4,33 @@
   <stop offset="1" stop-color="#123b35" stop-opacity=".15"/>
  </linearGradient></defs>
 <path d="M0 800 C123 770 209 760 306 766 S492 739 599 753 S792 766 896 737 S1116 767 1227 744 S1482 750 1600 800 L1600 1000 L0 1000Z" fill="url(#forestGrad)" opacity=".94"/>
-<path d="M0 800 C123 770 209 760 306 766 S492 739 599 753 S792 766 896 737 S1116 767 1227 744 S1482 750 1600 800" fill="none" stroke="#b9c09c" stroke-opacity=".16" stroke-width="3"/><g transform="translate(56.0 797.8) scale(0.305)"><path d="M0 -100 L-9 -72 L-5 -72 L-23 -49 L-12 -48 L-30 -22 L-16 -21 L-37 5 L38 5 L16 -21 L29 -22 L11 -48 L24 -49 L5 -72 L10 -72 Z" fill="#355750"/><path d="M0 -84 L-4 -46 M0 -58 L-13 -33 M0 -41 L10 -20" fill="none" stroke="#a3ac8b" stroke-width=".85" stroke-opacity=".19"/><path d="M-2 -80 L-4 8" stroke="#203c3b" stroke-opacity=".5" stroke-width="3"/><g data-art-pass="pine-boughs-v1" opacity=".54">
+<path d="M0 800 C123 770 209 760 306 766 S492 739 599 753 S792 766 896 737 S1116 767 1227 744 S1482 750 1600 800" fill="none" stroke="#b9c09c" stroke-opacity=".16" stroke-width="3"/><g id="near-broad-canopy-pigment-v1" clip-path="url(#clip-rock-near)">
+<!-- Layered, mobile-visible open-pigment canopy below the pine boughs. -->
+<path data-pigment="gouache-1" d="M2.6 833.0 C23.6 771.7 84.0 800.7 106 789.7 C145.6 812.7 200.4 820.7 209.4 833 C187.4 864.9 121.4 897.6 106 886.6 C62.0 877.6 -3.4 859.8 2.6 833Z" fill="#9db19b" fill-opacity="0.16"/>
+<path data-pigment="gouache-2" d="M179.1 862.0 C200.1 840.1 266.4 833.1 290 822.1 C332.5 845.1 391.9 853.1 400.9 862 C378.9 891.5 306.5 900.4 290 911.4 C242.8 902.4 173.1 886.7 179.1 862Z" fill="#799d83" fill-opacity="0.105"/>
+<path data-pigment="gouache-3" d="M351.9 811.0 C372.9 741.3 442.5 770.3 467 759.3 C511.1 782.3 573.1 790.3 582.1 811 C560.1 849.1 484.1 886.0 467 875.0 C418.0 866.0 345.9 843.0 351.9 811Z" fill="#254f46" fill-opacity="0.21"/>
+<path data-pigment="gouache-4" d="M565.9 847.0 C586.9 819.2 644.7 812.2 666 801.2 C704.3 824.2 757.1 832.2 766.1 847 C744.1 880.8 680.9 892.7 666 903.7 C623.4 894.7 559.9 875.3 565.9 847Z" fill="#b2ad85" fill-opacity="0.12"/>
+<path data-pigment="gouache-5" d="M708.2 805.0 C729.2 730.3 803.3 759.3 829 748.3 C875.3 771.3 940.8 779.3 949.8 805 C927.8 846.9 847.0 886.2 829 875.2 C777.6 866.2 702.2 840.1 708.2 805Z" fill="#618b73" fill-opacity="0.18"/>
+<path data-pigment="gouache-6" d="M921.1 855.0 C942.1 830.2 1002.1 823.2 1024 812.2 C1063.4 835.2 1117.9 843.2 1126.9 855 C1104.9 886.6 1039.3 897.0 1024 908.0 C980.2 899.0 915.1 881.5 921.1 855Z" fill="#d2bb88" fill-opacity="0.13"/>
+<path data-pigment="gouache-7" d="M1092.1 824.0 C1113.1 752.2 1180.2 781.2 1204 770.2 C1246.8 793.2 1306.9 801.2 1315.9 824 C1293.9 863.7 1220.7 901.6 1204 890.6 C1156.4 881.6 1086.1 857.3 1092.1 824Z" fill="#315849" fill-opacity="0.19"/>
+<path data-pigment="gouache-8" d="M1365.2 852.0 C1386.2 822.5 1422.5 815.5 1438 804.5 C1465.9 827.5 1501.8 835.5 1510.8 852 C1488.8 887.0 1448.8 899.8 1438 910.8 C1407.0 901.8 1359.2 881.4 1365.2 852Z" fill="#afbb9c" fill-opacity="0.11"/>
+<path data-pigment="gouache-9" d="M54.2 934.0 C75.2 876.5 161.9 905.5 191 894.5 C243.4 917.5 318.8 925.5 327.8 934 C305.8 963.1 211.4 993.9 191 982.9 C132.8 973.9 48.2 958.4 54.2 934Z" fill="#6d957c" fill-opacity="0.14"/>
+<path data-pigment="gouache-10" d="M421.4 940.0 C442.4 911.0 536.8 904.0 568 893.0 C624.2 916.0 705.6 924.0 714.6 940 C692.6 974.7 589.8 987.2 568 998.2 C505.6 989.2 415.4 969.1 421.4 940Z" fill="#b2ae85" fill-opacity="0.12"/>
+<path data-pigment="gouache-11" d="M837.7 942.0 C858.7 878.2 951.3 907.2 982 896.2 C1037.3 919.2 1117.3 927.2 1126.3 942 C1104.3 975.8 1003.5 1009.7 982 998.7 C920.6 989.7 831.7 970.3 837.7 942Z" fill="#294f47" fill-opacity="0.16"/>
+<path data-pigment="gouache-12" d="M1182.9 941.0 C1203.9 920.8 1286.9 913.8 1315 902.8 C1365.6 925.8 1438.1 933.8 1447.1 941 C1425.1 969.2 1334.7 977.3 1315 988.3 C1258.8 979.3 1176.9 964.7 1182.9 941Z" fill="#94a994" fill-opacity="0.14"/>
+<path data-pigment="broken-edge-1" d="M104 869 Q184 858 255 864.05 T369 867" fill="none" stroke="#d7c9a1" stroke-opacity="0.145" stroke-width="10" stroke-linecap="round"/>
+<path data-pigment="broken-edge-2" d="M236 914 Q299 899 356 907.25 T446 912" fill="none" stroke="#99b79f" stroke-opacity="0.08" stroke-width="7" stroke-linecap="round"/>
+<path data-pigment="broken-edge-3" d="M420 870 Q480 888 535 878.1 T621 873" fill="none" stroke="#274a41" stroke-opacity="0.11" stroke-width="11" stroke-linecap="round"/>
+<path data-pigment="broken-edge-4" d="M546 909 Q603 890 654 900.45 T735 906" fill="none" stroke="#d7c9a1" stroke-opacity="0.13" stroke-width="8" stroke-linecap="round"/>
+<path data-pigment="broken-edge-5" d="M698 856 Q759 839 814 848.35 T901 853" fill="none" stroke="#99b79f" stroke-opacity="0.145" stroke-width="12" stroke-linecap="round"/>
+<path data-pigment="broken-edge-6" d="M831 908 Q884 921 931 913.85 T1006 910" fill="none" stroke="#274a41" stroke-opacity="0.08" stroke-width="9" stroke-linecap="round"/>
+<path data-pigment="broken-edge-7" d="M941 853 Q1011 869 1074 860.2 T1175 855" fill="none" stroke="#d7c9a1" stroke-opacity="0.11" stroke-width="13" stroke-linecap="round"/>
+<path data-pigment="broken-edge-8" d="M1084 906 Q1146 897 1201 901.95 T1289 905" fill="none" stroke="#99b79f" stroke-opacity="0.13" stroke-width="8" stroke-linecap="round"/>
+<path data-pigment="broken-edge-9" d="M1213 865 Q1287 852 1353 859.15 T1459 863" fill="none" stroke="#274a41" stroke-opacity="0.145" stroke-width="12" stroke-linecap="round"/>
+<path data-pigment="broken-edge-10" d="M203 961 Q299 972 386 965.95 T524 963" fill="none" stroke="#d7c9a1" stroke-opacity="0.08" stroke-width="13" stroke-linecap="round"/>
+<path data-pigment="broken-edge-11" d="M587 955 Q673 938 751 947.35 T874 952" fill="none" stroke="#99b79f" stroke-opacity="0.11" stroke-width="10" stroke-linecap="round"/>
+<path data-pigment="broken-edge-12" d="M988 969 Q1073 985 1149 976.2 T1270 971" fill="none" stroke="#274a41" stroke-opacity="0.13" stroke-width="9" stroke-linecap="round"/>
+</g><g transform="translate(56.0 797.8) scale(0.305)"><path d="M0 -100 L-9 -72 L-5 -72 L-23 -49 L-12 -48 L-30 -22 L-16 -21 L-37 5 L38 5 L16 -21 L29 -22 L11 -48 L24 -49 L5 -72 L10 -72 Z" fill="#355750"/><path d="M0 -84 L-4 -46 M0 -58 L-13 -33 M0 -41 L10 -20" fill="none" stroke="#a3ac8b" stroke-width=".85" stroke-opacity=".19"/><path d="M-2 -80 L-4 8" stroke="#203c3b" stroke-opacity=".5" stroke-width="3"/><g data-art-pass="pine-boughs-v1" opacity=".54">
      <path d="M-5.0 -62 Q-13 -57 -27 -45 L-20 -45 L-15 -48 L-26 -33 L-13 -36 L-5 -40 Z
       M5.0 -57 Q14 -52 26 -42 L18 -42 L11 -46 L24 -30 L12 -34 L3 -38Z"
       fill="#1d443e" fill-opacity=".29"/>
