@@ -476,10 +476,10 @@ test('Alpha 24 edited 2x master and 1x derivative are exact, safe non-shipping p
  assert.equal((master.match(/M0 1194 C60 1194 125 1141 202 1137/g)||[]).length,3,
    'terrain clip, filled silhouette and crest contour all share the same high-resolution ridge');
  const manifest=JSON.parse(read('flappy/assets/v4/MASTER_HANDOFF.json'));
- assert.equal(manifest.pilot_completion.completed_studies,2);
+ assert.equal(manifest.pilot_completion.completed_studies,4);
  assert.equal(manifest.pilot_completion.total_layer_targets,10);
  assert.equal(manifest.pilot_completion.completed_final_masters,0);
- assert.equal(manifest.pilots.length,2);
+ assert.equal(manifest.pilots.length,4);
  const pilot=manifest.pilots[0];
  assert.equal(pilot.source_master_path,'masters/warm/far-master-pilot.svg');
  assert.equal(pilot.preview_asset_path,'pilot/warm/far.svg');
@@ -525,9 +525,9 @@ test('Alpha 25 slate editable 3200px mountain master and 1600px derivative are i
  assert.notEqual(master.slice(master.indexOf('<title>')),warmMaster.slice(warmMaster.indexOf('<title>')),
    'Blue-hour ridge cannot be a renamed warm valley painting');
  const manifest=JSON.parse(read('flappy/assets/v4/MASTER_HANDOFF.json'));
- assert.deepEqual(manifest.pilots.map(p=>p.theme),['warm','slate']);
- assert.deepEqual(manifest.pilots.map(p=>p.layer),['far','far']);
- assert.equal(manifest.pilot_completion.completed_studies,2);
+ assert.deepEqual(manifest.pilots.map(p=>p.theme),['warm','slate','warm','slate']);
+ assert.deepEqual(manifest.pilots.map(p=>p.layer),['far','far','mid','mid']);
+ assert.equal(manifest.pilot_completion.completed_studies,4);
  assert.equal(manifest.pilot_completion.total_layer_targets,10);
  assert.equal(manifest.pilot_completion.completed_final_masters,0);
  const slate=manifest.pilots[1];
@@ -555,4 +555,59 @@ test('Alpha 25 pilot ridge-only highlights must never stroke image frame edges',
        'The filled ridge silhouette still extends fully to the ground');
    }
  }
+});
+
+
+test('Alpha 26 original paired mid masters retain exact 3200 to 1600 provenance and border safety',()=>{
+ const manifest=JSON.parse(read('flappy/assets/v4/MASTER_HANDOFF.json'));
+ assert.deepEqual(manifest.pilots.map(p=>p.theme+'/'+p.layer),['warm/far','slate/far','warm/mid','slate/mid']);
+ assert.deepEqual(manifest.pilot_completion,{completed_studies:4,total_layer_targets:10,completed_final_masters:0});
+ for(const [theme,y,washes,facets,brushes] of [['warm',1416,9,6,9],['slate',1496,10,7,10]]){
+   const source=read('flappy/assets/v4/masters/'+theme+'/mid-master-pilot.svg');
+   const mini=read('flappy/assets/v4/pilot/'+theme+'/mid.svg');
+   assert.match(source,/width="3200" height="2000" viewBox="0 0 3200 2000"/);
+   assert.match(mini,/width="1600" height="1000" viewBox="0 0 1600 1000"/);
+   assert.match(mini,/<g transform="scale\(\.5\)">/);
+   for(const svg of [source,mini]){
+     assert.equal((svg.match(/data-wash="/g)||[]).length,washes);
+     assert.equal((svg.match(/data-facet="/g)||[]).length,facets);
+     assert.equal((svg.match(/data-brush="/g)||[]).length,brushes);
+     assert.ok(Buffer.byteLength(svg,'utf8')<12_000);
+     assert.match(svg,/id="mid-painted-base"/);
+     assert.match(svg,/id="mid-crest-highlight"/);
+     assert.doesNotMatch(svg,/<(?:image|use|script|filter|foreignObject|animate)\b|\b(?:href|src)\s*=/i);
+     for(const g of svg.matchAll(/<linearGradient\b[^>]*>/g))
+       assert.match(g[0],/x1="0" y1="0" x2="0" y2="1"/);
+   }
+   const crest=source.match(/<path id="mid-crest-highlight" d="([^"]+)" fill="none"/);
+   assert.ok(crest&&crest[1].endsWith(' 3200 '+y),'crest should end only on the physical ridge at repeat edge');
+   assert.doesNotMatch(crest[1],/\bL3200 2000\b|\bL0 2000\b/,'do not trace the right viewport border as bright edge');
+   const clip=source.match(/<clipPath id="mid-painted-clip"><path d="([^"]+)"\/><\/clipPath>/);
+   const painted=source.match(/<path id="mid-painted-base" d="([^"]+)" fill=/);
+   assert.ok(clip&&painted);
+   assert.equal(clip[1],painted[1],'clip and base must share the exact 2x geometry');
+   assert.equal(clip[1],crest[1]+' L3200 2000 L0 2000Z');
+   assert.match(crest[1],new RegExp('^M0 '+y+' C'));
+   assert.match(crest[1],new RegExp('C\\d+ \\d+ \\d+ '+y+' 3200 '+y+'$'),
+     'horizontal tangent at both repeat boundaries');
+   const masterBody=source.slice(source.indexOf('<title>'),source.lastIndexOf('</svg>'))
+      .replaceAll('id="mid-painted-clip"','id="pilot-mid-painted-clip"')
+      .replaceAll('url(#mid-painted-clip)','url(#pilot-mid-painted-clip)');
+   const miniBody=mini.slice(mini.indexOf('<g transform="scale(.5)">')+
+     '<g transform="scale(.5)">'.length,mini.lastIndexOf('</g>'));
+   assert.equal(miniBody.trim(),masterBody.trim(),'1x art must be exact scaled master, not separately repainted');
+   const m=manifest.pilots.find(p=>p.theme===theme&&p.layer==='mid');
+   assert.equal(m.source_master_path,'masters/'+theme+'/mid-master-pilot.svg');
+   assert.equal(m.preview_asset_path,'pilot/'+theme+'/mid.svg');
+   assert.equal(m.production_asset,false);
+   assert.equal(m.renderer_swap_enabled,false);
+   assert.equal(m.art_direction_approved,false);
+ }
+ const warm=read('flappy/assets/v4/masters/warm/mid-master-pilot.svg');
+ const slate=read('flappy/assets/v4/masters/slate/mid-master-pilot.svg');
+ assert.notEqual(warm.match(/<path id="mid-crest-highlight" d="([^"]+)"/)[1],
+                 slate.match(/<path id="mid-crest-highlight" d="([^"]+)"/)[1],
+                 'middle worlds must be independently composed');
+ assert.ok(Object.values(manifest.release_gates).every(v=>v===false));
+ assert.doesNotMatch(html,/pilot\/(?:warm|slate)\/mid\.svg/);
 });
