@@ -158,15 +158,19 @@ const server=createServer((req,res)=>{
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 await new Promise((ok,fail)=>{server.once('error',fail);server.listen(0,'127.0.0.1',ok);});
 const port=server.address().port;
-const profile=mkdtempSync(join(tmpdir(),'flappy-v4-cdp-'));
-const browser=spawn(process.env.CHROME||'chromium',[
-  '--headless=new','--no-sandbox','--disable-dev-shm-usage',
-  '--disable-background-networking','--no-first-run',
-  '--remote-debugging-port=0','--remote-allow-origins=*',
-  '--user-data-dir='+profile,'about:blank'
-],{stdio:['ignore','ignore','pipe']});
+let profile=mkdtempSync(join(tmpdir(),'flappy-v4-cdp-'));
 let stderr='';
-browser.stderr.on('data',b=>{stderr=(stderr+b.toString()).slice(-20000);});
+function launchChrome(){
+  const process=spawn(process.env.CHROME||'chromium',[
+    '--headless=new','--no-sandbox','--disable-dev-shm-usage',
+    '--disable-background-networking','--no-first-run',
+    '--remote-debugging-port=0','--remote-allow-origins=*',
+    '--user-data-dir='+profile,'about:blank'
+  ],{stdio:['ignore','ignore','pipe']});
+  process.stderr.on('data',b=>{stderr=(stderr+b.toString()).slice(-20000);});
+  return process;
+}
+let browser=launchChrome();
 let ws=null,id=0;
 const requests=new Map();
 const browserExceptions=[];
@@ -245,13 +249,33 @@ const evidence={kind:'Draft-only real Flappy browser renderer evidence',
   createdAt:new Date().toISOString(),samples:[]};
 try{
   let debuggerPort;
-  for(let n=0;n<100;n++){
-    const file=join(profile,'DevToolsActivePort');
-    if(existsSync(file)){debuggerPort=Number(readFileSync(file,'utf8').split('\n')[0]);break;}
-    if(browser.exitCode!==null)throw new Error('Chrome failed: '+stderr.slice(-900));
-    await sleep(100);
+  // Hosted CI Chrome occasionally hangs before exposing a debugger port.
+  // A single bounded retry gets a NEW browser process AND temporary profile.
+  // No gameplay or audio assertion is retried after page navigation begins.
+  for(let attempt=0;attempt<2&&!debuggerPort;attempt++){
+    if(attempt){
+      const closed=new Promise(resolve=>browser.once('close',resolve));
+      if(browser.exitCode===null&&browser.signalCode===null)browser.kill('SIGTERM');
+      await Promise.race([closed,sleep(1300)]);
+      if(browser.exitCode===null&&browser.signalCode===null)browser.kill('SIGKILL');
+      try{rmSync(profile,{recursive:true,force:true,maxRetries:4,retryDelay:100});}
+      catch(error){console.warn('Stale Chrome profile after failed startup:',String(error));}
+      profile=mkdtempSync(join(tmpdir(),'flappy-v4-cdp-'));
+      stderr='';
+      browser=launchChrome();
+      console.warn('Retrying Chrome debugger startup once in a clean profile');
+    }
+    for(let n=0;n<110;n++){
+      const file=join(profile,'DevToolsActivePort');
+      if(existsSync(file)){
+        debuggerPort=Number(readFileSync(file,'utf8').split('\n')[0]);
+        if(debuggerPort>0)break;
+      }
+      if(browser.exitCode!==null||browser.signalCode!==null)break;
+      await sleep(100);
+    }
   }
-  if(!debuggerPort)throw new Error('Chrome did not expose debugger: '+stderr.slice(-900));
+  if(!debuggerPort)throw new Error('Chrome did not expose debugger after bounded startup retry: '+stderr.slice(-900));
   const pages=await(await fetch('http://127.0.0.1:'+debuggerPort+'/json/list')).json();
   const tab=pages.find(p=>p.type==='page');
   assert.ok(tab,'No browser target');
