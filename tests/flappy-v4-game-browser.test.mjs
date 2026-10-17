@@ -172,3 +172,12 @@ test('V4 idle prime experiment remains isolated from production debug controls',
   assert.match(workflow,/len\(combinations\)==16/);
   assert.doesNotMatch(game,/coldCaseParts|__v4GameQa|V4_COLD_CASE/);
 });
+
+test('V4 fresh-process comparison records ready-screen long frames as well as tap latency',()=>{
+  assert.match(probe,/preTapFrames=JSON\.parse/);
+  assert.match(probe,/slow24ms:a\.filter\(v=>v>24\)\.length/);
+  assert.match(probe,/slow40ms:a\.filter\(v=>v>40\)\.length/);
+  assert.match(probe,/preTapFrames\.samples>=15/);
+  assert.match(probe,/readyElapsedMs,preTapFrames/);
+  assert.doesNotMatch(game,/preTapFrames|slow24ms|__v4GameQa/);
+});
