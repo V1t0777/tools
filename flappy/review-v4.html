@@ -27,6 +27,10 @@ header p{max-width:760px;margin:0 0 16px}
 .layer{position:absolute;max-width:none;width:auto;height:100%;top:0;left:0;transform:none;pointer-events:none;user-select:none}
 .layer.sky{z-index:0;left:89%}
 .layer.far{z-index:1}
+.layer.far-pilot{display:none}
+#paint-pilot:checked~.worlds .warm .far-base{display:none}
+#paint-pilot:checked~.worlds .warm .far-pilot{display:block}
+/* Alpha 24 pilot layer is QA opt-in, never a default runtime image. */
 .layer.mid{z-index:2}
 .layer.mist{z-index:3;opacity:.7}
 .layer.near{z-index:4}
@@ -95,6 +99,8 @@ body:has(.phase-anchor:target) .frame{width:100vw;height:100dvh;aspect-ratio:aut
 .phase-anchor:is(#warm-power,#slate-power):target~.frame .bird{background-position:0% 33.333333%}
 .phase-anchor:is(#warm-recovery,#slate-recovery):target~.frame .bird{background-position:0% 66.666667%}
 .phase-anchor:is(#warm-glide,#slate-glide):target~.frame .bird{background-position:0% 100%}
+#warm-pilot:target~.frame .far-base{display:none}
+#warm-pilot:target~.frame .far-pilot{display:block}
 /* Automated screenshot capture uses no JavaScript and exercises real atlas rows. */
 .seamworld{display:none}
 .seamframe{position:relative;isolation:isolate;height:100dvh;width:100vw;overflow:hidden}
@@ -119,7 +125,7 @@ body:has(.seamworld:target) .seamworld:target{display:block}
 <main>
 <header><span class="tag">DRAFT · 静态安全验收页 · 不代表正式发布</span>
 <h1>V4 Cinematic Worlds · 双主题对比</h1>
-<p>无 JavaScript 的五层场景对比。角色直接使用游戏中的透明 24 帧图集（帧 0、6、12、18 可切换）；石柱仍为布局参考，不是正式 Canvas 材质。真实滚动、碰撞和管道请在相同开发分支的游戏画面中验收。</p>
+<p>无 JavaScript 的五层场景对比。角色使用游戏中的透明 24 帧图集（帧 0、6、12、18 可切换）。暖色远景可单独切换 Alpha 24 绘景母版试制层，默认仍为原始 SVG。试制图层不在游戏运行时使用；石柱仍为布局参考。</p>
 </header>
 <section class="options" aria-label="美术验收选项">
 <input type="radio" id="s360" name="size" checked><label for="s360">360 × 600</label>
@@ -128,6 +134,7 @@ body:has(.seamworld:target) .seamworld:target{display:block}
 <input type="radio" id="s320" name="size"><label for="s320">320 × 568</label>
 <input type="checkbox" id="guides" checked><label for="guides">角色与障碍参考</label>
 <input type="checkbox" id="fog" checked><label for="fog">谷雾图层</label>
+<input type="checkbox" id="paint-pilot"><label for="paint-pilot">暖色远景原画试制 A/B（非正式资源）</label>
 <input type="radio" id="wing-rest" name="wing" checked><label for="wing-rest">羽翼 0 · 休止</label>
 <input type="radio" id="wing-power" name="wing"><label for="wing-power">羽翼 6 · 发力</label>
 <input type="radio" id="wing-recovery" name="wing"><label for="wing-recovery">羽翼 12 · 回收</label>
@@ -135,10 +142,11 @@ body:has(.seamworld:target) .seamworld:target{display:block}
 <div class="worlds">
 <article class="world warm" id="warm">
 <h2>晨曦山谷 · 暖棕旅鸟</h2>
-<span class="phase-anchor" id="warm-power" aria-hidden="true"></span><span class="phase-anchor" id="warm-recovery" aria-hidden="true"></span><span class="phase-anchor" id="warm-glide" aria-hidden="true"></span>
+<span class="phase-anchor" id="warm-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-power" aria-hidden="true"></span><span class="phase-anchor" id="warm-recovery" aria-hidden="true"></span><span class="phase-anchor" id="warm-glide" aria-hidden="true"></span>
 <div class="frame" role="img" aria-label="晨曦山谷 · 暖棕旅鸟五层背景静态美术预览">
 <img class="layer sky" src="./assets/v4/warm/sky.svg" alt="" loading="eager" decoding="async">
-<img class="layer far" src="./assets/v4/warm/far.svg" alt="" loading="eager" decoding="async">
+<img class="layer far far-base" src="./assets/v4/warm/far.svg" alt="" loading="eager" decoding="async">
+<img class="layer far far-pilot" src="./assets/v4/pilot/warm/far.svg" alt="" loading="eager" decoding="async">
 <img class="layer mid" src="./assets/v4/warm/mid.svg" alt="" loading="eager" decoding="async">
 <img class="layer mist" src="./assets/v4/warm/mist.svg" alt="" loading="eager" decoding="async">
 <img class="layer near" src="./assets/v4/warm/near.svg" alt="" loading="eager" decoding="async">
