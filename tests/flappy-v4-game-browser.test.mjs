@@ -213,3 +213,16 @@ test('Actual-game tile-join sampling captures all parallax layers with direct Ca
  assert.doesNotMatch(game,/seamQa|seamTarget|seamResult|sampledBeforeGameplayOverlays/);
  assert.doesNotMatch(builder,/headless-seam-metrics|seam-game/);
 });
+
+
+test('V4 Alpha 19 diagnostic separation is sampled only by the Draft browser harness',()=>{
+ assert.match(probe,/const visualSeparation=\{kind:/);
+ assert.match(probe,/birdCenterVsNearby:difference\(birdFront,birdNearby\)/);
+ assert.match(probe,/pipeInnerVsNearby:difference\(pipeFront,pipeNearby\)/);
+ assert.match(probe,/readable\.getImageData\(px,py,1,1\)/);
+ assert.match(probe,/qa\.birdX=bird\.x;qa\.birdY=bird\.y;/);
+ assert.match(probe,/visualSeparation,assets/);
+ assert.match(probe,/not perceptual contrast or WCAG/);
+ assert.doesNotMatch(game,/visualSeparation|pipeInnerVsNearby|birdCenterVsNearby/);
+ assert.doesNotMatch(builder,/visualSeparation|pipeInnerVsNearby/);
+});
