@@ -1,0 +1,212 @@
+{
+  "schema_version": 1,
+  "status": "DRAFT_SOURCE_HANDOFF_ONLY__PAINTERLY_MASTERS_NOT_DELIVERED",
+  "authoring_canvas": {
+    "width": 3200,
+    "height": 2000,
+    "aspect_ratio": "8:5",
+    "working_color_space": "sRGB",
+    "source_format": "editable_layered_native"
+  },
+  "runtime_canvas": {
+    "width": 1600,
+    "height": 1000,
+    "decode_policy": "five layers of one theme only",
+    "raster_format": "WebP_or_equivalent_after_hardware_QA",
+    "must_keep_svg_fallback_until_approved": true
+  },
+  "performance_note": "Per-layer sizes are initial compressed-delivery ceilings in KB, not guaranteed device budgets. Benchmark total decode/GPU memory, cold navigation and frame pacing before substitution.",
+  "layer_order": [
+    "sky",
+    "far",
+    "mid",
+    "mist",
+    "near"
+  ],
+  "themes": [
+    {
+      "id": "warm",
+      "name": "Dawn Valley",
+      "light_anchor_source_x": 1170,
+      "art_direction": "warm ochre sunrise, muted sage, restrained glowing valley mist",
+      "hero_atlas": "../v3/warm-flight.svg",
+      "layers": [
+        {
+          "id": "sky",
+          "existing_vector": "warm/sky.svg",
+          "repeat": false,
+          "transparent": false,
+          "notes": "Full-bleed sunrise/moonlit atmosphere; preserve light-source anchor (warm 1170, slate 1230) under mobile center crops",
+          "runtime_budget_kb": 140
+        },
+        {
+          "id": "far",
+          "existing_vector": "warm/far.svg",
+          "repeat": true,
+          "transparent": true,
+          "notes": "Far mountains and broad gouache value fields; tangent/tonal repetition at x=0/1600",
+          "runtime_budget_kb": 220
+        },
+        {
+          "id": "mid",
+          "existing_vector": "warm/mid.svg",
+          "repeat": true,
+          "transparent": true,
+          "notes": "Mid-range ridge material, softened intermediate contrast and readable rock facets",
+          "runtime_budget_kb": 240
+        },
+        {
+          "id": "mist",
+          "existing_vector": "warm/mist.svg",
+          "repeat": true,
+          "transparent": true,
+          "notes": "Sparse translucent atmosphere with no hard rectangular silhouettes or seams",
+          "runtime_budget_kb": 140
+        },
+        {
+          "id": "near",
+          "existing_vector": "warm/near.svg",
+          "repeat": true,
+          "transparent": true,
+          "notes": "Foreground forest tree silhouettes, restrained highlights, edge-accurate wrap",
+          "runtime_budget_kb": 260
+        }
+      ]
+    },
+    {
+      "id": "slate",
+      "name": "Blue Hour Range",
+      "light_anchor_source_x": 1230,
+      "art_direction": "lunar blue-hour alpine silhouettes and cool low-luminance mist",
+      "hero_atlas": "../v3/slate-flight.svg",
+      "layers": [
+        {
+          "id": "sky",
+          "existing_vector": "slate/sky.svg",
+          "repeat": false,
+          "transparent": false,
+          "notes": "Full-bleed sunrise/moonlit atmosphere; preserve light-source anchor (warm 1170, slate 1230) under mobile center crops",
+          "runtime_budget_kb": 140
+        },
+        {
+          "id": "far",
+          "existing_vector": "slate/far.svg",
+          "repeat": true,
+          "transparent": true,
+          "notes": "Far mountains and broad gouache value fields; tangent/tonal repetition at x=0/1600",
+          "runtime_budget_kb": 220
+        },
+        {
+          "id": "mid",
+          "existing_vector": "slate/mid.svg",
+          "repeat": true,
+          "transparent": true,
+          "notes": "Mid-range ridge material, softened intermediate contrast and readable rock facets",
+          "runtime_budget_kb": 240
+        },
+        {
+          "id": "mist",
+          "existing_vector": "slate/mist.svg",
+          "repeat": true,
+          "transparent": true,
+          "notes": "Sparse translucent atmosphere with no hard rectangular silhouettes or seams",
+          "runtime_budget_kb": 140
+        },
+        {
+          "id": "near",
+          "existing_vector": "slate/near.svg",
+          "repeat": true,
+          "transparent": true,
+          "notes": "Foreground forest tree silhouettes, restrained highlights, edge-accurate wrap",
+          "runtime_budget_kb": 260
+        }
+      ]
+    }
+  ],
+  "art_signoff_matrix": {
+    "viewports": [
+      "320x568",
+      "360x600",
+      "390x844",
+      "420x740"
+    ],
+    "scroll_offsets": [
+      0,
+      960
+    ],
+    "bird_pose_frames": [
+      0,
+      6,
+      12,
+      18
+    ],
+    "verify": "both theme scenes, no seam kink, no horizon stretch, clear true atlas silhouette, pipe gap honesty"
+  },
+  "release_gates": {
+    "master_art_accepted": false,
+    "physical_ios_safari_passed": false,
+    "physical_android_chrome_passed": false,
+    "sustained_high_score_playability_passed": false,
+    "draft_qa_removed": false,
+    "user_release_authorization": false
+  },
+  "pilots": [
+    {
+      "theme": "warm",
+      "layer": "far",
+      "source_master_path": "masters/warm/far-master-pilot.svg",
+      "preview_asset_path": "pilot/warm/far.svg",
+      "authoring_type": "editable_vector_gouache_study",
+      "authored_source_size": "3200x2000",
+      "preview_display_size": "1600x1000",
+      "production_asset": false,
+      "renderer_swap_enabled": false,
+      "art_direction_approved": false,
+      "notes": "Alpha 24 first one-of-ten original hand-composed painterly study. Raster-painted editable PSD/KRA masters and physical device signoff still not delivered. Compare original vs pilot only in Draft review-v4.html #warm / #warm-pilot."
+    },
+    {
+      "theme": "slate",
+      "layer": "far",
+      "source_master_path": "masters/slate/far-master-pilot.svg",
+      "preview_asset_path": "pilot/slate/far.svg",
+      "authoring_type": "editable_vector_gouache_study",
+      "authored_source_size": "3200x2000",
+      "preview_display_size": "1600x1000",
+      "production_asset": false,
+      "renderer_swap_enabled": false,
+      "art_direction_approved": false,
+      "notes": "Alpha 25 unique blue-hour distant mountain study; own long jagged ridge, pale moonlit scree and sparse pigment. Paired A/B and seam proof in Draft review only. This is NOT final high-resolution raster master art."
+    },
+    {
+      "theme": "warm",
+      "layer": "mid",
+      "source_master_path": "masters/warm/mid-master-pilot.svg",
+      "preview_asset_path": "pilot/warm/mid.svg",
+      "authoring_type": "editable_vector_gouache_study",
+      "authored_source_size": "3200x2000",
+      "preview_display_size": "1600x1000",
+      "production_asset": false,
+      "renderer_swap_enabled": false,
+      "art_direction_approved": false,
+      "notes": "Alpha 26 independently composed warm mid-distance foothills, amber stone facets and sage-shadow planes; preview supports mid-only or stack alongside warm far pilot. Never used by actual game."
+    },
+    {
+      "theme": "slate",
+      "layer": "mid",
+      "source_master_path": "masters/slate/mid-master-pilot.svg",
+      "preview_asset_path": "pilot/slate/mid.svg",
+      "authoring_type": "editable_vector_gouache_study",
+      "authored_source_size": "3200x2000",
+      "preview_display_size": "1600x1000",
+      "production_asset": false,
+      "renderer_swap_enabled": false,
+      "art_direction_approved": false,
+      "notes": "Alpha 26 independently composed cool slate midrange ridge with moonlit limestone facets and subdued blue-basin values. QA-only mid/stack preview; not approved for runtime."
+    }
+  ],
+  "pilot_completion": {
+    "completed_studies": 4,
+    "total_layer_targets": 10,
+    "completed_final_masters": 0
+  }
+}

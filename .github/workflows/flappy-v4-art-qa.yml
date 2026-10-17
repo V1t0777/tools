@@ -1,0 +1,348 @@
+name: Flappy V4 visual evidence (draft only)
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'flappy/**'
+      - '.github/workflows/flappy-v4-art-qa.yml'
+permissions:
+  contents: read
+jobs:
+  screenshot-draft:
+    # Generate reproducible evidence, never deploy or publish.
+    if: github.event.pull_request.draft && github.event.pull_request.number == 57
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout without saved credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify original V4 art exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          for theme in warm slate; do
+            for layer in sky far mid mist near; do
+              test -s "flappy/assets/v4/$theme/$layer.svg"
+            done
+          done
+          test -s flappy/review-v4.html
+          test -s flappy/assets/v4/masters/warm/far-master-pilot.svg
+          test -s flappy/assets/v4/pilot/warm/far.svg
+          test -s flappy/assets/v4/masters/slate/far-master-pilot.svg
+          test -s flappy/assets/v4/pilot/slate/far.svg
+          test -s flappy/assets/v4/masters/warm/mid-master-pilot.svg
+          test -s flappy/assets/v4/pilot/warm/mid.svg
+          test -s flappy/assets/v4/masters/slate/mid-master-pilot.svg
+          test -s flappy/assets/v4/pilot/slate/mid.svg
+      - name: Capture isolated Chrome-process first-tap audio A/B
+        shell: bash
+        run: |
+          set -euo pipefail
+          if command -v google-chrome >/dev/null; then
+            export CHROME="$(command -v google-chrome)"
+          elif command -v chromium >/dev/null; then
+            export CHROME="$(command -v chromium)"
+          else
+            echo "Missing browser for fresh-profile A/B" >&2
+            exit 1
+          fi
+          node --check tests/flappy-v4-game-browser.mjs
+          # Every invocation starts its OWN Chrome process and clean profile.
+          # Order interleaves treatment/control; keep QA-only browser artifact isolated.
+          # Alternate sound state and skin to reduce fixed test-order bias.
+          for spec in \
+            "warm:off:1:prime" "warm:on:1:control" "warm:on:1:prime" "warm:off:1:control" \
+            "slate:on:1:prime" "slate:off:1:control" "slate:on:1:control" "slate:off:1:prime" \
+            "slate:off:2:prime" "slate:on:2:control" "slate:on:2:prime" "slate:off:2:control" \
+            "warm:on:2:prime" "warm:off:2:control" "warm:on:2:control" "warm:off:2:prime"; do
+            directory="${spec//:/-}"
+            V4_COLD_CASE="$spec" node tests/flappy-v4-game-browser.mjs "v4-cold-qa/$directory"
+          done
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path("v4-cold-qa")
+          files=sorted(root.glob("*/cold-firsttap.json"))
+          assert len(files)==16, f"Expected 16 independent cold-process reports, found {len(files)}"
+          cases=[json.loads(p.read_text()) for p in files]
+          combinations={(c['theme'],c['sound'],c['repetition'],c['variant']) for c in cases}
+          assert len(combinations)==16
+          assert len({c['processId'] for c in cases})>=1
+          for item in cases:
+              assert item['clicks']==1 and item['starts']>=1
+              assert item['sceneStatus']=='ready' and item['loadedLayers']==5
+              assert item['firstInput']['pointerToPhysicsMs']>=0
+              assert item['firstInput']['pointerToDrawMs']>=item['firstInput']['pointerToPhysicsMs']
+              if item['sound']=='on':
+                  assert item['audioCalls']>=1
+              else:
+                  assert item['audioCalls']==0 and not item['primeSuccess']
+              if item['variant']=='control':
+                  assert not item['primeSuccess']
+              filename=root/("-".join([item['theme'],item['sound'],str(item['repetition']),item['variant']])) / (
+                  f"first-tap-{item['theme']}-{item['sound']}-rep{item['repetition']}-{item['variant']}.png")
+              assert filename.is_file() and filename.stat().st_size>12000
+              print("FRESH FIRST TAP",item['theme'],item['sound'],item['repetition'],item['variant'],
+                    "appliedPhysicsMs",item['firstInput']['pointerToPhysicsMs'],
+                    "drawMs",item['firstInput']['pointerToDrawMs'],
+                    "audioMs",item['firstAudioInitMs'])
+          (root/"cold-process-summary.json").write_text(
+              json.dumps({"method":"16 individual Chrome processes and clean profiles: idle-prime on/off crossed with sound on/off, shared runner OS",
+                          "cases":cases},ensure_ascii=False,indent=2)+"\n")
+          PY
+      - name: Capture actual Flappy game Canvas (not the static art reviewer)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if command -v google-chrome >/dev/null; then
+            export CHROME="$(command -v google-chrome)"
+          else
+            export CHROME="$(command -v chromium)"
+          fi
+          node --check tests/flappy-v4-game-browser.mjs
+          node tests/flappy-v4-game-browser.mjs v4-game-qa
+          test -s v4-game-qa/headless-game-metrics.json
+          test -s v4-game-qa/headless-live-input-metrics.json
+          test -s v4-game-qa/headless-endurance-metrics.json
+          test -s v4-game-qa/headless-multiround-metrics.json
+          test -s v4-game-qa/headless-audio-ab-metrics.json
+          test -s v4-game-qa/headless-seam-metrics.json
+          test -s v4-game-qa/headless-narrow-readability.json
+          test "$(find v4-game-qa -maxdepth 1 -name 'seam-game-*.png' | wc -l)" -eq 18
+          test "$(find v4-game-qa -maxdepth 1 -name 'game-*.png' | wc -l)" -eq 12
+          test "$(find v4-game-qa -maxdepth 1 -name 'live-*.png' | wc -l)" -eq 2
+          # Real game and QA-only color evidence must cover the narrow layout;
+          # RGB deltas are diagnostic values, never interpreted as WCAG grades.
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('v4-game-qa')
+          report=json.loads((root/'headless-narrow-readability.json').read_text())
+          captures=report['captures']
+          assert len(captures)==12
+          assert sorted({row['viewport'] for row in captures})==['320x568','360x600','390x844']
+          assert len([row for row in captures if row['viewport']=='320x568'])==4
+          for row in captures:
+              assert row['originalAtlasDecoded'] and row['birdAtlasReady']
+              assert row['nominalBirdDiameterCssPx']>=26
+              for field in ('centerRgbDelta','breastRgbDelta'):
+                  assert isinstance(row[field],(float,int)) and 0<=row[field]<=255
+              assert (root/row['filename']).is_file()
+              for field in ('centerLinearLuminance','underCenterLinearLuminance',
+                            'breastLinearLuminance','underBreastLinearLuminance',
+                            'centerLinearLuminanceGap','breastLinearLuminanceGap'):
+                  assert isinstance(row[field],(float,int)) and 0<=row[field]<=1,(row['theme'],row['viewport'],field,row.get(field))
+          assert len(json.loads((root/'headless-seam-metrics.json').read_text())['results'])==18
+          summaries=report['luminanceSummary']
+          assert {entry['theme'] for entry in summaries}=={'warm','slate'}
+          for entry in summaries:
+              assert entry['positions']==6
+              assert 0<=entry['minCenterGap']<=entry['maxCenterGap']<=1
+          print('Alpha 22: 12 luminance + RGB sample pairs across two scenes and three viewports verified')
+          print('Alpha 20: 12 true Canvas captures, 18 layer joins, 4 narrow-layout records verified')
+          PY
+      - name: Render responsive draft evidence with installed headless Chrome
+        shell: bash
+        run: |
+          set -euo pipefail
+          if command -v google-chrome >/dev/null; then
+            CHROME="$(command -v google-chrome)"
+          elif command -v chromium >/dev/null; then
+            CHROME="$(command -v chromium)"
+          else
+            echo "Neither Chrome nor Chromium is present on this runner." >&2
+            exit 1
+          fi
+          mkdir -p v4-art-qa
+          python3 -m http.server 8765 --bind 127.0.0.1 >v4-art-qa/server.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          python3 - <<'PY'
+          import time
+          import urllib.request
+          url="http://127.0.0.1:8765/flappy/review-v4.html"
+          for attempt in range(30):
+              try:
+                  with urllib.request.urlopen(url,timeout=1) as response:
+                      if response.status==200:
+                          break
+              except Exception:
+                  time.sleep(.3)
+          else:
+              raise SystemExit("local visual review server did not start")
+          PY
+          for theme in warm slate; do
+            for view in scene seam; do
+              fragment="$theme"
+              if [[ "$view" == seam ]]; then fragment="$theme-seam"; fi
+              for shape in "360 600" "390 844" "420 740" "320 568"; do
+                read -r W H <<<"$shape"
+                png="v4-art-qa/$view-$theme-$W"x"$H.png"
+                "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+                  --hide-scrollbars --force-device-scale-factor=1 \
+                  --virtual-time-budget=2200 --window-size="$W,$H" \
+                  "--screenshot=$png" \
+                  "http://127.0.0.1:8765/flappy/review-v4.html#$fragment" \
+                  >/dev/null 2>v4-art-qa/chrome.log
+                test -s "$png"
+              done
+            done
+          done
+          # Alpha 23: compare ORIGINAL atlas frames 0/6/12/18 in the same art scene.
+          # Frame 0 is captured by scene-theme-{320,390} already; this adds 6/12/18.
+          # Every fragment is a CSS-only :target selector. No page JavaScript.
+          for theme in warm slate; do
+            for phase in power recovery glide; do
+              for shape in "320 568" "390 844"; do
+                read -r W H <<<"$shape"
+                png="v4-art-qa/pose-$theme-$phase-$W"x"$H.png"
+                "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+                  --hide-scrollbars --force-device-scale-factor=1 \
+                  --virtual-time-budget=2200 --window-size="$W,$H" \
+                  "--screenshot=$png" \
+                  "http://127.0.0.1:8765/flappy/review-v4.html#$theme-$phase" \
+                  >/dev/null 2>v4-art-qa/chrome.log
+                test -s "$png"
+              done
+            done
+          done
+          # Alpha 25: both original 3200x2000 source-painted masters remain
+          # QA-only. For each theme, change *only* the far painting in CSS.
+          # Keep the warm-specific probe to preserve Alpha 24's reviewer route.
+          for theme in warm slate; do
+            for shape in "320 568" "390 844"; do
+              read -r W H <<<"$shape"
+              png="v4-art-qa/pilot-$theme-far-$W"x"$H.png"
+              "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+                --hide-scrollbars --force-device-scale-factor=1 \
+                --virtual-time-budget=2200 --window-size="$W,$H" \
+                "--screenshot=$png" \
+                "http://127.0.0.1:8765/flappy/review-v4.html#$theme-pilot" \
+                >/dev/null 2>v4-art-qa/chrome.log
+              test -s "$png"
+              ! cmp -s "$png" "v4-art-qa/scene-$theme-$W"x"$H.png"
+            done
+            "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+              --hide-scrollbars --force-device-scale-factor=1 \
+              --virtual-time-budget=2200 --window-size="3200,2000" \
+              "--screenshot=v4-art-qa/master-$theme-far-3200x2000.png" \
+              "http://127.0.0.1:8765/flappy/assets/v4/masters/$theme/far-master-pilot.svg" \
+              >/dev/null 2>v4-art-qa/chrome.log
+            test -s "v4-art-qa/master-$theme-far-3200x2000.png"
+            # One full painterly-far repeat seam screenshot for each theme,
+            # in addition to the real-game 18 dynamic joins of existing assets.
+            "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+              --hide-scrollbars --force-device-scale-factor=1 \
+              --virtual-time-budget=2200 --window-size="320,568" \
+              "--screenshot=v4-art-qa/pilot-seam-$theme-320x568.png" \
+              "http://127.0.0.1:8765/flappy/review-v4.html#$theme-pilot-seam" \
+              >/dev/null 2>v4-art-qa/chrome.log
+            test -s "v4-art-qa/pilot-seam-$theme-320x568.png"
+          done
+          # Alpha 26: mid-only A/B distinguishes painterly mid terrain from
+          # unmodified far; paired stack A/B checks far+mid value grouping.
+          # Both remain CSS-only QA, with NO in-game runtime asset overrides.
+          for theme in warm slate; do
+            for kind in mid stack; do
+              for shape in "320 568" "390 844"; do
+                read -r W H <<<"$shape"
+                png="v4-art-qa/pilot-$kind-$theme-$W"x"$H.png"
+                "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+                  --hide-scrollbars --force-device-scale-factor=1 \
+                  --virtual-time-budget=2200 --window-size="$W,$H" \
+                  "--screenshot=$png" \
+                  "http://127.0.0.1:8765/flappy/review-v4.html#$theme-$kind-pilot" \
+                  >/dev/null 2>v4-art-qa/chrome.log
+                test -s "$png"
+                ! cmp -s "$png" "v4-art-qa/scene-$theme-$W"x"$H.png"
+              done
+            done
+            "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+              --hide-scrollbars --force-device-scale-factor=1 \
+              --virtual-time-budget=2200 --window-size="3200,2000" \
+              "--screenshot=v4-art-qa/master-$theme-mid-3200x2000.png" \
+              "http://127.0.0.1:8765/flappy/assets/v4/masters/$theme/mid-master-pilot.svg" \
+              >/dev/null 2>v4-art-qa/chrome.log
+            test -s "v4-art-qa/master-$theme-mid-3200x2000.png"
+            "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+              --hide-scrollbars --force-device-scale-factor=1 \
+              --virtual-time-budget=2200 --window-size="320,568" \
+              "--screenshot=v4-art-qa/pilot-mid-seam-$theme-320x568.png" \
+              "http://127.0.0.1:8765/flappy/review-v4.html#$theme-mid-pilot-seam" \
+              >/dev/null 2>v4-art-qa/chrome.log
+            test -s "v4-art-qa/pilot-mid-seam-$theme-320x568.png"
+          done
+          # Unchanged warm route is exercised by the loop above:
+          # http://127.0.0.1:8765/flappy/review-v4.html#warm-pilot
+          # pilot-warm-far-$W, master-warm-far-3200x2000.png
+          python3 - <<'PY'
+          from pathlib import Path
+          import struct
+          for path in sorted(Path("v4-art-qa").glob("*.png")):
+              b=path.read_bytes()
+              if b[:8]!=b"\x89PNG\r\n\x1a\n":
+                  raise SystemExit(f"Invalid PNG signature: {path}; size={len(b)}")
+              if len(b)<20000:
+                  raise SystemExit(f"Suspiciously small screenshot: {path}; size={len(b)}; see uploaded diagnostics")
+              width,height=struct.unpack(">II",b[16:24])
+              label=path.stem.split("-")[-1]
+              expected_width,expected_height=map(int,label.split("x"))
+              if (width,height)!=(expected_width,expected_height):
+                  raise SystemExit(f"Wrong mobile capture dimensions: {path} {width}x{height}")
+              print(f"{path}: {width}x{height}, {len(b)} bytes")
+          scene_count=len(list(Path("v4-art-qa").glob("scene-*.png")))
+          seam_count=len(list(Path("v4-art-qa").glob("seam-*.png")))
+          pose_count=len(list(Path("v4-art-qa").glob("pose-*.png")))
+          pilot_count=sum(len(list(Path("v4-art-qa").glob(f"pilot-{theme}-far-*.png"))) for theme in ("warm","slate"))
+          pilot_seam_count=len(list(Path("v4-art-qa").glob("pilot-seam-*.png")))
+          mid_count=len(list(Path("v4-art-qa").glob("pilot-mid-*.png")))-len(list(Path("v4-art-qa").glob("pilot-mid-seam-*.png")))
+          stack_count=len(list(Path("v4-art-qa").glob("pilot-stack-*.png")))
+          mid_seam_count=len(list(Path("v4-art-qa").glob("pilot-mid-seam-*.png")))
+          master_count=len(list(Path("v4-art-qa").glob("master-*.png")))
+          if (scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count)!=(8,8,12,4,4,2,4,4,2):
+              raise SystemExit(f"Expected 8 scenes, 8 original joins, 12 atlas poses, 4 far A/B, 4 masters, 2 far seams, 4 mid A/B, 4 combined A/B, 2 mid seams, got {(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count)}")
+          PY
+          # Alpha 26: use actual decompressed Chrome PNG pixels, not file counts,
+          # to reject a bright repeat-border stroke like the Alpha 25 defect.
+          python3 tests/flappy-v4-pilot-seam-check.py v4-art-qa
+      - name: Keep isolated cold-audio A/B screenshots and measurements
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: flappy-v4-draft-cold-audio-pr57
+          path: |
+            v4-cold-qa/**/*.png
+            v4-cold-qa/**/*.json
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Keep actual-game screenshots and headless metrics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: flappy-v4-draft-real-game-pr57
+          path: |
+            v4-game-qa/*.png
+            v4-game-qa/headless-game-metrics.json
+            v4-game-qa/headless-live-input-metrics.json
+            v4-game-qa/headless-endurance-metrics.json
+            v4-game-qa/headless-multiround-metrics.json
+            v4-game-qa/headless-audio-ab-metrics.json
+            v4-game-qa/headless-seam-metrics.json
+            v4-game-qa/headless-narrow-readability.json
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Keep 16 original scenes/seams, 12 poses and 20 pilot art proofs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: flappy-v4-draft-visual-pr57
+          path: |
+            v4-art-qa/*.png
+            v4-art-qa/headless-painted-pilot-seams.json
+            v4-art-qa/server.log
+            v4-art-qa/chrome.log
+          retention-days: 7
+          # Preserve the actual Chrome exception as the cause if capture stopped early.
+          if-no-files-found: warn

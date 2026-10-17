@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" role="img" aria-label="Blue Hour Range original cinematic background layer"><defs>
+<linearGradient id="blueMist" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#becddd" stop-opacity="0"/><stop offset=".40" stop-color="#b2c4d7" stop-opacity=".22"/><stop offset=".7" stop-color="#b5cbd9" stop-opacity=".17"/><stop offset="1" stop-color="#bdd4dd" stop-opacity="0"/></linearGradient>
+<radialGradient id="fogPool"><stop stop-color="#bcd2df" stop-opacity=".18"/><stop offset="1" stop-color="#a4bed6" stop-opacity="0"/></radialGradient>
+</defs>
+<rect x="0" y="558" width="1600" height="154" fill="url(#blueMist)"/>
+<ellipse cx="410" cy="687" rx="300" ry="49" fill="url(#fogPool)"/>
+<ellipse cx="1021" cy="700" rx="401" ry="73" fill="url(#fogPool)"/>
+<path d="M0 625 C210 613 427 652 691 628 S1082 621 1292 637 S1498 642 1600 625" fill="none" stroke="#d2deec" stroke-width="16" stroke-opacity=".055"/></svg>

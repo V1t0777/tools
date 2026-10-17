@@ -18,10 +18,10 @@ function extractGameScript(documentSource){
 }
 const source=extractGameScript(html);
 new vm.Script(source); // Syntax check independent of the DOM harness.
-function setup({auth=true,fetchImpl=async()=>{throw new Error('offline');},storage=new Map([['zhaoFlappyBest.v1','12']]),render=false}={}){
-  const elements=new Map(),events={},rafQueue=[];let authChange,createdCanvases=0,drawImages=0;const paintedColors=[];
+function setup({auth=true,fetchImpl=async()=>{throw new Error('offline');},storage=new Map([['zhaoFlappyBest.v1','12']]),render=false,imageLoading=false,imageDecoding=false,deviceMemory=8,saveData=false,reduceMotion=false,audioConstructor=null,chromium=false,idleCallback=false}={}){
+  const elements=new Map(),events={},rafQueue=[],idleQueue=[];let authChange,createdCanvases=0,drawImages=0;const paintedColors=[],drawnSources=[],imageObjects=[];
   const gradient={addColorStop(){}};
-  const fakeCtx=new Proxy({createLinearGradient(){return gradient;},createRadialGradient(){return gradient;},drawImage(){drawImages++;}},
+  const fakeCtx=new Proxy({createLinearGradient(){return gradient;},createRadialGradient(){return gradient;},drawImage(im){drawImages++;if(im&&im.src)drawnSources.push(im.src);}},
     {get(target,key){return target[key]??(()=>{});},set(target,key,value){if(key==='fillStyle'&&typeof value==='string')paintedColors.push(value);target[key]=value;return true;}});
   function element(id){
     if(elements.has(id))return elements.get(id);
@@ -33,18 +33,27 @@ function setup({auth=true,fetchImpl=async()=>{throw new Error('offline');},stora
   }
   const session={user:{id:'u1'},access_token:'fake'};
   const toolbox={url:'https://example.test',key:'public',peekSession:()=>session,getSession:async()=>session,onAuthStateChange:fn=>{authChange=fn;},signIn:async()=>{},authMessage:e=>e.message};
-  const window={matchMedia:()=>({matches:false}),addEventListener(){},ToolboxAuth:auth?toolbox:undefined};
+  const window={matchMedia:()=>({matches:reduceMotion}),addEventListener(){},ToolboxAuth:auth?toolbox:undefined,AudioContext:audioConstructor||undefined,
+    requestIdleCallback:idleCallback?fn=>idleQueue.push(fn):undefined};
   const localStorage={getItem(key){return storage.has(key)?storage.get(key):null;},setItem(key,value){storage.set(key,String(value));}};
   const document={getElementById:element,addEventListener(t,fn){events[t]=fn;},body:{setAttribute(){}},
     createElement(tag){if(tag!=='canvas')throw new Error('Unexpected element');createdCanvases++;return {getContext(){return fakeCtx;}};}};
-  const context={window,document,navigator:{},localStorage,performance:{now:()=>1000},
+  function FakeImage(){
+    this.onload=null;this.onerror=null;this.naturalWidth=1600;this.naturalHeight=1000;this.src='';
+    if(imageDecoding)this.decode=()=>new Promise((resolve,reject)=>{this.resolveDecode=resolve;this.rejectDecode=reject;});
+    imageObjects.push(this);
+  }
+  const context={window,document,navigator:{deviceMemory,connection:{saveData},
+    userAgentData:chromium?{brands:[{brand:'Chromium',version:'120'}]}:undefined},localStorage,performance:{now:()=>1000},
     requestAnimationFrame(fn){if(render)rafQueue.push(fn);},setTimeout,clearTimeout,AbortController,fetch:fetchImpl,Intl,console};
+  if(imageLoading)context.Image=FakeImage;
   // Test-only closure access, not shipped in the game.
-  const instrumented=source.replace('  loadBest();loadPendingBest();restorePendingRuns();resetGame(true);',`  window.testApi={startGame,finishGame,openLeaderboard,closeLeaderboard,sendRun,submitOnlineRun,refreshLeaderboard,retryPendingSubmission,get active(){return activeRun;},get state(){return state;},get best(){return best;},get pendingBest(){return pendingBest;},set score(value){score=value;},drawBirdForSkin(value){birdSkin=value;drawBird(1000);},birdRadiusForTest(){return birdRadius();},skinName(value){return BIRD_SKINS[value].name;},flapForTest(){flap();},get wingPhase(){return bird.wingPhase;},get wingActive(){return bird.wingActive;},get wingQueued(){return bird.wingQueued;},get wingTempo(){return bird.wingTempo;},get vy(){return bird.vy;}};\n  loadBest();loadPendingBest();restorePendingRuns();resetGame(true);`);
+  const instrumented=source.replace('  loadBest();loadPendingBest();restorePendingRuns();resetGame(true);',`  window.testApi={startGame,finishGame,openLeaderboard,closeLeaderboard,sendRun,submitOnlineRun,refreshLeaderboard,retryPendingSubmission,get active(){return activeRun;},get state(){return state;},get best(){return best;},get pendingBest(){return pendingBest;},set score(value){score=value;},drawBirdForSkin(value){birdSkin=value;drawBird(1000);},birdRadiusForTest(){return birdRadius();},skinName(value){return BIRD_SKINS[value].name;},flapForTest(){flap();},get wingPhase(){return bird.wingPhase;},get wingActive(){return bird.wingActive;},get wingQueued(){return bird.wingQueued;},get wingTempo(){return bird.wingTempo;},get vy(){return bird.vy;},forceWarmSample(){birdSkin='warm';preloadCinematicWorld('warm');resetGame(false);},forceSlateSample(){birdSkin='slate';preloadCinematicWorld('slate');resetGame(false);},selectVisualWorldForTest(skin){releaseInactiveCinematicWorld(skin);birdSkin=skin;preloadCinematicWorld(skin);resetGame(false);},worldStatusForTest(skin){return cinematicWorlds[skin].status;},worldLayerCountForTest(skin){return Object.keys(cinematicWorlds[skin].layers).length;},get cinematicStatus(){return cinematicWorlds[birdSkin].status;},get cinematicSession(){return cinematicSession;},resetSample(){resetGame(false);},drawSample(){draw(1000);},sampleFrameForTest(seconds){observeSceneryFrame(seconds);},get sceneryQuality(){return sceneryQuality;},get birdHitRadius(){return birdRadius();}};\n  loadBest();loadPendingBest();restorePendingRuns();resetGame(true);`);
   vm.runInNewContext(instrumented,context);
   return {api:window.testApi,e:element,events,authChange,session,storage,
+    runIdle(budget=50){const cb=idleQueue.shift();if(!cb)throw new Error('No queued audio prime');cb({timeRemaining:()=>budget});},idlePending(){return idleQueue.length},
     tick(t){const callback=rafQueue.shift();if(!callback)throw new Error('Missing RAF callback');callback(t);},
-    createdCanvases(){return createdCanvases;},drawImages(){return drawImages;},
+    createdCanvases(){return createdCanvases;},drawImages(){return drawImages;},drawnSources(){return [...drawnSources]},clearDrawnSources(){drawnSources.length=0;},imageObjects(){return [...imageObjects]},
     resetPaint(){paintedColors.length=0;},paintedColors(){return [...paintedColors]}};
 }
 const flush=()=>new Promise(r=>setImmediate(r));
@@ -185,4 +194,287 @@ test('V3.1 queued strokes settle to neutral without a restart or permanent flapp
   assert.equal(scene.api.wingQueued,false);
   assert.equal(scene.api.wingActive,false,'one queued stroke must settle to neutral');
   assert.equal(scene.api.wingPhase,0,'neutral matches the first/last visual pose');
+});
+
+test('V4 warm assets activate atomically only after all five images finish loading',()=>{
+  const scene=setup({render:true,imageLoading:true});
+  scene.api.forceWarmSample();
+  const images=scene.imageObjects().filter(im=>im.src.includes('/v4/warm/'));
+  assert.equal(images.length,5);
+  assert.equal(scene.api.cinematicStatus,'loading');
+  assert.equal(scene.api.cinematicSession,null);
+  for(let i=0;i<4;i++)images[i].onload();
+  assert.equal(scene.api.cinematicStatus,'loading');
+  assert.equal(scene.api.cinematicSession,null);
+  images[4].onload();
+  assert.equal(scene.api.cinematicStatus,'ready');
+  assert.equal(scene.api.cinematicSession,'warm');
+  scene.api.drawSample();
+  const rendered=scene.drawnSources();
+  for(const id of ['sky','far','mid','mist','near'])
+    assert.ok(rendered.some(src=>src.endsWith('/v4/warm/'+id+'.svg')),'render missing '+id);
+});
+
+test('V4 an unavailable background layer rejects the entire sample and retains V3 drawing',()=>{
+  const scene=setup({render:true,imageLoading:true});
+  scene.api.forceWarmSample();
+  const images=scene.imageObjects().filter(im=>im.src.includes('/v4/warm/'));
+  images[0].onload();images[1].onerror(new Error('404'));
+  for(let i=2;i<images.length;i++)images[i].onload();
+  assert.equal(scene.api.cinematicStatus,'failed');
+  assert.equal(scene.api.cinematicSession,null);
+  scene.resetPaint();scene.api.drawSample();
+  assert.ok(scene.paintedColors().some(c=>c==='#9aaab5'||c==='#667991'||c==='#426c65'),
+    'V3 ridges must still render if a new layer fails');
+});
+
+test('V4 late loading during an ongoing game cannot switch the background mid-run',()=>{
+  const scene=setup({render:true,imageLoading:true});
+  scene.api.forceWarmSample();
+  scene.api.startGame();
+  const images=scene.imageObjects().filter(im=>im.src.includes('/v4/warm/'));
+  images.forEach(im=>im.onload());
+  assert.equal(scene.api.cinematicStatus,'ready');
+  assert.equal(scene.api.cinematicSession,null,'ongoing run retains chosen background mode');
+  scene.api.resetSample();
+  assert.equal(scene.api.cinematicSession,'warm','next round may use the completed sample');
+});
+
+test('V4 slate world is independently loaded, rendered and available without warm assets',()=>{
+  const scene=setup({render:true,imageLoading:true});
+  scene.api.forceSlateSample();
+  const images=scene.imageObjects().filter(im=>im.src.includes('/v4/slate/'));
+  assert.equal(images.length,5);
+  images.forEach(im=>im.onload());
+  assert.equal(scene.api.cinematicStatus,'ready');
+  assert.equal(scene.api.cinematicSession,'slate');
+  scene.api.drawSample();
+  for(const id of ['sky','far','mid','mist','near'])
+    assert.ok(scene.drawnSources().some(src=>src.endsWith('/v4/slate/'+id+'.svg')),'missing slate '+id);
+  assert.ok(!scene.drawnSources().some(src=>src.includes('/v4/warm/')),'must not draw warm world');
+});
+
+test('V4 late completion of previous world does not overwrite newly selected world',()=>{
+  const scene=setup({render:true,imageLoading:true});
+  scene.api.forceWarmSample();
+  const warm=scene.imageObjects().filter(im=>im.src.includes('/v4/warm/'));
+  scene.api.forceSlateSample();
+  const slate=scene.imageObjects().filter(im=>im.src.includes('/v4/slate/'));
+  assert.equal(warm.length,5);
+  assert.equal(slate.length,5);
+  warm.forEach(im=>im.onload());
+  assert.equal(scene.api.cinematicSession,null,'warm late completion cannot hijack slate selection');
+  slate.forEach(im=>im.onload());
+  assert.equal(scene.api.cinematicSession,'slate');
+});
+
+test('V4 slate asset failure independently retains procedural twilight fallback',()=>{
+  const scene=setup({render:true,imageLoading:true});
+  scene.api.forceSlateSample();
+  const slate=scene.imageObjects().filter(im=>im.src.includes('/v4/slate/'));
+  slate[0].onload();slate[2].onerror(new Error('bad sprite'));
+  assert.equal(scene.api.cinematicStatus,'failed');
+  assert.equal(scene.api.cinematicSession,null);
+  scene.api.drawSample();
+  assert.ok(scene.paintedColors().includes('#667991'),'procedural slate ridges still render');
+});
+
+test('V4 reduced-motion, data saving and weak-memory hints use low-cost background without animated fog',()=>{
+  for(const opts of [{deviceMemory:2},{saveData:true},{reduceMotion:true}]){
+    const scene=setup({render:true,imageLoading:true,...opts});
+    scene.api.forceWarmSample();
+    scene.imageObjects().filter(im=>im.src.includes('/v4/warm/')).forEach(im=>im.onload());
+    assert.equal(scene.api.sceneryQuality,'low');
+    scene.clearDrawnSources();
+    scene.api.drawSample();
+    assert.ok(scene.drawnSources().some(src=>src.includes('/v4/warm/sky.svg')));
+    assert.ok(scene.drawnSources().some(src=>src.includes('/v4/warm/near.svg')));
+    assert.equal(scene.drawnSources().filter(src=>src.includes('/v4/warm/mist.svg')).length,0);
+  }
+});
+
+test('V4 high/medium fog layers use bounded image draws and preserve gameplay collision geometry',()=>{
+  for(const [memory,expected] of [[8,2],[4,1]]){
+    const scene=setup({render:true,imageLoading:true,deviceMemory:memory});
+    scene.api.forceSlateSample();
+    scene.imageObjects().filter(im=>im.src.includes('/v4/slate/')).forEach(im=>im.onload());
+    assert.equal(scene.api.sceneryQuality,memory===8?'high':'medium');
+    const radius=scene.api.birdHitRadius;
+    scene.clearDrawnSources();scene.api.drawSample();
+    // Rendering in the fixture uses one 1600:1000 wide tile per effect on the standard portrait canvas.
+    assert.equal(scene.drawnSources().filter(src=>src.includes('/v4/slate/mist.svg')).length,expected);
+    assert.equal(scene.api.birdHitRadius,radius);
+  }
+});
+
+test('V4 a sustained slow frame sample reduces only scenery quality; tapping still applies immediate lift',()=>{
+  const scene=setup({render:true,imageLoading:true,deviceMemory:8});
+  scene.api.forceWarmSample();
+  scene.imageObjects().filter(im=>im.src.includes('/v4/warm/')).forEach(im=>im.onload());
+  scene.api.startGame();
+  assert.equal(scene.api.sceneryQuality,'high');
+  const radius=scene.api.birdHitRadius,vy=scene.api.vy;
+  for(let i=0;i<210;i++)scene.api.sampleFrameForTest(.028);
+  assert.equal(scene.api.sceneryQuality,'low');
+  assert.equal(scene.api.birdHitRadius,radius);
+  scene.api.flapForTest();
+  assert.ok(scene.api.vy<=vy,'input retains its immediate upward response');
+  scene.clearDrawnSources();scene.api.drawSample();
+  assert.equal(scene.drawnSources().filter(src=>src.includes('/v4/warm/mist.svg')).length,0);
+});
+
+test('V4 image onload cannot activate the world before all SVGs complete decoding',async()=>{
+  const scene=setup({render:true,imageLoading:true,imageDecoding:true});
+  scene.api.selectVisualWorldForTest('warm');
+  const images=scene.imageObjects().filter(img=>img.src.includes('/v4/warm/'));
+  assert.equal(images.length,5);
+  images.forEach(img=>img.onload());
+  assert.equal(scene.api.cinematicStatus,'loading');
+  assert.equal(scene.api.cinematicSession,null);
+  images.slice(0,4).forEach(img=>img.resolveDecode());
+  await flush();
+  assert.equal(scene.api.cinematicStatus,'loading','partial decoding must not activate the scene');
+  images[4].resolveDecode();await flush();
+  assert.equal(scene.api.cinematicStatus,'ready');
+  assert.equal(scene.api.cinematicSession,'warm');
+});
+
+test('V4 decode rejection retains the procedural fallback and does not partially render',async()=>{
+  const scene=setup({render:true,imageLoading:true,imageDecoding:true});
+  scene.api.selectVisualWorldForTest('slate');
+  const images=scene.imageObjects().filter(img=>img.src.includes('/v4/slate/'));
+  assert.equal(images.length,5);
+  images.forEach(img=>img.onload());
+  images[0].resolveDecode();
+  images[1].rejectDecode(new Error('SVG decode unavailable'));
+  images.slice(2).forEach(img=>img.resolveDecode());
+  await flush();
+  assert.equal(scene.api.cinematicStatus,'failed');
+  assert.equal(scene.api.cinematicSession,null);
+  scene.clearDrawnSources();scene.api.drawSample();
+  assert.equal(scene.drawnSources().some(src=>src.includes('/v4/slate/')),false);
+});
+
+test('V4 choosing another theme releases the old decoded world; stale decode cannot revive it',async()=>{
+  const scene=setup({render:true,imageLoading:true,imageDecoding:true});
+  scene.api.selectVisualWorldForTest('warm');
+  const warm=scene.imageObjects().filter(img=>img.src.includes('/v4/warm/'));
+  assert.equal(warm.length,5);
+  warm.forEach(img=>img.onload());
+  warm.forEach(img=>img.resolveDecode());await flush();
+  assert.equal(scene.api.worldStatusForTest('warm'),'ready');
+  assert.equal(scene.api.worldLayerCountForTest('warm'),5);
+  scene.api.selectVisualWorldForTest('slate');
+  assert.equal(scene.api.worldStatusForTest('warm'),'idle','inactive world must be evicted');
+  assert.equal(scene.api.worldLayerCountForTest('warm'),0);
+  assert.equal(scene.api.cinematicSession,null);
+  assert.ok(warm.every(img=>img.onload===null&&img.onerror===null),'old image handlers detached');
+  // The fixture intentionally retains historical fake images; only the latest five belong to the active world.
+  const slate=scene.imageObjects().filter(img=>img.src.includes('/v4/slate/')).slice(-5);
+  assert.equal(scene.api.worldLayerCountForTest('slate'),5);
+  assert.equal(slate.length,5);
+  slate.forEach(img=>img.onload());
+  slate.forEach(img=>img.resolveDecode());await flush();
+  assert.equal(scene.api.cinematicSession,'slate');
+  scene.api.selectVisualWorldForTest('warm');
+  assert.equal(scene.api.worldLayerCountForTest('slate'),0);
+  const reloaded=scene.imageObjects().filter(img=>img.src.includes('/v4/warm/'));
+  assert.equal(reloaded.length,10,'returning to previously evicted theme reloads its 5 layers');
+});
+
+test('First pointer tap applies vertical lift before synchronous AudioContext construction',()=>{
+  let scene,created=0,velocityAtAudioCreation=null,tones=0;
+  const parameter=()=>({setValueAtTime(){},exponentialRampToValueAtTime(){},linearRampToValueAtTime(){}});
+  function AudioContextStub(){
+    created++;velocityAtAudioCreation=scene.api.vy;
+    this.state='running';this.currentTime=1;this.sampleRate=44100;
+    this.destination={};
+    this.createOscillator=()=>{tones++;return {frequency:parameter(),connect(){},start(){},stop(){}};};
+    this.createGain=()=>({gain:parameter(),connect(){}});
+    this.createBuffer=()=>({getChannelData:()=>new Float32Array(8)});
+    this.createBufferSource=()=>({connect(){},start(){},stop(){}});
+    this.createBiquadFilter=()=>({frequency:{value:0},connect(){}});
+  }
+  scene=setup({audioConstructor:AudioContextStub});
+  scene.e('stage').listeners.pointerdown({target:{closest:()=>null},preventDefault(){}});
+  assert.equal(scene.api.state,'running');
+  assert.ok(scene.api.vy<0,'first tap must apply impulse');
+  assert.ok(velocityAtAudioCreation<0,'slow audio construction must follow the impulse');
+  assert.equal(created,1,'a single audio context must be reused by tone and airy');
+  assert.ok(tones>=1,'first flap still schedules sound in the same user gesture');
+});
+
+test('AudioContext permission/constructor failures cannot block the first flight',()=>{
+  let attempts=0,scene;
+  function BlockedAudioContext(){
+    attempts++;
+    assert.ok(scene.api.vy<0,'bird impulse precedes rejected audio initialization');
+    throw new Error('Audio output unavailable');
+  }
+  scene=setup({audioConstructor:BlockedAudioContext});
+  scene.e('stage').listeners.pointerdown({target:{closest:()=>null},preventDefault(){}});
+  assert.equal(scene.api.state,'running');
+  assert.ok(scene.api.vy<0);
+  assert.equal(attempts,1);
+  scene.api.flapForTest();
+  assert.equal(attempts,1,'repeated flaps must not retry a throwing constructor');
+  scene.e('soundBtn').listeners.click({stopPropagation(){}});
+  scene.e('soundBtn').listeners.click({stopPropagation(){}});
+  assert.equal(attempts,2,'explicit sound re-enable may retry audio initialization');
+  assert.equal(scene.api.state,'running','failed sound retries must not crash game');
+});
+
+test('Chromium idle audio priming allocates silently and first tap resumes/sounds in user gesture',()=>{
+  let created=0,resumed=0,oscillators=0;
+  const parameter=()=>({setValueAtTime(){},exponentialRampToValueAtTime(){},linearRampToValueAtTime(){}});
+  function AudioContextStub(){
+    created++;this.state='suspended';this.currentTime=1;this.sampleRate=44100;this.destination={};
+    this.resume=()=>{resumed++;this.state='running';return Promise.resolve();};
+    this.createOscillator=()=>{oscillators++;return {frequency:parameter(),connect(){},start(){},stop(){}};};
+    this.createGain=()=>({gain:parameter(),connect(){}});
+    this.createBuffer=()=>({getChannelData:()=>new Float32Array(8)});
+    this.createBufferSource=()=>({connect(){},start(){},stop(){}});
+    this.createBiquadFilter=()=>({frequency:{value:0},connect(){}});
+  }
+  const scene=setup({chromium:true,idleCallback:true,audioConstructor:AudioContextStub});
+  assert.equal(scene.idlePending(),1);
+  assert.equal(created,0,'must not construct audio synchronously during page boot');
+  scene.runIdle();
+  assert.equal(created,1);
+  assert.equal(resumed,0,'idle phase must NOT unlock or play sound without user activation');
+  assert.equal(oscillators,0,'idle phase must not generate sound');
+  scene.e('stage').listeners.pointerdown({target:{closest:()=>null},preventDefault(){}});
+  assert.ok(scene.api.vy<0);
+  assert.equal(created,1,'first tap should reuse preallocated context');
+  assert.ok(resumed>=1,'suspended context resumes inside first pointer gesture');
+  assert.ok(oscillators>=1,'first flap schedules a genuine tone');
+});
+
+test('Idle audio is skipped when muted, non-Chromium, low-memory or budget is too short',()=>{
+  let constructed=0;
+  function AC(){constructed++;}
+  for(const options of [
+    {chromium:true,storage:new Map([['zhaoFlappySound.v1','off']])},
+    {chromium:false},
+    {chromium:true,deviceMemory:2},
+    {chromium:true,saveData:true}
+  ]){
+    const scene=setup({...options,idleCallback:true,audioConstructor:AC});
+    assert.equal(scene.idlePending(),0,'unsafe or muted context should not schedule an idle task');
+  }
+  const insufficient=setup({chromium:true,idleCallback:true,audioConstructor:AC});
+  assert.equal(insufficient.idlePending(),1);
+  insufficient.runIdle(2);
+  assert.equal(constructed,0,'do not allocate when idle budget is too small');
+});
+
+test('Rejected background audio construction retries on first real click without disabling gameplay',()=>{
+  let attempts=0;
+  function Denied(){attempts++;throw new Error('gesture required');}
+  const scene=setup({chromium:true,idleCallback:true,audioConstructor:Denied});
+  scene.runIdle();
+  assert.equal(attempts,1);
+  scene.e('stage').listeners.pointerdown({target:{closest:()=>null},preventDefault(){}});
+  assert.ok(scene.api.vy<0);
+  assert.equal(attempts,2,'idle denial must not permanently suppress activation-triggered retry');
 });

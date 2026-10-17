@@ -1,0 +1,47 @@
+{
+  "version": "4.0-alpha1",
+  "status": "technical-sample-not-for-release",
+  "viewBox": [
+    0,
+    0,
+    1600,
+    1000
+  ],
+  "tileAspect": 1.6,
+  "theme": "warm",
+  "fallback": "V3 procedural scene",
+  "layers": [
+    {
+      "id": "sky",
+      "file": "sky.svg",
+      "scrollFactor": 0,
+      "alpha": false
+    },
+    {
+      "id": "far",
+      "file": "far.svg",
+      "scrollFactor": 0.045,
+      "alpha": true
+    },
+    {
+      "id": "mid",
+      "file": "mid.svg",
+      "scrollFactor": 0.12,
+      "alpha": true
+    },
+    {
+      "id": "mist",
+      "file": "mist.svg",
+      "scrollFactor": 0.19,
+      "alpha": true,
+      "optionalForReducedMotion": true
+    },
+    {
+      "id": "near",
+      "file": "near.svg",
+      "scrollFactor": 0.28,
+      "alpha": true
+    }
+  ],
+  "notes": "All art drawn before pipes/ground; loading is atomic. This is a technology and style sample, not final approved painted art."
+}

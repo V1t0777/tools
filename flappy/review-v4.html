@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Flappy V4 · 双世界美术对比（开发预览）</title>
+<style>
+:root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif}
+*{box-sizing:border-box}body{margin:0;background:#0b1420;color:#f0f4fa}
+main{max-width:1100px;margin:auto;padding:22px 18px 55px}
+h1{font-size:clamp(23px,3vw,32px);margin:0 0 8px}
+header p,.note{color:#a5b8c9;font-size:13px;line-height:1.7}
+header p{max-width:760px;margin:0 0 16px}
+.tag{display:inline-block;border:1px solid #78674a;color:#f3d49a;background:#372c1b;padding:5px 10px;border-radius:99px;font-size:11px;margin-bottom:13px}
+.options{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;border:1px solid #2f4155;background:#152336;padding:14px;border-radius:16px;margin-bottom:19px}
+.options label{font-size:12px;color:#dbe8f4;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.options input{accent-color:#8dc5da}
+.options>input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.options>label[for]{padding:7px 9px;border:1px solid #43566b;border-radius:10px;min-height:34px;user-select:none}
+.options>input:checked+label{background:#274457;color:#e7f7ff;border-color:#739fb8}
+.options>input:focus-visible+label{outline:2px solid #a9d5e6;outline-offset:3px}
+.worlds{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+.world{min-width:0;background:#172336;border:1px solid #304358;padding:13px;border-radius:17px}
+.world h2{font-size:16px;margin:0 0 12px;font-weight:650}
+.frame{position:relative;isolation:isolate;width:100%;aspect-ratio:360/600;overflow:hidden;background:#21374b;border-radius:13px;contain:paint}
+.layer{position:absolute;max-width:none;width:auto;height:100%;top:0;left:0;transform:none;pointer-events:none;user-select:none}
+.layer.sky{z-index:0;left:89%}
+.layer.far{z-index:1}
+.layer.far-pilot{display:none}
+#paint-pilot:checked~.worlds .warm .far-base{display:none}
+#paint-pilot:checked~.worlds .warm .far-pilot{display:block}
+#paint-pilot:checked~.worlds .slate .far-base{display:none}
+#paint-pilot:checked~.worlds .slate .far-pilot{display:block}
+/* Alpha 24 pilot layer is QA opt-in, never a default runtime image. */
+.layer.mid{z-index:2}
+.layer.mid-pilot{display:none}
+#paint-mid-pilot:checked~.worlds .world .mid-base{display:none}
+#paint-mid-pilot:checked~.worlds .world .mid-pilot{display:block}
+.layer.mist{z-index:3;opacity:.7}
+.layer.near{z-index:4}
+/* Match the live Canvas sky crop: sx = lightX - 0.89 * visibleSourceWidth.
+   For a 1600px-wide image at 100% scene height, the world-space light
+   anchors (1170 / 1230) become 73.125% / 76.875% image offsets. */
+.warm .layer.sky{transform:translateX(-73.125%)}
+.slate .layer.sky{transform:translateX(-76.875%)}
+.guides{position:absolute;z-index:5;inset:0;display:none;pointer-events:none}
+.pipe{position:absolute;left:68%;width:14%;background:linear-gradient(90deg,#526365,#abafa1 46%,#536466);box-shadow:0 0 0 1px #d1d6d1}
+.slate .pipe{background:linear-gradient(90deg,#283e58,#889eb2 50%,#30475c)}
+.pipe.top{top:0;height:30%}.pipe.bottom{top:61%;bottom:11.5%}
+/* Alpha 23: the SAME passive 6x4 / 24-frame transparent atlas as the real game.
+   Nominal game draw size = birdRadius() * 4.04; r=max(13, width*.043).
+   Actual Canvas composition is still checked independently, not claimed by CSS. */
+.bird{position:absolute;left:25%;top:42%;width:max(52.52px,17.372%);aspect-ratio:1;
+  transform:translate(-50%,-52.5%);border:0;border-radius:0;box-shadow:none;
+  background-image:url("./assets/v3/warm-flight.svg");background-repeat:no-repeat;
+  background-size:600% 400%;background-position:0% 0%;image-rendering:auto;pointer-events:none}
+.slate .bird{background-image:url("./assets/v3/slate-flight.svg")}
+#wing-rest:checked~.worlds .bird{background-position:0% 0%}
+#wing-power:checked~.worlds .bird{background-position:0% 33.333333%}
+#wing-recovery:checked~.worlds .bird{background-position:0% 66.666667%}
+#wing-glide:checked~.worlds .bird{background-position:0% 100%}
+.ground{position:absolute;bottom:0;left:0;right:0;height:11.5%;background:rgba(28,52,47,.83);border-top:2px solid rgba(219,212,165,.5)}
+.slate .ground{background:rgba(21,42,60,.89)}
+#s390:checked~.worlds .frame{aspect-ratio:390/844}
+#s420:checked~.worlds .frame{aspect-ratio:420/740}
+#s320:checked~.worlds .frame{aspect-ratio:320/568}
+#guides:checked~.worlds .guides{display:block}
+#fog:not(:checked)~.worlds .layer.mist{display:none}
+.note{margin:12px 2px 0;font-size:12px}
+aside{font-size:12px;color:#a5b8c9;line-height:1.8;margin-top:20px}
+a{color:#9acde2}
+/* Evidence capture mode: hash-select a single original world at the exact
+   browser viewport ratio. No JavaScript, downloaded libraries or external data.
+   Unfragmented links retain the interactive, side-by-side art review. */
+body:has(.world:target) main{padding:0;max-width:none;margin:0}
+body:has(.world:target) header,
+body:has(.world:target) aside,
+body:has(.world:target) .options>input,
+body:has(.world:target) .options>label[for]{display:none}
+body:has(.world:target) .options{padding:0;margin:0;border:0;background:none;border-radius:0;display:block}
+body:has(.world:target) .worlds{display:block}
+body:has(.world:target) .world:not(:target){display:none}
+body:has(.world:target) .world:target{padding:0;border:0;border-radius:0;background:none}
+body:has(.world:target) .world h2,
+body:has(.world:target) .world .note{display:none}
+body:has(.world:target) .frame{width:100vw;height:100dvh;aspect-ratio:auto;border-radius:0}
+/* Direct edge-join evidence: the center line is the physical point where the
+   same 1600:1000 panoramic strip repeats. Both halves use the same source art.
+   The sky is non-tiling and intentionally omitted from seam comparisons. */
+.phase-anchor{position:absolute;width:0;height:0;overflow:hidden;pointer-events:none}
+body:has(.phase-anchor:target) main{padding:0;max-width:none;margin:0}
+body:has(.phase-anchor:target) header,
+body:has(.phase-anchor:target) aside,
+body:has(.phase-anchor:target) .options>input,
+body:has(.phase-anchor:target) .options>label[for]{display:none}
+body:has(.phase-anchor:target) .options{padding:0;margin:0;border:0;background:none;border-radius:0;display:block}
+body:has(.phase-anchor:target) .worlds{display:block}
+body:has(.phase-anchor:target) .world:not(:has(.phase-anchor:target)){display:none}
+body:has(.phase-anchor:target) .world:has(.phase-anchor:target){padding:0;border:0;border-radius:0;background:none}
+body:has(.phase-anchor:target) .world:has(.phase-anchor:target) h2,
+body:has(.phase-anchor:target) .world:has(.phase-anchor:target) .note{display:none}
+body:has(.phase-anchor:target) .frame{width:100vw;height:100dvh;aspect-ratio:auto;border-radius:0}
+.phase-anchor:is(#warm-power,#slate-power):target~.frame .bird{background-position:0% 33.333333%}
+.phase-anchor:is(#warm-recovery,#slate-recovery):target~.frame .bird{background-position:0% 66.666667%}
+.phase-anchor:is(#warm-glide,#slate-glide):target~.frame .bird{background-position:0% 100%}
+#warm-pilot:target~.frame .far-base{display:none}
+#warm-pilot:target~.frame .far-pilot{display:block}
+#slate-pilot:target~.frame .far-base{display:none}
+#slate-pilot:target~.frame .far-pilot{display:block}
+/* Mid-only and paired far+mid screenshots isolate the artist's value grouping. */
+#warm-mid-pilot:target~.frame .mid-base,#slate-mid-pilot:target~.frame .mid-base{display:none}
+#warm-mid-pilot:target~.frame .mid-pilot,#slate-mid-pilot:target~.frame .mid-pilot{display:block}
+#warm-stack-pilot:target~.frame .far-base,#slate-stack-pilot:target~.frame .far-base,
+#warm-stack-pilot:target~.frame .mid-base,#slate-stack-pilot:target~.frame .mid-base{display:none}
+#warm-stack-pilot:target~.frame .far-pilot,#slate-stack-pilot:target~.frame .far-pilot,
+#warm-stack-pilot:target~.frame .mid-pilot,#slate-stack-pilot:target~.frame .mid-pilot{display:block}
+/* Automated screenshot capture uses no JavaScript and exercises real atlas rows. */
+.seamworld{display:none}
+.seamframe{position:relative;isolation:isolate;height:100dvh;width:100vw;overflow:hidden}
+.seamframe.warm{background:linear-gradient(#9eb9ba,#e5c9ae)}
+.seamframe.slate{background:linear-gradient(#314967,#a5a0b1)}
+.seamframe img{position:absolute;height:100%;width:auto;max-width:none;pointer-events:none;user-select:none}
+.seamframe img.first{left:calc(50% - 160dvh)}
+.seamframe img.second{left:50%}
+.seamframe img.far{z-index:1}
+.seamframe img.mid{z-index:2}
+.seamframe img.mist{z-index:3;opacity:.7}
+.seamframe img.near{z-index:4}
+body:has(.seamworld:target) main{max-width:none;margin:0;padding:0}
+body:has(.seamworld:target) header,
+body:has(.seamworld:target) .options,
+body:has(.seamworld:target) aside{display:none}
+body:has(.seamworld:target) .seamworld:target{display:block}
+@media(max-width:670px){.worlds{grid-template-columns:1fr}main{padding:17px 12px 34px}}
+</style>
+</head>
+<body>
+<main>
+<header><span class="tag">DRAFT · 静态安全验收页 · 不代表正式发布</span>
+<h1>V4 Cinematic Worlds · 双主题对比</h1>
+<p>无 JavaScript 的五层场景对比。角色使用游戏中的透明 24 帧图集（帧 0、6、12、18 可切换）。两套远山和中景均可分别切换 Alpha 24–26 试制层，默认仍为原始 SVG；可同时切换查看色彩衔接。试制图层不在游戏运行时使用；石柱仍为布局参考，不是正式 Canvas 材质。</p>
+</header>
+<section class="options" aria-label="美术验收选项">
+<input type="radio" id="s360" name="size" checked><label for="s360">360 × 600</label>
+<input type="radio" id="s390" name="size"><label for="s390">390 × 844</label>
+<input type="radio" id="s420" name="size"><label for="s420">420 × 740</label>
+<input type="radio" id="s320" name="size"><label for="s320">320 × 568</label>
+<input type="checkbox" id="guides" checked><label for="guides">角色与障碍参考</label>
+<input type="checkbox" id="fog" checked><label for="fog">谷雾图层</label>
+<input type="checkbox" id="paint-pilot"><label for="paint-pilot">双世界远山原画试制 A/B（非正式资源）</label>
+<input type="checkbox" id="paint-mid-pilot"><label for="paint-mid-pilot">双世界中景原画试制 A/B（非正式资源）</label>
+<input type="radio" id="wing-rest" name="wing" checked><label for="wing-rest">羽翼 0 · 休止</label>
+<input type="radio" id="wing-power" name="wing"><label for="wing-power">羽翼 6 · 发力</label>
+<input type="radio" id="wing-recovery" name="wing"><label for="wing-recovery">羽翼 12 · 回收</label>
+<input type="radio" id="wing-glide" name="wing"><label for="wing-glide">羽翼 18 · 滑翔</label>
+<div class="worlds">
+<article class="world warm" id="warm">
+<h2>晨曦山谷 · 暖棕旅鸟</h2>
+<span class="phase-anchor" id="warm-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-mid-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-stack-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-power" aria-hidden="true"></span><span class="phase-anchor" id="warm-recovery" aria-hidden="true"></span><span class="phase-anchor" id="warm-glide" aria-hidden="true"></span>
+<div class="frame" role="img" aria-label="晨曦山谷 · 暖棕旅鸟五层背景静态美术预览">
+<img class="layer sky" src="./assets/v4/warm/sky.svg" alt="" loading="eager" decoding="async">
+<img class="layer far far-base" src="./assets/v4/warm/far.svg" alt="" loading="eager" decoding="async">
+<img class="layer far far-pilot" src="./assets/v4/pilot/warm/far.svg" alt="" loading="eager" decoding="async">
+<img class="layer mid mid-base" src="./assets/v4/warm/mid.svg" alt="" loading="eager" decoding="async">
+<img class="layer mid mid-pilot" src="./assets/v4/pilot/warm/mid.svg" alt="" loading="eager" decoding="async">
+<img class="layer mist" src="./assets/v4/warm/mist.svg" alt="" loading="eager" decoding="async">
+<img class="layer near" src="./assets/v4/warm/near.svg" alt="" loading="eager" decoding="async">
+<div class="guides" aria-hidden="true"><span class="pipe top"></span><span class="pipe bottom"></span><span class="bird"></span><span class="ground"></span></div>
+</div><p class="note">独立山谷图层与空间层次；需要实机截图审核，当前不是最终手绘纹理。</p></article>
+<article class="world slate" id="slate">
+<h2>暮蓝远山 · 板岩夜鸟</h2>
+<span class="phase-anchor" id="slate-pilot" aria-hidden="true"></span><span class="phase-anchor" id="slate-mid-pilot" aria-hidden="true"></span><span class="phase-anchor" id="slate-stack-pilot" aria-hidden="true"></span>
+<span class="phase-anchor" id="slate-power" aria-hidden="true"></span><span class="phase-anchor" id="slate-recovery" aria-hidden="true"></span><span class="phase-anchor" id="slate-glide" aria-hidden="true"></span>
+<div class="frame" role="img" aria-label="暮蓝远山 · 板岩夜鸟五层背景静态美术预览">
+<img class="layer sky" src="./assets/v4/slate/sky.svg" alt="" loading="eager" decoding="async">
+<img class="layer far far-base" src="./assets/v4/slate/far.svg" alt="" loading="eager" decoding="async">
+<img class="layer far far-pilot" src="./assets/v4/pilot/slate/far.svg" alt="" loading="eager" decoding="async">
+<img class="layer mid mid-base" src="./assets/v4/slate/mid.svg" alt="" loading="eager" decoding="async">
+<img class="layer mid mid-pilot" src="./assets/v4/pilot/slate/mid.svg" alt="" loading="eager" decoding="async">
+<img class="layer mist" src="./assets/v4/slate/mist.svg" alt="" loading="eager" decoding="async">
+<img class="layer near" src="./assets/v4/slate/near.svg" alt="" loading="eager" decoding="async">
+<div class="guides" aria-hidden="true"><span class="pipe top"></span><span class="pipe bottom"></span><span class="bird"></span><span class="ground"></span></div>
+</div><p class="note">独立山谷图层与空间层次；需要实机截图审核，当前不是最终手绘纹理。</p></article>
+</div>
+</section>
+<section class="seamworld pilot-seamworld" id="warm-mid-pilot-seam" aria-label="warm original middle mountains repeating tile proof"><div class="seamframe warm">
+<img class="first mid" src="./assets/v4/pilot/warm/mid.svg" alt="" decoding="async">
+<img class="second mid" src="./assets/v4/pilot/warm/mid.svg" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="warm-pilot-seam" aria-label="warm original far painting pilot seamless tile visual evidence"><div class="seamframe warm">
+<img class="first far" src="./assets/v4/pilot/warm/far.svg" alt="" decoding="async">
+<img class="second far" src="./assets/v4/pilot/warm/far.svg" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="slate-mid-pilot-seam" aria-label="slate original middle mountains repeating tile proof"><div class="seamframe slate">
+<img class="first mid" src="./assets/v4/pilot/slate/mid.svg" alt="" decoding="async">
+<img class="second mid" src="./assets/v4/pilot/slate/mid.svg" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="slate-pilot-seam" aria-label="slate original far painting pilot seamless tile visual evidence"><div class="seamframe slate">
+<img class="first far" src="./assets/v4/pilot/slate/far.svg" alt="" decoding="async">
+<img class="second far" src="./assets/v4/pilot/slate/far.svg" alt="" decoding="async">
+</div></section>
+<section class="seamworld" id="warm-seam" aria-label="warm 地貌图层无缝循环边界审阅"><div class="seamframe warm">
+<img class="first far" src="./assets/v4/warm/far.svg" alt="" decoding="async">
+<img class="second far" src="./assets/v4/warm/far.svg" alt="" decoding="async">
+<img class="first mid" src="./assets/v4/warm/mid.svg" alt="" decoding="async">
+<img class="second mid" src="./assets/v4/warm/mid.svg" alt="" decoding="async">
+<img class="first mist" src="./assets/v4/warm/mist.svg" alt="" decoding="async">
+<img class="second mist" src="./assets/v4/warm/mist.svg" alt="" decoding="async">
+<img class="first near" src="./assets/v4/warm/near.svg" alt="" decoding="async">
+<img class="second near" src="./assets/v4/warm/near.svg" alt="" decoding="async">
+</div></section>
+<section class="seamworld" id="slate-seam" aria-label="slate 地貌图层无缝循环边界审阅"><div class="seamframe slate">
+<img class="first far" src="./assets/v4/slate/far.svg" alt="" decoding="async">
+<img class="second far" src="./assets/v4/slate/far.svg" alt="" decoding="async">
+<img class="first mid" src="./assets/v4/slate/mid.svg" alt="" decoding="async">
+<img class="second mid" src="./assets/v4/slate/mid.svg" alt="" decoding="async">
+<img class="first mist" src="./assets/v4/slate/mist.svg" alt="" decoding="async">
+<img class="second mist" src="./assets/v4/slate/mist.svg" alt="" decoding="async">
+<img class="first near" src="./assets/v4/slate/near.svg" alt="" decoding="async">
+<img class="second near" src="./assets/v4/slate/near.svg" alt="" decoding="async">
+</div></section>
+<aside>验收说明：此页面无脚本、无第三方资源、无登录/数据库访问。真实小鸟取自游戏的 1440×960、6 列×4 行透明原始 24 帧 SVG 图集；四个选项为第 0、6、12、18 帧。静态石柱仅提示视觉占位和开口，形状与光影不等于游戏 Canvas 石柱。正式发布前须在真实游戏截图中审核管道、完整扑翼、动态接缝和移动端设备，且移除本开发页。</aside>
+</main>
+</body>
+</html>
