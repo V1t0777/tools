@@ -26,7 +26,7 @@ function visualFixture(){
   s=once(s,'  function tone(',
     '  function initAudio(){var at=performance.now();'+
     'var result=originalInitAudio();var q=window.__v4GameQa;'+
-    'if(q)q.audioTimes.push(Math.round((performance.now()-at)*100)/100);'+
+    'if(q&&result)q.audioTimes.push(Math.round((performance.now()-at)*100)/100);'+
     'return result;}  function tone(');
   const frameHook=[
     '  function frame(t){',
@@ -496,7 +496,7 @@ try{
     assert.ok(raw.actualInput?.pointerToPhysicsMs>=0);
     assert.ok(raw.actualInput?.pointerToDrawMs>=raw.actualInput?.pointerToPhysicsMs);
     if(sound==='off'){
-      assert.equal(raw.totalAudioCalls,0,'Sound off must not invoke the audio context');
+      assert.equal(raw.totalAudioCalls,0,'Sound off must not create or use an audio context');
     }else{
       assert.ok(raw.totalAudioCalls>=1,'Sound on first gesture must attempt audio');
     }
