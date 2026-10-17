@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3200" height="2000" viewBox="0 0 3200 2000" role="img" aria-label="Dawn Valley, hand-composed far mountain painting pilot — editable 3200x2000 master">
+<title>Alpha 24 — Dawn Valley hand-composed distant landscape master pilot</title>
+<desc>Original editable vector-paint study. Draft source artwork only; not final painted-raster approval or shipping runtime asset.</desc>
+<defs>
+<linearGradient id="dawn-rock-bed" x1="0" y1="0" x2="0" y2="1">
+<stop stop-color="#b1bdaf"/><stop offset=".28" stop-color="#8ca9a0"/><stop offset=".69" stop-color="#708e83"/><stop offset="1" stop-color="#506d66"/>
+</linearGradient>
+<linearGradient id="dawn-shadow" x1="0" y1="0" x2="0" y2="1">
+<stop stop-color="#789c98" stop-opacity=".26"/><stop offset=".54" stop-color="#355b5c" stop-opacity=".43"/><stop offset="1" stop-color="#1e4b4c" stop-opacity=".18"/>
+</linearGradient>
+<linearGradient id="dawn-wash" x1="0" y1="0" x2="0" y2="1">
+<stop stop-color="#f9edda" stop-opacity=".16"/><stop offset=".46" stop-color="#fae8d4" stop-opacity=".21"/><stop offset="1" stop-color="#e1dbbc" stop-opacity=".055"/>
+</linearGradient>
+<clipPath id="far-painted-terrain"><path d="M0 1194 C60 1194 125 1141 202 1137 L291 1144 Q382 1088 466 1060 L591 1008 Q651 1044 720 1090 L824 1051 L990 978 Q1056 1017 1126 1062 L1232 1008 L1407 1079 L1506 1059 L1661 1001 Q1752 1037 1846 1073 L1958 948 Q2038 982 2092 1031 L2238 974 L2370 1055 L2480 1066 L2612 989 Q2714 1040 2780 1083 L2895 1044 L3040 1145 C3102 1165 3145 1194 3200 1194 L3200 2000 L0 2000Z"/></clipPath>
+</defs>
+<path id="far-painted-base" d="M0 1194 C60 1194 125 1141 202 1137 L291 1144 Q382 1088 466 1060 L591 1008 Q651 1044 720 1090 L824 1051 L990 978 Q1056 1017 1126 1062 L1232 1008 L1407 1079 L1506 1059 L1661 1001 Q1752 1037 1846 1073 L1958 948 Q2038 982 2092 1031 L2238 974 L2370 1055 L2480 1066 L2612 989 Q2714 1040 2780 1083 L2895 1044 L3040 1145 C3102 1165 3145 1194 3200 1194 L3200 2000 L0 2000Z" fill="url(#dawn-rock-bed)"/>
+<g id="large-gouache-landforms" clip-path="url(#far-painted-terrain)">
+<path data-gouache="west-ochre" d="M108 1240 Q280 1130 450 1138 Q560 1109 670 1153 Q506 1231 405 1351 L210 1462Z" fill="#e6d3ad" fill-opacity=".21"/>
+<path data-gouache="north-sage" d="M445 1194 Q571 1013 674 1081 Q793 1157 881 1199 Q699 1199 561 1332Z" fill="#456d68" fill-opacity=".22"/>
+<path data-gouache="mountain-amber" d="M799 1189 Q953 962 1040 1007 Q1095 1080 1257 1135 Q1068 1187 922 1344Z" fill="#efe3cb" fill-opacity=".26"/>
+<path data-gouache="ochre-ridge-dark" d="M1009 1032 L1122 1068 Q1226 1155 1309 1217 Q1163 1268 1087 1391 Q1113 1193 1009 1032Z" fill="#668985" fill-opacity=".24"/>
+<path data-gouache="mountain-centre" d="M1432 1128 Q1552 1044 1658 1001 Q1700 994 1799 1061 Q1655 1139 1605 1261 L1453 1390Z" fill="#d8d6ba" fill-opacity=".21"/>
+<path data-gouache="east-stone-light" d="M1761 1109 Q1890 1008 1958 948 Q2066 1004 2164 1127 Q1948 1176 1811 1321Z" fill="#f8e5c5" fill-opacity=".23"/>
+<path data-gouache="east-stone-shadow" d="M1958 948 Q2051 1050 2120 1068 Q2186 1150 2245 1226 Q2083 1211 2000 1396 Q2052 1198 1958 948Z" fill="#517974" fill-opacity=".19"/>
+<path data-gouache="sage-spur" d="M2271 1108 Q2497 1063 2612 989 Q2718 1061 2822 1144 Q2590 1193 2394 1304Z" fill="#a5b4a0" fill-opacity=".24"/>
+<path data-gouache="horizon-ochre" d="M2691 1108 Q2796 1061 2895 1044 Q3027 1085 3108 1184 L3084 1342 Q2890 1275 2787 1357Z" fill="#f6e4c8" fill-opacity=".17"/>
+<path data-gouache="low-mist-shelf" d="M122 1432 Q540 1318 890 1360 Q1334 1461 1700 1347 Q2152 1272 2710 1375 L3095 1509 Q2467 1473 2125 1565 Q1537 1518 1131 1607 Q515 1484 156 1598Z" fill="#e8e5cf" fill-opacity=".125"/>
+<path data-gouache="green-deep" d="M151 1507 Q521 1388 873 1513 Q1206 1591 1456 1507 Q1896 1403 2207 1522 Q2644 1489 3067 1556 L3067 1900 L134 1900Z" fill="#526f68" fill-opacity=".22"/>
+<path data-gouache="warm-valley-light" d="M348 1663 Q812 1560 1271 1692 Q1680 1638 2100 1637 Q2671 1541 2950 1727 L2950 1890 Q2213 1849 1810 1927 Q1116 1831 350 1910Z" fill="#f4ddb8" fill-opacity=".11"/>
+<path d="M0 1474 Q240 1436 515 1474 Q790 1528 1120 1506 Q1534 1447 1820 1496 Q2193 1559 2598 1463 Q2859 1452 3200 1474 L3200 2000 L0 2000Z" fill="url(#dawn-shadow)" opacity=".57"/>
+<path d="M0 1424 Q442 1374 854 1428 Q1311 1473 1721 1405 Q2230 1372 2701 1441 Q2991 1455 3200 1424 L3200 1710 L0 1710Z" fill="url(#dawn-wash)" opacity=".42"/>
+</g>
+<g id="broad-drybrush-highlights" clip-path="url(#far-painted-terrain)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+<path data-brush="1" d="M246 1208 Q353 1157 478 1142" stroke="#fbeacf" stroke-width="22" stroke-opacity="0.14"/>
+<path data-brush="2" d="M522 1193 Q607 1121 714 1139" stroke="#f5e7cb" stroke-width="18" stroke-opacity="0.11"/>
+<path data-brush="3" d="M878 1168 Q965 1044 1053 1058" stroke="#fdf0dd" stroke-width="18" stroke-opacity="0.16"/>
+<path data-brush="4" d="M1021 1209 Q1147 1179 1248 1215" stroke="#d4cfb6" stroke-width="26" stroke-opacity="0.085"/>
+<path data-brush="5" d="M1497 1165 Q1618 1081 1694 1069" stroke="#f7efd8" stroke-width="22" stroke-opacity="0.14"/>
+<path data-brush="6" d="M1821 1136 Q1932 1033 1982 1021" stroke="#fff0d9" stroke-width="20" stroke-opacity="0.16"/>
+<path data-brush="7" d="M2246 1248 Q2408 1166 2515 1157" stroke="#dbe0c2" stroke-width="19" stroke-opacity="0.1"/>
+<path data-brush="8" d="M2640 1193 Q2770 1149 2908 1165" stroke="#f8e4c8" stroke-width="21" stroke-opacity="0.12"/>
+<path data-brush="9" d="M345 1483 Q646 1427 906 1514" stroke="#ebebd9" stroke-width="34" stroke-opacity="0.08"/>
+<path data-brush="10" d="M1307 1532 Q1624 1470 1970 1515" stroke="#f5e8d3" stroke-width="30" stroke-opacity="0.075"/>
+<path data-brush="11" d="M2200 1544 Q2465 1478 2762 1564" stroke="#f7e1bb" stroke-width="32" stroke-opacity="0.075"/>
+<path data-brush="12" d="M710 1715 Q1090 1651 1420 1739" stroke="#ffebcb" stroke-width="24" stroke-opacity="0.08"/>
+</g>
+<g id="hand-broken-pigment" clip-path="url(#far-painted-terrain)" fill="none" stroke-linecap="round">
+<path data-grain="1" d="M296 1265 q49 -16 101 -12 m-69 27 q44 -15 84 -9" stroke="#4f8074" stroke-opacity=".12" stroke-width="11"/>
+<path data-grain="2" d="M592 1339 q69 -32 125 -10 m-108 35 q57 -18 103 -4" stroke="#f4e6d4" stroke-opacity=".14" stroke-width="11"/>
+<path data-grain="3" d="M960 1350 q94 -26 174 -8 m-131 35 q79 -12 138 -3" stroke="#50746e" stroke-opacity=".11" stroke-width="10"/>
+<path data-grain="4" d="M1437 1318 q90 -24 162 7 m-148 24 q67 -8 134 13" stroke="#e8d9bd" stroke-opacity=".15" stroke-width="13"/>
+<path data-grain="5" d="M1850 1384 q101 -28 185 -4 m-120 38 q77 -25 150 -8" stroke="#e0e2cf" stroke-opacity=".12" stroke-width="13"/>
+<path data-grain="6" d="M2283 1425 q80 -22 167 -2 m-128 40 q77 -17 119 -3" stroke="#e8debf" stroke-opacity=".13" stroke-width="12"/>
+<path data-grain="7" d="M2591 1469 q108 -19 166 4 m-148 25 q75 -10 143 5" stroke="#f5e4c8" stroke-opacity=".11" stroke-width="12"/>
+</g>
+<path id="dawn-ridge-edge" d="M0 1194 C60 1194 125 1141 202 1137 L291 1144 Q382 1088 466 1060 L591 1008 Q651 1044 720 1090 L824 1051 L990 978 Q1056 1017 1126 1062 L1232 1008 L1407 1079 L1506 1059 L1661 1001 Q1752 1037 1846 1073 L1958 948 Q2038 982 2092 1031 L2238 974 L2370 1055 L2480 1066 L2612 989 Q2714 1040 2780 1083 L2895 1044 L3040 1145 C3102 1165 3145 1194 3200 1194" fill="none" stroke="#fff1d7" stroke-width="5" stroke-opacity=".10"/>
+</svg>
