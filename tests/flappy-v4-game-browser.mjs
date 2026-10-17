@@ -32,7 +32,7 @@ function visualFixture(){
     "        resetGame(false);state='running';readyLayer.classList.add('hidden');",
     '        qa.started=true;qa.startedAt=t;qa.readyMs=performance.now()-qa.createdAt;',
     '      }',
-    '      if(qa.mode==='stabilized'&&qa.started){bird.y=H*.45;bird.vy=0;',
+    "      if(qa.mode==='stabilized'&&qa.started){bird.y=H*.45;bird.vy=0;",
     '        scroll=qa.scrollOffset+(t-qa.startedAt)*.21;',
     '        qa.drawState=state;qa.world=cinematicSession;',
     '        qa.observedScroll=scroll;qa.pipeCount=pipes.length;',
