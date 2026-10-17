@@ -34,3 +34,19 @@ test('V4 browser QA is read-only, draft only and never shipped into production',
   assert.match(workflow,/flappy-v4-draft-real-game-pr57/);
   assert.match(probe,/Headless Chromium frame intervals are NOT iPhone\/Android FPS/);
 });
+
+test('V4 normal input QA keeps genuine gravity and collision on, then restarts via Chromium pointer events',()=>{
+  assert.match(probe,/mode:qaArgs\.get\("mode"\)==="live"\?"live":"stabilized"/);
+  assert.match(probe,/mode==='live'/);
+  assert.match(probe,/__v4GameQa\?\.mode===\\'stabilized\\'/);
+  assert.match(probe,/Input\.dispatchMouseEvent/);
+  assert.match(probe,/type:'mousePressed'/);
+  assert.match(probe,/type:'mouseReleased'/);
+  assert.match(probe,/birdYSpan>5/);
+  assert.match(probe,/collisionSeen&&window\.__v4GameQa\.gameOverSeen/);
+  assert.match(probe,/startCount>=2/);
+  assert.match(probe,/headless-live-input-metrics\.json/);
+  assert.match(workflow,/test -s v4-game-qa\/headless-live-input-metrics\.json/);
+  assert.match(workflow,/live-\*\.png/);
+  assert.ok(!game.includes("if(window.__v4GameQa"),'production collisions must not be modified');
+});
