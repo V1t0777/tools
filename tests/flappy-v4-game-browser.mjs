@@ -105,7 +105,10 @@ function visualFixture(){
     '</style>',
     '<script>',
     'const qaArgs=new URLSearchParams(location.search);',
+    // QA-only sound preference, before the original game script reads localStorage.
+    'try{localStorage.setItem("zhaoFlappySound.v1",qaArgs.get("sound")==="off"?"off":"on");}catch(e){}',
     'window.__v4GameQa={skin:qaArgs.get("skin")==="slate"?"slate":"warm",',
+    'sound:qaArgs.get("sound")==="off"?"off":"on",',
     'mode:qaArgs.get("mode")==="live"?"live":"stabilized",pointerdowns:0,',
     'state:"ready",previousState:"ready",startCount:0,runningFrames:0,',
     'previousWingPhase:-1,unexpectedWingResets:0,pipeData:[],',
@@ -459,6 +462,53 @@ try{
   assert.ok(multiRound.results.reduce((sum,r)=>sum+r.durationMs,0)>=31000,
     'Need at least 31 aggregate seconds with unmodified physics');
   writeFileSync(join(output,'headless-multiround-metrics.json'),JSON.stringify(multiRound,null,2)+'\n');
+  // Repeated first-gesture A/B diagnostics using unchanged production audio.
+  // Browser process is reused: this is not an independent mobile cold boot.
+  const audioAb={kind:'Counterbalanced first-tap sound-on vs sound-off Chrome diagnostic',
+    disclaimer:'Eight navigations within one headless Chromium process. Cached system/browser audio state shared. Not iPhone/Android input/first-sound proof.',
+    scenarios:[]};
+  const order=[['warm','off'],['warm','on'],['slate','on'],['slate','off'],
+    ['slate','off'],['slate','on'],['warm','on'],['warm','off']];
+  const abExpression='JSON.stringify((()=>{'+
+    'const q=window.__v4GameQa;'+
+    'return {skin:q.skin,sound:q.sound,started:q.startCount>=1,'+
+      'world:q.world,clicked:q.pointerdowns,actualInput:q.latencySamples[0],'+
+      'firstAudioCallMs:q.audioTimes.length?q.audioTimes[0]:null,'+
+      'totalAudioCalls:q.audioTimes.length,'+
+      'frameCount:q.frames,worldTransitions:q.worldTransitions};'+
+    '})())';
+  for(let iteration=0;iteration<order.length;iteration++){
+    const [skin,sound]=order[iteration];
+    const width=360,height=600;
+    await cdp('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:true});
+    await cdp('Page.navigate',{url:'http://127.0.0.1:'+port+
+      '/flappy/qa-game.html?skin='+skin+'&mode=live&sound='+sound});
+    await until('Boolean(window.__v4GameQa&&window.__v4GameQa.mode==="live"&&window.__v4GameQa.state==="ready"&&window.__v4GameQa.world===window.__v4GameQa.skin&&window.__v4GameQa.frames>20)');
+    const press={x:width*.28,y:height*.45,button:'left',clickCount:1};
+    await cdp('Input.dispatchMouseEvent',{...press,type:'mousePressed'});
+    await cdp('Input.dispatchMouseEvent',{...press,type:'mouseReleased'});
+    await until('Boolean(window.__v4GameQa&&window.__v4GameQa.latencySamples.length>=1)');
+    const raw=JSON.parse(await read(abExpression));
+    assert.equal(raw.skin,skin);
+    assert.equal(raw.sound,sound);
+    assert.equal(raw.world,skin,'A/B variants must use the real V4 cinematic assets');
+    assert.ok(raw.started&&raw.clicked===1,'A/B must start from one real pointer event');
+    assert.ok(raw.actualInput?.pointerToPhysicsMs>=0);
+    assert.ok(raw.actualInput?.pointerToDrawMs>=raw.actualInput?.pointerToPhysicsMs);
+    if(sound==='off'){
+      assert.equal(raw.totalAudioCalls,0,'Sound off must not invoke the audio context');
+    }else{
+      assert.ok(raw.totalAudioCalls>=1,'Sound on first gesture must attempt audio');
+    }
+    audioAb.scenarios.push({iteration,...raw});
+    console.log('AUDIO A/B',iteration,skin,sound,
+      'physics='+raw.actualInput.pointerToPhysicsMs,
+      'canvas='+raw.actualInput.pointerToDrawMs,
+      'audioInit='+raw.firstAudioCallMs);
+  }
+  assert.equal(audioAb.scenarios.length,8);
+  writeFileSync(join(output,'headless-audio-ab-metrics.json'),JSON.stringify(audioAb,null,2)+'\n');
+
 
 
   writeFileSync(join(output,'headless-live-input-metrics.json'),JSON.stringify(interactive,null,2)+'\n');
