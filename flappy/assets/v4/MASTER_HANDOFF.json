@@ -176,10 +176,36 @@
       "renderer_swap_enabled": false,
       "art_direction_approved": false,
       "notes": "Alpha 25 unique blue-hour distant mountain study; own long jagged ridge, pale moonlit scree and sparse pigment. Paired A/B and seam proof in Draft review only. This is NOT final high-resolution raster master art."
+    },
+    {
+      "theme": "warm",
+      "layer": "mid",
+      "source_master_path": "masters/warm/mid-master-pilot.svg",
+      "preview_asset_path": "pilot/warm/mid.svg",
+      "authoring_type": "editable_vector_gouache_study",
+      "authored_source_size": "3200x2000",
+      "preview_display_size": "1600x1000",
+      "production_asset": false,
+      "renderer_swap_enabled": false,
+      "art_direction_approved": false,
+      "notes": "Alpha 26 independently composed warm mid-distance foothills, amber stone facets and sage-shadow planes; preview supports mid-only or stack alongside warm far pilot. Never used by actual game."
+    },
+    {
+      "theme": "slate",
+      "layer": "mid",
+      "source_master_path": "masters/slate/mid-master-pilot.svg",
+      "preview_asset_path": "pilot/slate/mid.svg",
+      "authoring_type": "editable_vector_gouache_study",
+      "authored_source_size": "3200x2000",
+      "preview_display_size": "1600x1000",
+      "production_asset": false,
+      "renderer_swap_enabled": false,
+      "art_direction_approved": false,
+      "notes": "Alpha 26 independently composed cool slate midrange ridge with moonlit limestone facets and subdued blue-basin values. QA-only mid/stack preview; not approved for runtime."
     }
   ],
   "pilot_completion": {
-    "completed_studies": 2,
+    "completed_studies": 4,
     "total_layer_targets": 10,
     "completed_final_masters": 0
   }
