@@ -744,7 +744,11 @@
     if(!AUDIO_IDLE_PRIME||!soundOn||audioCtx||audioConstructionFailed||state!=='ready')return;
     if(document.hidden||!window.requestIdleCallback)return;
     var brands=navigator.userAgentData&&navigator.userAgentData.brands;
-    if(!brands||!brands.some(function(entry){return entry.brand==='Chromium';}))return;
+    var chromiumBrand=brands&&brands.some(function(entry){return entry.brand==='Chromium';});
+    // Headless/mobile emulation can omit userAgentData even on Chromium.
+    // Restrict fallback to Chromium/Chrome tokens; CriOS/other iOS WebKit is excluded.
+    var chromiumUa=/(?:Chrome|Chromium|HeadlessChrome)\/\d+/.test(navigator.userAgent||'')&&!/CriOS|EdgiOS|FxiOS/.test(navigator.userAgent||'');
+    if(!chromiumBrand&&!chromiumUa)return;
     if(navigator.connection&&navigator.connection.saveData)return;
     if(typeof navigator.deviceMemory==='number'&&navigator.deviceMemory<=2)return;
     var AC=window.AudioContext||window.webkitAudioContext;
