@@ -407,3 +407,36 @@ test('Alpha 23 reviewer displays true atlas wing poses rather than a mock circle
  assert.match(page,/石柱仍为布局参考，不是正式 Canvas 材质/);
  assert.ok(page.length<16000,'QA reviewer stays small and low-complexity');
 });
+
+
+test('Alpha 23 production art master handoff manifest is complete but never falsely approved',()=>{
+ const manifest=JSON.parse(read('flappy/assets/v4/MASTER_HANDOFF.json'));
+ assert.equal(manifest.schema_version,1);
+ assert.match(manifest.status,/DRAFT_SOURCE_HANDOFF_ONLY.*MASTERS_NOT_DELIVERED/);
+ assert.deepEqual(manifest.authoring_canvas,{width:3200,height:2000,aspect_ratio:'8:5',
+   working_color_space:'sRGB',source_format:'editable_layered_native'});
+ assert.equal(manifest.runtime_canvas.width,1600);
+ assert.equal(manifest.runtime_canvas.height,1000);
+ assert.equal(manifest.runtime_canvas.must_keep_svg_fallback_until_approved,true);
+ assert.deepEqual(manifest.layer_order,['sky','far','mid','mist','near']);
+ assert.deepEqual(manifest.themes.map(x=>x.id),['warm','slate']);
+ for(const [i,theme] of manifest.themes.entries()){
+   assert.equal(theme.light_anchor_source_x,i===0?1170:1230);
+   assert.equal(theme.hero_atlas,'../v3/'+theme.id+'-flight.svg');
+   assert.deepEqual(theme.layers.map(x=>x.id),manifest.layer_order);
+   for(const layer of theme.layers){
+     assert.equal(layer.existing_vector,theme.id+'/'+layer.id+'.svg');
+     assert.equal(layer.repeat,layer.id!=='sky');
+     assert.equal(layer.transparent,layer.id!=='sky');
+     assert.ok(layer.runtime_budget_kb>=100&&layer.runtime_budget_kb<=300);
+     assert.ok(layer.notes.length>45,'Each layer needs an art direction and edge contract');
+     assert.match(read('flappy/assets/v4/'+layer.existing_vector),/viewBox="0 0 1600 1000"/);
+   }
+ }
+ assert.deepEqual(manifest.art_signoff_matrix.viewports,['320x568','360x600','390x844','420x740']);
+ assert.deepEqual(manifest.art_signoff_matrix.bird_pose_frames,[0,6,12,18]);
+ assert.ok(Object.keys(manifest.release_gates).length>=6);
+ assert.ok(Object.values(manifest.release_gates).every(x=>x===false),
+   'No release gate may be pre-approved by an engineering art handoff');
+ assert.match(manifest.performance_note,/not guaranteed device budgets/);
+});
