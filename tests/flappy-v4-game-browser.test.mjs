@@ -188,6 +188,8 @@ test('V4 fresh-process comparison records ready-screen long frames as well as ta
 
 test('V4 browser QA allows one clean-profile retry for Chrome debugging startup only',()=>{
  assert.match(probe,/function launchChrome\(\)/);
+ assert.match(probe,/const child=spawn\(process\.env\.CHROME/);
+ assert.doesNotMatch(probe,/const process=spawn/);
  assert.match(probe,/attempt<2&&\!debuggerPort/);
  assert.match(probe,/profile=mkdtempSync/);
  assert.match(probe,/No gameplay or audio assertion is retried after page navigation/);
