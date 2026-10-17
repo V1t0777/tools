@@ -12,7 +12,7 @@ jobs:
     # Generate reproducible evidence, never deploy or publish.
     if: github.event.pull_request.draft && github.event.pull_request.number == 57
     runs-on: ubuntu-latest
-    timeout-minutes: 14
+    timeout-minutes: 20
     steps:
       - name: Checkout without saved credentials
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -28,6 +28,54 @@ jobs:
             done
           done
           test -s flappy/review-v4.html
+      - name: Capture isolated Chrome-process first-tap audio A/B
+        shell: bash
+        run: |
+          set -euo pipefail
+          if command -v google-chrome >/dev/null; then
+            export CHROME="$(command -v google-chrome)"
+          elif command -v chromium >/dev/null; then
+            export CHROME="$(command -v chromium)"
+          else
+            echo "Missing browser for fresh-profile A/B" >&2
+            exit 1
+          fi
+          node --check tests/flappy-v4-game-browser.mjs
+          # Every invocation starts its OWN Chrome process and clean profile.
+          # Alternate sound state and skin to reduce fixed test-order bias.
+          for spec in \
+            "warm:off:1" "warm:on:1" "slate:on:1" "slate:off:1" \
+            "slate:off:2" "slate:on:2" "warm:on:2" "warm:off:2"; do
+            directory="${spec//:/-}"
+            V4_COLD_CASE="$spec" node tests/flappy-v4-game-browser.mjs "v4-cold-qa/$directory"
+          done
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path("v4-cold-qa")
+          files=sorted(root.glob("*/cold-firsttap.json"))
+          assert len(files)==8, f"Expected 8 independent cold-process reports, found {len(files)}"
+          cases=[json.loads(p.read_text()) for p in files]
+          combinations={(c['theme'],c['sound'],c['repetition']) for c in cases}
+          assert len(combinations)==8
+          assert len({c['processId'] for c in cases})>=1
+          for item in cases:
+              assert item['clicks']==1 and item['starts']>=1
+              assert item['sceneStatus']=='ready' and item['loadedLayers']==5
+              assert item['firstInput']['pointerToPhysicsMs']>=0
+              assert item['firstInput']['pointerToDrawMs']>=item['firstInput']['pointerToPhysicsMs']
+              assert item['audioCalls']>=1 if item['sound']=='on' else item['audioCalls']==0
+              filename=root/("-".join([item['theme'],item['sound'],str(item['repetition'])])) / (
+                  f"first-tap-{item['theme']}-{item['sound']}-rep{item['repetition']}.png")
+              assert filename.is_file() and filename.stat().st_size>12000
+              print("FRESH FIRST TAP",item['theme'],item['sound'],item['repetition'],
+                    "appliedPhysicsMs",item['firstInput']['pointerToPhysicsMs'],
+                    "drawMs",item['firstInput']['pointerToDrawMs'],
+                    "audioMs",item['firstAudioInitMs'])
+          (root/"cold-process-summary.json").write_text(
+              json.dumps({"method":"8 individual Chrome processes and clean profiles, shared runner OS",
+                          "cases":cases},ensure_ascii=False,indent=2)+"\n")
+          PY
       - name: Capture actual Flappy game Canvas (not the static art reviewer)
         shell: bash
         run: |
@@ -111,6 +159,16 @@ jobs:
           if len(list(Path("v4-art-qa").glob("*.png")))!=16:
               raise SystemExit("Expected exactly 16 scene/seam mobile screenshots")
           PY
+      - name: Keep isolated cold-audio A/B screenshots and measurements
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: flappy-v4-draft-cold-audio-pr57
+          path: |
+            v4-cold-qa/**/*.png
+            v4-cold-qa/**/*.json
+          retention-days: 7
+          if-no-files-found: warn
       - name: Keep actual-game screenshots and headless metrics
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
