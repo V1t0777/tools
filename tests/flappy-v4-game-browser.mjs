@@ -28,20 +28,31 @@ function visualFixture(){
     '      if(qa.previousStamp>0){var interval=t-qa.previousStamp;',
     '        if(interval>0&&interval<1000)qa.frameIntervals.push(Math.round(interval*100)/100);}',
     '      qa.previousStamp=t;',
-    "      if(!qa.started&&cinematicWorlds[birdSkin].status==='ready'){",
+    "      if(qa.mode==='stabilized'&&!qa.started&&cinematicWorlds[birdSkin].status==='ready'){",
     "        resetGame(false);state='running';readyLayer.classList.add('hidden');",
     '        qa.started=true;qa.startedAt=t;qa.readyMs=performance.now()-qa.createdAt;',
     '      }',
-    '      if(qa.started){bird.y=H*.45;bird.vy=0;',
+    '      if(qa.mode==='stabilized'&&qa.started){bird.y=H*.45;bird.vy=0;',
     '        scroll=qa.scrollOffset+(t-qa.startedAt)*.21;',
     '        qa.drawState=state;qa.world=cinematicSession;',
     '        qa.observedScroll=scroll;qa.pipeCount=pipes.length;',
     '      }',
+    "      if(qa.mode==='live'){",
+    "        qa.state=state;qa.world=cinematicSession;qa.pipeCount=pipes.length;",
+    "        qa.birdY=bird.y;qa.birdVy=bird.vy;qa.observedScroll=scroll;",
+    "        if(state==='running'){qa.runningFrames++;",
+    "          qa.yMin=Math.min(qa.yMin,bird.y);qa.yMax=Math.max(qa.yMax,bird.y);",
+    "          if(qa.previousState!=='running')qa.startCount++;",
+    "        }",
+    "        if(state==='falling')qa.collisionSeen=true;",
+    "        if(state==='over')qa.gameOverSeen=true;",
+    "        qa.previousState=state;",
+    "      }",
     '    }'
   ].join('\n');
   s=once(s,'  function frame(t){',frameHook);
   s=once(s,'  function collides(){',
-    '  function collides(){if(window.__v4GameQa)return false; // QA-only collision suppression');
+    '  function collides(){if(window.__v4GameQa?.mode===\'stabilized\')return false; // QA-only collision suppression');
   const head=[
     '<style id="v4-game-qa-only">',
     'html,body{margin:0!important;padding:0!important;overflow:hidden!important;min-height:0!important}',
@@ -58,9 +69,13 @@ function visualFixture(){
     '<script>',
     'const qaArgs=new URLSearchParams(location.search);',
     'window.__v4GameQa={skin:qaArgs.get("skin")==="slate"?"slate":"warm",',
+    'mode:qaArgs.get("mode")==="live"?"live":"stabilized",pointerdowns:0,',
+    'state:"ready",previousState:"ready",startCount:0,runningFrames:0,',
+    'yMin:99999,yMax:-99999,collisionSeen:false,gameOverSeen:false,',
     'frames:0,frameIntervals:[],previousStamp:0,started:false,',
     'createdAt:performance.now(),readyMs:null,scrollOffset:0,',
     'drawState:"not-started",pipeCount:0,world:null};',
+    'window.addEventListener("pointerdown",()=>window.__v4GameQa.pointerdowns++);',
     '</script>',
     '</head>'
   ].join('\n');
@@ -123,7 +138,10 @@ const metricExpression=[
   'const assets=assetEntries.map(x=>({file:x.name.split("/").slice(-2).join("/"),',
   'durationMs:Math.round(x.duration*100)/100,transferBytes:x.transferSize||0}));',
   'const rect=document.getElementById("canvas").getBoundingClientRect();',
-  'return {skin:q.skin,scene:q.world,started:q.started,state:q.drawState,',
+  'return {skin:q.skin,mode:q.mode,scene:q.world,started:q.started,state:q.mode==="live"?q.state:q.drawState,',
+  'pointerdowns:q.pointerdowns,startCount:q.startCount,collisionSeen:q.collisionSeen,',
+  'gameOverSeen:q.gameOverSeen,runningFrames:q.runningFrames,',
+  'birdYSpan:q.yMin===99999?null:Math.round((q.yMax-q.yMin)*10)/10,',
   'frames:q.frames,pipeCount:q.pipeCount,scroll:Math.round(q.observedScroll||0),',
   'imageDecodeReadyMs:q.readyMs===null?null:Math.round(q.readyMs),',
   'canvasCssSize:{width:Math.round(rect.width),height:Math.round(rect.height)},',
@@ -185,6 +203,55 @@ try{
     }
   }
   assert.equal(evidence.samples.length,8);
+  // A second, independent pass uses the unmodified physics, hit detection,
+  // state transitions, and actual browser pointer events. No auto-flapping,
+  // no camera freeze, no collision suppression and no gameplay internals called.
+  const interactive={kind:'Actual pointer input + normal physics/collisions',
+    disclaimer:'Emulated mobile viewport in desktop Chromium, NOT an iPhone or Android hardware test.',
+    results:[]};
+  for(const skin of ['warm','slate']){
+    const width=360,height=600;
+    await cdp('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:true});
+    await cdp('Page.navigate',{url:'http://127.0.0.1:'+port+'/flappy/qa-game.html?skin='+skin+'&mode=live'});
+    await until('Boolean(window.__v4GameQa&&window.__v4GameQa.mode==="live"&&window.__v4GameQa.state==="ready"&&window.__v4GameQa.world===window.__v4GameQa.skin&&window.__v4GameQa.frames>20)');
+    const tap=async()=>{
+      const p={x:width*.28,y:height*.45,button:'left',clickCount:1};
+      await cdp('Input.dispatchMouseEvent',{...p,type:'mousePressed'});
+      await cdp('Input.dispatchMouseEvent',{...p,type:'mouseReleased'});
+    };
+    await tap();  // First real pointerdown -> startGame() + flap()
+    await until('window.__v4GameQa.state==="running"&&window.__v4GameQa.pointerdowns>=1');
+    await sleep(260);
+    const inFlight=JSON.parse(await read(metricExpression));
+    assert.equal(inFlight.mode,'live');
+    assert.equal(inFlight.state,'running');
+    assert.equal(inFlight.scene,skin);
+    assert.ok(inFlight.pipeCount>=1,'Normal mode has real obstacles');
+    assert.ok(inFlight.birdYSpan>5,'Bird motion must be driven by game physics');
+    assert.ok(inFlight.scroll>0,'Gameplay parallax must actually move');
+    const shot=await cdp('Page.captureScreenshot',{format:'png',captureBeyondViewport:false,fromSurface:true});
+    const image=Buffer.from(shot.result.data,'base64');
+    assert.equal(image.subarray(0,8).toString('hex'),'89504e470d0a1a0a');
+    const screenshot='live-'+skin+'-normal-flight.png';
+    writeFileSync(join(output,screenshot),image);
+    await until('window.__v4GameQa.state==="over"&&window.__v4GameQa.collisionSeen&&window.__v4GameQa.gameOverSeen',7500);
+    const afterDeath=JSON.parse(await read(metricExpression));
+    assert.equal(afterDeath.scene,skin,'Background must stay unchanged through collision');
+    assert.equal(afterDeath.state,'over');
+    assert.ok(afterDeath.birdYSpan>25,'Real collision test must show trajectory variation');
+    assert.ok(afterDeath.pointerdowns>=1);
+    await tap(); // Second real pointerdown -> reset/another genuine game
+    await until('window.__v4GameQa.state==="running"&&window.__v4GameQa.startCount>=2&&window.__v4GameQa.pointerdowns>=2');
+    const afterRestart=JSON.parse(await read(metricExpression));
+    assert.equal(afterRestart.scene,skin);
+    interactive.results.push({skin,inFlight,afterDeath,afterRestart,flightScreenshot:screenshot});
+    console.log('NORMAL GAMEPLAY',skin,'taps='+afterRestart.pointerdowns,
+      'collision='+afterDeath.collisionSeen,'restarts='+afterRestart.startCount,
+      'birdMotion='+afterDeath.birdYSpan);
+  }
+  assert.equal(interactive.results.length,2);
+  writeFileSync(join(output,'headless-live-input-metrics.json'),JSON.stringify(interactive,null,2)+'\n');
+
   writeFileSync(join(output,'headless-game-metrics.json'),JSON.stringify(evidence,null,2)+'\n');
   console.log('Completed eight actual-game captures; metrics are CI-headless only, not a mobile-device benchmark.');
 }finally{
