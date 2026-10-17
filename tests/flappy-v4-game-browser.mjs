@@ -165,7 +165,10 @@ function cdp(method,params={}){
 }
 async function read(expression){
   const response=await cdp('Runtime.evaluate',{expression,returnByValue:true});
-  if(response.result.exceptionDetails)throw new Error('Browser JS exception');
+  if(response.result.exceptionDetails){
+    const detail=response.result.exceptionDetails;
+    throw new Error('Browser JS exception: '+String(detail.exception?.description||detail.text).slice(0,500));
+  }
   return response.result.result.value;
 }
 async function until(expr,timeout=18000){
@@ -270,8 +273,8 @@ try{
       'theme:q.skin,sound:q.sound,mode:q.mode,clicks:q.pointerdowns,starts:q.startCount,'+
       'firstInput:q.latencySamples[0],audioCalls:q.audioTimes.length,'+
       'firstAudioInitMs:q.audioTimes.length?q.audioTimes[0]:null,'+
-      'background:q.world,loadedLayers:Object.keys(cinematicWorlds[q.skin].layers).length,'+
-      'sceneStatus:cinematicWorlds[q.skin].status,frameCount:q.frames};})())'));
+      'background:q.world,loadedLayers:q.activeWorldLayers,'+
+      'sceneStatus:q.worldStatus,frameCount:q.frames};})())'));
     assert.equal(qa.theme,skin);
     assert.equal(qa.sound,sound);
     assert.equal(qa.mode,'live');
