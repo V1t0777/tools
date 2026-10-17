@@ -304,6 +304,9 @@ jobs:
           if (scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count)!=(8,8,12,4,4,2,4,4,2):
               raise SystemExit(f"Expected 8 scenes, 8 original joins, 12 atlas poses, 4 far A/B, 4 masters, 2 far seams, 4 mid A/B, 4 combined A/B, 2 mid seams, got {(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count)}")
           PY
+          # Alpha 26: use actual decompressed Chrome PNG pixels, not file counts,
+          # to reject a bright repeat-border stroke like the Alpha 25 defect.
+          python3 tests/flappy-v4-pilot-seam-check.py v4-art-qa
       - name: Keep isolated cold-audio A/B screenshots and measurements
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -337,6 +340,7 @@ jobs:
           name: flappy-v4-draft-visual-pr57
           path: |
             v4-art-qa/*.png
+            v4-art-qa/headless-painted-pilot-seams.json
             v4-art-qa/server.log
             v4-art-qa/chrome.log
           retention-days: 7
