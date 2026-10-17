@@ -356,9 +356,15 @@ try{
         if(lastState==='running')cumulativeScroll+=move;
         highestScroll=Math.max(highestScroll,q.scroll);
         const activeTime=Date.now()-roundStartedAt;
-        // Repeated physical clicks for the first ~1.5s of each round, then
-        // let ordinary gravity and collision end it naturally.
-        if(activeTime<1550&&q.birdY>height*.42&&q.birdVy>0&&Date.now()-lastTap>250){
+        // The first round actively attempts actual obstacle traversal.
+        // Subsequent rounds emphasize real deaths/restarts for lifecycle QA.
+        // No pipe teleporting, no forced score, no collision/physics bypass.
+        const longest=starts===1?5700:1550;
+        const nextPipe=(q.pipeData||[]).filter(p=>p.x+56>=q.birdX-20)
+          .sort((a,b)=>a.x-b.x)[0];
+        const target=Math.min(height*.59,Math.max(height*.32,
+          nextPipe?nextPipe.gapY+5:height*.44));
+        if(activeTime<longest&&q.birdY>target+8&&q.birdVy>0&&Date.now()-lastTap>250){
           await tap();taps++;lastTap=Date.now();
         }
       }else if(q.state==='ready'||q.state==='over'){
