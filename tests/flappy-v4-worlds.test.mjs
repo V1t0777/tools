@@ -275,12 +275,12 @@ test('V4 Alpha 18 skyline directional atmospheric bounce stays subtle, original 
    assert.ok(shelves.every((match,i)=>Number(match[1])===i+1));
    // Minimize clutter in the central bird lane: tint stays nearly invisible
    // while retaining a localized horizon field behind the mountain masks.
-   for(const [,tag] of shelves){
+   for(const [tag] of shelves){
      const opacity=Number(tag.match(/stroke-opacity="([^"]+)"/)?.[1]);
      assert.ok(opacity>0&&opacity<=.1,'high-contrast cloud stroke could obscure gameplay');
      assert.match(tag,/stroke-width="(?:31|33|39|43|46|48)"/);
    }
-   for(const [,tag] of glows){
+   for(const [tag] of glows){
      const opacity=Number(tag.match(/opacity="([^"]+)"/)?.[1]);
      assert.ok(opacity>=.25&&opacity<=.6,'sky bloom must be controlled');
    }
