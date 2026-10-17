@@ -349,3 +349,36 @@ test('Alpha 21 warm-near C1 seam keeps original ridgeline, transparent sky and r
  const other=read('flappy/assets/v4/slate/near.svg');
  assert.match(other,/M0 815 Q166 766 314 790/,'slate art retained for independent QA baseline');
 });
+
+
+test('V4 Alpha 22 valley-value grouping is broad, distinct, clipped and safe on repeating scene tiles',()=>{
+ const themePasses=[];
+ for(const theme of ['warm','slate']){
+   const art=read('flappy/assets/v4/'+theme+'/far.svg');
+   const section=art.match(/<g id="far-valley-broad-pigment-v2" clip-path="url\(#far-terrain-clip\)">([\s\S]*?)<\/g>/);
+   assert.ok(section,theme+' needs its own broad valley-pigment pass');
+   const washes=[...section[1].matchAll(/<path data-atmosphere="valley-wash-(\d+)"[^>]*\/>/g)];
+   const lights=[...section[1].matchAll(/<path data-atmosphere="ridge-softlight-(\d+)"[^>]*\/>/g)];
+   assert.equal(washes.length,5,'large translucent valley blocks, not noisy micropixels');
+   assert.equal(lights.length,4,'only four restrained broad brushstrokes');
+   for(const [i,item] of washes.entries()){
+     assert.equal(Number(item[1]),i+1);
+     const opacity=Number(item[0].match(/fill-opacity="([^"]+)"/)?.[1]);
+     assert.ok(opacity>=.08&&opacity<=.11,'avoid washed-out gameplay backdrop');
+     assert.match(item[0],/d="M(?:78|90|386|405|714|716|998|999|1290|1317) /);
+   }
+   for(const [i,item] of lights.entries()){
+     assert.equal(Number(item[1]),i+1);
+     const opacity=Number(item[0].match(/stroke-opacity="([^"]+)"/)?.[1]);
+     assert.ok(opacity>0&&opacity<.09);
+     assert.match(item[0],/stroke-width="(?:13|14|15)"/);
+   }
+   assert.ok(art.indexOf('id="far-atmospheric-gouache-v1"')<art.indexOf('id="far-valley-broad-pigment-v2"'));
+   assert.ok(art.indexOf('id="far-valley-broad-pigment-v2"')<art.indexOf('id="far-rock-surface"'));
+   assert.doesNotMatch(section[1],/<(?:image|filter|script|animate|foreignObject)\b|(?:href|src)=/i);
+   assert.ok(Buffer.byteLength(art,'utf8')<20_000,'keep original tiny far-layer mobile budget');
+   assert.match(art,/viewBox="0 0 1600 1000"/);
+   themePasses.push(section[1]);
+ }
+ assert.notEqual(themePasses[0],themePasses[1],'dawn and blue-hour light must be independently painted');
+});
