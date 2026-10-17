@@ -216,6 +216,16 @@ jobs:
             test -s "$png"
             ! cmp -s "$png" "v4-art-qa/scene-warm-$W"x"$H.png"
           done
+          # Alpha 24 high-resolution authoring master raster proof, for review only.
+          # Actual editable SVG master remains in the repository; PNG stays in
+          # the 7-day Draft Actions artifact and is NOT loaded by the game.
+          "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+            --hide-scrollbars --force-device-scale-factor=1 \
+            --virtual-time-budget=2200 --window-size="3200,2000" \
+            "--screenshot=v4-art-qa/master-warm-far-3200x2000.png" \
+            "http://127.0.0.1:8765/flappy/assets/v4/masters/warm/far-master-pilot.svg" \
+            >/dev/null 2>v4-art-qa/chrome.log
+          test -s v4-art-qa/master-warm-far-3200x2000.png
           python3 - <<'PY'
           from pathlib import Path
           import struct
@@ -235,8 +245,9 @@ jobs:
           seam_count=len(list(Path("v4-art-qa").glob("seam-*.png")))
           pose_count=len(list(Path("v4-art-qa").glob("pose-*.png")))
           pilot_count=len(list(Path("v4-art-qa").glob("pilot-warm-far-*.png")))
-          if (scene_count,seam_count,pose_count,pilot_count)!=(8,8,12,2):
-              raise SystemExit(f"Expected 8 scenes, 8 seams, 12 authentic atlas poses and 2 isolated painted-layer A/B captures, got {(scene_count,seam_count,pose_count,pilot_count)}")
+          master_count=len(list(Path("v4-art-qa").glob("master-*.png")))
+          if (scene_count,seam_count,pose_count,pilot_count,master_count)!=(8,8,12,2,1):
+              raise SystemExit(f"Expected 8 scenes, 8 seams, 12 authentic atlas poses, 2 painted-layer A/B and 1 master proof, got {(scene_count,seam_count,pose_count,pilot_count,master_count)}")
           PY
       - name: Keep isolated cold-audio A/B screenshots and measurements
         if: always()
@@ -264,7 +275,7 @@ jobs:
             v4-game-qa/headless-narrow-readability.json
           retention-days: 7
           if-no-files-found: warn
-      - name: Keep 16 scenes/seams, 12 atlas poses, 2 painted pilot A/B and diagnostics
+      - name: Keep 16 scenes/seams, 12 poses, 2 painted A/B, 1 master PNG and diagnostics
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
