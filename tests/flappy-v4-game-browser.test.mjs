@@ -288,8 +288,8 @@ test('Alpha 23 no-script real atlas pose capture expands draft-only evidence saf
  assert.match(workflow,/pose-\$theme-\$phase-\$W/);
  assert.match(workflow,/review-v4\.html#\$theme-\$phase/);
  assert.match(workflow,/scene_count=len\(list\(Path\("v4-art-qa"\)\.glob\("scene-\*\.png"\)\)\)/);
- assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count\)!=\(8,8,12,4,2,2\)/);
- assert.match(workflow,/Keep 16 scenes\/seams, 12 poses, 4 painted A\/B, 2 masters and seam proofs/);
+ assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count\)!=\(8,8,12,4,4,2,4,4,2\)/);
+ assert.match(workflow,/Keep 16 original scenes\/seams, 12 poses and 20 pilot art proofs/);
  assert.match(workflow,/if: github\.event\.pull_request\.draft && github\.event\.pull_request\.number == 57/);
  assert.doesNotMatch(game,/phase-anchor|review-v4\.html|pose-\$theme-\$phase/);
  assert.doesNotMatch(builder,/phase-anchor|pose-\$theme-\$phase/);
@@ -330,8 +330,25 @@ test('Alpha 25 both painted pilot masters, four A/B frames and two edge joins ar
  assert.match(workflow,/review-v4\.html#\$theme-pilot-seam/);
  assert.match(workflow,/master-\$theme-far-3200x2000\.png/);
  assert.match(workflow,/pilot_seam_count=len\(list\(Path\("v4-art-qa"\)\.glob\("pilot-seam-\*\.png"\)\)\)/);
- assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count\)!=\(8,8,12,4,2,2\)/);
+ assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count\)!=\(8,8,12,4,4,2,4,4,2\)/);
  assert.match(workflow,/if: github\.event\.pull_request\.draft && github\.event\.pull_request\.number == 57/);
  assert.doesNotMatch(game,/pilot\/slate\/far|far-master-pilot|slate-pilot-seam/);
  assert.doesNotMatch(builder,/pilot\/slate\/far|far-master-pilot|slate-pilot-seam/);
+});
+
+
+test('Alpha 26 middle painting evidence is 12 added Draft-only PNGs, never live-game overrides',()=>{
+ for(const theme of ['warm','slate']){
+   assert.match(workflow,new RegExp('test -s flappy/assets/v4/masters/'+theme+'/mid-master-pilot\\.svg'));
+   assert.match(workflow,new RegExp('test -s flappy/assets/v4/pilot/'+theme+'/mid\\.svg'));
+ }
+ assert.match(workflow,/for kind in mid stack/);
+ assert.match(workflow,/pilot-\$kind-\$theme-\$W/);
+ assert.match(workflow,/review-v4\.html#\$theme-\$kind-pilot/);
+ assert.match(workflow,/pilot-mid-seam-\$theme-320x568\.png/);
+ assert.match(workflow,/master-\$theme-mid-3200x2000\.png/);
+ assert.match(workflow,/mid_seam_count=len\(list\(Path\("v4-art-qa"\)\.glob\("pilot-mid-seam-\*\.png"\)\)\)/);
+ assert.match(workflow,/stack_count=len\(list\(Path\("v4-art-qa"\)\.glob\("pilot-stack-\*\.png"\)\)\)/);
+ assert.doesNotMatch(game,/pilot\/slate\/mid|pilot\/warm\/mid|mid-master-pilot|stack-pilot/);
+ assert.doesNotMatch(builder,/pilot\/slate\/mid|pilot\/warm\/mid|mid-master-pilot|stack-pilot/);
 });
