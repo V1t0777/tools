@@ -97,7 +97,7 @@ test('V4 browser evidence shows actual repeating layer joins at mid-screen witho
   const workflow=read('.github/workflows/flappy-v4-art-qa.yml');
   assert.match(workflow,/for view in scene seam/);
   assert.match(workflow,/fragment="\$theme-seam"/);
-  assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count,alpha32_raster_count,alpha32_raster_seam_count\)!=\(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2,4,4,2,4,2\)/);
+  assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count,alpha32_raster_count,alpha32_raster_seam_count,alpha33_raster_count,alpha33_raster_seam_count\)!=\(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2,4,4,2,4,2,4,2\)/);
   assert.match(workflow,/for phase in power recovery glide/);
   assert.match(workflow,/review-v4\.html#\$theme-\$phase/);
 });
@@ -281,4 +281,25 @@ test('Alpha32 directed RGBA study uses separate QA routes, no game injection',()
  }
  assert.doesNotMatch(game,/near-raster-alpha32|directional-paint/);
  assert.doesNotMatch(html,/<script\b/i);
+});
+
+test('Alpha33 corrects two-world Alpha32 preview missing/duplicate layers',()=>{
+ const workflow=read('.github/workflows/flappy-v4-art-qa.yml');
+ for(const theme of ['warm','slate']){
+   const article=html.split('<article class="world '+theme+'"')[1].split('</article>')[0];
+   assert.ok(article,'missing theme article '+theme);
+   for(const stage of [31,32,33]){
+     const needle='class="layer near near-raster-alpha'+stage+'"';
+     assert.equal(article.split(needle).length-1,1,'exactly one '+theme+' alpha'+stage+' visual layer');
+   }
+   assert.ok(article.includes('id="'+theme+'-raster-alpha33"'));
+   assert.ok(html.includes('id="'+theme+'-raster-alpha33-seam"'));
+   assert.match(html,new RegExp('\\.'+theme+' \\.near-raster-alpha33\\{background-image:url'));
+ }
+ assert.match(workflow,/flappy-v4-local-material\.py/);
+ assert.match(workflow,/alpha33-raster-seam-\$theme-320x568/);
+ assert.match(workflow,/alpha33-local-material-metrics\.json/);
+ assert.match(workflow,/Alpha 33 expected 104 static art screenshots/);
+ assert.doesNotMatch(html,/<script\b/i);
+ assert.doesNotMatch(game,/near-raster-alpha33|local-material/);
 });
