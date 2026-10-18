@@ -645,6 +645,29 @@
       "QA_only": true,
       "live_v3_1_unchanged": true,
       "production_release_blockers": "10/10 pilot original source scene layers; 0/10 final professionally accepted native raster masters; real phone hardware, long-session fairness and final explicit authorization missing"
+    },
+    {
+      "alpha": 43,
+      "stage": "two_original_distant_mountain_crest_and_material_reauthors",
+      "original_editable_2x_sources": [
+        "flappy/assets/v4/masters/warm/far-organic-alpha43.svg",
+        "flappy/assets/v4/masters/slate/far-organic-alpha43.svg"
+      ],
+      "source_paint": "Original warm and blue-hour complete far ridge crest, fill path and clip all edited consistently; 8 separately curved rock value masses, 6 directional light and shadow atmospheric glazes, 6 original broken mineral strata strokes for each scene.",
+      "reference": "Retain Alpha40 editable originals and Alpha41 offline RGBA unmodified for old-vs-new A/B and bounded sky/edge preservation.",
+      "CI_renderer": "tests/flappy-v4-organic-far.py",
+      "draft_art_pngs": [
+        "flappy/assets/v4/pilot/warm/far-raster-alpha43.png",
+        "flappy/assets/v4/pilot/slate/far-raster-alpha43.png"
+      ],
+      "scene_integration": "warm far43+mid41+mist+near36 and slate far43+mid42+mist+near36",
+      "guardrails": "both first/last 40px exact old RGBA, upper 430px bird sky unchanged, original 2x vector mask/rim/source base path identical, both changed skyline alpha directions required, mobile source actual A/B over 2500 pixels",
+      "target_screenshots": 183,
+      "target_real_decoded_png_seam_audits": 36,
+      "target_recent_browser_capture": 48,
+      "production_runtime_changed": false,
+      "final_professional_native_masters_approved": 0,
+      "must_not_deploy": true
     }
   ]
 }
