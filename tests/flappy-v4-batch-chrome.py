@@ -37,8 +37,16 @@ def scenes(stage="alpha39"):
     if stage=="recent":
         # Consolidated A/B histories Alpha39/40 + Alpha41 under ONE
         # isolated DevTools session instead of three Chrome subprocesses.
-        for name in ("alpha39","alpha40","alpha41","alpha42","alpha43","alpha44"):
+        for name in ("alpha39","alpha40","alpha41","alpha42","alpha43","alpha44","alpha45"):
             yield from scenes(name)
+        return
+    if stage=="alpha45":
+        # Exact true four individual atlas poses (0/6/12/18 of 24)
+        # and a background-without-bird control for each phone/world.
+        for theme in ("warm","slate"):
+            for w,h in ((320,568),(390,844)):
+                for pose in ("rest","power","recovery","glide","clear"):
+                    yield f"alpha45-actor-{theme}-{pose}-{w}x{h}.png", f"#{theme}-world-alpha45-{pose}",w,h
         return
     if stage=="alpha44":
         for theme in ("warm","slate"):
@@ -211,9 +219,9 @@ def screenshot_batch(chrome, base, folder, stage='alpha39'):
     if stage=="recent":
         # Keep every previous stage's original evidence manifest while
         # documenting that all 36 captures share *one* Chrome process.
-        for historical in ("alpha39","alpha40","alpha41","alpha42","alpha43","alpha44"):
+        for historical in ("alpha39","alpha40","alpha41","alpha42","alpha43","alpha44","alpha45"):
             subset=[m for m in metrics if m["file"].startswith(historical+"-")]
-            expected={"alpha39":8,"alpha40":14,"alpha41":14,"alpha42":4,"alpha43":8,"alpha44":16}[historical]
+            expected={"alpha39":8,"alpha40":14,"alpha41":14,"alpha42":4,"alpha43":8,"alpha44":16,"alpha45":20}[historical]
             if len(subset)!=expected:
                 raise AssertionError(f"Pooled browser coverage lost {historical}: {len(subset)}")
             smaller={
@@ -239,7 +247,7 @@ if __name__=="__main__":
     parser.add_argument("--chrome",required=True)
     parser.add_argument("--base-url",required=True)
     parser.add_argument("--output",default="v4-art-qa")
-    parser.add_argument("--stage",choices=("alpha39","alpha40","alpha41","alpha42","alpha43","alpha44","recent"),default="alpha39")
+    parser.add_argument("--stage",choices=("alpha39","alpha40","alpha41","alpha42","alpha43","alpha44","alpha45","recent"),default="alpha39")
     args=parser.parse_args()
     if not args.base_url.startswith("http://127.0.0.1:"):
         raise SystemExit("Alpha39 screenshot target must be local QA HTTP server")
