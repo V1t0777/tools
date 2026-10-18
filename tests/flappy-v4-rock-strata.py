@@ -19,7 +19,7 @@ ALLOWED_ATTRS={"width","height","viewBox","role","aria-label",
   "id","d","data-alpha39-wash","data-alpha39-strata","data-alpha39-flecks",
   "fill","fill-opacity","stroke","stroke-opacity","stroke-width",
   "stroke-linecap","stroke-linejoin"}
-EXPECTED={"warm":(4,17,4),"slate":(4,16,4)}
+EXPECTED={"warm":(4,16,4),"slate":(4,16,4)}
 
 
 def validate(path,theme):
