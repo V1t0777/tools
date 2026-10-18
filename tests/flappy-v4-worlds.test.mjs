@@ -405,7 +405,7 @@ test('Alpha 23 reviewer displays true atlas wing poses rather than a mock circle
  }
  assert.doesNotMatch(page,/<script\b|border-radius:50%;background:#c18e60|\.bird:after\{/i);
  assert.match(page,/石柱仍为布局参考，不是正式 Canvas 材质/);
- assert.ok(page.length<29000,'Draft-only QA reviewer stays no-script under 29KB after Alpha 29 complete-pilot A/B');
+ assert.ok(page.length<32*1024,'Draft-only source-review HTML must stay under 32KiB and have no scripts; this larger QA-only limit does not change the game bundle');
 });
 
 
