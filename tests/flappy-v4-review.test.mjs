@@ -476,3 +476,17 @@ test('Alpha44 Draft reviewer has individually addressable far mid near and integ
  assert.doesNotMatch(html,/<script\b/i);
  assert.doesNotMatch(game,/raster-alpha44/);
 });
+
+test('Alpha45 original bird wing-state A/B selector has five unique static route anchors per world',()=>{
+ const workflow=read('.github/workflows/flappy-v4-art-qa.yml');
+ for(const world of ['warm','slate']){
+  const art=html.split('<article class="world '+world+'"')[1].split('</article>')[0];
+  for(const pose of ['rest','power','recovery','glide','clear']){
+   assert.equal(art.split('id="'+world+'-world-alpha45-'+pose+'"').length-1,1);
+  }
+  assert.ok(html.includes('#'+world+'-world-alpha45-clear:target~.frame .bird{display:none}'));
+ }
+ assert.match(workflow,/Alpha 45 expected 219 static art screenshots/);
+ assert.doesNotMatch(html,/<script\b/i);
+ assert.doesNotMatch(game,/world-alpha45/);
+});
