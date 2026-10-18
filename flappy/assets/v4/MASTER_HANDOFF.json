@@ -322,6 +322,34 @@
       "production_asset": false,
       "art_direction_approved": false,
       "notes": "Actual offline per-pixel colored multi-frequency grain from editable 2x art, exact source alpha preservation and 20px border-taper check. Explicit first raster trial; not final hand-painted native source art."
+    },
+    {
+      "alpha": 32,
+      "stage": "material_directional_near_brush_study",
+      "themes": [
+        "warm",
+        "slate"
+      ],
+      "layers": [
+        "near"
+      ],
+      "source": "tests/flappy-v4-directional-paint.py",
+      "comparison": "Alpha 31 isotropic random-pigment bitmap retained as a separate before/after QA control; Alpha 32 directly re-rasterizes the same original 3200x2000 near master",
+      "generated_outputs": [
+        "flappy/assets/v4/pilot/warm/near-raster-alpha32.png",
+        "flappy/assets/v4/pilot/slate/near-raster-alpha32.png"
+      ],
+      "material_directions": [
+        "warm short angled leaf strokes",
+        "slate opposed fir/spruce needle diagonals",
+        "vertical bark grain",
+        "horizontal ground dry-brush"
+      ],
+      "generated_in": "Draft-only GitHub Actions, RGBA output kept only as downloadable QA artifacts",
+      "runtime_asset": false,
+      "production_asset": false,
+      "art_direction_approved": false,
+      "notes": "Reproducible geometry-guided brush direction in actual transparent PNG data; not artist-authorized native painterly production art."
     }
   ]
 }
