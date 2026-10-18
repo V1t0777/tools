@@ -38,6 +38,9 @@ header p{max-width:760px;margin:0 0 16px}
 #paint-mid-pilot:checked~.worlds .world .mid-base{display:none}
 #paint-mid-pilot:checked~.worlds .world .mid-pilot{display:block}
 .layer.mist{z-index:3;opacity:.7}
+.layer.mist-pilot{display:none}
+#paint-mist-pilot:checked~.worlds .world .mist-base{display:none}
+#paint-mist-pilot:checked~.worlds .world .mist-pilot{display:block}
 .layer.near{z-index:4}
 /* Match the live Canvas sky crop: sx = lightX - 0.89 * visibleSourceWidth.
    For a 1600px-wide image at 100% scene height, the world-space light
@@ -115,6 +118,15 @@ body:has(.phase-anchor:target) .frame{width:100vw;height:100dvh;aspect-ratio:aut
 #warm-stack-pilot:target~.frame .mid-base,#slate-stack-pilot:target~.frame .mid-base{display:none}
 #warm-stack-pilot:target~.frame .far-pilot,#slate-stack-pilot:target~.frame .far-pilot,
 #warm-stack-pilot:target~.frame .mid-pilot,#slate-stack-pilot:target~.frame .mid-pilot{display:block}
+/* Alpha 27 mist-only A/B and three-layer far+mid+mist atlas-correct QA. */
+#warm-mist-pilot:target~.frame .mist-base,#slate-mist-pilot:target~.frame .mist-base{display:none}
+#warm-mist-pilot:target~.frame .mist-pilot,#slate-mist-pilot:target~.frame .mist-pilot{display:block}
+#warm-atmo-pilot:target~.frame .far-base,#slate-atmo-pilot:target~.frame .far-base,
+#warm-atmo-pilot:target~.frame .mid-base,#slate-atmo-pilot:target~.frame .mid-base,
+#warm-atmo-pilot:target~.frame .mist-base,#slate-atmo-pilot:target~.frame .mist-base{display:none}
+#warm-atmo-pilot:target~.frame .far-pilot,#slate-atmo-pilot:target~.frame .far-pilot,
+#warm-atmo-pilot:target~.frame .mid-pilot,#slate-atmo-pilot:target~.frame .mid-pilot,
+#warm-atmo-pilot:target~.frame .mist-pilot,#slate-atmo-pilot:target~.frame .mist-pilot{display:block}
 /* Automated screenshot capture uses no JavaScript and exercises real atlas rows. */
 .seamworld{display:none}
 .seamframe{position:relative;isolation:isolate;height:100dvh;width:100vw;overflow:hidden}
@@ -139,7 +151,7 @@ body:has(.seamworld:target) .seamworld:target{display:block}
 <main>
 <header><span class="tag">DRAFT · 静态安全验收页 · 不代表正式发布</span>
 <h1>V4 Cinematic Worlds · 双主题对比</h1>
-<p>无 JavaScript 的五层场景对比。角色使用游戏中的透明 24 帧图集（帧 0、6、12、18 可切换）。两套远山和中景均可分别切换 Alpha 24–26 试制层，默认仍为原始 SVG；可同时切换查看色彩衔接。试制图层不在游戏运行时使用；石柱仍为布局参考，不是正式 Canvas 材质。</p>
+<p>无 JavaScript 的五层场景对比。角色使用游戏中的透明 24 帧图集（帧 0、6、12、18 可切换）。远景、中景与谷雾试制均可分别切换（Alpha 24–27），默认仍为原始 SVG；可同时切换研究空气透视。试制图层不在游戏运行时使用；石柱仍为布局参考，不是正式 Canvas 材质。</p>
 </header>
 <section class="options" aria-label="美术验收选项">
 <input type="radio" id="s360" name="size" checked><label for="s360">360 × 600</label>
@@ -150,6 +162,7 @@ body:has(.seamworld:target) .seamworld:target{display:block}
 <input type="checkbox" id="fog" checked><label for="fog">谷雾图层</label>
 <input type="checkbox" id="paint-pilot"><label for="paint-pilot">双世界远山原画试制 A/B（非正式资源）</label>
 <input type="checkbox" id="paint-mid-pilot"><label for="paint-mid-pilot">双世界中景原画试制 A/B（非正式资源）</label>
+<input type="checkbox" id="paint-mist-pilot"><label for="paint-mist-pilot">双世界谷雾空气透视试制 A/B（非正式资源）</label>
 <input type="radio" id="wing-rest" name="wing" checked><label for="wing-rest">羽翼 0 · 休止</label>
 <input type="radio" id="wing-power" name="wing"><label for="wing-power">羽翼 6 · 发力</label>
 <input type="radio" id="wing-recovery" name="wing"><label for="wing-recovery">羽翼 12 · 回收</label>
@@ -157,20 +170,21 @@ body:has(.seamworld:target) .seamworld:target{display:block}
 <div class="worlds">
 <article class="world warm" id="warm">
 <h2>晨曦山谷 · 暖棕旅鸟</h2>
-<span class="phase-anchor" id="warm-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-mid-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-stack-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-power" aria-hidden="true"></span><span class="phase-anchor" id="warm-recovery" aria-hidden="true"></span><span class="phase-anchor" id="warm-glide" aria-hidden="true"></span>
+<span class="phase-anchor" id="warm-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-mid-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-stack-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-mist-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-atmo-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-power" aria-hidden="true"></span><span class="phase-anchor" id="warm-recovery" aria-hidden="true"></span><span class="phase-anchor" id="warm-glide" aria-hidden="true"></span>
 <div class="frame" role="img" aria-label="晨曦山谷 · 暖棕旅鸟五层背景静态美术预览">
 <img class="layer sky" src="./assets/v4/warm/sky.svg" alt="" loading="eager" decoding="async">
 <img class="layer far far-base" src="./assets/v4/warm/far.svg" alt="" loading="eager" decoding="async">
 <img class="layer far far-pilot" src="./assets/v4/pilot/warm/far.svg" alt="" loading="eager" decoding="async">
 <img class="layer mid mid-base" src="./assets/v4/warm/mid.svg" alt="" loading="eager" decoding="async">
 <img class="layer mid mid-pilot" src="./assets/v4/pilot/warm/mid.svg" alt="" loading="eager" decoding="async">
-<img class="layer mist" src="./assets/v4/warm/mist.svg" alt="" loading="eager" decoding="async">
+<img class="layer mist mist-base" src="./assets/v4/warm/mist.svg" alt="" loading="eager" decoding="async">
+<img class="layer mist mist-pilot" src="./assets/v4/pilot/warm/mist.svg" alt="" loading="eager" decoding="async">
 <img class="layer near" src="./assets/v4/warm/near.svg" alt="" loading="eager" decoding="async">
 <div class="guides" aria-hidden="true"><span class="pipe top"></span><span class="pipe bottom"></span><span class="bird"></span><span class="ground"></span></div>
 </div><p class="note">独立山谷图层与空间层次；需要实机截图审核，当前不是最终手绘纹理。</p></article>
 <article class="world slate" id="slate">
 <h2>暮蓝远山 · 板岩夜鸟</h2>
-<span class="phase-anchor" id="slate-pilot" aria-hidden="true"></span><span class="phase-anchor" id="slate-mid-pilot" aria-hidden="true"></span><span class="phase-anchor" id="slate-stack-pilot" aria-hidden="true"></span>
+<span class="phase-anchor" id="slate-pilot" aria-hidden="true"></span><span class="phase-anchor" id="slate-mid-pilot" aria-hidden="true"></span><span class="phase-anchor" id="slate-stack-pilot" aria-hidden="true"></span><span class="phase-anchor" id="slate-mist-pilot" aria-hidden="true"></span><span class="phase-anchor" id="slate-atmo-pilot" aria-hidden="true"></span>
 <span class="phase-anchor" id="slate-power" aria-hidden="true"></span><span class="phase-anchor" id="slate-recovery" aria-hidden="true"></span><span class="phase-anchor" id="slate-glide" aria-hidden="true"></span>
 <div class="frame" role="img" aria-label="暮蓝远山 · 板岩夜鸟五层背景静态美术预览">
 <img class="layer sky" src="./assets/v4/slate/sky.svg" alt="" loading="eager" decoding="async">
@@ -178,12 +192,17 @@ body:has(.seamworld:target) .seamworld:target{display:block}
 <img class="layer far far-pilot" src="./assets/v4/pilot/slate/far.svg" alt="" loading="eager" decoding="async">
 <img class="layer mid mid-base" src="./assets/v4/slate/mid.svg" alt="" loading="eager" decoding="async">
 <img class="layer mid mid-pilot" src="./assets/v4/pilot/slate/mid.svg" alt="" loading="eager" decoding="async">
-<img class="layer mist" src="./assets/v4/slate/mist.svg" alt="" loading="eager" decoding="async">
+<img class="layer mist mist-base" src="./assets/v4/slate/mist.svg" alt="" loading="eager" decoding="async">
+<img class="layer mist mist-pilot" src="./assets/v4/pilot/slate/mist.svg" alt="" loading="eager" decoding="async">
 <img class="layer near" src="./assets/v4/slate/near.svg" alt="" loading="eager" decoding="async">
 <div class="guides" aria-hidden="true"><span class="pipe top"></span><span class="pipe bottom"></span><span class="bird"></span><span class="ground"></span></div>
 </div><p class="note">独立山谷图层与空间层次；需要实机截图审核，当前不是最终手绘纹理。</p></article>
 </div>
 </section>
+<section class="seamworld pilot-seamworld" id="warm-mist-pilot-seam" aria-label="warm original transparent valley mist repeating edge study"><div class="seamframe warm">
+<img class="first mist" src="./assets/v4/pilot/warm/mist.svg" alt="" decoding="async">
+<img class="second mist" src="./assets/v4/pilot/warm/mist.svg" alt="" decoding="async">
+</div></section>
 <section class="seamworld pilot-seamworld" id="warm-mid-pilot-seam" aria-label="warm original middle mountains repeating tile proof"><div class="seamframe warm">
 <img class="first mid" src="./assets/v4/pilot/warm/mid.svg" alt="" decoding="async">
 <img class="second mid" src="./assets/v4/pilot/warm/mid.svg" alt="" decoding="async">
@@ -191,6 +210,10 @@ body:has(.seamworld:target) .seamworld:target{display:block}
 <section class="seamworld pilot-seamworld" id="warm-pilot-seam" aria-label="warm original far painting pilot seamless tile visual evidence"><div class="seamframe warm">
 <img class="first far" src="./assets/v4/pilot/warm/far.svg" alt="" decoding="async">
 <img class="second far" src="./assets/v4/pilot/warm/far.svg" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="slate-mist-pilot-seam" aria-label="slate original transparent valley mist repeating edge study"><div class="seamframe slate">
+<img class="first mist" src="./assets/v4/pilot/slate/mist.svg" alt="" decoding="async">
+<img class="second mist" src="./assets/v4/pilot/slate/mist.svg" alt="" decoding="async">
 </div></section>
 <section class="seamworld pilot-seamworld" id="slate-mid-pilot-seam" aria-label="slate original middle mountains repeating tile proof"><div class="seamframe slate">
 <img class="first mid" src="./assets/v4/pilot/slate/mid.svg" alt="" decoding="async">
