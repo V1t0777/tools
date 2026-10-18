@@ -97,7 +97,7 @@ test('V4 browser evidence shows actual repeating layer joins at mid-screen witho
   const workflow=read('.github/workflows/flappy-v4-art-qa.yml');
   assert.match(workflow,/for view in scene seam/);
   assert.match(workflow,/fragment="\$theme-seam"/);
-  assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count\)!=\(8,8,12,4,8,2,4,4,2,4,4,2,4,4\)/);
+  assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count\)!=\(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2\)/);
   assert.match(workflow,/for phase in power recovery glide/);
   assert.match(workflow,/review-v4\.html#\$theme-\$phase/);
 });
@@ -218,4 +218,24 @@ test('Alpha 28 sky and four-layer luminous composite are opt-in with the real at
  assert.match(html,/background-image:url\("\.\/assets\/v3\/warm-flight\.svg"\)/);
  assert.doesNotMatch(html,/<script\b/i);
  assert.doesNotMatch(game,/pilot\/warm\/sky|pilot\/slate\/sky|sky-master-pilot/);
+});
+
+
+test('Alpha 29 authentic warm and slate forest near artwork is independently reviewable in five-layer source stack',()=>{
+ assert.match(html,/id="paint-near-pilot"/);
+ assert.match(html,/#paint-near-pilot:checked~\.worlds \.world \.near-base\{display:none\}/);
+ assert.match(html,/#paint-near-pilot:checked~\.worlds \.world \.near-pilot\{display:block\}/);
+ for(const theme of ['warm','slate']){
+   assert.match(html,new RegExp('id="'+theme+'-near-pilot"'));
+   assert.match(html,new RegExp('id="'+theme+'-full-pilot"'));
+   assert.match(html,new RegExp('class="layer near near-base" src="\\./assets/v4/'+theme+'/near\\.svg"'));
+   assert.match(html,new RegExp('class="layer near near-pilot" src="\\./assets/v4/pilot/'+theme+'/near\\.svg"'));
+   const section=html.split('id="'+theme+'-near-pilot-seam"')[1]?.split('</section>')[0];
+   assert.ok(section,'Near repeating trees require a separate tile seam QA route');
+   assert.equal(section.split('src="./assets/v4/pilot/'+theme+'/near.svg"').length-1,2);
+ }
+ assert.match(html,/#warm-full-pilot:target~\.frame \.near-base/);
+ assert.match(html,/#slate-full-pilot:target~\.frame \.near-pilot/);
+ assert.doesNotMatch(html,/<script\b/i);
+ assert.doesNotMatch(game,/pilot\/warm\/near|pilot\/slate\/near|full-pilot/);
 });
