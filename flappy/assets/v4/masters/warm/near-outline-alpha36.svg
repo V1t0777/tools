@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3200" height="2000" viewBox="0 0 3200 2000" role="img" aria-label="warm Alpha36 individually authored irregular tree silhouette study"><title>Alpha 36 original irregular crown outer edge painting — warm</title><desc>Three positive jagged edge extensions and two negative sky notches for each of eleven individually laid out species trees; separate additive and subtractive editable paths. Offline QA study only; real production art and runtime are unchanged.</desc>
+<g data-alpha36-tree="1" data-species="oak" transform="translate(208 1429) scale(1.060 1.060)">
+<g data-edge-add="1">
+<path data-edge-positive="1" d="M-68 24 Q-92 13 -105 -8 Q-96 -20 -87 -23 Q-103 -38 -86 -48 Q-64 -41 -52 -26 Q-68 -8 -68 24Z" fill="#638b69" fill-opacity="0.640"/>
+<path data-edge-positive="2" d="M48 -22 Q75 -54 97 -50 Q91 -34 110 -22 Q98 -6 79 5 Q67 3 48 -22Z" fill="#c2c99d" fill-opacity="0.520"/>
+<path data-edge-positive="3" d="M-41 -41 Q-30 -63 -5 -65 Q18 -73 32 -51 Q13 -47 -7 -39 Q-28 -31 -41 -41Z" fill="#98ad8a" fill-opacity="0.430"/>
+</g><g data-edge-remove="1">
+<path data-edge-negative="1" d="M-67 -22 Q-48 -17 -42 -6 L-69 6 Q-53 -8 -67 -22Z" fill="#ffffff" fill-opacity="0.64"/>
+<path data-edge-negative="2" d="M59 -35 Q48 -18 36 -14 Q58 -11 75 2 Q58 -21 59 -35Z" fill="#ffffff" fill-opacity="0.64"/>
+</g></g>
+<g data-alpha36-tree="2" data-species="willow" transform="translate(445 1410) scale(-0.910 0.910)">
+<g data-edge-add="1">
+<path data-edge-positive="1" d="M-52 -8 Q-74 -17 -82 -40 Q-66 -41 -44 -22 Q-59 -3 -54 37 Q-57 52 -67 64 Q-59 27 -52 -8Z" fill="#507f72" fill-opacity="0.563"/>
+<path data-edge-positive="2" d="M51 -35 Q68 -39 81 -31 Q65 -9 63 21 Q68 47 55 69 Q57 20 43 1 Q36 -19 51 -35Z" fill="#bdc6a0" fill-opacity="0.458"/>
+<path data-edge-positive="3" d="M-19 -54 Q-14 -74 4 -76 Q27 -74 31 -51 Q9 -47 -8 -34 Q-11 -46 -19 -54Z" fill="#98ad8a" fill-opacity="0.378"/>
+</g><g data-edge-remove="1">
+<path data-edge-negative="1" d="M-51 -31 Q-37 -19 -37 -6 Q-53 -2 -64 11 Q-52 -12 -51 -31Z" fill="#ffffff" fill-opacity="0.56"/>
+<path data-edge-negative="2" d="M43 -17 Q27 3 37 15 Q53 21 62 13 Q45 10 43 -17Z" fill="#ffffff" fill-opacity="0.56"/>
+</g></g>
+<g data-alpha36-tree="3" data-species="birch" transform="translate(718 1410) scale(1.120 1.120)">
+<g data-edge-add="1">
+<path data-edge-positive="1" d="M-54 6 Q-86 -1 -99 -23 Q-83 -29 -70 -19 Q-68 -36 -49 -40 Q-51 -15 -54 6Z" fill="#6d917d" fill-opacity="0.602"/>
+<path data-edge-positive="2" d="M56 -44 Q80 -59 101 -37 Q90 -22 107 -5 Q91 12 67 6 Q72 -16 56 -44Z" fill="#d0d2ac" fill-opacity="0.489"/>
+<path data-edge-positive="3" d="M-27 -45 Q-6 -67 19 -62 Q33 -57 34 -36 Q13 -44 -10 -27Z" fill="#98ad8a" fill-opacity="0.404"/>
+</g><g data-edge-remove="1">
+<path data-edge-negative="1" d="M-66 -27 Q-51 -21 -45 -4 Q-65 4 -83 9 Q-59 -7 -66 -27Z" fill="#ffffff" fill-opacity="0.48"/>
+<path data-edge-negative="2" d="M67 -33 Q43 -18 40 -7 Q63 -2 81 16 Q58 -9 67 -33Z" fill="#ffffff" fill-opacity="0.48"/>
+</g></g>
+<g data-alpha36-tree="4" data-species="alder" transform="translate(973 1416) scale(-0.880 0.880)">
+<g data-edge-add="1">
+<path data-edge-positive="1" d="M-51 -23 Q-71 -42 -91 -37 Q-96 -24 -77 -11 Q-86 0 -74 18 Q-55 11 -48 -4Z" fill="#4f7661" fill-opacity="0.640"/>
+<path data-edge-positive="2" d="M44 -21 Q59 -49 79 -48 Q94 -41 85 -20 Q100 -3 79 12 Q55 15 44 -21Z" fill="#aec294" fill-opacity="0.520"/>
+<path data-edge-positive="3" d="M-18 -58 Q-3 -78 21 -64 Q41 -45 23 -37 Q5 -43 -18 -58Z" fill="#98ad8a" fill-opacity="0.430"/>
+</g><g data-edge-remove="1">
+<path data-edge-negative="1" d="M-66 -31 Q-51 -13 -48 4 Q-71 6 -82 14 Q-58 -3 -66 -31Z" fill="#ffffff" fill-opacity="0.64"/>
+<path data-edge-negative="2" d="M62 -28 Q48 -9 40 -6 Q56 1 87 5 Q61 -8 62 -28Z" fill="#ffffff" fill-opacity="0.64"/>
+</g></g>
+<g data-alpha36-tree="5" data-species="oak" transform="translate(1239 1369) scale(1.150 1.150)">
+<g data-edge-add="1">
+<path data-edge-positive="1" d="M-68 24 Q-92 13 -105 -8 Q-96 -20 -87 -23 Q-103 -38 -86 -48 Q-64 -41 -52 -26 Q-68 -8 -68 24Z" fill="#638b69" fill-opacity="0.563"/>
+<path data-edge-positive="2" d="M48 -22 Q75 -54 97 -50 Q91 -34 110 -22 Q98 -6 79 5 Q67 3 48 -22Z" fill="#c2c99d" fill-opacity="0.458"/>
+<path data-edge-positive="3" d="M-41 -41 Q-30 -63 -5 -65 Q18 -73 32 -51 Q13 -47 -7 -39 Q-28 -31 -41 -41Z" fill="#98ad8a" fill-opacity="0.378"/>
+</g><g data-edge-remove="1">
+<path data-edge-negative="1" d="M-67 -22 Q-48 -17 -42 -6 L-69 6 Q-53 -8 -67 -22Z" fill="#ffffff" fill-opacity="0.56"/>
+<path data-edge-negative="2" d="M59 -35 Q48 -18 36 -14 Q58 -11 75 2 Q58 -21 59 -35Z" fill="#ffffff" fill-opacity="0.56"/>
+</g></g>
+<g data-alpha36-tree="6" data-species="willow" transform="translate(1543 1417) scale(-1.010 1.010)">
+<g data-edge-add="1">
+<path data-edge-positive="1" d="M-52 -8 Q-74 -17 -82 -40 Q-66 -41 -44 -22 Q-59 -3 -54 37 Q-57 52 -67 64 Q-59 27 -52 -8Z" fill="#507f72" fill-opacity="0.602"/>
+<path data-edge-positive="2" d="M51 -35 Q68 -39 81 -31 Q65 -9 63 21 Q68 47 55 69 Q57 20 43 1 Q36 -19 51 -35Z" fill="#bdc6a0" fill-opacity="0.489"/>
+<path data-edge-positive="3" d="M-19 -54 Q-14 -74 4 -76 Q27 -74 31 -51 Q9 -47 -8 -34 Q-11 -46 -19 -54Z" fill="#98ad8a" fill-opacity="0.404"/>
+</g><g data-edge-remove="1">
+<path data-edge-negative="1" d="M-51 -31 Q-37 -19 -37 -6 Q-53 -2 -64 11 Q-52 -12 -51 -31Z" fill="#ffffff" fill-opacity="0.48"/>
+<path data-edge-negative="2" d="M43 -17 Q27 3 37 15 Q53 21 62 13 Q45 10 43 -17Z" fill="#ffffff" fill-opacity="0.48"/>
+</g></g>
+<g data-alpha36-tree="7" data-species="birch" transform="translate(1822 1344) scale(1.180 1.180)">
+<g data-edge-add="1">
+<path data-edge-positive="1" d="M-54 6 Q-86 -1 -99 -23 Q-83 -29 -70 -19 Q-68 -36 -49 -40 Q-51 -15 -54 6Z" fill="#6d917d" fill-opacity="0.640"/>
+<path data-edge-positive="2" d="M56 -44 Q80 -59 101 -37 Q90 -22 107 -5 Q91 12 67 6 Q72 -16 56 -44Z" fill="#d0d2ac" fill-opacity="0.520"/>
+<path data-edge-positive="3" d="M-27 -45 Q-6 -67 19 -62 Q33 -57 34 -36 Q13 -44 -10 -27Z" fill="#98ad8a" fill-opacity="0.430"/>
+</g><g data-edge-remove="1">
+<path data-edge-negative="1" d="M-66 -27 Q-51 -21 -45 -4 Q-65 4 -83 9 Q-59 -7 -66 -27Z" fill="#ffffff" fill-opacity="0.64"/>
+<path data-edge-negative="2" d="M67 -33 Q43 -18 40 -7 Q63 -2 81 16 Q58 -9 67 -33Z" fill="#ffffff" fill-opacity="0.64"/>
+</g></g>
+<g data-alpha36-tree="8" data-species="alder" transform="translate(2095 1424) scale(-1.040 1.040)">
+<g data-edge-add="1">
+<path data-edge-positive="1" d="M-51 -23 Q-71 -42 -91 -37 Q-96 -24 -77 -11 Q-86 0 -74 18 Q-55 11 -48 -4Z" fill="#4f7661" fill-opacity="0.563"/>
+<path data-edge-positive="2" d="M44 -21 Q59 -49 79 -48 Q94 -41 85 -20 Q100 -3 79 12 Q55 15 44 -21Z" fill="#aec294" fill-opacity="0.458"/>
+<path data-edge-positive="3" d="M-18 -58 Q-3 -78 21 -64 Q41 -45 23 -37 Q5 -43 -18 -58Z" fill="#98ad8a" fill-opacity="0.378"/>
+</g><g data-edge-remove="1">
+<path data-edge-negative="1" d="M-66 -31 Q-51 -13 -48 4 Q-71 6 -82 14 Q-58 -3 -66 -31Z" fill="#ffffff" fill-opacity="0.56"/>
+<path data-edge-negative="2" d="M62 -28 Q48 -9 40 -6 Q56 1 87 5 Q61 -8 62 -28Z" fill="#ffffff" fill-opacity="0.56"/>
+</g></g>
+<g data-alpha36-tree="9" data-species="oak" transform="translate(2382 1386) scale(1.000 1.000)">
+<g data-edge-add="1">
+<path data-edge-positive="1" d="M-68 24 Q-92 13 -105 -8 Q-96 -20 -87 -23 Q-103 -38 -86 -48 Q-64 -41 -52 -26 Q-68 -8 -68 24Z" fill="#638b69" fill-opacity="0.602"/>
+<path data-edge-positive="2" d="M48 -22 Q75 -54 97 -50 Q91 -34 110 -22 Q98 -6 79 5 Q67 3 48 -22Z" fill="#c2c99d" fill-opacity="0.489"/>
+<path data-edge-positive="3" d="M-41 -41 Q-30 -63 -5 -65 Q18 -73 32 -51 Q13 -47 -7 -39 Q-28 -31 -41 -41Z" fill="#98ad8a" fill-opacity="0.404"/>
+</g><g data-edge-remove="1">
+<path data-edge-negative="1" d="M-67 -22 Q-48 -17 -42 -6 L-69 6 Q-53 -8 -67 -22Z" fill="#ffffff" fill-opacity="0.48"/>
+<path data-edge-negative="2" d="M59 -35 Q48 -18 36 -14 Q58 -11 75 2 Q58 -21 59 -35Z" fill="#ffffff" fill-opacity="0.48"/>
+</g></g>
+<g data-alpha36-tree="10" data-species="willow" transform="translate(2669 1428) scale(-0.880 0.880)">
+<g data-edge-add="1">
+<path data-edge-positive="1" d="M-52 -8 Q-74 -17 -82 -40 Q-66 -41 -44 -22 Q-59 -3 -54 37 Q-57 52 -67 64 Q-59 27 -52 -8Z" fill="#507f72" fill-opacity="0.640"/>
+<path data-edge-positive="2" d="M51 -35 Q68 -39 81 -31 Q65 -9 63 21 Q68 47 55 69 Q57 20 43 1 Q36 -19 51 -35Z" fill="#bdc6a0" fill-opacity="0.520"/>
+<path data-edge-positive="3" d="M-19 -54 Q-14 -74 4 -76 Q27 -74 31 -51 Q9 -47 -8 -34 Q-11 -46 -19 -54Z" fill="#98ad8a" fill-opacity="0.430"/>
+</g><g data-edge-remove="1">
+<path data-edge-negative="1" d="M-51 -31 Q-37 -19 -37 -6 Q-53 -2 -64 11 Q-52 -12 -51 -31Z" fill="#ffffff" fill-opacity="0.64"/>
+<path data-edge-negative="2" d="M43 -17 Q27 3 37 15 Q53 21 62 13 Q45 10 43 -17Z" fill="#ffffff" fill-opacity="0.64"/>
+</g></g>
+<g data-alpha36-tree="11" data-species="birch" transform="translate(2979 1456) scale(0.760 0.760)">
+<g data-edge-add="1">
+<path data-edge-positive="1" d="M-54 6 Q-86 -1 -99 -23 Q-83 -29 -70 -19 Q-68 -36 -49 -40 Q-51 -15 -54 6Z" fill="#6d917d" fill-opacity="0.563"/>
+<path data-edge-positive="2" d="M56 -44 Q80 -59 101 -37 Q90 -22 107 -5 Q91 12 67 6 Q72 -16 56 -44Z" fill="#d0d2ac" fill-opacity="0.458"/>
+<path data-edge-positive="3" d="M-27 -45 Q-6 -67 19 -62 Q33 -57 34 -36 Q13 -44 -10 -27Z" fill="#98ad8a" fill-opacity="0.378"/>
+</g><g data-edge-remove="1">
+<path data-edge-negative="1" d="M-66 -27 Q-51 -21 -45 -4 Q-65 4 -83 9 Q-59 -7 -66 -27Z" fill="#ffffff" fill-opacity="0.56"/>
+<path data-edge-negative="2" d="M67 -33 Q43 -18 40 -7 Q63 -2 81 16 Q58 -9 67 -33Z" fill="#ffffff" fill-opacity="0.56"/>
+</g></g>
+</svg>
