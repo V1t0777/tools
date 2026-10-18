@@ -97,7 +97,7 @@ test('V4 browser evidence shows actual repeating layer joins at mid-screen witho
   const workflow=read('.github/workflows/flappy-v4-art-qa.yml');
   assert.match(workflow,/for view in scene seam/);
   assert.match(workflow,/fragment="\$theme-seam"/);
-  assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count\)!=\(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2\)/);
+  assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count\)!=\(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2,4\)/);
   assert.match(workflow,/for phase in power recovery glide/);
   assert.match(workflow,/review-v4\.html#\$theme-\$phase/);
 });
@@ -238,4 +238,17 @@ test('Alpha 29 authentic warm and slate forest near artwork is independently rev
  assert.match(html,/#slate-full-pilot:target~\.frame \.near-pilot/);
  assert.doesNotMatch(html,/<script\b/i);
  assert.doesNotMatch(game,/pilot\/warm\/near|pilot\/slate\/near|full-pilot/);
+});
+
+
+test('Alpha 30 frozen original near art A/B is CSS-only, transparent to real game assets',()=>{
+ assert.match(html,/\.layer\.near-alpha29\{display:none\}/);
+ assert.match(html,/#warm-near-alpha29:target~\.frame \.near-base/);
+ assert.match(html,/#slate-near-alpha29:target~\.frame \.near-alpha29/);
+ for(const theme of ['warm','slate']){
+   assert.match(html,new RegExp('id="'+theme+'-near-alpha29"'));
+   assert.match(html,new RegExp('src="\\./assets/v4/pilot/'+theme+'/near-alpha29\\.svg"'));
+ }
+ assert.doesNotMatch(game,/near-alpha29|full-pilot/);
+ assert.doesNotMatch(html,/<script\b/i);
 });
