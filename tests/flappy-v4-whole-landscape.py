@@ -82,7 +82,11 @@ def compose(root,theme,depth):
     # original outer silhouette, unlike postprocessing whole screenshot.
     diffuse=candidate.filter(ImageFilter.GaussianBlur(7))
     result=Image.blend(candidate,diffuse,.32)
+    # In transparent sky the RGBA *bytes*, not only alpha, must remain
+    # original. Blur can leak hidden RGB into zero-alpha pixels.
+    result=Image.composite(result,before,before.getchannel("A"))
     result.putalpha(before.getchannel("A"))
+    result.paste(before.crop((0,0,W,SKY[depth])),(0,0))
     # Only source tile edge strips are preserved from previous QA candidate.
     # The 16px interior crossfade prevents obvious hard material boundaries.
     result.paste(before.crop((0,0,QUIET_EDGE,H)),(0,0))
