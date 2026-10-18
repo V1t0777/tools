@@ -430,6 +430,33 @@
       "runtime_asset": false,
       "final_original_master_approved": false,
       "note": "This changes only interior illustrated tree value planes/branches, not exterior tree silhouettes, physics, player, leaderboard, nor V3.1."
+    },
+    {
+      "alpha": 36,
+      "stage": "two_original_irregular_silhouette_positive_negative_crown_studies",
+      "themes": [
+        "warm",
+        "slate"
+      ],
+      "layers": [
+        "near"
+      ],
+      "original_editable_2x": [
+        "flappy/assets/v4/masters/warm/near-outline-alpha36.svg",
+        "flappy/assets/v4/masters/slate/near-outline-alpha36.svg"
+      ],
+      "authoring_per_theme": "11 tree-specific groups, 33 positive shaped extensions and 22 negative sky-outline notches; 55 independent source paths",
+      "renderer": "tests/flappy-v4-outline-paint.py",
+      "generated_ci_only": "flappy/assets/v4/pilot/{warm,slate}/near-raster-alpha36.png",
+      "baseline": "warm Alpha34, slate Alpha35 RGBA; original source SVG Alpha30 tree crown paths",
+      "safety": "intentional alpha changes bounded to per-tree original crown morphology within 14 raster px, upper 600 pixels, outer 40px repeating edge always byte-identical; source bbox unchanged; PNG max 4MB",
+      "browser_evidence": "two themes two mobile viewport real screenshot A/B RGB pixel comparisons and both actual tile joins, reject unchanged routes",
+      "static_art_browser_screenshots_target": 119,
+      "decoded_source_seam_audits_target": 19,
+      "production_runtime_changed": false,
+      "gameplay_physics_changed": false,
+      "master_approved": false,
+      "limitations": "Illustrated contour study improving irregularity, not signed-off true professional native textured artwork; no actual physical phone tests."
     }
   ]
 }
