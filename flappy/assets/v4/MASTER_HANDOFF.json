@@ -449,14 +449,15 @@
       "renderer": "tests/flappy-v4-outline-paint.py",
       "generated_ci_only": "flappy/assets/v4/pilot/{warm,slate}/near-raster-alpha36.png",
       "baseline": "warm Alpha34, slate Alpha35 RGBA; original source SVG Alpha30 tree crown paths",
-      "safety": "intentional alpha changes bounded to per-tree original crown morphology within 14 raster px, upper 600 pixels, outer 40px repeating edge always byte-identical; source bbox unchanged; PNG max 4MB",
+      "safety": "intentional alpha changes bounded to per-tree original crown morphology within 14 raster px, upper 600 pixels, outer 40px repeating edge always byte-identical; only source alpha bbox top may shift, by at most 28px; all other bbox edges unchanged; PNG max 4MB",
       "browser_evidence": "two themes two mobile viewport real screenshot A/B RGB pixel comparisons and both actual tile joins, reject unchanged routes",
       "static_art_browser_screenshots_target": 119,
       "decoded_source_seam_audits_target": 19,
       "production_runtime_changed": false,
       "gameplay_physics_changed": false,
       "master_approved": false,
-      "limitations": "Illustrated contour study improving irregularity, not signed-off true professional native textured artwork; no actual physical phone tests."
+      "limitations": "Illustrated contour study improving irregularity, not signed-off true professional native textured artwork; no actual physical phone tests.",
+      "art_direction_followup": "First run revealed slate negative notches altered only 1 visible alpha pixel; revised slate source-authoring groups extend the notches into actual cone boughs and added minimum 40 carved pixels acceptance threshold."
     }
   ]
 }
