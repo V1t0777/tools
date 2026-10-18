@@ -172,7 +172,12 @@ def compose(root: Path, theme: str):
             if prev_data[a:b] != current_data[a:b]:
                 raise AssertionError(f"{theme} repeat-edge bytes changed")
     total, alpha_added, alpha_carved = count_changes(before, result)
-    if total < 1000 or total > 100000 or alpha_added < 10:
+    # Both silhouettes must have real additive sky-facing tips AND
+    # deliberately recessed edge holes. A nearly zero recess is the known
+    # blue-hour Alpha36-first-pass flaw and cannot be accepted as finished.
+    min_recess = 100 if theme == "warm" else 40
+    if (total < 1000 or total > 100000 or alpha_added < 10
+            or alpha_carved < min_recess):
         raise AssertionError(
             f"{theme} alpha36 outline modification out of bounds: "
             f"{total=}, {alpha_added=}, {alpha_carved=}")
@@ -206,6 +211,7 @@ def compose(root: Path, theme: str):
             "rgba_changed_pixels": total,
             "NEW_alpha_edge_pixels": alpha_added,
             "recessed_source_perimeter_pixels": alpha_carved,
+            "minimum_recessed_alpha_edge_pixels": min_recess,
             "altered_alpha_intentionally": True,
             "alpha_bbox_before": list(old_box),
             "alpha_bbox_after": list(new_box),
