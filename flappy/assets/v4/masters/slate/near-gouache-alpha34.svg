@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3200" height="2000" viewBox="0 0 3200 2000" role="img" aria-label="Alpha34 independently authored slate original gouache accents QA source">
+<title>Alpha 34 — Blue Hour Range source-layout-specific editorial gouache brush artwork</title>
+<desc>Hand-positioned source-editable scene value washes and branch direction along each of eleven trees, distinct warm and slate compositions. The renderer crops them against the original Alpha30 tree silhouettes and ridge to keep alpha exactly stable. Draft study only, not professionally approved production artwork.</desc>
+<g id="authored-crown-gouache" data-alpha34="crown" stroke-linecap="round"><g data-paint-tree="1" data-material="conifer" transform="translate(188 1418)">
+<path data-author-mark="light" d="M-6 -70 Q-24 -33 -40 -13 Q-24 -12 -8 -29 Q1 -12 16 -8 Q25 -12 30 -24 Q7 -40 -6 -70Z" fill="#91b3c3" fill-opacity=".11"/>
+<path data-author-mark="occlusion" d="M-8 -16 Q-24 14 -41 35 M4 -7 Q18 14 40 24" fill="none" stroke="#132f49" stroke-width="6" stroke-linejoin="round" stroke-linecap="round" stroke-opacity=".24"/>
+<path data-author-mark="edge" d="M-33 22 Q-4 17 22 24 M-27 47 Q0 33 24 41" fill="none" stroke="#b1b1b1" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" stroke-opacity=".20"/>
+</g>
+<g data-paint-tree="2" data-material="conifer" transform="translate(410 1454)">
+<path data-author-mark="light" d="M-7 -65 Q-30 -38 -38 -21 Q-20 -18 -2 -34 Q7 -26 29 -19 Q28 -40 -7 -65Z" fill="#647f97" fill-opacity=".11"/>
+<path data-author-mark="occlusion" d="M-5 -13 Q-24 4 -51 15 M6 2 Q22 15 48 21" fill="none" stroke="#132f49" stroke-width="6" stroke-linejoin="round" stroke-linecap="round" stroke-opacity=".24"/>
+<path data-author-mark="edge" d="M-38 38 Q-10 19 32 27 M-28 53 Q13 40 44 50" fill="none" stroke="#b1b1b1" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" stroke-opacity=".20"/>
+</g>
+<g data-paint-tree="3" data-material="conifer" transform="translate(670 1363)">
+<path data-author-mark="light" d="M-9 -75 Q-16 -48 -35 -26 Q-15 -25 -6 -41 Q4 -22 29 -29 Q10 -54 -9 -75Z" fill="#91b3c3" fill-opacity=".11"/>
+<path data-author-mark="occlusion" d="M-17 -8 Q-31 11 -53 20 M9 -13 Q34 5 50 10" fill="none" stroke="#132f49" stroke-width="6" stroke-linejoin="round" stroke-linecap="round" stroke-opacity=".24"/>
+<path data-author-mark="edge" d="M-41 44 Q-7 23 34 38 M-33 70 Q7 43 39 58" fill="none" stroke="#b1b1b1" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" stroke-opacity=".20"/>
+</g>
+<g data-paint-tree="4" data-material="conifer" transform="translate(947 1360)">
+<path data-author-mark="light" d="M-9 -68 Q-27 -38 -36 -22 Q-15 -24 -7 -39 Q12 -23 35 -17 Q21 -44 -9 -68Z" fill="#647f97" fill-opacity=".11"/>
+<path data-author-mark="occlusion" d="M-18 -4 Q-39 14 -57 27 M11 -2 Q23 11 47 18" fill="none" stroke="#132f49" stroke-width="6" stroke-linejoin="round" stroke-linecap="round" stroke-opacity=".24"/>
+<path data-author-mark="edge" d="M-44 49 Q-6 32 34 44 M-35 66 Q-7 49 29 61" fill="none" stroke="#b1b1b1" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" stroke-opacity=".20"/>
+</g>
+<g data-paint-tree="5" data-material="conifer" transform="translate(1225 1455)">
+<path data-author-mark="light" d="M-6 -65 Q-23 -42 -37 -21 Q-16 -21 -5 -35 Q11 -22 33 -19 Q19 -48 -6 -65Z" fill="#91b3c3" fill-opacity=".11"/>
+<path data-author-mark="occlusion" d="M-10 -15 Q-31 0 -50 11 M12 -8 Q31 4 52 11" fill="none" stroke="#132f49" stroke-width="6" stroke-linejoin="round" stroke-linecap="round" stroke-opacity=".24"/>
+<path data-author-mark="edge" d="M-43 44 Q-14 25 27 30 M-30 63 Q4 46 40 52" fill="none" stroke="#b1b1b1" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" stroke-opacity=".20"/>
+</g>
+<g data-paint-tree="6" data-material="conifer" transform="translate(1515 1346)">
+<path data-author-mark="light" d="M-6 -78 Q-29 -46 -39 -28 Q-17 -32 -4 -44 Q16 -29 29 -22 Q15 -52 -6 -78Z" fill="#647f97" fill-opacity=".11"/>
+<path data-author-mark="occlusion" d="M-20 -13 Q-43 5 -52 20 M10 -14 Q36 3 43 11" fill="none" stroke="#132f49" stroke-width="6" stroke-linejoin="round" stroke-linecap="round" stroke-opacity=".24"/>
+<path data-author-mark="edge" d="M-40 45 Q-6 18 27 32 M-31 76 Q7 48 41 63" fill="none" stroke="#b1b1b1" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" stroke-opacity=".20"/>
+</g>
+<g data-paint-tree="7" data-material="conifer" transform="translate(1803 1346)">
+<path data-author-mark="light" d="M-7 -72 Q-24 -37 -39 -19 Q-18 -22 -7 -40 Q13 -26 31 -17 Q14 -44 -7 -72Z" fill="#91b3c3" fill-opacity=".11"/>
+<path data-author-mark="occlusion" d="M-17 -7 Q-35 10 -49 24 M10 -2 Q27 14 48 24" fill="none" stroke="#132f49" stroke-width="6" stroke-linejoin="round" stroke-linecap="round" stroke-opacity=".24"/>
+<path data-author-mark="edge" d="M-41 39 Q-4 24 33 34 M-32 68 Q-5 52 28 60" fill="none" stroke="#b1b1b1" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" stroke-opacity=".20"/>
+</g>
+<g data-paint-tree="8" data-material="conifer" transform="translate(2072 1401)">
+<path data-author-mark="light" d="M-8 -70 Q-32 -37 -40 -24 Q-17 -25 -8 -41 Q17 -23 29 -18 Q18 -49 -8 -70Z" fill="#647f97" fill-opacity=".11"/>
+<path data-author-mark="occlusion" d="M-19 -14 Q-45 10 -60 14 M11 -9 Q31 8 50 14" fill="none" stroke="#132f49" stroke-width="6" stroke-linejoin="round" stroke-linecap="round" stroke-opacity=".24"/>
+<path data-author-mark="edge" d="M-45 43 Q-8 29 28 32 M-33 71 Q3 49 41 55" fill="none" stroke="#b1b1b1" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" stroke-opacity=".20"/>
+</g>
+<g data-paint-tree="9" data-material="conifer" transform="translate(2356 1347)">
+<path data-author-mark="light" d="M-11 -81 Q-28 -55 -45 -33 Q-21 -29 -9 -45 Q9 -34 31 -29 Q8 -60 -11 -81Z" fill="#91b3c3" fill-opacity=".11"/>
+<path data-author-mark="occlusion" d="M-18 -9 Q-36 10 -53 19 M8 -8 Q31 10 54 21" fill="none" stroke="#132f49" stroke-width="6" stroke-linejoin="round" stroke-linecap="round" stroke-opacity=".24"/>
+<path data-author-mark="edge" d="M-42 52 Q-10 27 31 42 M-33 76 Q-1 50 43 65" fill="none" stroke="#b1b1b1" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" stroke-opacity=".20"/>
+</g>
+<g data-paint-tree="10" data-material="conifer" transform="translate(2685 1453)">
+<path data-author-mark="light" d="M-6 -69 Q-27 -33 -44 -19 Q-22 -19 -8 -32 Q8 -20 29 -22 Q17 -52 -6 -69Z" fill="#647f97" fill-opacity=".11"/>
+<path data-author-mark="occlusion" d="M-23 -5 Q-46 12 -54 23 M14 -1 Q27 12 53 29" fill="none" stroke="#132f49" stroke-width="6" stroke-linejoin="round" stroke-linecap="round" stroke-opacity=".24"/>
+<path data-author-mark="edge" d="M-41 39 Q-2 21 30 36 M-32 65 Q6 40 35 49" fill="none" stroke="#b1b1b1" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" stroke-opacity=".20"/>
+</g>
+<g data-paint-tree="11" data-material="conifer" transform="translate(2982 1473)">
+<path data-author-mark="light" d="M-7 -69 Q-31 -41 -37 -23 Q-16 -20 -7 -39 Q13 -28 33 -14 Q23 -47 -7 -69Z" fill="#91b3c3" fill-opacity=".11"/>
+<path data-author-mark="occlusion" d="M-15 -4 Q-40 14 -54 23 M12 1 Q34 12 53 20" fill="none" stroke="#132f49" stroke-width="6" stroke-linejoin="round" stroke-linecap="round" stroke-opacity=".24"/>
+<path data-author-mark="edge" d="M-43 39 Q-7 26 31 35 M-31 62 Q4 47 36 54" fill="none" stroke="#b1b1b1" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" stroke-opacity=".20"/>
+</g></g>
+<g id="authored-ground-gouache" data-alpha34="soil" stroke-linecap="round"><path data-ground-paint="1" d="M95 1766 Q218 1745 366 1763 Q475 1781 568 1747" fill="none" stroke="#647f97" stroke-width="28" stroke-opacity=".13" stroke-linecap="round"/>
+<path data-ground-paint="2" d="M392 1858 Q571 1812 708 1847 Q825 1858 966 1843" fill="none" stroke="#91b3c3" stroke-width="16" stroke-opacity=".09" stroke-linecap="round"/>
+<path data-ground-paint="3" d="M829 1726 Q1011 1698 1169 1734 Q1263 1745 1399 1718" fill="none" stroke="#132f49" stroke-width="16" stroke-opacity=".09" stroke-linecap="round"/>
+<path data-ground-paint="4" d="M1246 1930 Q1478 1889 1642 1914 Q1759 1932 1870 1903" fill="none" stroke="#647f97" stroke-width="28" stroke-opacity=".13" stroke-linecap="round"/>
+<path data-ground-paint="5" d="M1711 1786 Q1894 1720 2061 1752 Q2218 1792 2316 1744" fill="none" stroke="#91b3c3" stroke-width="16" stroke-opacity=".09" stroke-linecap="round"/>
+<path data-ground-paint="6" d="M2144 1856 Q2318 1805 2462 1841 Q2590 1872 2722 1846" fill="none" stroke="#132f49" stroke-width="16" stroke-opacity=".09" stroke-linecap="round"/>
+<path data-ground-paint="7" d="M2675 1775 Q2888 1733 3032 1770" fill="none" stroke="#647f97" stroke-width="28" stroke-opacity=".13" stroke-linecap="round"/>
+<path data-ground-paint="8" d="M302 1947 Q557 1886 783 1924" fill="none" stroke="#91b3c3" stroke-width="16" stroke-opacity=".09" stroke-linecap="round"/>
+<path data-ground-paint="9" d="M1795 1964 Q2028 1906 2242 1941 Q2371 1959 2603 1933" fill="none" stroke="#132f49" stroke-width="16" stroke-opacity=".09" stroke-linecap="round"/></g>
+</svg>
