@@ -101,7 +101,7 @@ def seam_audit(path: Path):
 
 def run(directory: Path):
     reports = []
-    for layer in ("far", "mid", "mist"):
+    for layer in ("far", "mid", "mist", "near"):
         for theme in ("warm", "slate"):
             name = (f"pilot-seam-{theme}-320x568.png" if layer == "far" else
                     f"pilot-{layer}-seam-{theme}-320x568.png")
