@@ -175,6 +175,14 @@ def run(directory: Path):
             if not path.is_file():
                 raise FileNotFoundError(path)
             reports.append(seam_audit(path))
+    # Alpha41: all four new far/mid transparent repeated source seam scenes
+    # in the combined one-process Chrome 36-image recent-stage capture.
+    for theme in ("warm", "slate"):
+        for depth in ("far","mid"):
+            file = directory / f"alpha41-{depth}-seam-{theme}-320x568.png"
+            if not file.is_file():
+                raise FileNotFoundError(file)
+            reports.append(seam_audit(file))
     result = {
         "scope": "Alpha 26 original far/mid pilot flat tile boundary, Chrome mobile viewport",
         "warning": "Single-row-band RGB diagnostics, not painterly review or hardware proof",
