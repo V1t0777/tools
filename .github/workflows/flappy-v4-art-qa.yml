@@ -141,6 +141,16 @@ jobs:
           for theme in warm slate; do
             cp "flappy/assets/v4/pilot/$theme/far-raster-alpha43.png" "v4-art-qa/alpha43-far-natural/$theme-far-rgba-1600x1000.png"
           done
+          # Alpha44: six original far/mid/near tonal harmony PNGs from
+          # two independent editable 2x source SVGs (Draft/CI ONLY).
+          .alpha31-art-venv/bin/python tests/flappy-v4-depth-cohesion.py
+          mkdir -p v4-art-qa/alpha44-cohesion
+          for theme in warm slate; do
+            for depth in far mid near; do
+              cp "flappy/assets/v4/pilot/$theme/$depth-raster-alpha44.png" "v4-art-qa/alpha44-cohesion/$theme-$depth-1600x1000.png"
+            done
+          done
+          test -s v4-art-qa/alpha44-cohesion-metrics.json
           test -s v4-art-qa/alpha43-far-organic-metrics.json
           test -s v4-art-qa/alpha42-slate-organic-metrics.json
           test -s v4-art-qa/alpha41-atmospheric-metrics.json
@@ -705,12 +715,16 @@ jobs:
           .alpha31-art-venv/bin/python tests/flappy-v4-atmospheric-depth.py --verify-screens
           .alpha31-art-venv/bin/python tests/flappy-v4-organic-midrange.py --verify-screens
           .alpha31-art-venv/bin/python tests/flappy-v4-organic-far.py --verify-screens
-          for stage in alpha39 alpha40 alpha41 alpha42 alpha43; do
+          .alpha31-art-venv/bin/python tests/flappy-v4-depth-cohesion.py --verify-screens
+          .alpha31-art-venv/bin/python tests/flappy-v4-foreground-readability.py
+          for stage in alpha39 alpha40 alpha41 alpha42 alpha43 alpha44; do
             test -s "v4-art-qa/$stage-batch-chrome-metrics.json"
           done
           test -s v4-art-qa/recent-batch-chrome-metrics.json
           test -s v4-art-qa/alpha42-slate-mobile-ab.json
           test -s v4-art-qa/alpha43-far-mobile-ab.json
+          test -s v4-art-qa/alpha44-real-world-ab.json
+          test -s v4-art-qa/alpha44-real-chrome-readability.json
           # Unchanged warm route is exercised by the loop above:
           # http://127.0.0.1:8765/flappy/review-v4.html#warm-pilot
           # pilot-warm-far-$W, master-warm-far-3200x2000.png
@@ -724,7 +738,7 @@ jobs:
               # Alpha 27 mist-only proofs are mostly transparent; expected to
               # compress better than fully-painted screenshots. Keep a strict
               # nonempty threshold, PNG CRC/signature, dimensions and RGB seam QA.
-              min_bytes=12000 if path.name.startswith(("pilot-mist-seam-", "pilot-near-seam-", "alpha37-mid-seam-", "alpha38-far-seam-", "alpha40-far-seam-", "alpha40-mid-seam-", "alpha42-mid-seam-", "alpha43-far-seam-")) else 20000
+              min_bytes=12000 if path.name.startswith(("pilot-mist-seam-", "pilot-near-seam-", "alpha37-mid-seam-", "alpha38-far-seam-", "alpha40-far-seam-", "alpha40-mid-seam-", "alpha42-mid-seam-", "alpha43-far-seam-", "alpha44-far-seam-", "alpha44-mid-seam-", "alpha44-near-seam-")) else 20000
               if len(b)<min_bytes:
                   raise SystemExit(f"Suspiciously small screenshot: {path}; size={len(b)}; minimum={min_bytes}")
               width,height=struct.unpack(">II",b[16:24])
@@ -787,9 +801,16 @@ jobs:
           alpha43_far_count=len(list(Path("v4-art-qa").glob("alpha43-far-*.png")))-len(list(Path("v4-art-qa").glob("alpha43-far-seam-*.png")))
           alpha43_far_seam_count=len(list(Path("v4-art-qa").glob("alpha43-far-seam-*.png")))
           alpha43_world_count=len(list(Path("v4-art-qa").glob("alpha43-world-*.png")))
+          alpha44_far_count=len(list(Path("v4-art-qa").glob("alpha44-far-*.png")))-len(list(Path("v4-art-qa").glob("alpha44-far-seam-*.png")))
+          alpha44_mid_count=len(list(Path("v4-art-qa").glob("alpha44-mid-*.png")))-len(list(Path("v4-art-qa").glob("alpha44-mid-seam-*.png")))
+          alpha44_near_count=len(list(Path("v4-art-qa").glob("alpha44-near-*.png")))-len(list(Path("v4-art-qa").glob("alpha44-near-seam-*.png")))
+          alpha44_far_seam_count=len(list(Path("v4-art-qa").glob("alpha44-far-seam-*.png")))
+          alpha44_mid_seam_count=len(list(Path("v4-art-qa").glob("alpha44-mid-seam-*.png")))
+          alpha44_near_seam_count=len(list(Path("v4-art-qa").glob("alpha44-near-seam-*.png")))
+          alpha44_world_count=len(list(Path("v4-art-qa").glob("alpha44-world-*.png")))
           master_count=len(list(Path("v4-art-qa").glob("master-*.png")))
-          if (scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count,alpha32_raster_count,alpha32_raster_seam_count,alpha33_raster_count,alpha33_raster_seam_count,alpha34_raster_count,alpha34_raster_seam_count,alpha35_raster_count,alpha35_raster_seam_count,alpha36_raster_count,alpha36_raster_seam_count,alpha37_mid_count,alpha37_mid_seam_count,alpha37_world_count,alpha38_far_count,alpha38_far_seam_count,alpha38_world_count,alpha39_far_count,alpha39_far_seam_count,alpha39_world_count,alpha40_far_count,alpha40_mid_count,alpha40_far_seam_count,alpha40_mid_seam_count,alpha40_world_count,alpha41_far_count,alpha41_mid_count,alpha41_far_seam_count,alpha41_mid_seam_count,alpha41_world_count,alpha42_mid_count,alpha42_mid_seam_count,alpha42_world_count,alpha43_far_count,alpha43_far_seam_count,alpha43_world_count)!=(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2,4,4,2,4,2,4,2,4,2,2,1,4,2,4,2,2,4,2,2,4,2,2,4,4,2,2,2,4,4,2,2,2,2,1,1,4,2,2):
-              raise SystemExit(f"Alpha 43 expected 183 static art screenshots: got {(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count,alpha32_raster_count,alpha32_raster_seam_count,alpha33_raster_count,alpha33_raster_seam_count,alpha34_raster_count,alpha34_raster_seam_count,alpha35_raster_count,alpha35_raster_seam_count,alpha36_raster_count,alpha36_raster_seam_count,alpha37_mid_count,alpha37_mid_seam_count,alpha37_world_count,alpha38_far_count,alpha38_far_seam_count,alpha38_world_count,alpha39_far_count,alpha39_far_seam_count,alpha39_world_count,alpha40_far_count,alpha40_mid_count,alpha40_far_seam_count,alpha40_mid_seam_count,alpha40_world_count,alpha41_far_count,alpha41_mid_count,alpha41_far_seam_count,alpha41_mid_seam_count,alpha41_world_count,alpha42_mid_count,alpha42_mid_seam_count,alpha42_world_count,alpha43_far_count,alpha43_far_seam_count,alpha43_world_count)}")
+          if (scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count,alpha32_raster_count,alpha32_raster_seam_count,alpha33_raster_count,alpha33_raster_seam_count,alpha34_raster_count,alpha34_raster_seam_count,alpha35_raster_count,alpha35_raster_seam_count,alpha36_raster_count,alpha36_raster_seam_count,alpha37_mid_count,alpha37_mid_seam_count,alpha37_world_count,alpha38_far_count,alpha38_far_seam_count,alpha38_world_count,alpha39_far_count,alpha39_far_seam_count,alpha39_world_count,alpha40_far_count,alpha40_mid_count,alpha40_far_seam_count,alpha40_mid_seam_count,alpha40_world_count,alpha41_far_count,alpha41_mid_count,alpha41_far_seam_count,alpha41_mid_seam_count,alpha41_world_count,alpha42_mid_count,alpha42_mid_seam_count,alpha42_world_count,alpha43_far_count,alpha43_far_seam_count,alpha43_world_count,alpha44_far_count,alpha44_mid_count,alpha44_near_count,alpha44_far_seam_count,alpha44_mid_seam_count,alpha44_near_seam_count,alpha44_world_count)!=(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2,4,4,2,4,2,4,2,4,2,2,1,4,2,4,2,2,4,2,2,4,2,2,4,4,2,2,2,4,4,2,2,2,2,1,1,4,2,2,2,2,2,2,2,2,4):
+              raise SystemExit(f"Alpha 44 expected 199 static art screenshots: got {(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count,alpha32_raster_count,alpha32_raster_seam_count,alpha33_raster_count,alpha33_raster_seam_count,alpha34_raster_count,alpha34_raster_seam_count,alpha35_raster_count,alpha35_raster_seam_count,alpha36_raster_count,alpha36_raster_seam_count,alpha37_mid_count,alpha37_mid_seam_count,alpha37_world_count,alpha38_far_count,alpha38_far_seam_count,alpha38_world_count,alpha39_far_count,alpha39_far_seam_count,alpha39_world_count,alpha40_far_count,alpha40_mid_count,alpha40_far_seam_count,alpha40_mid_seam_count,alpha40_world_count,alpha41_far_count,alpha41_mid_count,alpha41_far_seam_count,alpha41_mid_seam_count,alpha41_world_count,alpha42_mid_count,alpha42_mid_seam_count,alpha42_world_count,alpha43_far_count,alpha43_far_seam_count,alpha43_world_count,alpha44_far_count,alpha44_mid_count,alpha44_near_count,alpha44_far_seam_count,alpha44_mid_seam_count,alpha44_near_seam_count,alpha44_world_count)}")
           PY
           # Alpha 26: use actual decompressed Chrome PNG pixels, not file counts,
           # to reject a bright repeat-border stroke like the Alpha 25 defect.
@@ -820,7 +841,7 @@ jobs:
             v4-game-qa/headless-narrow-readability.json
           retention-days: 7
           if-no-files-found: warn
-      - name: Keep 183 browser artwork shots and twenty-eight actual 1600px RGBA study outputs
+      - name: Keep 199 browser artwork shots and thirty-four actual 1600px RGBA study outputs
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -868,6 +889,11 @@ jobs:
             v4-art-qa/alpha43-far-organic-metrics.json
             v4-art-qa/alpha43-far-mobile-ab.json
             v4-art-qa/alpha43-batch-chrome-metrics.json
+            v4-art-qa/alpha44-cohesion/*.png
+            v4-art-qa/alpha44-cohesion-metrics.json
+            v4-art-qa/alpha44-real-world-ab.json
+            v4-art-qa/alpha44-real-chrome-readability.json
+            v4-art-qa/alpha44-batch-chrome-metrics.json
             v4-art-qa/headless-painted-pilot-seams.json
             v4-art-qa/server.log
             v4-art-qa/chrome.log
