@@ -266,7 +266,7 @@
       "production_asset": false,
       "renderer_swap_enabled": false,
       "art_direction_approved": false,
-      "notes": "Alpha29 hand-authored dawn valley close broadleaf canopy; 11 independently drawn trees, restrained sandy foreground gouache, seamless ridge, no live runtime change."
+      "notes": "Alpha29 hand-authored dawn valley close broadleaf canopy; 11 independently drawn trees, restrained sandy foreground gouache, seamless ridge, no live runtime change. Alpha30: organic asymmetrical woodland canopy, 3+ crown families and layered branches, unchanged ridge."
     },
     {
       "theme": "slate",
@@ -279,12 +279,27 @@
       "production_asset": false,
       "renderer_swap_enabled": false,
       "art_direction_approved": false,
-      "notes": "Alpha29 independently hand-authored blue-hour alpine conifers, 11 slender spruce silhouettes, dark granite foothill washes and tile-aligned ridge, reviewer-only."
+      "notes": "Alpha29 independently hand-authored blue-hour alpine conifers, 11 slender spruce silhouettes, dark granite foothill washes and tile-aligned ridge, reviewer-only. Alpha30: uneven spruce/fir/larch crown silhouettes, asymmetric branching and fewer repeated triangular motifs, unchanged ridge."
     }
   ],
   "pilot_completion": {
     "completed_studies": 10,
     "total_layer_targets": 10,
     "completed_final_masters": 0
-  }
+  },
+  "pilot_refinements": [
+    {
+      "alpha": 30,
+      "stage": "near_forest_organic_geometry_pass_1",
+      "baseline": "Alpha 29 original masters and preview copies retained as masters/{theme}/near-master-alpha29.svg and pilot/{theme}/near-alpha29.svg",
+      "theme_layers": [
+        "warm/near",
+        "slate/near"
+      ],
+      "status": "QA_ONLY_NOT_FINAL",
+      "production_asset": false,
+      "art_direction_approved": false,
+      "notes": "Fresh variable organic contour/branches; high-res native painted textures, device playtests and professional art acceptance still missing."
+    }
+  ]
 }
