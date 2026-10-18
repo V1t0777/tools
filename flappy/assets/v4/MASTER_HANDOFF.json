@@ -374,6 +374,40 @@
       "runtime_asset": false,
       "art_direction_approved": false,
       "notes": "Original path-masked interior texture lighting and ground ribbons preserve exact 1600x1000 alpha and 40px repeat border. This remains algorithmic illustration QA, not artist-approved native production painting."
+    },
+    {
+      "alpha": 34,
+      "stage": "explicit_2x_editable_original_editorial_tree_value_and_ground_washes",
+      "themes": [
+        "warm",
+        "slate"
+      ],
+      "layers": [
+        "near"
+      ],
+      "source": [
+        "flappy/assets/v4/masters/warm/near-gouache-alpha34.svg",
+        "flappy/assets/v4/masters/slate/near-gouache-alpha34.svg"
+      ],
+      "renderer": "tests/flappy-v4-editorial-gouache.py",
+      "baseline": "Existing original authored source tree silhouettes and Alpha33 bitmap kept unmodified",
+      "per_theme": {
+        "tree_compositions": 11,
+        "curated_canopy_paths": 33,
+        "curated_terrain_paths": 9,
+        "source_size": "3200x2000",
+        "raster_QA_size": "1600x1000"
+      },
+      "generated_outputs": [
+        "flappy/assets/v4/pilot/warm/near-raster-alpha34.png",
+        "flappy/assets/v4/pilot/slate/near-raster-alpha34.png"
+      ],
+      "generated_in": "Draft-only CI and local QA; preview bitmaps are never source-committed or runtime-loaded",
+      "masking": "Original tree crown silhouettes and open ground ridge, original RGBA alpha and 40px boundary retained",
+      "production_asset": false,
+      "runtime_asset": false,
+      "art_direction_approved": false,
+      "notes": "Two independent human-directed path compositions for watercolor/gouache-like value structure, not algorithmically dispersed new brush marks. Remains SVG painting pilot, not artist-approved layered native bitmap master."
     }
   ]
 }
