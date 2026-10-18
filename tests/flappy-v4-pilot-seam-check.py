@@ -154,6 +154,12 @@ def run(directory: Path):
         if not path.is_file():
             raise FileNotFoundError(path)
         reports.append(seam_audit(path))
+    # Alpha38 far ridge true repeated PNG / decoded Chrome RGB seam evidence.
+    for theme in ("warm", "slate"):
+        path = directory / f"alpha38-far-seam-{theme}-320x568.png"
+        if not path.is_file():
+            raise FileNotFoundError(path)
+        reports.append(seam_audit(path))
     result = {
         "scope": "Alpha 26 original far/mid pilot flat tile boundary, Chrome mobile viewport",
         "warning": "Single-row-band RGB diagnostics, not painterly review or hardware proof",
