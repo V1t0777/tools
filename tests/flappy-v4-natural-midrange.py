@@ -125,7 +125,7 @@ def verify_screens(root):
     results = []
     for theme in ("warm", "slate"):
         for w,h in ((320,568),(390,844)):
-            a = folder / f"alpha37-mid-reference-{theme}-{w}x{h}.png"
+            a = folder / f"pilot-mid-{theme}-{w}x{h}.png"
             b = folder / f"alpha37-mid-{theme}-{w}x{h}.png"
             with Image.open(a) as x, Image.open(b) as y:
                 if x.size != (w,h) or y.size != x.size:
