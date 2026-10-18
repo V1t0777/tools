@@ -764,7 +764,7 @@ test('Alpha42 new slate original midrange source structurally changes crest/base
  assert.match(workflow,/alpha42-slate-mobile-ab\.json/);
  assert.match(workflow,/Alpha 43 expected 183 static art screenshots/);
  assert.match(runner,/alpha42-world-slate-320x568/);
- assert.match(runner,/expected=\{"alpha39":8,"alpha40":14,"alpha41":14,"alpha42":4\}/);
+ assert.match(runner,/expected=\{"alpha39":8,"alpha40":14,"alpha41":14,"alpha42":4,"alpha43":8\}/);
  assert.match(seams,/alpha42-mid-seam-slate-320x568\.png/);
  assert.doesNotMatch(game,/mid-raster-alpha42|organic-midrange/);
  assert.doesNotMatch(builder,/mid-raster-alpha42|organic-midrange/);
