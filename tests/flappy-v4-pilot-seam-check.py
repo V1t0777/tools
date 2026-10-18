@@ -183,6 +183,12 @@ def run(directory: Path):
             if not file.is_file():
                 raise FileNotFoundError(file)
             reports.append(seam_audit(file))
+    # Alpha42 true original slate mid skyline + repaint repeated PNG join,
+    # decoded actual browser pixels, not a file size or header-only test.
+    sample = directory / "alpha42-mid-seam-slate-320x568.png"
+    if not sample.is_file():
+        raise FileNotFoundError(sample)
+    reports.append(seam_audit(sample))
     result = {
         "scope": "Alpha 26 original far/mid pilot flat tile boundary, Chrome mobile viewport",
         "warning": "Single-row-band RGB diagnostics, not painterly review or hardware proof",
