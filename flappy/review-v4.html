@@ -47,6 +47,10 @@ header p{max-width:760px;margin:0 0 16px}
 .layer.near{z-index:4}
 .layer.near-pilot{display:none}
 .layer.near-alpha29{display:none}
+/* Generated in Draft CI only. No shipped texture and no CSS filter cost. */
+.layer.near-raster-alpha31{display:none;aspect-ratio:8/5;background-size:100% 100%;background-repeat:no-repeat}
+.warm .near-raster-alpha31{background-image:url("./assets/v4/pilot/warm/near-raster-alpha31.png")}
+.slate .near-raster-alpha31{background-image:url("./assets/v4/pilot/slate/near-raster-alpha31.png")}
 /* Historical source state remains hidden unless the explicit Alpha 29 review hash is targeted. */
 #paint-near-pilot:checked~.worlds .world .near-base{display:none}
 #paint-near-pilot:checked~.worlds .world .near-pilot{display:block}
@@ -163,6 +167,10 @@ body:has(.phase-anchor:target) .frame{width:100vw;height:100dvh;aspect-ratio:aut
 /* Alpha 30: frozen Alpha 29 near-only visual reference for honest shape A/B */
 #warm-near-alpha29:target~.frame .near-base,#slate-near-alpha29:target~.frame .near-base{display:none}
 #warm-near-alpha29:target~.frame .near-alpha29,#slate-near-alpha29:target~.frame .near-alpha29{display:block}
+/* The raster assets are written only by tests/flappy-v4-raster-pigment.py in CI.
+   Without that build these hash routes are explicitly not an online preview. */
+#warm-raster-alpha31:target~.frame .near-base,#slate-raster-alpha31:target~.frame .near-base{display:none}
+#warm-raster-alpha31:target~.frame .near-raster-alpha31,#slate-raster-alpha31:target~.frame .near-raster-alpha31{display:block}
 /* Automated screenshot capture uses no JavaScript and exercises real atlas rows. */
 .seamworld{display:none}
 .seamframe{position:relative;isolation:isolate;height:100dvh;width:100vw;overflow:hidden}
@@ -187,7 +195,7 @@ body:has(.seamworld:target) .seamworld:target{display:block}
 <main>
 <header><span class="tag">DRAFT · 静态安全验收页 · 不代表正式发布</span>
 <h1>V4 Cinematic Worlds · 双主题对比</h1>
-<p>无 JavaScript 的五层场景对比。角色使用游戏中的透明 24 帧图集（帧 0、6、12、18 可切换）。天空、远景、中景、谷雾和近景森林均有独立试制 A/B（Alpha 24–30）；近景可用 #warm-near-alpha29 / #slate-near-alpha29 对照前版，默认仍为原始游戏 SVG；也可对比五层完整试制构图。试制图层不在游戏运行时使用；石柱仍为布局参考，不是正式 Canvas 材质。</p>
+<p>无 JavaScript 的五层场景对比。角色使用游戏中的透明 24 帧图集（帧 0、6、12、18 可切换）。天空、远景、中景、谷雾和近景森林均有独立试制 A/B（Alpha 24–30）；近景可用 #warm-near-alpha29 / #slate-near-alpha29 对照前版；新增 #warm-raster-alpha31 / #slate-raster-alpha31 为本地构建或 Draft CI 才可看的 PNG 像素肌理试制，默认仍为原始游戏 SVG；也可对比五层完整试制构图。试制图层不在游戏运行时使用；石柱仍为布局参考，不是正式 Canvas 材质。</p>
 </header>
 <section class="options" aria-label="美术验收选项">
 <input type="radio" id="s360" name="size" checked><label for="s360">360 × 600</label>
@@ -208,7 +216,7 @@ body:has(.seamworld:target) .seamworld:target{display:block}
 <div class="worlds">
 <article class="world warm" id="warm">
 <h2>晨曦山谷 · 暖棕旅鸟</h2>
-<span class="phase-anchor" id="warm-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-mid-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-stack-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-mist-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-atmo-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-sky-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-light-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-near-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-near-alpha29" aria-hidden="true"></span><span class="phase-anchor" id="warm-full-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-power" aria-hidden="true"></span><span class="phase-anchor" id="warm-recovery" aria-hidden="true"></span><span class="phase-anchor" id="warm-glide" aria-hidden="true"></span>
+<span class="phase-anchor" id="warm-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-mid-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-stack-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-mist-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-atmo-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-sky-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-light-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-near-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-near-alpha29" aria-hidden="true"></span><span class="phase-anchor" id="warm-raster-alpha31" aria-hidden="true"></span><span class="phase-anchor" id="warm-full-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-power" aria-hidden="true"></span><span class="phase-anchor" id="warm-recovery" aria-hidden="true"></span><span class="phase-anchor" id="warm-glide" aria-hidden="true"></span>
 <div class="frame" role="img" aria-label="晨曦山谷 · 暖棕旅鸟五层背景静态美术预览">
 <img class="layer sky sky-base" src="./assets/v4/warm/sky.svg" alt="" loading="eager" decoding="async">
 <img class="layer sky sky-pilot" src="./assets/v4/pilot/warm/sky.svg" alt="" loading="eager" decoding="async">
@@ -221,11 +229,12 @@ body:has(.seamworld:target) .seamworld:target{display:block}
 <img class="layer near near-base" src="./assets/v4/warm/near.svg" alt="" loading="eager" decoding="async">
 <img class="layer near near-pilot" src="./assets/v4/pilot/warm/near.svg" alt="" loading="eager" decoding="async">
 <img class="layer near near-alpha29" src="./assets/v4/pilot/warm/near-alpha29.svg" alt="" loading="eager" decoding="async">
+<div class="layer near near-raster-alpha31" role="presentation" aria-hidden="true"></div>
 <div class="guides" aria-hidden="true"><span class="pipe top"></span><span class="pipe bottom"></span><span class="bird"></span><span class="ground"></span></div>
 </div><p class="note">独立山谷图层与空间层次；需要实机截图审核，当前不是最终手绘纹理。</p></article>
 <article class="world slate" id="slate">
 <h2>暮蓝远山 · 板岩夜鸟</h2>
-<span class="phase-anchor" id="slate-pilot" aria-hidden="true"></span><span class="phase-anchor" id="slate-mid-pilot" aria-hidden="true"></span><span class="phase-anchor" id="slate-stack-pilot" aria-hidden="true"></span><span class="phase-anchor" id="slate-mist-pilot" aria-hidden="true"></span><span class="phase-anchor" id="slate-atmo-pilot" aria-hidden="true"></span><span class="phase-anchor" id="slate-sky-pilot" aria-hidden="true"></span><span class="phase-anchor" id="slate-light-pilot" aria-hidden="true"></span><span class="phase-anchor" id="slate-near-pilot" aria-hidden="true"></span><span class="phase-anchor" id="slate-near-alpha29" aria-hidden="true"></span><span class="phase-anchor" id="slate-full-pilot" aria-hidden="true"></span>
+<span class="phase-anchor" id="slate-pilot" aria-hidden="true"></span><span class="phase-anchor" id="slate-mid-pilot" aria-hidden="true"></span><span class="phase-anchor" id="slate-stack-pilot" aria-hidden="true"></span><span class="phase-anchor" id="slate-mist-pilot" aria-hidden="true"></span><span class="phase-anchor" id="slate-atmo-pilot" aria-hidden="true"></span><span class="phase-anchor" id="slate-sky-pilot" aria-hidden="true"></span><span class="phase-anchor" id="slate-light-pilot" aria-hidden="true"></span><span class="phase-anchor" id="slate-near-pilot" aria-hidden="true"></span><span class="phase-anchor" id="slate-near-alpha29" aria-hidden="true"></span><span class="phase-anchor" id="slate-raster-alpha31" aria-hidden="true"></span><span class="phase-anchor" id="slate-full-pilot" aria-hidden="true"></span>
 <span class="phase-anchor" id="slate-power" aria-hidden="true"></span><span class="phase-anchor" id="slate-recovery" aria-hidden="true"></span><span class="phase-anchor" id="slate-glide" aria-hidden="true"></span>
 <div class="frame" role="img" aria-label="暮蓝远山 · 板岩夜鸟五层背景静态美术预览">
 <img class="layer sky sky-base" src="./assets/v4/slate/sky.svg" alt="" loading="eager" decoding="async">
@@ -239,10 +248,15 @@ body:has(.seamworld:target) .seamworld:target{display:block}
 <img class="layer near near-base" src="./assets/v4/slate/near.svg" alt="" loading="eager" decoding="async">
 <img class="layer near near-pilot" src="./assets/v4/pilot/slate/near.svg" alt="" loading="eager" decoding="async">
 <img class="layer near near-alpha29" src="./assets/v4/pilot/slate/near-alpha29.svg" alt="" loading="eager" decoding="async">
+<div class="layer near near-raster-alpha31" role="presentation" aria-hidden="true"></div>
 <div class="guides" aria-hidden="true"><span class="pipe top"></span><span class="pipe bottom"></span><span class="bird"></span><span class="ground"></span></div>
 </div><p class="note">独立山谷图层与空间层次；需要实机截图审核，当前不是最终手绘纹理。</p></article>
 </div>
 </section>
+<section class="seamworld pilot-seamworld" id="warm-raster-alpha31-seam" aria-label="warm 1600px raster-pigment original woodland repeat proof, build-only"><div class="seamframe warm">
+<img class="first near" src="./assets/v4/pilot/warm/near-raster-alpha31.png" alt="" decoding="async">
+<img class="second near" src="./assets/v4/pilot/warm/near-raster-alpha31.png" alt="" decoding="async">
+</div></section>
 <section class="seamworld pilot-seamworld" id="warm-near-pilot-seam" aria-label="warm original foreground repeat-tile proof"><div class="seamframe warm">
 <img class="first near" src="./assets/v4/pilot/warm/near.svg" alt="" decoding="async">
 <img class="second near" src="./assets/v4/pilot/warm/near.svg" alt="" decoding="async">
@@ -258,6 +272,10 @@ body:has(.seamworld:target) .seamworld:target{display:block}
 <section class="seamworld pilot-seamworld" id="warm-pilot-seam" aria-label="warm original far painting pilot seamless tile visual evidence"><div class="seamframe warm">
 <img class="first far" src="./assets/v4/pilot/warm/far.svg" alt="" decoding="async">
 <img class="second far" src="./assets/v4/pilot/warm/far.svg" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="slate-raster-alpha31-seam" aria-label="slate 1600px raster-pigment original woodland repeat proof, build-only"><div class="seamframe slate">
+<img class="first near" src="./assets/v4/pilot/slate/near-raster-alpha31.png" alt="" decoding="async">
+<img class="second near" src="./assets/v4/pilot/slate/near-raster-alpha31.png" alt="" decoding="async">
 </div></section>
 <section class="seamworld pilot-seamworld" id="slate-near-pilot-seam" aria-label="slate original foreground repeat-tile proof"><div class="seamframe slate">
 <img class="first near" src="./assets/v4/pilot/slate/near.svg" alt="" decoding="async">
