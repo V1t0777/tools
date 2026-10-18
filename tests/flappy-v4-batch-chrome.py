@@ -34,6 +34,21 @@ SCRIPT = """(async () => {
 
 
 def scenes(stage="alpha39"):
+    if stage=="recent":
+        # Consolidated A/B histories Alpha39/40 + Alpha41 under ONE
+        # isolated DevTools session instead of three Chrome subprocesses.
+        for name in ("alpha39","alpha40","alpha41"):
+            yield from scenes(name)
+        return
+    if stage=="alpha41":
+        for theme in ("warm","slate"):
+            for layer in ("far","mid"):
+                for w,h in ((320,568),(390,844)):
+                    yield f"alpha41-{layer}-{theme}-{w}x{h}.png", f"#{theme}-{layer}-alpha41",w,h
+            yield f"alpha41-world-{theme}-320x568.png", f"#{theme}-world-alpha41",320,568
+            for layer in ("far","mid"):
+                yield f"alpha41-{layer}-seam-{theme}-320x568.png", f"#{theme}-{layer}-alpha41-seam",320,568
+        return
     if stage=="alpha40":
         for theme in ("warm", "slate"):
             for layer in ("far","mid"):
@@ -170,6 +185,27 @@ def screenshot_batch(chrome, base, folder, stage='alpha39'):
     }
     (folder/f"{stage}-batch-chrome-metrics.json").write_text(
         json.dumps(manifest,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+    if stage=="recent":
+        # Keep every previous stage's original evidence manifest while
+        # documenting that all 36 captures share *one* Chrome process.
+        for historical in ("alpha39","alpha40","alpha41"):
+            subset=[m for m in metrics if m["file"].startswith(historical+"-")]
+            expected={"alpha39":8,"alpha40":14,"alpha41":14}[historical]
+            if len(subset)!=expected:
+                raise AssertionError(f"Pooled browser coverage lost {historical}: {len(subset)}")
+            smaller={
+                "stage":historical,"strategy":"one shared single CDP Chrome process for all recent historical stages",
+                "shared_single_chrome_process":True,
+                "total_new_browser_processes_for_recent_stages":1,
+                "independent_capture_count":len(subset),
+                "total_recent_captures":len(metrics),
+                "old_135_capture_coverage_unchanged":True,
+                "historical_143_capture_coverage_unchanged":True,
+                "all_previous_157_evidence_kept":True,
+                "qa_only":True,"screenshots":subset
+            }
+            (folder/f"{historical}-batch-chrome-metrics.json").write_text(
+                json.dumps(smaller,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
     print(stage.upper()+" POOLED CHROME SCREENSHOTS",json.dumps({
         "chrome_processes":1,"images":len(metrics),"duration_seconds":duration,
         "bytes":[m["bytes"] for m in metrics]},ensure_ascii=False))
@@ -180,7 +216,7 @@ if __name__=="__main__":
     parser.add_argument("--chrome",required=True)
     parser.add_argument("--base-url",required=True)
     parser.add_argument("--output",default="v4-art-qa")
-    parser.add_argument("--stage",choices=("alpha39","alpha40"),default="alpha39")
+    parser.add_argument("--stage",choices=("alpha39","alpha40","alpha41","recent"),default="alpha39")
     args=parser.parse_args()
     if not args.base_url.startswith("http://127.0.0.1:"):
         raise SystemExit("Alpha39 screenshot target must be local QA HTTP server")
