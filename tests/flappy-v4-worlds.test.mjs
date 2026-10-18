@@ -639,7 +639,7 @@ test('Alpha 27 true original transparent mist studies are exact, safe and tile-c
      assert.doesNotMatch(asset,/<(?:image|script|filter|use|foreignObject|animate)\b|\b(?:href|src)\s*=/i);
      assert.doesNotMatch(asset,/<rect\b|<foreignObject\b|<filter\b/,'soft transparent envelopes, not rectangle or GPU blur');
      assert.ok(Buffer.byteLength(asset,'utf8')<9000);
-     for(const [,cx,,rx] of asset.matchAll(/<ellipse data-pool="\d" cx="(\d+)" cy="\d+" rx="(\d+)" ry="\d+"/g)){
+     for(const [,cx,rx] of asset.matchAll(/<ellipse data-pool="\d" cx="(\d+)" cy="\d+" rx="(\d+)" ry="\d+"/g)){
        assert.ok(Number(cx)>Number(rx)&&Number(cx)+Number(rx)<3200,
         'Light puddles may not be cut by either horizontal repeat border');
      }
