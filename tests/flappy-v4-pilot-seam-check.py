@@ -167,6 +167,14 @@ def run(directory: Path):
         if not path.is_file():
             raise FileNotFoundError(path)
         reports.append(seam_audit(path))
+    # Alpha40: four independent painted-source far/mid image joins from
+    # the one-process pooled Chrome browser capture, true decoded pixels.
+    for theme in ("warm", "slate"):
+        for depth in ("far", "mid"):
+            path = directory / f"alpha40-{depth}-seam-{theme}-320x568.png"
+            if not path.is_file():
+                raise FileNotFoundError(path)
+            reports.append(seam_audit(path))
     result = {
         "scope": "Alpha 26 original far/mid pilot flat tile boundary, Chrome mobile viewport",
         "warning": "Single-row-band RGB diagnostics, not painterly review or hardware proof",
