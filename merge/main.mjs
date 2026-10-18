@@ -16,6 +16,7 @@ let selected = -1;
 let drag = null;
 let ignoreNextClick = false;
 let noticeTimer = 0;
+let saveIssue = loaded.blocked ? loaded.reason : null;
 if (loaded.migrated) window.setTimeout(() => hint('已保留旧版试玩进度，并升级为 P2 存档'), 250);
 
 function hint(text) {
@@ -23,9 +24,13 @@ function hint(text) {
   window.clearTimeout(noticeTimer);
   noticeTimer = window.setTimeout(() => { notice.textContent = ''; }, 2400);
 }
-function persist() {
-  const saved = saveLocal(store, state);
-  byId('save-status').textContent = saved ? '已保存于此浏览器 · 未上传云端' : '浏览器不允许保存 · 请勿关闭页面';
+function persist({confirmedReset=false}={}) {
+  const saved = saveLocal(store, state, confirmedReset ? {allowReset:true} : undefined);
+  if (saved) saveIssue = null;
+  else saveIssue ??= 'WRITE_FAILED';
+  byId('save-status').textContent = saved ? '已保存于此浏览器 · 未上传云端'
+    : saveIssue === 'CORRUPT_SAVE' ? '检测到异常存档，原始数据已保留；确认重置后才会覆盖'
+    : '无法安全保存，原始存档未被覆盖 · 请勿关闭页面';
 }
 function commit(result) {
   if (result.state !== state) state = result.state;
@@ -216,10 +221,13 @@ byId('store-selected').addEventListener('click',()=>{
 byId('warehouse-upgrade').addEventListener('click',()=>commit(upgradeWarehouse(state)));
 
 byId('reset').addEventListener('click', () => {
-  if (!window.confirm('确定重置本地试玩进度吗？当前棋盘、金币和订单会被清空，且无法恢复。')) return;
+  const warning = saveIssue
+    ? '当前存档无法安全保存。重置会永久覆盖原始存档数据（可能仍可人工修复），确定继续吗？'
+    : '确定重置本地试玩进度吗？当前棋盘、金币和订单会被清空，且无法恢复。';
+  if (!window.confirm(warning)) return;
   state = createInitialState();
   selected = -1;
-  persist(); render(); hint('已重置试玩进度');
+  persist({confirmedReset:true}); render(); hint('已重置试玩进度');
 });
 const dialog = byId('guide');
 byId('how-to').addEventListener('click', () => dialog.showModal());
@@ -228,8 +236,11 @@ byId('close-guide').addEventListener('click', () => dialog.close());
 window.addEventListener('storage', event => {
   if (event.key !== SAVE_KEY || !store) return;
   const fresh = loadLocal(store);
+  if (fresh.blocked) {
+    saveIssue = fresh.reason;persist();return;
+  }
   if (fresh.recovered && fresh.state.revision > state.revision) {
-    state = advanceTime(fresh.state);selected = -1;render();hint('已从其他标签页恢复更新进度');
+    state = advanceTime(fresh.state);selected = -1;persist();render();hint('已从其他标签页恢复更新进度');
   }
 });
 window.setInterval(() => {
@@ -238,4 +249,5 @@ window.setInterval(() => {
   else renderResources();
 }, 1000);
 persist(); render();
-if (!loaded.recovered) hint('欢迎来到云屿百物铺！试试合成两片茶芽。');
+if (loaded.blocked) hint('本地存档无法安全恢复，原始数据不会自动覆盖');
+else if (!loaded.recovered) hint('欢迎来到云屿百物铺！试试合成两片茶芽。');
