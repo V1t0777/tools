@@ -228,10 +228,36 @@
       "renderer_swap_enabled": false,
       "art_direction_approved": false,
       "notes": "Alpha 27 slate blue-hour mist study, independently placed cool lunar haze pools and silver-blue envelope; QA-only non-runtime layer."
+    },
+    {
+      "theme": "warm",
+      "layer": "sky",
+      "source_master_path": "masters/warm/sky-master-pilot.svg",
+      "preview_asset_path": "pilot/warm/sky.svg",
+      "authoring_type": "editable_vector_gouache_study",
+      "authored_source_size": "3200x2000",
+      "preview_display_size": "1600x1000",
+      "production_asset": false,
+      "renderer_swap_enabled": false,
+      "art_direction_approved": false,
+      "notes": "Alpha 28 independent nonrepeating dawn gradient and warm sunrise anchored at 1170px game x; subdued sun disc, broad cloud and pigment bank QA only."
+    },
+    {
+      "theme": "slate",
+      "layer": "sky",
+      "source_master_path": "masters/slate/sky-master-pilot.svg",
+      "preview_asset_path": "pilot/slate/sky.svg",
+      "authoring_type": "editable_vector_gouache_study",
+      "authored_source_size": "3200x2000",
+      "preview_display_size": "1600x1000",
+      "production_asset": false,
+      "renderer_swap_enabled": false,
+      "art_direction_approved": false,
+      "notes": "Alpha 28 distinct nonrepeating blue-hour luminance palette, lunar halo anchored at 1230px game x, sparse stars and independent dusk cloud masses, QA only."
     }
   ],
   "pilot_completion": {
-    "completed_studies": 6,
+    "completed_studies": 8,
     "total_layer_targets": 10,
     "completed_final_masters": 0
   }
