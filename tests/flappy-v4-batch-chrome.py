@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Alpha39 batch Chrome CDP screenshot capture: ONE process, eight art views.
+"""Alpha39 batch Chrome CDP screenshot capture: ONE process, staged complete art views.
 
 Draft-only visual QA speed pilot. Keep all prior 135 independently verified
 headless Chrome screenshots. Chrome CDP is loopback-only with an ephemeral
@@ -33,7 +33,18 @@ SCRIPT = """(async () => {
 })()"""
 
 
-def scenes():
+def scenes(stage="alpha39"):
+    if stage=="alpha40":
+        for theme in ("warm", "slate"):
+            for layer in ("far","mid"):
+                for w, h in ((320,568),(390,844)):
+                    yield f"alpha40-{layer}-{theme}-{w}x{h}.png", f"#{theme}-{layer}-alpha40", w,h
+            yield f"alpha40-world-{theme}-320x568.png", f"#{theme}-world-alpha40", 320,568
+            for layer in ("far","mid"):
+                yield f"alpha40-{layer}-seam-{theme}-320x568.png", f"#{theme}-{layer}-alpha40-seam",320,568
+        return
+    if stage!="alpha39":
+        raise ValueError("Unknown Draft visual QA stage")
     for theme in ("warm", "slate"):
         for w, h in ((320, 568), (390, 844)):
             yield f"alpha39-far-{theme}-{w}x{h}.png", f"#{theme}-far-alpha39", w, h
@@ -41,7 +52,7 @@ def scenes():
         yield f"alpha39-far-seam-{theme}-320x568.png", f"#{theme}-far-alpha39-seam", 320, 568
 
 
-def screenshot_batch(chrome, base, folder):
+def screenshot_batch(chrome, base, folder, stage='alpha39'):
     folder.mkdir(parents=True, exist_ok=True)
     start=time.monotonic()
     with tempfile.TemporaryDirectory(prefix="flappy-alpha39-chrome-") as profile:
@@ -93,7 +104,7 @@ def screenshot_batch(chrome, base, folder):
                 cdp("Page.enable")
                 cdp("Runtime.enable")
                 metrics=[]
-                for name, fragment, width, height in scenes():
+                for name, fragment, width, height in scenes(stage):
                     cdp("Emulation.setDeviceMetricsOverride", {
                         "width":width,"height":height,"deviceScaleFactor":1,
                         "mobile":False})
@@ -146,19 +157,20 @@ def screenshot_batch(chrome, base, folder):
                 proc.wait(timeout=6)
     duration=round(time.monotonic()-start,3)
     manifest={
-        "stage":"Alpha39 Draft original-rock QA",
-        "strategy":"one headless Chrome CDP process for eight fully decoded real-page screenshots",
+        "stage":stage+" Draft natural landscape QA",
+        "strategy":"one headless Chrome CDP process for complete freshly authored stage screenshot batch",
         "actual_chrome_process_launches":1,
         "independent_capture_count":len(metrics),
         "duration_seconds":duration,
         "qa_only":True,
         "old_135_capture_coverage_unchanged":True,
+        "historical_143_capture_coverage_unchanged":True,
         "network_exposure":"local loopback ephemeral DevTools only",
         "screenshots":metrics,
     }
-    (folder/"alpha39-batch-chrome-metrics.json").write_text(
+    (folder/f"{stage}-batch-chrome-metrics.json").write_text(
         json.dumps(manifest,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
-    print("ALPHA39 POOLED CHROME SCREENSHOTS",json.dumps({
+    print(stage.upper()+" POOLED CHROME SCREENSHOTS",json.dumps({
         "chrome_processes":1,"images":len(metrics),"duration_seconds":duration,
         "bytes":[m["bytes"] for m in metrics]},ensure_ascii=False))
 
@@ -168,7 +180,8 @@ if __name__=="__main__":
     parser.add_argument("--chrome",required=True)
     parser.add_argument("--base-url",required=True)
     parser.add_argument("--output",default="v4-art-qa")
+    parser.add_argument("--stage",choices=("alpha39","alpha40"),default="alpha39")
     args=parser.parse_args()
     if not args.base_url.startswith("http://127.0.0.1:"):
         raise SystemExit("Alpha39 screenshot target must be local QA HTTP server")
-    screenshot_batch(args.chrome,args.base_url,Path(args.output))
+    screenshot_batch(args.chrome,args.base_url,Path(args.output),stage=args.stage)
