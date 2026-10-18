@@ -820,3 +820,30 @@ test('Alpha 30 near forest crowns are nonidentical, species varied and strictly 
  assert.ok(Object.values(manifest.release_gates).every(x=>x===false));
  assert.doesNotMatch(html,/near-alpha29|near-master-pilot/);
 });
+
+
+test('Alpha 31 pixel-paint pipeline is build-only and preserves all final release locks',()=>{
+ const program=read('tests/flappy-v4-raster-pigment.py');
+ const manifest=JSON.parse(read('flappy/assets/v4/MASTER_HANDOFF.json'));
+ assert.match(program,/import random/);
+ assert.match(program,/import cairosvg/);
+ assert.match(program,/from PIL import Image/);
+ assert.match(program,/WIDTH, HEIGHT = 1600, 1000/);
+ assert.match(program,/quiet = 20/);
+ assert.match(program,/border = min\(x, WIDTH - 1 - x\)/);
+ assert.match(program,/edge = max\(0\.0, min\(1\.0, \(border - 9\) \/ \(quiet - 9\)\)\)/);
+ assert.match(program,/assert out\.getbbox\(\) == base\.getbbox\(\)/);
+ assert.match(program,/changed_channel_share/);
+ assert.match(program,/mean_changed_channel_delta/);
+ assert.match(program,/source_master/);
+ assert.match(program,/DRAFT_OFFLINE_RASTER_STUDY_NOT_FINAL_MASTER/);
+ assert.deepEqual(manifest.pilot_completion,{completed_studies:10,total_layer_targets:10,completed_final_masters:0});
+ assert.ok(Object.values(manifest.release_gates).every(x=>x===false));
+ for(const th of ['warm','slate']){
+   assert.match(program,new RegExp('masters/\\{theme\\}/near-master-pilot\\.svg'));
+   assert.match(program,new RegExp('pilot/\\{theme\\}/near-raster-alpha31\\.png'));
+   const near=manifest.pilots.find(p=>p.theme===th&&p.layer==='near');
+   assert.ok(near&&!near.production_asset&&!near.renderer_swap_enabled&&!near.art_direction_approved);
+ }
+ assert.doesNotMatch(html,/near-raster-alpha31|alpha31-raster/);
+});
