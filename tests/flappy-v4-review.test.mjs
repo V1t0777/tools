@@ -97,7 +97,7 @@ test('V4 browser evidence shows actual repeating layer joins at mid-screen witho
   const workflow=read('.github/workflows/flappy-v4-art-qa.yml');
   assert.match(workflow,/for view in scene seam/);
   assert.match(workflow,/fragment="\$theme-seam"/);
-  assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count,alpha32_raster_count,alpha32_raster_seam_count,alpha33_raster_count,alpha33_raster_seam_count,alpha34_raster_count,alpha34_raster_seam_count,alpha35_raster_count,alpha35_raster_seam_count,alpha36_raster_count,alpha36_raster_seam_count,alpha37_mid_count,alpha37_mid_seam_count,alpha37_world_count,alpha38_far_count,alpha38_far_seam_count,alpha38_world_count,alpha39_far_count,alpha39_far_seam_count,alpha39_world_count,alpha40_far_count,alpha40_mid_count,alpha40_far_seam_count,alpha40_mid_seam_count,alpha40_world_count,alpha41_far_count,alpha41_mid_count,alpha41_far_seam_count,alpha41_mid_seam_count,alpha41_world_count,alpha42_mid_count,alpha42_mid_seam_count,alpha42_world_count,alpha43_far_count,alpha43_far_seam_count,alpha43_world_count\)!=\(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2,4,4,2,4,2,4,2,4,2,2,1,4,2,4,2,2,4,2,2,4,2,2,4,4,2,2,2,4,4,2,2,2,2,1,1,4,2,2\)/);
+  assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count,alpha32_raster_count,alpha32_raster_seam_count,alpha33_raster_count,alpha33_raster_seam_count,alpha34_raster_count,alpha34_raster_seam_count,alpha35_raster_count,alpha35_raster_seam_count,alpha36_raster_count,alpha36_raster_seam_count,alpha37_mid_count,alpha37_mid_seam_count,alpha37_world_count,alpha38_far_count,alpha38_far_seam_count,alpha38_world_count,alpha39_far_count,alpha39_far_seam_count,alpha39_world_count,alpha40_far_count,alpha40_mid_count,alpha40_far_seam_count,alpha40_mid_seam_count,alpha40_world_count,alpha41_far_count,alpha41_mid_count,alpha41_far_seam_count,alpha41_mid_seam_count,alpha41_world_count,alpha42_mid_count,alpha42_mid_seam_count,alpha42_world_count,alpha43_far_count,alpha43_far_seam_count,alpha43_world_count,alpha44_far_count,alpha44_mid_count,alpha44_near_count,alpha44_far_seam_count,alpha44_mid_seam_count,alpha44_near_seam_count,alpha44_world_count\)!=\(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2,4,4,2,4,2,4,2,4,2,2,1,4,2,4,2,2,4,2,2,4,2,2,4,4,2,2,2,4,4,2,2,2,2,1,1,4,2,2,2,2,2,2,2,2,4\)/);
   assert.match(workflow,/for phase in power recovery glide/);
   assert.match(workflow,/review-v4\.html#\$theme-\$phase/);
 });
@@ -299,7 +299,7 @@ test('Alpha33 corrects two-world Alpha32 preview missing/duplicate layers',()=>{
  assert.match(workflow,/flappy-v4-local-material\.py/);
  assert.match(workflow,/alpha33-raster-seam-\$theme-320x568/);
  assert.match(workflow,/alpha33-local-material-metrics\.json/);
- assert.match(workflow,/Alpha 43 expected 183 static art screenshots/);
+ assert.match(workflow,/Alpha 44 expected 199 static art screenshots/);
  assert.doesNotMatch(html,/<script\b/i);
  assert.doesNotMatch(game,/near-raster-alpha33|local-material/);
 });
@@ -316,7 +316,7 @@ test('Alpha34 A/B shows exactly one current and historical PNG per scene',()=>{
   assert.ok(html.includes('id="'+th+'-raster-alpha34-seam"'));
   assert.ok(html.includes('near-raster-alpha34.png'));
  }
- assert.match(workflow,/Alpha 43 expected 183 static art screenshots/);
+ assert.match(workflow,/Alpha 44 expected 199 static art screenshots/);
  assert.doesNotMatch(html,/<script\b/i);
  assert.doesNotMatch(game,/near-raster-alpha34/);
 });
@@ -334,7 +334,7 @@ test('Alpha35 draft reviewer displays exactly one slate image and leaves warm un
  assert.ok(slate.includes('id="slate-raster-alpha35"'));
  assert.ok(html.includes('id="slate-raster-alpha35-seam"'));
  assert.match(html,/#slate-raster-alpha35:target~\.frame \.near-raster-alpha35\{display:block\}/);
- assert.match(workflow,/Alpha 43 expected 183 static art screenshots/);
+ assert.match(workflow,/Alpha 44 expected 199 static art screenshots/);
  assert.doesNotMatch(html,/<script\b/i);
  assert.doesNotMatch(game,/near-raster-alpha35|conifer-structure/);
 });
@@ -348,7 +348,7 @@ test('Alpha36 scenes use one isolated outline raster each with both source repea
   assert.ok(html.includes('id="'+th+'-raster-alpha36-seam"'));
   assert.match(html,new RegExp('\\.'+th+' \\.near-raster-alpha36\\{background-image:url'));
  }
- assert.match(workflow,/Alpha 43 expected 183 static art screenshots/);
+ assert.match(workflow,/Alpha 44 expected 199 static art screenshots/);
  assert.doesNotMatch(html,/<script\b/i);
  assert.doesNotMatch(game,/near-raster-alpha36/);
 });
@@ -363,7 +363,7 @@ test('Alpha37 reviewer provides coherent independent natural mountain A/B and tw
   assert.ok(html.includes('id="'+theme+'-mid-alpha37-seam"'));
   assert.match(html,new RegExp('\\.'+theme+' \\.mid-alpha37\\{background-image:url'));
  }
- assert.match(workflow,/Alpha 43 expected 183 static art screenshots/);
+ assert.match(workflow,/Alpha 44 expected 199 static art screenshots/);
  assert.doesNotMatch(html,/<script\b/i);
  assert.doesNotMatch(game,/mid-raster-alpha37/);
 });
@@ -378,7 +378,7 @@ test('Alpha38 reviewer has one far bitmap A/B, integrated cinema-world and true 
   assert.ok(html.includes('id="'+th+'-far-alpha38-seam"'));
   assert.match(html,new RegExp('\\.'+th+' \\.far-alpha38\\{background-image:url'));
  }
- assert.match(workflow,/Alpha 43 expected 183 static art screenshots/);
+ assert.match(workflow,/Alpha 44 expected 199 static art screenshots/);
  assert.doesNotMatch(html,/<script\b/i);
  assert.doesNotMatch(game,/far-raster-alpha38/);
 });
@@ -393,7 +393,7 @@ test('Alpha39 original rock comparison reviewer has one opt-in far material, ful
   assert.ok(html.includes('id="'+th+'-far-alpha39-seam"'));
   assert.match(html,new RegExp('\\.'+th+' \\.far-alpha39\\{background-image:url'));
  }
- assert.match(wf,/Alpha 43 expected 183 static art screenshots/);
+ assert.match(wf,/Alpha 44 expected 199 static art screenshots/);
  assert.doesNotMatch(html,/<script\b/i);
  assert.doesNotMatch(game,/far-raster-alpha39/);
 });
@@ -410,7 +410,7 @@ test('Alpha40 source art reviewer has isolated far, mid, whole-world, and origin
   }
   assert.ok(scene.includes('id="'+theme+'-world-alpha40"'));
  }
- assert.match(workflow,/Alpha 43 expected 183 static art screenshots/);
+ assert.match(workflow,/Alpha 44 expected 199 static art screenshots/);
  assert.doesNotMatch(html,/<script\b/i);
  assert.doesNotMatch(game,/far-raster-alpha40|mid-raster-alpha40/);
 });
@@ -427,7 +427,7 @@ test('Alpha41 reviewer renders one original far and mid material per world and i
   }
   assert.ok(scene.includes('id="'+theme+'-world-alpha41"'));
  }
- assert.match(wf,/Alpha 43 expected 183 static art screenshots/);
+ assert.match(wf,/Alpha 44 expected 199 static art screenshots/);
  assert.doesNotMatch(html,/<script\b/i);
  assert.doesNotMatch(game,/far-raster-alpha41|mid-raster-alpha41/);
 });
@@ -440,7 +440,7 @@ test('Alpha42 slate review has one uniquely authored middle ridge, world composi
  assert.ok(slate.includes('id="slate-world-alpha42"'));
  assert.ok(html.includes('id="slate-mid-alpha42-seam"'));
  assert.match(html,/\.slate \.mid-alpha42\{background-image:url/);
- assert.match(wf,/Alpha 43 expected 183 static art screenshots/);
+ assert.match(wf,/Alpha 44 expected 199 static art screenshots/);
  assert.doesNotMatch(html,/<script\b/i);
  assert.doesNotMatch(game,/mid-raster-alpha42/);
 });
@@ -455,7 +455,24 @@ test('Alpha43 draft reviewer has unique full original far skyline and integrated
   assert.ok(html.includes('id="'+theme+'-far-alpha43-seam"'));
   assert.match(html,new RegExp('\\.'+theme+' \\.far-alpha43\\{background-image:url'));
  }
- assert.match(workflow,/Alpha 43 expected 183 static art screenshots/);
+ assert.match(workflow,/Alpha 44 expected 199 static art screenshots/);
  assert.doesNotMatch(html,/<script\b/i);
  assert.doesNotMatch(game,/far-raster-alpha43/);
+});
+
+test('Alpha44 Draft reviewer has individually addressable far mid near and integrated world per theme',()=>{
+ const workflow=read('.github/workflows/flappy-v4-art-qa.yml');
+ for(const world of ['warm','slate']){
+  const scene=html.split('<article class="world '+world+'"')[1].split('</article>')[0];
+  for(const depth of ['far','mid','near']){
+   assert.equal(scene.split('class="layer '+depth+' '+depth+'-alpha44"').length-1,1);
+   assert.ok(scene.includes('id="'+world+'-'+depth+'-alpha44"'));
+   assert.ok(html.includes('id="'+world+'-'+depth+'-alpha44-seam"'));
+   assert.match(html,new RegExp('\\.'+world+' \\.'+depth+'-alpha44\\{background-image:url'));
+  }
+  assert.ok(scene.includes('id="'+world+'-world-alpha44"'));
+ }
+ assert.match(workflow,/Alpha 44 expected 199 static art screenshots/);
+ assert.doesNotMatch(html,/<script\b/i);
+ assert.doesNotMatch(game,/raster-alpha44/);
 });
