@@ -101,10 +101,10 @@ def seam_audit(path: Path):
 
 def run(directory: Path):
     reports = []
-    for layer in ("far", "mid"):
+    for layer in ("far", "mid", "mist"):
         for theme in ("warm", "slate"):
             name = (f"pilot-seam-{theme}-320x568.png" if layer == "far" else
-                    f"pilot-mid-seam-{theme}-320x568.png")
+                    f"pilot-{layer}-seam-{theme}-320x568.png")
             path = directory / name
             if not path.is_file():
                 raise FileNotFoundError(path)
