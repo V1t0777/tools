@@ -97,7 +97,7 @@ test('V4 browser evidence shows actual repeating layer joins at mid-screen witho
   const workflow=read('.github/workflows/flappy-v4-art-qa.yml');
   assert.match(workflow,/for view in scene seam/);
   assert.match(workflow,/fragment="\$theme-seam"/);
-  assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count\)!=\(8,8,12,4,4,2,4,4,2\)/);
+  assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count\)!=\(8,8,12,4,6,2,4,4,2,4,4,2\)/);
   assert.match(workflow,/for phase in power recovery glide/);
   assert.match(workflow,/review-v4\.html#\$theme-\$phase/);
 });
@@ -179,4 +179,23 @@ test('Alpha 26 two middle-distance originals toggle independently or paired in n
  assert.match(html,/#slate-stack-pilot:target~\.frame \.far-pilot/);
  assert.doesNotMatch(html,/<script\b/i);
  assert.doesNotMatch(game,/pilot\/warm\/mid|pilot\/slate\/mid|stack-pilot/);
+});
+
+
+test('Alpha 27 authentic valley fog isolates original vs pilot and far+mid+mist compound',()=>{
+ assert.match(html,/id="paint-mist-pilot"/);
+ assert.match(html,/#paint-mist-pilot:checked~\.worlds \.world \.mist-base\{display:none\}/);
+ for(const theme of ['warm','slate']){
+   assert.match(html,new RegExp('id="'+theme+'-mist-pilot"'));
+   assert.match(html,new RegExp('id="'+theme+'-atmo-pilot"'));
+   assert.match(html,new RegExp('class="layer mist mist-base" src="\\./assets/v4/'+theme+'/mist\\.svg"'));
+   assert.match(html,new RegExp('class="layer mist mist-pilot" src="\\./assets/v4/pilot/'+theme+'/mist\\.svg"'));
+   const section=html.split('id="'+theme+'-mist-pilot-seam"')[1]?.split('</section>')[0];
+   assert.ok(section,'Original mist must have a repeat join proof');
+   assert.equal(section.split('src="./assets/v4/pilot/'+theme+'/mist.svg"').length-1,2);
+ }
+ assert.match(html,/#warm-atmo-pilot:target~\.frame \.mist-base/);
+ assert.match(html,/#slate-atmo-pilot:target~\.frame \.far-pilot/);
+ assert.doesNotMatch(html,/<script\b/i);
+ assert.doesNotMatch(game,/pilot\/warm\/mist|pilot\/slate\/mist|atmo-pilot/);
 });
