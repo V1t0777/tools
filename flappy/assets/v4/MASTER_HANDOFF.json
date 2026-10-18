@@ -497,6 +497,46 @@
       "runtime_modified": false,
       "approved_final_art": false,
       "limitations": "Midrange original authored SVG painted pilot, not final 4k layered native master; no phone hardware or artist signoff."
+    },
+    {
+      "alpha": 38,
+      "stage": "two_original_far_ridge_silhouette_and_painted_shadow_plane_recompositions",
+      "worlds": [
+        "warm",
+        "slate"
+      ],
+      "layer": "far",
+      "source_editable_2x_originals": [
+        "flappy/assets/v4/masters/warm/far-natural-alpha38.svg",
+        "flappy/assets/v4/masters/slate/far-natural-alpha38.svg"
+      ],
+      "kept_existing_original_sources": [
+        "flappy/assets/v4/masters/warm/far-master-pilot.svg",
+        "flappy/assets/v4/masters/slate/far-master-pilot.svg"
+      ],
+      "offline_script": "tests/flappy-v4-natural-far.py",
+      "qa_pngs": [
+        "flappy/assets/v4/pilot/warm/far-raster-alpha38.png",
+        "flappy/assets/v4/pilot/slate/far-raster-alpha38.png"
+      ],
+      "source_semantics": "One original SVG path synchronizes distant mountain base, original clip, edited ridge highlight; 7 distinct authored mountain-value paint marks per theme",
+      "safety": "Alpha38 offline RGBA protects top 430/1000 px exactly and first/last 40px of each row, feather 16px into edited far painting; no production asset mutation",
+      "CI_target": {
+        "static_browser_screenshots": 135,
+        "decoded_png_repeat_audits": 23,
+        "real_mobile_browser_AB": [
+          320,
+          390
+        ]
+      },
+      "review_hashes": [
+        "#warm-far-alpha38",
+        "#slate-far-alpha38",
+        "#warm-world-alpha38",
+        "#slate-world-alpha38"
+      ],
+      "professional_art_final_master_approved": false,
+      "game_runtime_modified": false
     }
   ]
 }
