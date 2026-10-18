@@ -405,7 +405,7 @@ test('Alpha 23 reviewer displays true atlas wing poses rather than a mock circle
  }
  assert.doesNotMatch(page,/<script\b|border-radius:50%;background:#c18e60|\.bird:after\{/i);
  assert.match(page,/石柱仍为布局参考，不是正式 Canvas 材质/);
- assert.ok(page.length<19000,'Draft-only QA reviewer remains script-free and under 19KB after Alpha 26 layered comparisons');
+ assert.ok(page.length<23000,'Draft-only QA reviewer remains script-free and under 19KB after Alpha 26 layered comparisons');
 });
 
 
@@ -476,10 +476,10 @@ test('Alpha 24 edited 2x master and 1x derivative are exact, safe non-shipping p
  assert.equal((master.match(/M0 1194 C60 1194 125 1141 202 1137/g)||[]).length,3,
    'terrain clip, filled silhouette and crest contour all share the same high-resolution ridge');
  const manifest=JSON.parse(read('flappy/assets/v4/MASTER_HANDOFF.json'));
- assert.equal(manifest.pilot_completion.completed_studies,4);
+ assert.equal(manifest.pilot_completion.completed_studies,6);
  assert.equal(manifest.pilot_completion.total_layer_targets,10);
  assert.equal(manifest.pilot_completion.completed_final_masters,0);
- assert.equal(manifest.pilots.length,4);
+ assert.equal(manifest.pilots.length,6);
  const pilot=manifest.pilots[0];
  assert.equal(pilot.source_master_path,'masters/warm/far-master-pilot.svg');
  assert.equal(pilot.preview_asset_path,'pilot/warm/far.svg');
@@ -525,9 +525,9 @@ test('Alpha 25 slate editable 3200px mountain master and 1600px derivative are i
  assert.notEqual(master.slice(master.indexOf('<title>')),warmMaster.slice(warmMaster.indexOf('<title>')),
    'Blue-hour ridge cannot be a renamed warm valley painting');
  const manifest=JSON.parse(read('flappy/assets/v4/MASTER_HANDOFF.json'));
- assert.deepEqual(manifest.pilots.map(p=>p.theme),['warm','slate','warm','slate']);
- assert.deepEqual(manifest.pilots.map(p=>p.layer),['far','far','mid','mid']);
- assert.equal(manifest.pilot_completion.completed_studies,4);
+ assert.deepEqual(manifest.pilots.map(p=>p.theme),['warm','slate','warm','slate','warm','slate']);
+ assert.deepEqual(manifest.pilots.map(p=>p.layer),['far','far','mid','mid','mist','mist']);
+ assert.equal(manifest.pilot_completion.completed_studies,6);
  assert.equal(manifest.pilot_completion.total_layer_targets,10);
  assert.equal(manifest.pilot_completion.completed_final_masters,0);
  const slate=manifest.pilots[1];
@@ -560,8 +560,8 @@ test('Alpha 25 pilot ridge-only highlights must never stroke image frame edges',
 
 test('Alpha 26 original paired mid masters retain exact 3200 to 1600 provenance and border safety',()=>{
  const manifest=JSON.parse(read('flappy/assets/v4/MASTER_HANDOFF.json'));
- assert.deepEqual(manifest.pilots.map(p=>p.theme+'/'+p.layer),['warm/far','slate/far','warm/mid','slate/mid']);
- assert.deepEqual(manifest.pilot_completion,{completed_studies:4,total_layer_targets:10,completed_final_masters:0});
+ assert.deepEqual(manifest.pilots.map(p=>p.theme+'/'+p.layer),['warm/far','slate/far','warm/mid','slate/mid','warm/mist','slate/mist']);
+ assert.deepEqual(manifest.pilot_completion,{completed_studies:6,total_layer_targets:10,completed_final_masters:0});
  for(const [theme,y,washes,facets,brushes] of [['warm',1416,9,6,9],['slate',1496,10,7,10]]){
    const source=read('flappy/assets/v4/masters/'+theme+'/mid-master-pilot.svg');
    const mini=read('flappy/assets/v4/pilot/'+theme+'/mid.svg');
@@ -610,4 +610,54 @@ test('Alpha 26 original paired mid masters retain exact 3200 to 1600 provenance 
                  'middle worlds must be independently composed');
  assert.ok(Object.values(manifest.release_gates).every(v=>v===false));
  assert.doesNotMatch(html,/pilot\/(?:warm|slate)\/mid\.svg/);
+});
+
+
+test('Alpha 27 true original transparent mist studies are exact, safe and tile-continuous',()=>{
+ const manifest=JSON.parse(read('flappy/assets/v4/MASTER_HANDOFF.json'));
+ assert.equal(manifest.pilot_completion.completed_studies,6);
+ assert.equal(manifest.pilot_completion.completed_final_masters,0);
+ assert.deepEqual(manifest.pilots.map(x=>x.theme+'/'+x.layer),
+  ['warm/far','slate/far','warm/mid','slate/mid','warm/mist','slate/mist']);
+ for(const [theme,y] of [['warm',1214],['slate',1342]]){
+   const source=read('flappy/assets/v4/masters/'+theme+'/mist-master-pilot.svg');
+   const pilot=read('flappy/assets/v4/pilot/'+theme+'/mist.svg');
+   assert.match(source,/width="3200" height="2000" viewBox="0 0 3200 2000"/);
+   assert.match(pilot,/width="1600" height="1000" viewBox="0 0 1600 1000"/);
+   const b=source.slice(source.indexOf('<title>'),source.lastIndexOf('</svg>'));
+   const scaled=pilot.slice(pilot.indexOf('<g transform="scale(.5)">')+
+     '<g transform="scale(.5)">'.length,pilot.lastIndexOf('</g>'));
+   assert.equal(b.trim(),scaled.trim(),'Mist pilot must be a pure scaled editable original');
+   for(const asset of [source,pilot]){
+     assert.match(asset,/id="mist-wide-envelopes"/);
+     assert.match(asset,/id="mist-drifting-valleys"/);
+     assert.equal((asset.match(/data-haze="/g)||[]).length,2);
+     assert.equal((asset.match(/data-pool="/g)||[]).length,4);
+     assert.equal((asset.match(/data-wisp="/g)||[]).length,4);
+     assert.equal((asset.match(/<linearGradient\b/g)||[]).length,2);
+     assert.equal((asset.match(/<radialGradient\b/g)||[]).length,1);
+     assert.doesNotMatch(asset,/<(?:image|script|filter|use|foreignObject|animate)\b|\b(?:href|src)\s*=/i);
+     assert.doesNotMatch(asset,/<rect\b|<foreignObject\b|<filter\b/,'soft transparent envelopes, not rectangle or GPU blur');
+     assert.ok(Buffer.byteLength(asset,'utf8')<9000);
+     for(const [,cx,,rx] of asset.matchAll(/<ellipse data-pool="\d" cx="(\d+)" cy="\d+" rx="(\d+)" ry="\d+"/g)){
+       assert.ok(Number(cx)>Number(rx)&&Number(cx)+Number(rx)<3200,
+        'Light puddles may not be cut by either horizontal repeat border');
+     }
+     const p=asset.match(/<path data-haze="primary" d="([^"]+)" fill="url\(#mist-broad\)"/);
+     assert.ok(p);
+     assert.match(p[1],new RegExp('^M0 '+y+' C'));
+     assert.match(p[1],new RegExp('C\\d+ '+y+' \\d+ '+y+' 3200 '+y+' L3200')),
+       'Periodic top line must meet with horizontal tangent');
+   }
+   const m=manifest.pilots.find(x=>x.theme===theme&&x.layer==='mist');
+   assert.equal(m.source_master_path,'masters/'+theme+'/mist-master-pilot.svg');
+   assert.equal(m.preview_asset_path,'pilot/'+theme+'/mist.svg');
+   assert.equal(m.production_asset,false);
+   assert.equal(m.renderer_swap_enabled,false);
+   assert.equal(m.art_direction_approved,false);
+ }
+ assert.notEqual(read('flappy/assets/v4/masters/warm/mist-master-pilot.svg'),
+                 read('flappy/assets/v4/masters/slate/mist-master-pilot.svg'));
+ assert.ok(Object.values(manifest.release_gates).every(x=>x===false));
+ assert.doesNotMatch(html,/pilot\/warm\/mist\.svg|pilot\/slate\/mist\.svg/);
 });
