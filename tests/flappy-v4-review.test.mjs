@@ -97,7 +97,7 @@ test('V4 browser evidence shows actual repeating layer joins at mid-screen witho
   const workflow=read('.github/workflows/flappy-v4-art-qa.yml');
   assert.match(workflow,/for view in scene seam/);
   assert.match(workflow,/fragment="\$theme-seam"/);
-  assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count\)!=\(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2,4\)/);
+  assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count\)!=\(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2,4,4,2\)/);
   assert.match(workflow,/for phase in power recovery glide/);
   assert.match(workflow,/review-v4\.html#\$theme-\$phase/);
 });
@@ -251,4 +251,18 @@ test('Alpha 30 frozen original near art A/B is CSS-only, transparent to real gam
  }
  assert.doesNotMatch(game,/near-alpha29|full-pilot/);
  assert.doesNotMatch(html,/<script\b/i);
+});
+
+
+test('Alpha31 raster proof routes are opt-in and no runtime PNG injection',()=>{
+ assert.match(html,/#warm-raster-alpha31:target~\.frame \.near-base/);
+ assert.match(html,/#slate-raster-alpha31:target~\.frame \.near-raster-alpha31/);
+ assert.match(html,/\.layer\.near-raster-alpha31\{display:none;aspect-ratio:8\/5/);
+ for(const th of ['warm','slate']){
+  assert.match(html,new RegExp('id="'+th+'-raster-alpha31"'));
+  assert.match(html,new RegExp('id="'+th+'-raster-alpha31-seam"'));
+  assert.match(html,new RegExp('near-raster-alpha31\\.png'));
+ }
+ assert.doesNotMatch(html,/<script\b/i);
+ assert.doesNotMatch(game,/near-raster-alpha31|raster-pigment/);
 });
