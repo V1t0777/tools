@@ -831,3 +831,24 @@ test('Alpha44 two original three-depth harmonization sources and screenshot sali
  assert.doesNotMatch(game,/raster-alpha44|depth-cohesion|foreground-readability/);
  assert.doesNotMatch(builder,/raster-alpha44|depth-cohesion|foreground-readability/);
 });
+
+test('Alpha45 four original 24-frame atlas pose evidence and blank-scene control never enter production',()=>{
+ const runner=read('tests/flappy-v4-batch-chrome.py');
+ const reviewer=read('flappy/review-v4.html');
+ const checker=read('tests/flappy-v4-four-pose-readability.py');
+ const workflow=read('.github/workflows/flappy-v4-art-qa.yml');
+ for(const theme of ['warm','slate'])for(const pose of ['rest','power','recovery','glide','clear']){
+  assert.ok(reviewer.includes('id="'+theme+'-world-alpha45-'+pose+'"'));
+ }
+ assert.match(checker,/original_atlas_frame/);
+ assert.match(checker,/visible_bird_pixels_rgb_difference_gt8/);
+ assert.match(checker,/full_scene_outside_original_bird_bounds_pixel_identical/);
+ assert.match(checker,/pipe_region_pixel_identical/);
+ assert.match(checker,/physical_device_signoff/);
+ assert.match(workflow,/Alpha 45 expected 219 static art screenshots/);
+ assert.match(workflow,/alpha45-actual-wing-readability\.json/);
+ assert.match(runner,/alpha45-actor-/);
+ assert.match(runner,/expected=\{"alpha39":8,"alpha40":14,"alpha41":14,"alpha42":4,"alpha43":8,"alpha44":16,"alpha45":20\}/);
+ assert.doesNotMatch(game,/world-alpha45|four-pose-readability|alpha45-actor/);
+ assert.doesNotMatch(builder,/world-alpha45|four-pose-readability|alpha45-actor/);
+});
