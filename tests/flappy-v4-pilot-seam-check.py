@@ -160,6 +160,13 @@ def run(directory: Path):
         if not path.is_file():
             raise FileNotFoundError(path)
         reports.append(seam_audit(path))
+    # Alpha39: one pooled browser Chrome instance captured each original
+    # source RGBA tile twice; verify true decoded 320px join pixels.
+    for theme in ("warm", "slate"):
+        path = directory / f"alpha39-far-seam-{theme}-320x568.png"
+        if not path.is_file():
+            raise FileNotFoundError(path)
+        reports.append(seam_audit(path))
     result = {
         "scope": "Alpha 26 original far/mid pilot flat tile boundary, Chrome mobile viewport",
         "warning": "Single-row-band RGB diagnostics, not painterly review or hardware proof",
