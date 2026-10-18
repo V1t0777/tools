@@ -300,6 +300,28 @@
       "production_asset": false,
       "art_direction_approved": false,
       "notes": "Fresh variable organic contour/branches; high-res native painted textures, device playtests and professional art acceptance still missing."
+    },
+    {
+      "alpha": 31,
+      "stage": "offline_transparent_RGBA_pixel_pigment_study",
+      "themes": [
+        "warm",
+        "slate"
+      ],
+      "layers": [
+        "near"
+      ],
+      "source": "tests/flappy-v4-raster-pigment.py",
+      "generated_outputs": [
+        "flappy/assets/v4/pilot/warm/near-raster-alpha31.png",
+        "flappy/assets/v4/pilot/slate/near-raster-alpha31.png"
+      ],
+      "generated_in": "Draft GitHub Actions runner only; PNGs included in visual artifacts, not committed, not runtime-loaded",
+      "source_format": "transparent_RGBA_PNG_1600x1000",
+      "runtime_asset": false,
+      "production_asset": false,
+      "art_direction_approved": false,
+      "notes": "Actual offline per-pixel colored multi-frequency grain from editable 2x art, exact source alpha preservation and 20px border-taper check. Explicit first raster trial; not final hand-painted native source art."
     }
   ]
 }
