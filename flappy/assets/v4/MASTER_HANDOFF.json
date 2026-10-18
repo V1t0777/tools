@@ -254,10 +254,36 @@
       "renderer_swap_enabled": false,
       "art_direction_approved": false,
       "notes": "Alpha 28 distinct nonrepeating blue-hour luminance palette, lunar halo anchored at 1230px game x, sparse stars and independent dusk cloud masses, QA only."
+    },
+    {
+      "theme": "warm",
+      "layer": "near",
+      "source_master_path": "masters/warm/near-master-pilot.svg",
+      "preview_asset_path": "pilot/warm/near.svg",
+      "authoring_type": "editable_vector_gouache_study",
+      "authored_source_size": "3200x2000",
+      "preview_display_size": "1600x1000",
+      "production_asset": false,
+      "renderer_swap_enabled": false,
+      "art_direction_approved": false,
+      "notes": "Alpha29 hand-authored dawn valley close broadleaf canopy; 11 independently drawn trees, restrained sandy foreground gouache, seamless ridge, no live runtime change."
+    },
+    {
+      "theme": "slate",
+      "layer": "near",
+      "source_master_path": "masters/slate/near-master-pilot.svg",
+      "preview_asset_path": "pilot/slate/near.svg",
+      "authoring_type": "editable_vector_gouache_study",
+      "authored_source_size": "3200x2000",
+      "preview_display_size": "1600x1000",
+      "production_asset": false,
+      "renderer_swap_enabled": false,
+      "art_direction_approved": false,
+      "notes": "Alpha29 independently hand-authored blue-hour alpine conifers, 11 slender spruce silhouettes, dark granite foothill washes and tile-aligned ridge, reviewer-only."
     }
   ],
   "pilot_completion": {
-    "completed_studies": 8,
+    "completed_studies": 10,
     "total_layer_targets": 10,
     "completed_final_masters": 0
   }
