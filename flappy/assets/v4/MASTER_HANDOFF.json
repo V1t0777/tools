@@ -458,6 +458,45 @@
       "master_approved": false,
       "limitations": "Illustrated contour study improving irregularity, not signed-off true professional native textured artwork; no actual physical phone tests.",
       "art_direction_followup": "First run revealed slate negative notches altered only 1 visible alpha pixel; revised slate source-authoring groups extend the notches into actual cone boughs and added minimum 40 carved pixels acceptance threshold."
+    },
+    {
+      "alpha": 37,
+      "stage": "two_independent_3200x2000_original_midrange_ridge_paintings",
+      "themes": [
+        "warm",
+        "slate"
+      ],
+      "layer": [
+        "mid"
+      ],
+      "editable_2x_sources": [
+        "flappy/assets/v4/masters/warm/mid-natural-alpha37.svg",
+        "flappy/assets/v4/masters/slate/mid-natural-alpha37.svg"
+      ],
+      "original_baselines": [
+        "flappy/assets/v4/masters/warm/mid-master-pilot.svg",
+        "flappy/assets/v4/masters/slate/mid-master-pilot.svg"
+      ],
+      "offline_renderer": "tests/flappy-v4-natural-midrange.py",
+      "source_art": "Continuous asymmetrical edited ridge contour duplicated exactly across terrain base, clip path and crest highlight; 7 separate authored value/brush facets per theme",
+      "offline_outputs": [
+        "flappy/assets/v4/pilot/warm/mid-raster-alpha37.png",
+        "flappy/assets/v4/pilot/slate/mid-raster-alpha37.png"
+      ],
+      "integration": "QA-only opt-in #warm-mid-alpha37 / #slate-mid-alpha37 and integrated far+mid+mist+Alpha36 near scenes; 2 tile seam examples",
+      "invariants": "1600x1000, entire upper 555 px source RGBA identical, 40px both repeat borders byte-identical, full lower canvas retained; 4MB bitmap cap",
+      "qa_targets": {
+        "browser_static_screenshots": 127,
+        "independent_decoded_tile_seams": 21,
+        "mobile_ab_viewports": [
+          320,
+          390
+        ]
+      },
+      "game_asset_swapped": false,
+      "runtime_modified": false,
+      "approved_final_art": false,
+      "limitations": "Midrange original authored SVG painted pilot, not final 4k layered native master; no phone hardware or artist signoff."
     }
   ]
 }
