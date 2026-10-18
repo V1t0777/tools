@@ -129,6 +129,12 @@ jobs:
               cp "flappy/assets/v4/pilot/$theme/$depth-raster-alpha41.png" "v4-art-qa/alpha41-atmosphere/$theme-$depth-rgba-1600x1000.png"
             done
           done
+          # Alpha42: truly edited original slate middle-mountain silhouette,
+          # synchronized source crop + rim, independent authored material.
+          .alpha31-art-venv/bin/python tests/flappy-v4-organic-midrange.py
+          mkdir -p v4-art-qa/alpha42-organic
+          cp flappy/assets/v4/pilot/slate/mid-raster-alpha42.png v4-art-qa/alpha42-organic/slate-mid-original-1600x1000.png
+          test -s v4-art-qa/alpha42-slate-organic-metrics.json
           test -s v4-art-qa/alpha41-atmospheric-metrics.json
           test -s v4-art-qa/alpha40-landscape-metrics.json
           test -s v4-art-qa/alpha39-authored-rock-metrics.json
@@ -677,9 +683,9 @@ jobs:
             test -s "v4-art-qa/alpha38-far-seam-$theme-320x568.png"
           done
           .alpha31-art-venv/bin/python tests/flappy-v4-natural-far.py --verify-screens
-          # Alpha41 verified Chrome-process pooling: all 8 Alpha39,
-          # all 14 Alpha40 and all 14 Alpha41 live-browser screenshots in
-          # ONE secure localhost browser (36 instead of 3 process launches).
+          # Alpha42: all 8 Alpha39, 14 Alpha40, 14 Alpha41, 4 Alpha42
+          # actual Chrome screenshots in one loopback browser (40 frames).
+          # Historical 135 independent snapshots remain fully retained.
           # The earlier 135 static shots are still independently captured.
           .alpha31-art-venv/bin/python tests/flappy-v4-batch-chrome.py \
             --chrome "$CHROME" \
@@ -689,10 +695,12 @@ jobs:
           .alpha31-art-venv/bin/python tests/flappy-v4-rock-strata.py --verify-screens
           .alpha31-art-venv/bin/python tests/flappy-v4-whole-landscape.py --verify-screens
           .alpha31-art-venv/bin/python tests/flappy-v4-atmospheric-depth.py --verify-screens
-          for stage in alpha39 alpha40 alpha41; do
+          .alpha31-art-venv/bin/python tests/flappy-v4-organic-midrange.py --verify-screens
+          for stage in alpha39 alpha40 alpha41 alpha42; do
             test -s "v4-art-qa/$stage-batch-chrome-metrics.json"
           done
           test -s v4-art-qa/recent-batch-chrome-metrics.json
+          test -s v4-art-qa/alpha42-slate-mobile-ab.json
           # Unchanged warm route is exercised by the loop above:
           # http://127.0.0.1:8765/flappy/review-v4.html#warm-pilot
           # pilot-warm-far-$W, master-warm-far-3200x2000.png
@@ -706,7 +714,7 @@ jobs:
               # Alpha 27 mist-only proofs are mostly transparent; expected to
               # compress better than fully-painted screenshots. Keep a strict
               # nonempty threshold, PNG CRC/signature, dimensions and RGB seam QA.
-              min_bytes=12000 if path.name.startswith(("pilot-mist-seam-", "pilot-near-seam-", "alpha37-mid-seam-", "alpha38-far-seam-", "alpha40-far-seam-", "alpha40-mid-seam-")) else 20000
+              min_bytes=12000 if path.name.startswith(("pilot-mist-seam-", "pilot-near-seam-", "alpha37-mid-seam-", "alpha38-far-seam-", "alpha40-far-seam-", "alpha40-mid-seam-", "alpha42-mid-seam-")) else 20000
               if len(b)<min_bytes:
                   raise SystemExit(f"Suspiciously small screenshot: {path}; size={len(b)}; minimum={min_bytes}")
               width,height=struct.unpack(">II",b[16:24])
@@ -763,9 +771,12 @@ jobs:
           alpha41_far_seam_count=len(list(Path("v4-art-qa").glob("alpha41-far-seam-*.png")))
           alpha41_mid_seam_count=len(list(Path("v4-art-qa").glob("alpha41-mid-seam-*.png")))
           alpha41_world_count=len(list(Path("v4-art-qa").glob("alpha41-world-*.png")))
+          alpha42_mid_count=len(list(Path("v4-art-qa").glob("alpha42-mid-*.png")))-len(list(Path("v4-art-qa").glob("alpha42-mid-seam-*.png")))
+          alpha42_mid_seam_count=len(list(Path("v4-art-qa").glob("alpha42-mid-seam-*.png")))
+          alpha42_world_count=len(list(Path("v4-art-qa").glob("alpha42-world-*.png")))
           master_count=len(list(Path("v4-art-qa").glob("master-*.png")))
-          if (scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count,alpha32_raster_count,alpha32_raster_seam_count,alpha33_raster_count,alpha33_raster_seam_count,alpha34_raster_count,alpha34_raster_seam_count,alpha35_raster_count,alpha35_raster_seam_count,alpha36_raster_count,alpha36_raster_seam_count,alpha37_mid_count,alpha37_mid_seam_count,alpha37_world_count,alpha38_far_count,alpha38_far_seam_count,alpha38_world_count,alpha39_far_count,alpha39_far_seam_count,alpha39_world_count,alpha40_far_count,alpha40_mid_count,alpha40_far_seam_count,alpha40_mid_seam_count,alpha40_world_count,alpha41_far_count,alpha41_mid_count,alpha41_far_seam_count,alpha41_mid_seam_count,alpha41_world_count)!=(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2,4,4,2,4,2,4,2,4,2,2,1,4,2,4,2,2,4,2,2,4,2,2,4,4,2,2,2,4,4,2,2,2):
-              raise SystemExit(f"Alpha 41 expected 171 static art screenshots: got {(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count,alpha32_raster_count,alpha32_raster_seam_count,alpha33_raster_count,alpha33_raster_seam_count,alpha34_raster_count,alpha34_raster_seam_count,alpha35_raster_count,alpha35_raster_seam_count,alpha36_raster_count,alpha36_raster_seam_count,alpha37_mid_count,alpha37_mid_seam_count,alpha37_world_count,alpha38_far_count,alpha38_far_seam_count,alpha38_world_count,alpha39_far_count,alpha39_far_seam_count,alpha39_world_count,alpha40_far_count,alpha40_mid_count,alpha40_far_seam_count,alpha40_mid_seam_count,alpha40_world_count,alpha41_far_count,alpha41_mid_count,alpha41_far_seam_count,alpha41_mid_seam_count,alpha41_world_count)}")
+          if (scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count,alpha32_raster_count,alpha32_raster_seam_count,alpha33_raster_count,alpha33_raster_seam_count,alpha34_raster_count,alpha34_raster_seam_count,alpha35_raster_count,alpha35_raster_seam_count,alpha36_raster_count,alpha36_raster_seam_count,alpha37_mid_count,alpha37_mid_seam_count,alpha37_world_count,alpha38_far_count,alpha38_far_seam_count,alpha38_world_count,alpha39_far_count,alpha39_far_seam_count,alpha39_world_count,alpha40_far_count,alpha40_mid_count,alpha40_far_seam_count,alpha40_mid_seam_count,alpha40_world_count,alpha41_far_count,alpha41_mid_count,alpha41_far_seam_count,alpha41_mid_seam_count,alpha41_world_count,alpha42_mid_count,alpha42_mid_seam_count,alpha42_world_count)!=(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2,4,4,2,4,2,4,2,4,2,2,1,4,2,4,2,2,4,2,2,4,2,2,4,4,2,2,2,4,4,2,2,2,2,1,1):
+              raise SystemExit(f"Alpha 42 expected 175 static art screenshots: got {(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count,alpha32_raster_count,alpha32_raster_seam_count,alpha33_raster_count,alpha33_raster_seam_count,alpha34_raster_count,alpha34_raster_seam_count,alpha35_raster_count,alpha35_raster_seam_count,alpha36_raster_count,alpha36_raster_seam_count,alpha37_mid_count,alpha37_mid_seam_count,alpha37_world_count,alpha38_far_count,alpha38_far_seam_count,alpha38_world_count,alpha39_far_count,alpha39_far_seam_count,alpha39_world_count,alpha40_far_count,alpha40_mid_count,alpha40_far_seam_count,alpha40_mid_seam_count,alpha40_world_count,alpha41_far_count,alpha41_mid_count,alpha41_far_seam_count,alpha41_mid_seam_count,alpha41_world_count,alpha42_mid_count,alpha42_mid_seam_count,alpha42_world_count)}")
           PY
           # Alpha 26: use actual decompressed Chrome PNG pixels, not file counts,
           # to reject a bright repeat-border stroke like the Alpha 25 defect.
@@ -796,7 +807,7 @@ jobs:
             v4-game-qa/headless-narrow-readability.json
           retention-days: 7
           if-no-files-found: warn
-      - name: Keep 171 browser artwork shots and twenty-five actual 1600px RGBA study outputs
+      - name: Keep 175 browser artwork shots and twenty-six actual 1600px RGBA study outputs
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -836,6 +847,10 @@ jobs:
             v4-art-qa/alpha41-real-chrome-ab.json
             v4-art-qa/alpha41-batch-chrome-metrics.json
             v4-art-qa/recent-batch-chrome-metrics.json
+            v4-art-qa/alpha42-organic/*.png
+            v4-art-qa/alpha42-slate-organic-metrics.json
+            v4-art-qa/alpha42-slate-mobile-ab.json
+            v4-art-qa/alpha42-batch-chrome-metrics.json
             v4-art-qa/headless-painted-pilot-seams.json
             v4-art-qa/server.log
             v4-art-qa/chrome.log
