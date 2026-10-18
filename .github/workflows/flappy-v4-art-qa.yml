@@ -52,6 +52,18 @@ jobs:
           test -s flappy/assets/v4/masters/slate/near-master-alpha29.svg
           test -s flappy/assets/v4/pilot/warm/near-alpha29.svg
           test -s flappy/assets/v4/pilot/slate/near-alpha29.svg
+      - name: Generate offline alpha-accurate original raster pigment candidates (QA only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Scoped virtual environment; no production or application dependencies.
+          python3 -m venv .alpha31-art-venv
+          .alpha31-art-venv/bin/python -m pip install --disable-pip-version-check --no-input             'CairoSVG==2.8.2' 'Pillow==11.3.0'
+          .alpha31-art-venv/bin/python tests/flappy-v4-raster-pigment.py
+          mkdir -p v4-art-qa/alpha31-raster
+          cp flappy/assets/v4/pilot/warm/near-raster-alpha31.png             v4-art-qa/alpha31-raster/warm-near-rgba-1600x1000.png
+          cp flappy/assets/v4/pilot/slate/near-raster-alpha31.png             v4-art-qa/alpha31-raster/slate-near-rgba-1600x1000.png
+          test -s v4-art-qa/alpha31-pigment-study-metrics.json
       - name: Capture isolated Chrome-process first-tap audio A/B
         shell: bash
         run: |
@@ -395,6 +407,29 @@ jobs:
               ! cmp -s "$oldpng" "v4-art-qa/pilot-near-$theme-$W"x"$H.png"
             done
           done
+          # Alpha 31 true PNG RGBA raster paint prototypes (not SVG-only styling):
+          # source PNGs generated in the isolated offline build step above.
+          for theme in warm slate; do
+            for shape in "320 568" "390 844"; do
+              read -r W H <<<"$shape"
+              png="v4-art-qa/alpha31-raster-$theme-$W"x"$H.png"
+              "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+                --hide-scrollbars --force-device-scale-factor=1 \
+                --virtual-time-budget=2200 --window-size="$W,$H" \
+                "--screenshot=$png" \
+                "http://127.0.0.1:8765/flappy/review-v4.html#$theme-raster-alpha31" \
+                >/dev/null 2>v4-art-qa/chrome.log
+              test -s "$png"
+              ! cmp -s "$png" "v4-art-qa/pilot-near-$theme-$W"x"$H.png"
+            done
+            "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+              --hide-scrollbars --force-device-scale-factor=1 \
+              --virtual-time-budget=2200 --window-size="320,568" \
+              "--screenshot=v4-art-qa/alpha31-raster-seam-$theme-320x568.png" \
+              "http://127.0.0.1:8765/flappy/review-v4.html#$theme-raster-alpha31-seam" \
+              >/dev/null 2>v4-art-qa/chrome.log
+            test -s "v4-art-qa/alpha31-raster-seam-$theme-320x568.png"
+          done
           # Unchanged warm route is exercised by the loop above:
           # http://127.0.0.1:8765/flappy/review-v4.html#warm-pilot
           # pilot-warm-far-$W, master-warm-far-3200x2000.png
@@ -434,9 +469,11 @@ jobs:
           full_count=len(list(Path("v4-art-qa").glob("pilot-full-*.png")))
           near_seam_count=len(list(Path("v4-art-qa").glob("pilot-near-seam-*.png")))
           alpha29_ref_count=len(list(Path("v4-art-qa").glob("alpha29-near-*.png")))
+          alpha31_raster_count=len(list(Path("v4-art-qa").glob("alpha31-raster-*.png")))-len(list(Path("v4-art-qa").glob("alpha31-raster-seam-*.png")))
+          alpha31_raster_seam_count=len(list(Path("v4-art-qa").glob("alpha31-raster-seam-*.png")))
           master_count=len(list(Path("v4-art-qa").glob("master-*.png")))
-          if (scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count)!=(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2,4):
-              raise SystemExit(f"Alpha 30 expected 86 static art screenshots: got {(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count)}")
+          if (scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count)!=(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2,4,4,2):
+              raise SystemExit(f"Alpha 31 expected 92 static art screenshots: got {(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count)}")
           PY
           # Alpha 26: use actual decompressed Chrome PNG pixels, not file counts,
           # to reject a bright repeat-border stroke like the Alpha 25 defect.
@@ -467,13 +504,15 @@ jobs:
             v4-game-qa/headless-narrow-readability.json
           retention-days: 7
           if-no-files-found: warn
-      - name: Keep 16 original scenes/seams, 12 poses, 54 painted proofs and 4 original near A/B references
+      - name: Keep 92 browser artwork shots and two actual 1600px RGBA pigment outputs
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: flappy-v4-draft-visual-pr57
           path: |
             v4-art-qa/*.png
+            v4-art-qa/alpha31-raster/*.png
+            v4-art-qa/alpha31-pigment-study-metrics.json
             v4-art-qa/headless-painted-pilot-seams.json
             v4-art-qa/server.log
             v4-art-qa/chrome.log
