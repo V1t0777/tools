@@ -599,6 +599,32 @@
       },
       "blocked": "Draft only, 0/10 accepted professional native bitmap art, no real mobile/human 24-frame long-run release sign-off",
       "production_modified": false
+    },
+    {
+      "alpha": 41,
+      "stage": "original_scene_depth_haze_and_independent_geological_scumble",
+      "worlds": [
+        "warm",
+        "slate"
+      ],
+      "layers": [
+        "far",
+        "mid"
+      ],
+      "source_originals": [
+        "flappy/assets/v4/masters/warm/far-atmos-alpha41.svg",
+        "flappy/assets/v4/masters/warm/mid-atmos-alpha41.svg",
+        "flappy/assets/v4/masters/slate/far-atmos-alpha41.svg",
+        "flappy/assets/v4/masters/slate/mid-atmos-alpha41.svg"
+      ],
+      "art_direction": "two independently curved distance-color fields and ten individually hand-positioned broken rock pigment paths per original source; warm sunrise and slate moonlight palettes distinct",
+      "rendering": "tests/flappy-v4-atmospheric-depth.py overlays source onto retained Alpha40 1600x1000 offline RGBA; 4 PNGs CI only",
+      "pixel_safety": "original Alpha40 transparent alpha bytes unchanged; top 430 far/555 mid and 40px repeating edge source RGBA byte-for-byte unchanged",
+      "reviewer": "warm/slate far/mid/world Alpha41 named hash routes and four repeated tile seam images, Draft only",
+      "browser": "tests/flappy-v4-batch-chrome.py --stage recent captures Alpha39 8 + Alpha40 14 + Alpha41 14 screenshots in ONE localhost Chrome process; all 135 original historical screenshots remain independent; 171 total, 33 decoded PNG tile seams",
+      "blockers": "0/10 professional native bitmap artist final signoffs, iOS/Android hardware and skilled user long-run still absent, explicit merge/release authorization absent",
+      "runtime_modified": false,
+      "artist_approved_final": false
     }
   ]
 }
