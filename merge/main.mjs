@@ -117,6 +117,7 @@ board.addEventListener('pointerdown', event => {
   const index = Number(cell.dataset.slot);
   const item = state.board[index];
   if (!item || item.kind !== 'material') return;
+  cell.setPointerCapture?.(event.pointerId);
   drag = { id: event.pointerId, origin: index, startX: event.clientX, startY: event.clientY, moved: false, ghost: null };
 });
 board.addEventListener('pointermove', event => {
