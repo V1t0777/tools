@@ -690,6 +690,20 @@
       "release": "PR57 DRAFT do not merge/deploy; only 10/10 editable production studies, 0/10 approved final native hand-painted layers; iOS Android performance touch audible game physical testing and human game fairness still outstanding",
       "game_runtime_changed": false,
       "final_artist_approved": false
+    },
+    {
+      "alpha": 45,
+      "stage": "real_chrome_24_frame_sprite_four_pose_and_blank_world_readability_coverage",
+      "scope": "real original v3 bird atlas frame 0/6/12/18 in warm and slate against the original Alpha44 far/mid/near scene at 320x568 and 390x844",
+      "original_assets_unchanged": "flappy/assets/v3/warm-flight.svg and flappy/assets/v3/slate-flight.svg; all Alpha44 painterly far/mid/near PNG sources remain exactly as previous draft",
+      "browser_capture": "tests/flappy-v4-batch-chrome.py, 20 real PNGs from 2 worlds * 2 widths * 5 poses (four wing plus no-bird scene) sharing prior 64+20=84 real Chrome captures in one isolated localhost CDP process",
+      "pixel_QA": "tests/flappy-v4-four-pose-readability.py; tests original source atlas four distinct poses vs real source transparent-world without bird and image-level pixel identical background/pipe outside original player bounds at both mobile widths",
+      "safety": "Pure CSS-only <span> route markers and :target wing selectors, no JavaScript or framework, no game runtime, no leaderboard/database deploy changes",
+      "expected_static_images": 219,
+      "expected_original_source_RGB_seam_audits": 42,
+      "honest_limit": "No professionally accepted final original bitmap source masters (0/10), no physical mobile performance/audio/thermal/play acceptance; not a finished sprite art upgrade",
+      "draft_only": true,
+      "artist_approved_final": false
     }
   ]
 }
