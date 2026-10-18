@@ -668,6 +668,28 @@
       "production_runtime_changed": false,
       "final_professional_native_masters_approved": 0,
       "must_not_deploy": true
+    },
+    {
+      "alpha": 44,
+      "stage": "full_scene_value_and_subject_readability_review",
+      "two_original_source_editable_2x_paintings": [
+        "flappy/assets/v4/masters/warm/depth-harmony-alpha44.svg",
+        "flappy/assets/v4/masters/slate/depth-harmony-alpha44.svg"
+      ],
+      "design": "Each separately authored original world includes 3 original curved paint regions per far/mid/near source depth (9 paths per world), independently directed atmospheric and shadow gradients with warm/cool palettes distinct. Six Draft-only clipped 1600x1000 RGBA images.",
+      "six_layer_baselines": "Warm far43 mid41 near36, slate far43 mid42 near36",
+      "offline_compositor": "tests/flappy-v4-depth-cohesion.py",
+      "player_and_obstacle_readability": "tests/flappy-v4-foreground-readability.py compares real mobile Chrome Alpha43/44 original player region and obstacle surface pixels unchanged, lower pipe local contrast at 320/390 stays above minimum and no >28 percent regression relative to Alpha43",
+      "preserve": "Original RGBA alpha, top y430 far y555 mid y665 near and 40px left/right tile repeats byte-for-byte unchanged, 16px edge feather; opt-in only",
+      "browser_capture": "64 recent Alpha39–44 screenshots captured in one isolated Chrome, original 135 independently rendered older static scenes still kept",
+      "ci_targets": {
+        "total_static_browser_screenshots": 199,
+        "decoded_png_rgb_tile_joins": 42,
+        "one_chrome_recent_screenshots": 64
+      },
+      "release": "PR57 DRAFT do not merge/deploy; only 10/10 editable production studies, 0/10 approved final native hand-painted layers; iOS Android performance touch audible game physical testing and human game fairness still outstanding",
+      "game_runtime_changed": false,
+      "final_artist_approved": false
     }
   ]
 }
