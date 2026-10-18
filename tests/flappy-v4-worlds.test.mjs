@@ -405,7 +405,7 @@ test('Alpha 23 reviewer displays true atlas wing poses rather than a mock circle
  }
  assert.doesNotMatch(page,/<script\b|border-radius:50%;background:#c18e60|\.bird:after\{/i);
  assert.match(page,/石柱仍为布局参考，不是正式 Canvas 材质/);
- assert.ok(page.length<23000,'Draft-only QA reviewer stays no-script under 23KB after Alpha 28 sky comparisons');
+ assert.ok(page.length<29000,'Draft-only QA reviewer stays no-script under 29KB after Alpha 29 complete-pilot A/B');
 });
 
 
@@ -476,10 +476,10 @@ test('Alpha 24 edited 2x master and 1x derivative are exact, safe non-shipping p
  assert.equal((master.match(/M0 1194 C60 1194 125 1141 202 1137/g)||[]).length,3,
    'terrain clip, filled silhouette and crest contour all share the same high-resolution ridge');
  const manifest=JSON.parse(read('flappy/assets/v4/MASTER_HANDOFF.json'));
- assert.equal(manifest.pilot_completion.completed_studies,8);
+ assert.equal(manifest.pilot_completion.completed_studies,10);
  assert.equal(manifest.pilot_completion.total_layer_targets,10);
  assert.equal(manifest.pilot_completion.completed_final_masters,0);
- assert.equal(manifest.pilots.length,8);
+ assert.equal(manifest.pilots.length,10);
  const pilot=manifest.pilots[0];
  assert.equal(pilot.source_master_path,'masters/warm/far-master-pilot.svg');
  assert.equal(pilot.preview_asset_path,'pilot/warm/far.svg');
@@ -525,9 +525,9 @@ test('Alpha 25 slate editable 3200px mountain master and 1600px derivative are i
  assert.notEqual(master.slice(master.indexOf('<title>')),warmMaster.slice(warmMaster.indexOf('<title>')),
    'Blue-hour ridge cannot be a renamed warm valley painting');
  const manifest=JSON.parse(read('flappy/assets/v4/MASTER_HANDOFF.json'));
- assert.deepEqual(manifest.pilots.map(p=>p.theme),['warm','slate','warm','slate','warm','slate','warm','slate']);
- assert.deepEqual(manifest.pilots.map(p=>p.layer),['far','far','mid','mid','mist','mist','sky','sky']);
- assert.equal(manifest.pilot_completion.completed_studies,8);
+ assert.deepEqual(manifest.pilots.map(p=>p.theme),['warm','slate','warm','slate','warm','slate','warm','slate','warm','slate']);
+ assert.deepEqual(manifest.pilots.map(p=>p.layer),['far','far','mid','mid','mist','mist','sky','sky','near','near']);
+ assert.equal(manifest.pilot_completion.completed_studies,10);
  assert.equal(manifest.pilot_completion.total_layer_targets,10);
  assert.equal(manifest.pilot_completion.completed_final_masters,0);
  const slate=manifest.pilots[1];
@@ -560,8 +560,8 @@ test('Alpha 25 pilot ridge-only highlights must never stroke image frame edges',
 
 test('Alpha 26 original paired mid masters retain exact 3200 to 1600 provenance and border safety',()=>{
  const manifest=JSON.parse(read('flappy/assets/v4/MASTER_HANDOFF.json'));
- assert.deepEqual(manifest.pilots.map(p=>p.theme+'/'+p.layer),['warm/far','slate/far','warm/mid','slate/mid','warm/mist','slate/mist','warm/sky','slate/sky']);
- assert.deepEqual(manifest.pilot_completion,{completed_studies:8,total_layer_targets:10,completed_final_masters:0});
+ assert.deepEqual(manifest.pilots.map(p=>p.theme+'/'+p.layer),['warm/far','slate/far','warm/mid','slate/mid','warm/mist','slate/mist','warm/sky','slate/sky','warm/near','slate/near']);
+ assert.deepEqual(manifest.pilot_completion,{completed_studies:10,total_layer_targets:10,completed_final_masters:0});
  for(const [theme,y,washes,facets,brushes] of [['warm',1416,9,6,9],['slate',1496,10,7,10]]){
    const source=read('flappy/assets/v4/masters/'+theme+'/mid-master-pilot.svg');
    const mini=read('flappy/assets/v4/pilot/'+theme+'/mid.svg');
@@ -615,10 +615,10 @@ test('Alpha 26 original paired mid masters retain exact 3200 to 1600 provenance 
 
 test('Alpha 27 true original transparent mist studies are exact, safe and tile-continuous',()=>{
  const manifest=JSON.parse(read('flappy/assets/v4/MASTER_HANDOFF.json'));
- assert.equal(manifest.pilot_completion.completed_studies,8);
+ assert.equal(manifest.pilot_completion.completed_studies,10);
  assert.equal(manifest.pilot_completion.completed_final_masters,0);
  assert.deepEqual(manifest.pilots.map(x=>x.theme+'/'+x.layer),
-  ['warm/far','slate/far','warm/mid','slate/mid','warm/mist','slate/mist','warm/sky','slate/sky']);
+  ['warm/far','slate/far','warm/mid','slate/mid','warm/mist','slate/mist','warm/sky','slate/sky','warm/near','slate/near']);
  for(const [theme,y] of [['warm',1214],['slate',1342]]){
    const source=read('flappy/assets/v4/masters/'+theme+'/mist-master-pilot.svg');
    const pilot=read('flappy/assets/v4/pilot/'+theme+'/mist.svg');
@@ -666,8 +666,8 @@ test('Alpha 27 true original transparent mist studies are exact, safe and tile-c
 test('Alpha 28 independent nonrepeating full-opaque sky masters preserve game light anchors and all eight unapproved source pilots',()=>{
  const manifest=JSON.parse(read('flappy/assets/v4/MASTER_HANDOFF.json'));
  assert.deepEqual(manifest.pilots.map(p=>p.theme+'/'+p.layer),
-  ['warm/far','slate/far','warm/mid','slate/mid','warm/mist','slate/mist','warm/sky','slate/sky']);
- assert.deepEqual(manifest.pilot_completion,{completed_studies:8,total_layer_targets:10,completed_final_masters:0});
+  ['warm/far','slate/far','warm/mid','slate/mid','warm/mist','slate/mist','warm/sky','slate/sky','warm/near','slate/near']);
+ assert.deepEqual(manifest.pilot_completion,{completed_studies:10,total_layer_targets:10,completed_final_masters:0});
  for(const [theme,anchor,light] of [['warm',2340,'sun'],['slate',2460,'moon']]){
    const src=read('flappy/assets/v4/masters/'+theme+'/sky-master-pilot.svg');
    const preview=read('flappy/assets/v4/pilot/'+theme+'/sky.svg');
@@ -707,4 +707,63 @@ test('Alpha 28 independent nonrepeating full-opaque sky masters preserve game li
                  read('flappy/assets/v4/masters/slate/sky-master-pilot.svg'));
  assert.ok(Object.values(manifest.release_gates).every(v=>v===false));
  assert.doesNotMatch(html,/pilot\/warm\/sky\.svg|pilot\/slate\/sky\.svg/);
+});
+
+
+test('Alpha 29 independently authored near forest painting pilots have safe full-repeat terrain, 11 detailed trees and exact 2x origins',()=>{
+ const manifest=JSON.parse(read('flappy/assets/v4/MASTER_HANDOFF.json'));
+ assert.deepEqual(manifest.pilots.map(p=>p.theme+'/'+p.layer),
+  ['warm/far','slate/far','warm/mid','slate/mid','warm/mist','slate/mist','warm/sky','slate/sky','warm/near','slate/near']);
+ assert.deepEqual(manifest.pilot_completion,{completed_studies:10,total_layer_targets:10,completed_final_masters:0});
+ for(const [theme,y] of [['warm',1586],['slate',1636]]){
+   const master=read('flappy/assets/v4/masters/'+theme+'/near-master-pilot.svg');
+   const preview=read('flappy/assets/v4/pilot/'+theme+'/near.svg');
+   assert.match(master,/width="3200" height="2000" viewBox="0 0 3200 2000"/);
+   assert.match(preview,/width="1600" height="1000" viewBox="0 0 1600 1000"/);
+   assert.match(preview,/<g transform="scale\(\.5\)">/);
+   for(const asset of [master,preview]){
+     assert.equal((asset.match(/data-tree="/g)||[]).length,11);
+     assert.equal((asset.match(/data-wood="trunk"/g)||[]).length,11);
+     assert.equal((asset.match(/data-foliage="primary"/g)||[]).length,11);
+     assert.equal((asset.match(/data-foliage="wash"/g)||[]).length,11);
+     assert.equal((asset.match(/data-foreground-wash="/g)||[]).length,6);
+     assert.equal((asset.match(/data-foreground-brush="/g)||[]).length,6);
+     assert.match(asset,/id="foreground-ground-base"/);
+     assert.match(asset,/id="foreground-tree-canopy-forms"/);
+     assert.match(asset,/id="foreground-ridge-open-highlight"/);
+     assert.doesNotMatch(asset,/<(?:image|script|filter|foreignObject|animate|use)\b|\b(?:href|src)\s*=/i);
+     assert.ok(Buffer.byteLength(asset,'utf8')<14000);
+     for(const gradient of asset.matchAll(/<linearGradient\b[^>]*>/g))
+       assert.match(gradient[0],/x1="0" y1="0" x2="0" y2="1"/);
+   }
+   const crest=master.match(/<path id="foreground-ridge-open-highlight" d="([^"]+)" fill="none"/);
+   const full=master.match(/<path id="foreground-ground-base" d="([^"]+)" fill=/);
+   const clip=master.match(/<clipPath id="foreground-ground-clip"><path d="([^"]+)"\/><\/clipPath>/);
+   assert.ok(crest&&full&&clip,'Authored clip, base and open highlight must be present');
+   assert.equal(full[1],clip[1]);
+   assert.equal(full[1],crest[1]+' L3200 2000 L0 2000Z');
+   assert.match(crest[1],new RegExp('^M0 '+y+' C\\d+ '+y+' '));
+   assert.match(crest[1],new RegExp('C\\d+ '+y+' \\d+ '+y+' 3200 '+y+'$'),
+     'Matched horizontal first/last tangents prevent polygon tile kinks');
+   assert.doesNotMatch(crest[1],/L3200 2000|L0 2000/,'Never outline vertical tile border');
+   const sourceBody=master.slice(master.indexOf('<title>'),master.lastIndexOf('</svg>'))
+     .replaceAll('id="foreground-ground-clip"','id="pilot-foreground-ground-clip"')
+     .replaceAll('url(#foreground-ground-clip)','url(#pilot-foreground-ground-clip)');
+   const smallBody=preview.slice(preview.indexOf('<g transform="scale(.5)">')+
+     '<g transform="scale(.5)">'.length,preview.lastIndexOf('</g>'));
+   assert.equal(sourceBody.trim(),smallBody.trim(),
+     'Downscaled pilot must be exact authored master geometry and pigments');
+   const rec=manifest.pilots.find(p=>p.theme===theme&&p.layer==='near');
+   assert.equal(rec.source_master_path,'masters/'+theme+'/near-master-pilot.svg');
+   assert.equal(rec.preview_asset_path,'pilot/'+theme+'/near.svg');
+   assert.equal(rec.production_asset,false);
+   assert.equal(rec.renderer_swap_enabled,false);
+   assert.equal(rec.art_direction_approved,false);
+ }
+ const warm=read('flappy/assets/v4/masters/warm/near-master-pilot.svg');
+ const slate=read('flappy/assets/v4/masters/slate/near-master-pilot.svg');
+ assert.notEqual(warm.match(/<path id="foreground-ridge-open-highlight" d="([^"]+)"/)[1],
+  slate.match(/<path id="foreground-ridge-open-highlight" d="([^"]+)"/)[1]);
+ assert.ok(Object.values(manifest.release_gates).every(x=>x===false));
+ assert.doesNotMatch(html,/pilot\/warm\/near\.svg|pilot\/slate\/near\.svg|near-master-pilot/);
 });
