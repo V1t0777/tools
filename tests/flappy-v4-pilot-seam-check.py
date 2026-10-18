@@ -109,6 +109,13 @@ def run(directory: Path):
             if not path.is_file():
                 raise FileNotFoundError(path)
             reports.append(seam_audit(path))
+    # Alpha31's *real* raster masks must pass the same decoded-pixel seam
+    # comparison, not merely file format or transparent alpha tests.
+    for theme in ("warm", "slate"):
+        path = directory / f"alpha31-raster-seam-{theme}-320x568.png"
+        if not path.is_file():
+            raise FileNotFoundError(path)
+        reports.append(seam_audit(path))
     result = {
         "scope": "Alpha 26 original far/mid pilot flat tile boundary, Chrome mobile viewport",
         "warning": "Single-row-band RGB diagnostics, not painterly review or hardware proof",
