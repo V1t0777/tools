@@ -196,6 +196,14 @@ def run(directory: Path):
         if not path.is_file():
             raise FileNotFoundError(path)
         reports.append(seam_audit(path))
+    # Alpha44: six individually authored far/mid/near true repeated
+    # Chrome image joins, using decoded RGB, not just the PNG signature.
+    for theme in ("warm","slate"):
+        for depth in ("far","mid","near"):
+            sample = directory / f"alpha44-{depth}-seam-{theme}-320x568.png"
+            if not sample.is_file():
+                raise FileNotFoundError(sample)
+            reports.append(seam_audit(sample))
     result = {
         "scope": "Alpha 26 original far/mid pilot flat tile boundary, Chrome mobile viewport",
         "warning": "Single-row-band RGB diagnostics, not painterly review or hardware proof",
