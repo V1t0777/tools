@@ -392,7 +392,7 @@ test('Alpha 27 12 mist visual proofs and 6 real PNG seam samples remain Draft-on
 
 
 test('Alpha 27 compressed transparent mist screenshot exception keeps all ordinary PNG size gates',()=>{
- assert.match(workflow,/min_bytes=12000 if path\.name\.startswith\(\("pilot-mist-seam-", "pilot-near-seam-", "alpha37-mid-seam-"\)\) else 20000/);
+ assert.match(workflow,/min_bytes=12000 if path\.name\.startswith\(\("pilot-mist-seam-", "pilot-near-seam-", "alpha37-mid-seam-", "alpha38-far-seam-"\)\) else 20000/);
  assert.match(workflow,/if len\(b\)<min_bytes:/);
  assert.match(workflow,/Wrong mobile capture dimensions:/);
  assert.match(workflow,/b\[:8\]!=b"\\x89PNG/);
@@ -440,7 +440,7 @@ test('Alpha 29 Draft-only near and full five-layer originals produce 82 screensh
 
 
 test('Alpha 29 low-compression near tile PNG exception is narrow and checked pixel-by-pixel',()=>{
- assert.match(workflow,/min_bytes=12000 if path\.name\.startswith\(\("pilot-mist-seam-", "pilot-near-seam-", "alpha37-mid-seam-"\)\) else 20000/);
+ assert.match(workflow,/min_bytes=12000 if path\.name\.startswith\(\("pilot-mist-seam-", "pilot-near-seam-", "alpha37-mid-seam-", "alpha38-far-seam-"\)\) else 20000/);
  assert.match(workflow,/if len\(b\)<min_bytes/);
  assert.match(workflow,/python3 tests\/flappy-v4-pilot-seam-check\.py v4-art-qa/);
  assert.match(workflow,/v4-art-qa\/headless-painted-pilot-seams\.json/);
