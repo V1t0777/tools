@@ -320,8 +320,12 @@ jobs:
               b=path.read_bytes()
               if b[:8]!=b"\x89PNG\r\n\x1a\n":
                   raise SystemExit(f"Invalid PNG signature: {path}; size={len(b)}")
-              if len(b)<20000:
-                  raise SystemExit(f"Suspiciously small screenshot: {path}; size={len(b)}; see uploaded diagnostics")
+              # Alpha 27 mist-only proofs are mostly transparent; expected to
+              # compress better than fully-painted screenshots. Keep a strict
+              # nonempty threshold, PNG CRC/signature, dimensions and RGB seam QA.
+              min_bytes=12000 if path.name.startswith("pilot-mist-seam-") else 20000
+              if len(b)<min_bytes:
+                  raise SystemExit(f"Suspiciously small screenshot: {path}; size={len(b)}; minimum={min_bytes}")
               width,height=struct.unpack(">II",b[16:24])
               label=path.stem.split("-")[-1]
               expected_width,expected_height=map(int,label.split("x"))
