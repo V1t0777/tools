@@ -389,3 +389,13 @@ test('Alpha 27 12 mist visual proofs and 6 real PNG seam samples remain Draft-on
  assert.doesNotMatch(game,/mist-master-pilot|pilot\/slate\/mist|pilot\/warm\/mist|atmo-pilot/);
  assert.doesNotMatch(builder,/mist-master-pilot|pilot\/slate\/mist|pilot\/warm\/mist|atmo-pilot/);
 });
+
+
+test('Alpha 27 compressed transparent mist screenshot exception keeps all ordinary PNG size gates',()=>{
+ assert.match(workflow,/min_bytes=12000 if path\.name\.startswith\("pilot-mist-seam-"\) else 20000/);
+ assert.match(workflow,/if len\(b\)<min_bytes:/);
+ assert.match(workflow,/Wrong mobile capture dimensions:/);
+ assert.match(workflow,/b\[:8\]!=b"\\x89PNG/);
+ assert.match(workflow,/python3 tests\/flappy-v4-pilot-seam-check\.py v4-art-qa/);
+ assert.doesNotMatch(game,/min_bytes=12000|pilot-mist-seam-/);
+});
