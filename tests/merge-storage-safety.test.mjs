@@ -123,3 +123,76 @@ test('storage setItem failure cannot report a successful save',()=>{
   assert.equal(saveLocal(denied,moveOrMerge(start(),0,1).state),false);
   assert.equal(s.read(SAVE_KEY),raw);
 });
+test('same-revision concurrent tab edits cannot overwrite when using loaded raw baseline',()=>{
+  const initial=start(),s=storage({[SAVE_KEY]:JSON.stringify(initial)});
+  const tabA=loadLocal(s),tabB=loadLocal(s);
+  const changedA={...tabA.state,energyAt:tabA.state.energyAt+1};
+  const changedB={...tabB.state,energyAt:tabB.state.energyAt+2};
+  assert.equal(changedA.revision,changedB.revision);
+  assert.equal(validateSave(changedA),true);
+  assert.equal(validateSave(changedB),true);
+  assert.equal(saveLocal(s,changedA,{expectedRaw:tabA.raw}),true);
+  const committed=s.read(SAVE_KEY);
+  assert.equal(saveLocal(s,changedB,{expectedRaw:tabB.raw}),false);
+  assert.equal(s.read(SAVE_KEY),committed);
+});
+
+test('stale tab cannot overwrite a reset save even when its revision is higher',()=>{
+  const old=moveOrMerge(start(),0,1).state;
+  const s=storage({[SAVE_KEY]:JSON.stringify(old)}),stale=loadLocal(s);
+  const reset=start();
+  assert.equal(saveLocal(s,reset,{allowReset:true}),true);
+  assert.equal(saveLocal(s,old,{expectedRaw:stale.raw}),false);
+  assert.deepEqual(loadLocal(s).state,reset);
+});
+
+test('new tab cannot overwrite another tab initial creation using null baseline',()=>{
+  const s=storage(),first=loadLocal(s),second=loadLocal(s);
+  assert.equal(first.raw,null);
+  assert.equal(saveLocal(s,first.state,{expectedRaw:first.raw}),true);
+  const bytes=s.read(SAVE_KEY);
+  assert.equal(saveLocal(s,second.state,{expectedRaw:second.raw}),false);
+  assert.equal(s.read(SAVE_KEY),bytes);
+});
+
+test('same tab can continue writing after updating the successful raw baseline',()=>{
+  const s=storage(),initial=start();
+  assert.equal(saveLocal(s,initial,{expectedRaw:null}),true);
+  const firstRaw=s.read(SAVE_KEY);
+  const next=moveOrMerge(initial,0,1).state;
+  assert.equal(saveLocal(s,next,{expectedRaw:firstRaw}),true);
+  assert.deepEqual(loadLocal(s).state,next);
+  assert.equal(saveLocal(s,next,{expectedRaw:firstRaw}),false);
+});
+
+test('loadLocal retains exact original raw formatting for compare-before-write',()=>{
+  const raw=JSON.stringify(start(),null,2),s=storage({[SAVE_KEY]:raw});
+  const loaded=loadLocal(s);
+  assert.equal(loaded.raw,raw);
+  const updated=moveOrMerge(loaded.state,0,1).state;
+  assert.equal(saveLocal(s,updated,{expectedRaw:raw}),true);
+});
+
+test('successful legacy migration exposes the new stored bytes as its baseline',()=>{
+  const raw=JSON.stringify(createLegacy(1_000_000)),s=storage({[SAVE_KEY]:raw});
+  const loaded=loadLocal(s);
+  assert.equal(loaded.migrated,true);
+  assert.equal(loaded.raw,s.read(SAVE_KEY));
+  assert.equal(saveLocal(s,moveOrMerge(loaded.state,0,1).state,{expectedRaw:loaded.raw}),true);
+});
+
+test('confirmed reset intentionally overrides a mismatched baseline, not an ordinary save',()=>{
+  const s=storage({[SAVE_KEY]:'{invalid'}),initial=start();
+  assert.equal(saveLocal(s,initial,{expectedRaw:null}),false);
+  assert.equal(saveLocal(s,initial,{allowReset:true,expectedRaw:null}),true);
+  assert.equal(loadLocal(s).recovered,true);
+});
+
+test('failed compare-before-write does not call setItem or mutate the stored bytes',()=>{
+  const initial=start(),raw=JSON.stringify(initial),s=storage({[SAVE_KEY]:raw});
+  let writes=0;
+  const guarded={getItem:s.getItem,setItem:()=>{writes++;throw Error('should not write')}};
+  assert.equal(saveLocal(guarded,initial,{expectedRaw:'outdated'}),false);
+  assert.equal(writes,0);
+  assert.equal(s.read(SAVE_KEY),raw);
+});

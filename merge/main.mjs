@@ -17,6 +17,7 @@ let drag = null;
 let ignoreNextClick = false;
 let noticeTimer = 0;
 let saveIssue = loaded.blocked ? loaded.reason : null;
+let persistedRaw = loaded.raw;
 if (loaded.migrated) window.setTimeout(() => hint('已保留旧版试玩进度，并升级为 P2 存档'), 250);
 
 function hint(text) {
@@ -25,12 +26,13 @@ function hint(text) {
   noticeTimer = window.setTimeout(() => { notice.textContent = ''; }, 2400);
 }
 function persist({confirmedReset=false}={}) {
-  const saved = saveLocal(store, state, confirmedReset ? {allowReset:true} : undefined);
-  if (saved) saveIssue = null;
+  const saved = saveLocal(store, state, {allowReset:confirmedReset, expectedRaw:persistedRaw});
+  if (saved) { saveIssue = null; persistedRaw = JSON.stringify(state); }
   else saveIssue ??= 'WRITE_FAILED';
   byId('save-status').textContent = saved ? '已保存于此浏览器 · 未上传云端'
     : saveIssue === 'CORRUPT_SAVE' ? '检测到异常存档，原始数据已保留；确认重置后才会覆盖'
     : '无法安全保存，原始存档未被覆盖 · 请勿关闭页面';
+  return saved;
 }
 function commit(result) {
   if (result.state !== state) state = result.state;
@@ -227,7 +229,8 @@ byId('reset').addEventListener('click', () => {
   if (!window.confirm(warning)) return;
   state = createInitialState();
   selected = -1;
-  persist({confirmedReset:true}); render(); hint('已重置试玩进度');
+  const saved = persist({confirmedReset:true}); render();
+  hint(saved ? '已重置试玩进度' : '重置未保存，请勿关闭页面');
 });
 const dialog = byId('guide');
 byId('how-to').addEventListener('click', () => dialog.showModal());
@@ -239,8 +242,13 @@ window.addEventListener('storage', event => {
   if (fresh.blocked) {
     saveIssue = fresh.reason;persist();return;
   }
-  if (fresh.recovered && fresh.state.revision > state.revision) {
-    state = advanceTime(fresh.state);selected = -1;persist();render();hint('已从其他标签页恢复更新进度');
+  // Same-revision saves can still differ (e.g. energy recharge); do not
+  // overwrite them using a stale tab's old raw bytes.
+  if (fresh.recovered && fresh.raw !== persistedRaw &&
+      fresh.state.revision >= state.revision) {
+    if (saveIssue) { hint('其他标签页更新了存档，当前页面存在未保存进度'); return; }
+    state = advanceTime(fresh.state); persistedRaw = fresh.raw;
+    selected = -1; persist(); render(); hint('已从其他标签页恢复更新进度');
   }
 });
 window.setInterval(() => {

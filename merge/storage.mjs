@@ -7,7 +7,7 @@ export const LEGACY_BACKUP_KEY = `${SAVE_KEY}.backup-v1`;
 export const MAX_LOCAL_SAVE_BYTES = 160_000;
 
 const newSession = (now, reason) => ({state:createInitialState(now), recovered:false,
-  migrated:false, ...(reason ? {blocked:true, reason, volatile:true} : {})});
+  migrated:false, raw:null, ...(reason ? {blocked:true, reason, volatile:true} : {})});
 
 export function loadLocal(storage, now = Date.now()) {
   let raw;
@@ -21,7 +21,7 @@ export function loadLocal(storage, now = Date.now()) {
     if (typeof raw !== 'string' || raw.length > MAX_LOCAL_SAVE_BYTES)
       return newSession(now, 'CORRUPT_SAVE');
     const parsed = JSON.parse(raw);
-    if (validateSave(parsed)) return {state:parsed, recovered:true, migrated:false};
+    if (validateSave(parsed)) return {state:parsed, recovered:true, migrated:false, raw};
     if (parsed?.schemaVersion === 1 && validateLegacySave(parsed)) {
       const upgraded = upgradeLegacySave(parsed);
       // Never replace the sole valid legacy copy without a byte-for-byte backup.
@@ -34,7 +34,7 @@ export function loadLocal(storage, now = Date.now()) {
       if (!backedUp) return {state:upgraded,recovered:true,migrated:true,
         volatile:true,blocked:true,reason:'BACKUP_UNAVAILABLE'};
       if (saveLocal(storage,upgraded,{migrationRaw:raw}))
-        return {state:upgraded,recovered:true,migrated:true};
+        return {state:upgraded,recovered:true,migrated:true,raw:JSON.stringify(upgraded)};
       return {state:upgraded,recovered:true,migrated:true,
         volatile:true,blocked:true,reason:'WRITE_FAILED'};
     }
@@ -43,13 +43,17 @@ export function loadLocal(storage, now = Date.now()) {
 }
 
 /** Refuse corrupt saves, stale-tab rollback and unsafe legacy overwrite.
+ * expectedRaw is the exact last-read/successfully-written value for this tab.
+ * It detects sequential same-revision edits and intervening resets, but cannot
+ * make localStorage's separate read/write operations atomic across tabs.
  * allowReset must be used ONLY after an explicit user-confirmed reset.
  */
-export function saveLocal(storage, state, {allowReset=false, migrationRaw=null} = {}) {
+export function saveLocal(storage, state, {allowReset=false, migrationRaw=null, expectedRaw=undefined} = {}) {
   if (!validateSave(state)) return false;
   try {
     if (typeof storage?.getItem !== 'function' || typeof storage?.setItem !== 'function') return false;
     const current = storage.getItem(SAVE_KEY);
+    if (!allowReset && expectedRaw !== undefined && current !== expectedRaw) return false;
     if (current !== null) {
       if (migrationRaw !== null) {
         if (current !== migrationRaw || storage.getItem(LEGACY_BACKUP_KEY) !== migrationRaw)
