@@ -97,7 +97,7 @@ test('V4 browser evidence shows actual repeating layer joins at mid-screen witho
   const workflow=read('.github/workflows/flappy-v4-art-qa.yml');
   assert.match(workflow,/for view in scene seam/);
   assert.match(workflow,/fragment="\$theme-seam"/);
-  assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count,alpha32_raster_count,alpha32_raster_seam_count,alpha33_raster_count,alpha33_raster_seam_count,alpha34_raster_count,alpha34_raster_seam_count\)!=\(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2,4,4,2,4,2,4,2,4,2\)/);
+  assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count,alpha32_raster_count,alpha32_raster_seam_count,alpha33_raster_count,alpha33_raster_seam_count,alpha34_raster_count,alpha34_raster_seam_count,alpha35_raster_count,alpha35_raster_seam_count\)!=\(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2,4,4,2,4,2,4,2,4,2,2,1\)/);
   assert.match(workflow,/for phase in power recovery glide/);
   assert.match(workflow,/review-v4\.html#\$theme-\$phase/);
 });
@@ -299,7 +299,7 @@ test('Alpha33 corrects two-world Alpha32 preview missing/duplicate layers',()=>{
  assert.match(workflow,/flappy-v4-local-material\.py/);
  assert.match(workflow,/alpha33-raster-seam-\$theme-320x568/);
  assert.match(workflow,/alpha33-local-material-metrics\.json/);
- assert.match(workflow,/Alpha 34 expected 110 static art screenshots/);
+ assert.match(workflow,/Alpha 35 expected 113 static art screenshots/);
  assert.doesNotMatch(html,/<script\b/i);
  assert.doesNotMatch(game,/near-raster-alpha33|local-material/);
 });
@@ -316,7 +316,25 @@ test('Alpha34 A/B shows exactly one current and historical PNG per scene',()=>{
   assert.ok(html.includes('id="'+th+'-raster-alpha34-seam"'));
   assert.ok(html.includes('near-raster-alpha34.png'));
  }
- assert.match(workflow,/Alpha 34 expected 110 static art screenshots/);
+ assert.match(workflow,/Alpha 35 expected 113 static art screenshots/);
  assert.doesNotMatch(html,/<script\b/i);
  assert.doesNotMatch(game,/near-raster-alpha34/);
+});
+
+test('Alpha35 draft reviewer displays exactly one slate image and leaves warm unchanged',()=>{
+ const workflow=read('.github/workflows/flappy-v4-art-qa.yml');
+ const warm=html.split('<article class="world warm"')[1].split('</article>')[0];
+ const slate=html.split('<article class="world slate"')[1].split('</article>')[0];
+ for(const n of [31,32,33,34]){
+  assert.equal(warm.split('class="layer near near-raster-alpha'+n+'"').length-1,1);
+  assert.equal(slate.split('class="layer near near-raster-alpha'+n+'"').length-1,1);
+ }
+ assert.equal(warm.split('class="layer near near-raster-alpha35"').length-1,0);
+ assert.equal(slate.split('class="layer near near-raster-alpha35"').length-1,1);
+ assert.ok(slate.includes('id="slate-raster-alpha35"'));
+ assert.ok(html.includes('id="slate-raster-alpha35-seam"'));
+ assert.match(html,/#slate-raster-alpha35:target~\.frame \.near-raster-alpha35\{display:block\}/);
+ assert.match(workflow,/Alpha 35 expected 113 static art screenshots/);
+ assert.doesNotMatch(html,/<script\b/i);
+ assert.doesNotMatch(game,/near-raster-alpha35|conifer-structure/);
 });
