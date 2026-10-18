@@ -140,6 +140,13 @@ def run(directory: Path):
     if not path.is_file():
         raise FileNotFoundError(path)
     reports.append(seam_audit(path))
+    # Alpha36 both hand-authored silhouette variants now truly edit alpha,
+    # so audit their actual Chrome-decoded repeated-source joins.
+    for theme in ("warm", "slate"):
+        path = directory / f"alpha36-raster-seam-{theme}-320x568.png"
+        if not path.is_file():
+            raise FileNotFoundError(path)
+        reports.append(seam_audit(path))
     result = {
         "scope": "Alpha 26 original far/mid pilot flat tile boundary, Chrome mobile viewport",
         "warning": "Single-row-band RGB diagnostics, not painterly review or hardware proof",
