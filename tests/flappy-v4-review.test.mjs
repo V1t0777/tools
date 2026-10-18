@@ -97,7 +97,7 @@ test('V4 browser evidence shows actual repeating layer joins at mid-screen witho
   const workflow=read('.github/workflows/flappy-v4-art-qa.yml');
   assert.match(workflow,/for view in scene seam/);
   assert.match(workflow,/fragment="\$theme-seam"/);
-  assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count\)!=\(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2,4,4,2\)/);
+  assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count,alpha32_raster_count,alpha32_raster_seam_count\)!=\(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2,4,4,2,4,2\)/);
   assert.match(workflow,/for phase in power recovery glide/);
   assert.match(workflow,/review-v4\.html#\$theme-\$phase/);
 });
@@ -265,4 +265,20 @@ test('Alpha31 raster proof routes are opt-in and no runtime PNG injection',()=>{
  }
  assert.doesNotMatch(html,/<script\b/i);
  assert.doesNotMatch(game,/near-raster-alpha31|raster-pigment/);
+});
+
+test('Alpha32 directed RGBA study uses separate QA routes, no game injection',()=>{
+ const workflow=read('.github/workflows/flappy-v4-art-qa.yml');
+ assert.match(workflow,/flappy-v4-directional-paint\.py/);
+ assert.match(workflow,/alpha32-directional-paint-metrics\.json/);
+ assert.match(workflow,/alpha32-raster-seam/);
+ assert.match(html,/#warm-raster-alpha32:target~\.frame \.near-base/);
+ assert.match(html,/#slate-raster-alpha32:target~\.frame \.near-raster-alpha32/);
+ for(const theme of ['warm','slate']){
+   assert.ok(html.includes('id="'+theme+'-raster-alpha32"'));
+   assert.ok(html.includes('id="'+theme+'-raster-alpha32-seam"'));
+   assert.ok(html.includes('near-raster-alpha32.png'));
+ }
+ assert.doesNotMatch(game,/near-raster-alpha32|directional-paint/);
+ assert.doesNotMatch(html,/<script\b/i);
 });
