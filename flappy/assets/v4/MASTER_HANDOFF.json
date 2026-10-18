@@ -537,6 +537,38 @@
       ],
       "professional_art_final_master_approved": false,
       "game_runtime_modified": false
+    },
+    {
+      "alpha": 39,
+      "stage": "authored_rock_strata_gouache_value_unification_plus_safe_chrome_pooling",
+      "worlds": [
+        "warm",
+        "slate"
+      ],
+      "layers": [
+        "far"
+      ],
+      "editable_2x_art": [
+        "flappy/assets/v4/masters/warm/far-strata-alpha39.svg",
+        "flappy/assets/v4/masters/slate/far-strata-alpha39.svg"
+      ],
+      "baseline_source": "Alpha38 original far-authored mountain source and offline transparent RGBA only; zero runtime effect",
+      "generated_pngs": [
+        "flappy/assets/v4/pilot/warm/far-raster-alpha39.png",
+        "flappy/assets/v4/pilot/slate/far-raster-alpha39.png"
+      ],
+      "offline_compositor": "tests/flappy-v4-rock-strata.py",
+      "material": "4 independently shaped washes, 16-17 hand-positioned stratified rock line shapes, 4 mineral light/occlusion flecks per world; no new shader, random noise or alpha",
+      "protected": "original RGB(A) alpha exact; upper 430px, left/right 40px original RGBA byte-identical; 1600x1000 PNG under 4MB",
+      "screenshot_optimization": "tests/flappy-v4-batch-chrome.py captures 8 new phone/scene/join review PNGs using one loopback-only Chrome DevTools session, with image.decode/document.fonts ready and two animation frames, robust exact route loaded wait, without touching 135 historical screenshots",
+      "CI_targets": {
+        "chrome_static_screenshots": 143,
+        "decoded_source_tile_joins": 25,
+        "chrome_start_processes_for_alpha39_new_capture": 1
+      },
+      "runtime_modified": false,
+      "artist_approved_final": false,
+      "limitations": "still authored vector-painted gouache study, not accepted professional layered native painting; full screenshot capture may still be bottleneck until mature batch tool extends to historical evidence"
     }
   ]
 }
