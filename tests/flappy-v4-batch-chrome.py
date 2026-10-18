@@ -28,6 +28,7 @@ SCRIPT = """(async () => {
       img.src=s;
     }))
   ]);
+  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
   return {ready:document.readyState,images:imgs.length,backgrounds:refs.length};
 })()"""
 
@@ -97,6 +98,24 @@ def screenshot_batch(chrome, base, folder):
                         "width":width,"height":height,"deviceScaleFactor":1,
                         "mobile":False})
                     cdp("Page.navigate",{"url":base+fragment})
+                    # CDP Page.navigate returns before the final document load;
+                    # never grab a still-visible previous scene and accidentally
+                    # count it as new art. Different URL hashes also reuse DOM.
+                    settled=False
+                    for _ in range(80):
+                        try:
+                            state=cdp("Runtime.evaluate", {
+                                "expression":"location.hash+'|'+document.readyState",
+                                "returnByValue":True})
+                            status=state["result"].get("value","")
+                            if status==fragment+"|complete":
+                                settled=True
+                                break
+                        except RuntimeError:
+                            pass  # Navigation may destroy the old JS context.
+                        time.sleep(.05)
+                    if not settled:
+                        raise TimeoutError(f"New art route never loaded: {fragment}")
                     result=cdp("Runtime.evaluate", {
                         "expression":SCRIPT,"awaitPromise":True,
                         "returnByValue":True})
