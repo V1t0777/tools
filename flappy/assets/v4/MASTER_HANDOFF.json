@@ -408,6 +408,28 @@
       "runtime_asset": false,
       "art_direction_approved": false,
       "notes": "Two independent human-directed path compositions for watercolor/gouache-like value structure, not algorithmically dispersed new brush marks. Remains SVG painting pilot, not artist-approved layered native bitmap master."
+    },
+    {
+      "alpha": 35,
+      "stage": "slate_original_tree_by_tree_conifer_internal_branch_placement_and_visible_mobile_ab_guard",
+      "themes": [
+        "slate"
+      ],
+      "layers": [
+        "near"
+      ],
+      "original_2x_source": "flappy/assets/v4/masters/slate/near-structure-alpha35.svg",
+      "renderer": "tests/flappy-v4-conifer-structure.py",
+      "original_tree_layout": "11 individually editable fir/spruce/larch tree groups with 8 path structures per crown (88 total)",
+      "baseline": "Alpha34 editable artwork and generated 1600x1000 RGBA source remain independent and unmodified",
+      "generated_output": "flappy/assets/v4/pilot/slate/near-raster-alpha35.png",
+      "qa": "Each tree's original crown SVG mask rasterized individually, preserving source RGB(A) edges, 600px image upper play lane, byte-identical source alpha and source bbox; actual both 320/390 Chrome A/B screenshot differences checked.",
+      "target_static_browser_screenshots": 113,
+      "target_decoded_painted_tile_seams": 17,
+      "production_asset": false,
+      "runtime_asset": false,
+      "final_original_master_approved": false,
+      "note": "This changes only interior illustrated tree value planes/branches, not exterior tree silhouettes, physics, player, leaderboard, nor V3.1."
     }
   ]
 }
