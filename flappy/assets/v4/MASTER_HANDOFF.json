@@ -569,6 +569,36 @@
       "runtime_modified": false,
       "artist_approved_final": false,
       "limitations": "still authored vector-painted gouache study, not accepted professional layered native painting; full screenshot capture may still be bottleneck until mature batch tool extends to historical evidence"
+    },
+    {
+      "alpha": 40,
+      "stage": "replace_geometric_facets_with_original_curved_complete_landform_value_painting",
+      "worlds": [
+        "warm",
+        "slate"
+      ],
+      "layers": [
+        "far",
+        "mid"
+      ],
+      "four_editable_2x_originals": [
+        "flappy/assets/v4/masters/warm/far-value-alpha40.svg",
+        "flappy/assets/v4/masters/warm/mid-value-alpha40.svg",
+        "flappy/assets/v4/masters/slate/far-value-alpha40.svg",
+        "flappy/assets/v4/masters/slate/mid-value-alpha40.svg"
+      ],
+      "original_art": "9/7 independent original broad asymmetric curved landform paint shapes and 6 original gradient feathered light/shade paths per far/mid, replacing original geometric gouache/facet source groups",
+      "preserved": "Alpha38 original skyline+clip+rim for far and Alpha37 skyline+clip+rim for mid, game runtime unchanged",
+      "offline_pipeline": "tests/flappy-v4-whole-landscape.py",
+      "art_pngs_only_CI": "flappy/assets/v4/pilot/{warm,slate}/{far,mid}-raster-alpha40.png",
+      "safety": "all 4 candidate RGBA skies above y430/555 and both 40px tile edges unchanged byte-by-byte, original source alpha byte-identical, 16px edge feather, max4MB texture, required broad A/B >750 real RGB screenshot pixels",
+      "CI_target": {
+        "static_original_browser_screenshots": 157,
+        "decoded_original_source_tile_seams": 29,
+        "pooled_chrome_startups_for_14_new_screenshots": 1
+      },
+      "blocked": "Draft only, 0/10 accepted professional native bitmap art, no real mobile/human 24-frame long-run release sign-off",
+      "production_modified": false
     }
   ]
 }
