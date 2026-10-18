@@ -625,6 +625,26 @@
       "blockers": "0/10 professional native bitmap artist final signoffs, iOS/Android hardware and skilled user long-run still absent, explicit merge/release authorization absent",
       "runtime_modified": false,
       "artist_approved_final": false
+    },
+    {
+      "alpha": 42,
+      "stage": "original_slate_midrange_skyline_material_reauthored",
+      "original_editable_master": "flappy/assets/v4/masters/slate/mid-organic-alpha42.svg",
+      "comparison_master": "flappy/assets/v4/masters/slate/mid-value-alpha40.svg",
+      "comparison_bitmap": "flappy/assets/v4/pilot/slate/mid-raster-alpha41.png",
+      "original_landform_design": "One newly authored actual organic blue-hour crest reused identically across original midrange fill/clip/crest highlight; eight independently curved rock masses, four valley light/distance glazes, seven broken pigment stratum strokes",
+      "offline_renderer": "tests/flappy-v4-organic-midrange.py",
+      "output_only_in_CI": "flappy/assets/v4/pilot/slate/mid-raster-alpha42.png",
+      "safeguards": "Upper 555/1000 RGBA rows unchanged, 40px source repeated borders RGBA exactly retained, 16px transition feather; source crest/new removed alpha pixel checks; actual mobile 320/390 screenshot >2500 brightness changed",
+      "QA_targets": {
+        "static_browser_screenshots": 175,
+        "actual_decoded_png_tile_seam_tests": 34,
+        "shared_recent_browser_shots": 40
+      },
+      "production_approved": false,
+      "QA_only": true,
+      "live_v3_1_unchanged": true,
+      "production_release_blockers": "10/10 pilot original source scene layers; 0/10 final professionally accepted native raster masters; real phone hardware, long-session fairness and final explicit authorization missing"
     }
   ]
 }
