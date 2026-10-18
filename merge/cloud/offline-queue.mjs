@@ -185,6 +185,62 @@ export function createOfflineCommandQueue({ uid, storage, transport, clock = () 
     }
     phase='synced';return {ok:true,...status()};
   }
+  /** Conflict review is view-only. A cached snapshot is not an authenticated
+   * confirmation after a page restart; callers must connect() first.
+   */
+  function inspectConflict() {
+    if (damaged || phase === 'storage-error') return {ok:false,code:'STORAGE_ERROR'};
+    if (journal.blocked !== 'conflict' || !journal.pending.length)
+      return {ok:false,code:'NO_CONFLICT'};
+    if (!verifiedSinceStart || phase !== 'blocked' || !journal.confirmed)
+      return {ok:false,code:'REMOTE_VERIFICATION_REQUIRED'};
+    return {ok:true,originalOperationId:journal.pending[0].operationId,
+      action:copy(journal.pending[0].action),revision:journal.confirmed.revision,
+      state:copy(journal.confirmed.state),pending:journal.pending.length,
+      followingUnsent:journal.pending.slice(1).every(e=>e.attempts===0)};
+  }
+
+  /** A conflict response is definitive: that operation was not committed.
+   * Do NOT silently rebase its slot-based intent. The player must inspect the
+   * current server state and explicitly choose a NEW action, which receives a
+   * NEW ID. No command is sent until a separate flush().
+   */
+  async function replaceConflicted({confirmedByUser=false,originalOperationId,
+    expectedRevision,newAction,discardFollowing=false}={}) {
+    if (damaged || phase === 'storage-error') return {ok:false,code:'STORAGE_ERROR',...status()};
+    if (journal.blocked !== 'conflict' || !journal.pending.length)
+      return {ok:false,code:'NO_CONFLICT',...status()};
+    if (!confirmedByUser || !journal.confirmed ||
+        originalOperationId !== journal.pending[0].operationId ||
+        expectedRevision !== journal.confirmed.revision)
+      return {ok:false,code:'REVIEW_CONFIRMATION_REQUIRED',...status()};
+    if (!isValidAction(newAction)) return {ok:false,code:'BAD_COMMAND',...status()};
+    if (journal.pending.slice(1).some(e=>e.attempts!==0))
+      return {ok:false,code:'FOLLOWING_OUTCOME_UNKNOWN',...status()};
+    if (journal.pending.length > 1 && !discardFollowing)
+      return {ok:false,code:'FOLLOWING_ACTIONS_NEED_REVIEW',...status()};
+    // Re-read under the coordinator's exclusive Web Lock before accepting
+    // the confirmation; another device may have changed the server meanwhile.
+    const fresh=await readRemote();
+    if (!fresh.ok) return fresh;
+    if (journal.confirmed.revision !== expectedRevision) {
+      phase='blocked';
+      return {ok:false,code:'REVIEW_STALE',...status()};
+    }
+    let id;
+    try {id=makeId()?.toLowerCase();} catch {return {ok:false,code:'ID_UNAVAILABLE',...status()};}
+    if (!UUID.test(id) || journal.pending.some(e=>e.operationId===id))
+      return {ok:false,code:'INVALID_ID',...status()};
+    const discarded=journal.pending.length;
+    const next=copy(journal);
+    next.pending=[{operationId:id,action:copy(newAction),expectedRevision:null,
+      attempts:0,nextRetryAt:0}];
+    next.blocked=null;
+    if (!write(next)) {phase='storage-error';return {ok:false,code:'STORAGE_ERROR',...status()};}
+    phase='pending';
+    return {ok:true,operationId:id,discarded,...status()};
+  }
+
   function serialize(task) {
     if (running) return running;
     running=Promise.resolve().then(task).finally(()=>{running=null;});
@@ -192,6 +248,11 @@ export function createOfflineCommandQueue({ uid, storage, transport, clock = () 
   }
   return {
     preview,
+    inspectConflict,
+    replaceConflicted(options) {
+      if (running) return Promise.resolve({ok:false,code:'BUSY_OR_UNSAFE',...status()});
+      return serialize(()=>replaceConflicted(options));
+    },
     enqueue,
     // Only verified server read updates this cache. No merging from local P2 sandbox saves.
     connect() {return serialize(()=>process({connectOnly:true}));},

@@ -13,7 +13,7 @@ export function formatCloudSyncStatus(status) {
   if (status.phase === 'protocol-error')
     return {tone:'danger',title:'存档响应异常',detail:'已停止自动重试，防止错误覆盖'};
   if (status.blocked === 'conflict')
-    return {tone:'warning',title:'其他设备已更新进度',detail:`${status.pending} 个操作待确认；不会自动覆盖云端进度`};
+    return {tone:'warning',title:'其他设备已更新进度',detail:`${status.pending} 个操作待确认；请先核对最新云端物品，再选择取消或重新发起新操作`};
   if (status.blocked === 'rejected')
     return {tone:'warning',title:'操作需要人工处理',detail:`${status.pending} 个操作暂停；不能自动补发或领取奖励`};
   if (status.blocked)

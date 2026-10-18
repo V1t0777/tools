@@ -69,6 +69,13 @@ export function createCoordinatedCloudQueue({uid, storage, transport,
     connect() {return exclusive(queue => queue.connect());},
     flush(options) {return exclusive(queue => queue.flush(options));},
     discardUnsent() {return exclusive(queue => queue.discardUnsent());},
-    discardConflicted(options) {return exclusive(queue => queue.discardConflicted(options));}
+    discardConflicted(options) {return exclusive(queue => queue.discardConflicted(options));},
+    // Review under the same lock; a new queue instance must first verify
+    // the latest remote state instead of trusting a cached snapshot.
+    inspectConflict() {return exclusive(async queue => {
+      const connected=await queue.connect();
+      return connected.ok ? queue.inspectConflict() : connected;
+    });},
+    replaceConflicted(options) {return exclusive(queue => queue.replaceConflicted(options));}
   });
 }
