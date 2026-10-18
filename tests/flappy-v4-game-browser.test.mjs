@@ -288,8 +288,8 @@ test('Alpha 23 no-script real atlas pose capture expands draft-only evidence saf
  assert.match(workflow,/pose-\$theme-\$phase-\$W/);
  assert.match(workflow,/review-v4\.html#\$theme-\$phase/);
  assert.match(workflow,/scene_count=len\(list\(Path\("v4-art-qa"\)\.glob\("scene-\*\.png"\)\)\)/);
- assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count\)!=\(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2,4\)/);
- assert.match(workflow,/Keep 16 original scenes\/seams, 12 poses, 54 painted proofs and 4 original near A\/B references/);
+ assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count\)!=\(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2,4,4,2\)/);
+ assert.match(workflow,/Keep 92 browser artwork shots and two actual 1600px RGBA pigment outputs/);
  assert.match(workflow,/if: github\.event\.pull_request\.draft && github\.event\.pull_request\.number == 57/);
  assert.doesNotMatch(game,/phase-anchor|review-v4\.html|pose-\$theme-\$phase/);
  assert.doesNotMatch(builder,/phase-anchor|pose-\$theme-\$phase/);
@@ -330,7 +330,7 @@ test('Alpha 25 both painted pilot masters, four A/B frames and two edge joins ar
  assert.match(workflow,/review-v4\.html#\$theme-pilot-seam/);
  assert.match(workflow,/master-\$theme-far-3200x2000\.png/);
  assert.match(workflow,/pilot_seam_count=len\(list\(Path\("v4-art-qa"\)\.glob\("pilot-seam-\*\.png"\)\)\)/);
- assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count\)!=\(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2,4\)/);
+ assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count\)!=\(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2,4,4,2\)/);
  assert.match(workflow,/if: github\.event\.pull_request\.draft && github\.event\.pull_request\.number == 57/);
  assert.doesNotMatch(game,/pilot\/slate\/far|far-master-pilot|slate-pilot-seam/);
  assert.doesNotMatch(builder,/pilot\/slate\/far|far-master-pilot|slate-pilot-seam/);
@@ -383,7 +383,7 @@ test('Alpha 27 12 mist visual proofs and 6 real PNG seam samples remain Draft-on
  assert.match(workflow,/pilot-mist-seam-\$theme-320x568\.png/);
  assert.match(workflow,/pilot-mist-seam-\*\.png/);
  assert.match(workflow,/mist_count=len\(list\(Path\("v4-art-qa"\)\.glob\("pilot-mist-\*\.png"\)\)\)/);
- assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count\)!=\(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2,4\)/);
+ assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count\)!=\(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2,4,4,2\)/);
  const seamAudit=read('tests/flappy-v4-pilot-seam-check.py');
  assert.match(seamAudit,/for layer in \("far", "mid", "mist", "near"\):/);
  assert.doesNotMatch(game,/mist-master-pilot|pilot\/slate\/mist|pilot\/warm\/mist|atmo-pilot/);
@@ -412,7 +412,7 @@ test('Alpha 28 original sun and moon source sky A/B never enters game renderer',
  assert.match(workflow,/master-\$theme-sky-3200x2000\.png/);
  assert.match(workflow,/sky_count=len\(list\(Path\("v4-art-qa"\)\.glob\("pilot-sky-\*\.png"\)\)\)/);
  assert.match(workflow,/light_count=len\(list\(Path\("v4-art-qa"\)\.glob\("pilot-light-\*\.png"\)\)\)/);
- assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count\)!=\(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2,4\)/);
+ assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count\)!=\(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2,4,4,2\)/);
  assert.doesNotMatch(game,/sky-master-pilot|pilot\/slate\/sky|pilot\/warm\/sky|light-pilot/);
  assert.doesNotMatch(builder,/sky-master-pilot|pilot\/slate\/sky|pilot\/warm\/sky|light-pilot/);
 });
@@ -431,7 +431,7 @@ test('Alpha 29 Draft-only near and full five-layer originals produce 82 screensh
  assert.match(workflow,/near_count=len\(list\(Path\("v4-art-qa"\)\.glob\("pilot-near-\*\.png"\)\)\)/);
  assert.match(workflow,/near_seam_count=len\(list\(Path\("v4-art-qa"\)\.glob\("pilot-near-seam-\*\.png"\)\)\)/);
  assert.match(workflow,/full_count=len\(list\(Path\("v4-art-qa"\)\.glob\("pilot-full-\*\.png"\)\)\)/);
- assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count\)!=\(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2,4\)/);
+ assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count\)!=\(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2,4,4,2\)/);
  const audit=read('tests/flappy-v4-pilot-seam-check.py');
  assert.match(audit,/for layer in \("far", "mid", "mist", "near"\):/);
  assert.doesNotMatch(game,/near-master-pilot|pilot\/warm\/near|pilot\/slate\/near|full-pilot/);
@@ -458,6 +458,33 @@ test('Alpha 30 comparison uses retained original Alpha 29 forest imagery and cou
  assert.match(workflow,/alpha29-near-\$theme-\$W/);
  assert.match(workflow,/review-v4\.html#\$theme-near-alpha29/);
  assert.match(workflow,/alpha29_ref_count=len\(list\(Path\("v4-art-qa"\)\.glob\("alpha29-near-\*\.png"\)\)\)/);
- assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count\)!=\(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2,4\)/);
+ assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count\)!=\(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2,4,4,2\)/);
  assert.doesNotMatch(game,/near-alpha29|data-natural-contour|near-master-pilot/);
+});
+
+
+test('Alpha 31 offline deterministic RGBA near raster resources and 92 Draft Chrome screenshots',()=>{
+ const painter=read('tests/flappy-v4-raster-pigment.py');
+ assert.match(painter,/def raster_pigment\(svg_path: Path, theme: str, target: Path\)/);
+ assert.match(painter,/cairosvg\.svg2png/);
+ assert.match(painter,/Image\.frombytes\("RGBA"/);
+ assert.match(painter,/SEEDS = \{"warm": 30031, "slate": 71931\}/);
+ assert.match(painter,/assert out\.getchannel\("A"\)\.tobytes\(\) == base\.getchannel\("A"\)\.tobytes\(\)/);
+ assert.match(painter,/target\.parent\.mkdir/);
+ assert.match(painter,/for x in range\(WIDTH\)/);
+ assert.match(painter,/transparent_alpha_preserved/);
+ assert.match(painter,/production_art_approved": False/);
+ assert.match(workflow,/Generate offline alpha-accurate original raster pigment candidates \(QA only\)/);
+ assert.match(workflow,/CairoSVG==2\.8\.2/);
+ assert.match(workflow,/Pillow==11\.3\.0/);
+ assert.match(workflow,/python tests\/flappy-v4-raster-pigment\.py/);
+ assert.match(workflow,/alpha31-raster-\$theme-\$W/);
+ assert.match(workflow,/alpha31-raster-seam-\$theme-320x568/);
+ assert.match(workflow,/v4-art-qa\/alpha31-raster\/\*\.png/);
+ assert.match(workflow,/alpha31-pigment-study-metrics\.json/);
+ assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count\)!=\(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2,4,4,2\)/);
+ const seam=read('tests/flappy-v4-pilot-seam-check.py');
+ assert.match(seam,/alpha31-raster-seam-\{theme\}-320x568\.png/);
+ assert.doesNotMatch(game,/near-raster-alpha31|cairosvg|raster-pigment/);
+ assert.doesNotMatch(builder,/near-raster-alpha31|cairosvg|raster-pigment/);
 });
