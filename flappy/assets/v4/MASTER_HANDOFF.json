@@ -350,6 +350,30 @@
       "production_asset": false,
       "art_direction_approved": false,
       "notes": "Reproducible geometry-guided brush direction in actual transparent PNG data; not artist-authorized native painterly production art."
+    },
+    {
+      "alpha": 33,
+      "stage": "source_geometry_clipped_per_species_canopy_illumination_and_ground",
+      "themes": [
+        "warm",
+        "slate"
+      ],
+      "layers": [
+        "near"
+      ],
+      "source": "tests/flappy-v4-local-material.py",
+      "baseline": "Alpha 32 two-world unmodified RGBA directional paint from its own original source; Alpha 33 renders and clips separate species material over that immutable raster in offline Draft QA.",
+      "generated_outputs": [
+        "flappy/assets/v4/pilot/warm/near-raster-alpha33.png",
+        "flappy/assets/v4/pilot/slate/near-raster-alpha33.png"
+      ],
+      "source_mask": "Original authored per-tree foliage paths and original foreground-ground-clip terrain path",
+      "generated_in": "Draft-only GitHub Actions artifacts, not committed binary files or loaded in any production runtime",
+      "additional_validation": "fix 1 missing slate Alpha32 preview node and 1 duplicated warm Alpha32 node; explicit exact-one-per-theme assertions",
+      "production_asset": false,
+      "runtime_asset": false,
+      "art_direction_approved": false,
+      "notes": "Original path-masked interior texture lighting and ground ribbons preserve exact 1600x1000 alpha and 40px repeat border. This remains algorithmic illustration QA, not artist-approved native production painting."
     }
   ]
 }
