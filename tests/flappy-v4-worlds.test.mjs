@@ -732,7 +732,7 @@ test('Alpha 29 independently authored near forest painting pilots have safe full
      assert.match(asset,/id="foreground-tree-canopy-forms"/);
      assert.match(asset,/id="foreground-ridge-open-highlight"/);
      assert.doesNotMatch(asset,/<(?:image|script|filter|foreignObject|animate|use)\b|\b(?:href|src)\s*=/i);
-     assert.ok(Buffer.byteLength(asset,'utf8')<14000);
+     assert.ok(Buffer.byteLength(asset,'utf8')<28000,'Alpha 30 near originals must stay compact despite organic crowns');
      for(const gradient of asset.matchAll(/<linearGradient\b[^>]*>/g))
        assert.match(gradient[0],/x1="0" y1="0" x2="0" y2="1"/);
    }
@@ -766,4 +766,57 @@ test('Alpha 29 independently authored near forest painting pilots have safe full
   slate.match(/<path id="foreground-ridge-open-highlight" d="([^"]+)"/)[1]);
  assert.ok(Object.values(manifest.release_gates).every(x=>x===false));
  assert.doesNotMatch(html,/pilot\/warm\/near\.svg|pilot\/slate\/near\.svg|near-master-pilot/);
+});
+
+
+test('Alpha 30 near forest crowns are nonidentical, species varied and strictly replayable from editable 2x master',()=>{
+ const manifest=JSON.parse(read('flappy/assets/v4/MASTER_HANDOFF.json'));
+ assert.equal(manifest.pilot_completion.completed_studies,10);
+ assert.equal(manifest.pilot_completion.completed_final_masters,0);
+ for(const theme of ['warm','slate']){
+   const folder='flappy/assets/v4/';
+   const before=read(folder+'masters/'+theme+'/near-master-alpha29.svg');
+   const after=read(folder+'masters/'+theme+'/near-master-pilot.svg');
+   const beforeMin=read(folder+'pilot/'+theme+'/near-alpha29.svg');
+   const afterMin=read(folder+'pilot/'+theme+'/near.svg');
+   assert.match(before,/Alpha 29 —/,'frozen authoring reference is genuine historical baseline');
+   assert.match(after,/Alpha 30 —/);
+   assert.notEqual(before,after,'refinement must not be a version label only');
+   assert.equal((after.match(/data-tree="/g)||[]).length,11);
+   assert.equal((after.match(/data-wood="trunk"/g)||[]).length,11);
+   assert.equal((after.match(/data-foliage="primary"/g)||[]).length,11);
+   assert.equal((after.match(/data-foliage="wash"/g)||[]).length,11);
+   assert.ok((after.match(/data-natural-branch="/g)||[]).length>=25);
+   assert.ok((after.match(/data-natural-leaf="/g)||[]).length>=22 ||
+     (after.match(/data-natural-needle="/g)||[]).length>=22);
+   const species=[...after.matchAll(/data-species="([^"]+)"/g)].map(x=>x[1]);
+   assert.equal(species.length,11);
+   assert.ok(new Set(species).size>=3,'diverse tree species avoid repeated stamping');
+   const shapes=[...after.matchAll(/data-foliage="primary" data-natural-contour="(\d+)"/g)].map(x=>+x[1]);
+   assert.equal(shapes.length,11);
+   assert.ok(new Set(shapes).size>=4,'at least four distinct silhouette complexity levels');
+   const srcBody=after.slice(after.indexOf('<title>'),after.lastIndexOf('</svg>'))
+     .replaceAll('id="foreground-ground-clip"','id="pilot-foreground-ground-clip"')
+     .replaceAll('url(#foreground-ground-clip)','url(#pilot-foreground-ground-clip)');
+   const miniBody=afterMin.slice(afterMin.indexOf('<g transform="scale(.5)">')+
+       '<g transform="scale(.5)">'.length,afterMin.lastIndexOf('</g>'));
+   assert.equal(miniBody.trim(),srcBody.trim(),'1600px preview is an identical scale of source master');
+   const oldBody=before.slice(before.indexOf('<title>'),before.lastIndexOf('</svg>'))
+     .replaceAll('id="foreground-ground-clip"','id="pilot-foreground-ground-clip"')
+     .replaceAll('url(#foreground-ground-clip)','url(#pilot-foreground-ground-clip)');
+   const oldMiniBody=beforeMin.slice(beforeMin.indexOf('<g transform="scale(.5)">')+
+       '<g transform="scale(.5)">'.length,beforeMin.lastIndexOf('</g>'));
+   assert.equal(oldMiniBody.trim(),oldBody.trim(),'frozen Alpha 29 original retains provenance');
+   const findRidge=svg=>svg.match(/<path id="foreground-ridge-open-highlight" d="([^"]+)"/)?.[1];
+   assert.equal(findRidge(before),findRidge(after),
+     'Alpha 30 naturalized trees must NOT shift the gameplay-independent tile ridge');
+   for(const svg of [before,beforeMin,after,afterMin])
+     assert.doesNotMatch(svg,/<(?:script|filter|image|animate|foreignObject|use)\b|\b(?:href|src)\s*=/i);
+   const rec=manifest.pilots.find(p=>p.theme===theme&&p.layer==='near');
+   assert.equal(rec.production_asset,false);
+   assert.equal(rec.renderer_swap_enabled,false);
+   assert.equal(rec.art_direction_approved,false);
+ }
+ assert.ok(Object.values(manifest.release_gates).every(x=>x===false));
+ assert.doesNotMatch(html,/near-alpha29|near-master-pilot/);
 });
