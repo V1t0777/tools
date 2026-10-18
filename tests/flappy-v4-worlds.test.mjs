@@ -646,7 +646,7 @@ test('Alpha 27 true original transparent mist studies are exact, safe and tile-c
      const p=asset.match(/<path data-haze="primary" d="([^"]+)" fill="url\(#mist-broad\)"/);
      assert.ok(p);
      assert.match(p[1],new RegExp('^M0 '+y+' C'));
-     assert.match(p[1],new RegExp('C\\d+ '+y+' \\d+ '+y+' 3200 '+y+' L3200')),
+     assert.match(p[1],new RegExp('C\\d+ '+y+' \\d+ '+y+' 3200 '+y+' L3200'),
        'Periodic top line must meet with horizontal tangent');
    }
    const m=manifest.pilots.find(x=>x.theme===theme&&x.layer==='mist');
