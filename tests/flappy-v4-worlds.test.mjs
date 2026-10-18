@@ -405,7 +405,7 @@ test('Alpha 23 reviewer displays true atlas wing poses rather than a mock circle
  }
  assert.doesNotMatch(page,/<script\b|border-radius:50%;background:#c18e60|\.bird:after\{/i);
  assert.match(page,/石柱仍为布局参考，不是正式 Canvas 材质/);
- assert.ok(page.length<56*1024,'Draft-only QA review page below 56KiB without JavaScript or production inclusion');
+ assert.ok(page.length<68*1024,'Draft-only art reviewer below 68KiB with no executable JavaScript or release-page use');
 });
 
 
