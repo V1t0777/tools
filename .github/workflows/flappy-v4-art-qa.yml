@@ -91,6 +91,14 @@ jobs:
           for theme in warm slate; do
             cp "flappy/assets/v4/pilot/$theme/near-raster-alpha36.png" "v4-art-qa/alpha36-outline/$theme-near-rgba-1600x1000.png"
           done
+          # Alpha37: two independent 2x editable natural mountain paintings,
+          # each with synchronized ridge silhouette/clip/highlight.
+          .alpha31-art-venv/bin/python tests/flappy-v4-natural-midrange.py
+          mkdir -p v4-art-qa/alpha37-midrange
+          for theme in warm slate; do
+            cp "flappy/assets/v4/pilot/$theme/mid-raster-alpha37.png" "v4-art-qa/alpha37-midrange/$theme-mid-rgba-1600x1000.png"
+          done
+          test -s v4-art-qa/alpha37-natural-midrange-metrics.json
           test -s v4-art-qa/alpha36-original-outline-metrics.json
           test -s v4-art-qa/alpha35-structural-art-metrics.json
           test -s v4-art-qa/alpha34-editorial-composition-metrics.json
@@ -573,6 +581,37 @@ jobs:
             test -s "v4-art-qa/alpha36-raster-seam-$theme-320x568.png"
           done
           .alpha31-art-venv/bin/python tests/flappy-v4-outline-paint.py --verify-screens
+          # Alpha37: compare actual 320/390 Chrome scenes against existing
+          # independent pilot-mid screenshot (already checked above). Capture
+          # full far/mid/mist/near36 film-world proof and both true tile joins.
+          for theme in warm slate; do
+            for shape in "320 568" "390 844"; do
+              read -r W H <<<"$shape"
+              png="v4-art-qa/alpha37-mid-$theme-$W"x"$H.png"
+              "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+                --hide-scrollbars --force-device-scale-factor=1 \
+                --virtual-time-budget=2200 --window-size="$W,$H" \
+                "--screenshot=$png" \
+                "http://127.0.0.1:8765/flappy/review-v4.html#$theme-mid-alpha37" \
+                >/dev/null 2>v4-art-qa/chrome.log
+              test -s "$png"
+            done
+            "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+              --hide-scrollbars --force-device-scale-factor=1 \
+              --virtual-time-budget=2200 --window-size="320,568" \
+              "--screenshot=v4-art-qa/alpha37-world-$theme-320x568.png" \
+              "http://127.0.0.1:8765/flappy/review-v4.html#$theme-world-alpha37" \
+              >/dev/null 2>v4-art-qa/chrome.log
+            test -s "v4-art-qa/alpha37-world-$theme-320x568.png"
+            "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+              --hide-scrollbars --force-device-scale-factor=1 \
+              --virtual-time-budget=2200 --window-size="320,568" \
+              "--screenshot=v4-art-qa/alpha37-mid-seam-$theme-320x568.png" \
+              "http://127.0.0.1:8765/flappy/review-v4.html#$theme-mid-alpha37-seam" \
+              >/dev/null 2>v4-art-qa/chrome.log
+            test -s "v4-art-qa/alpha37-mid-seam-$theme-320x568.png"
+          done
+          .alpha31-art-venv/bin/python tests/flappy-v4-natural-midrange.py --verify-screens
           # Unchanged warm route is exercised by the loop above:
           # http://127.0.0.1:8765/flappy/review-v4.html#warm-pilot
           # pilot-warm-far-$W, master-warm-far-3200x2000.png
@@ -624,9 +663,12 @@ jobs:
           alpha35_raster_seam_count=len(list(Path("v4-art-qa").glob("alpha35-raster-seam-*.png")))
           alpha36_raster_count=len(list(Path("v4-art-qa").glob("alpha36-raster-*.png")))-len(list(Path("v4-art-qa").glob("alpha36-raster-seam-*.png")))
           alpha36_raster_seam_count=len(list(Path("v4-art-qa").glob("alpha36-raster-seam-*.png")))
+          alpha37_mid_count=len(list(Path("v4-art-qa").glob("alpha37-mid-*.png")))-len(list(Path("v4-art-qa").glob("alpha37-mid-seam-*.png")))
+          alpha37_mid_seam_count=len(list(Path("v4-art-qa").glob("alpha37-mid-seam-*.png")))
+          alpha37_world_count=len(list(Path("v4-art-qa").glob("alpha37-world-*.png")))
           master_count=len(list(Path("v4-art-qa").glob("master-*.png")))
-          if (scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count,alpha32_raster_count,alpha32_raster_seam_count,alpha33_raster_count,alpha33_raster_seam_count,alpha34_raster_count,alpha34_raster_seam_count,alpha35_raster_count,alpha35_raster_seam_count,alpha36_raster_count,alpha36_raster_seam_count)!=(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2,4,4,2,4,2,4,2,4,2,2,1,4,2):
-              raise SystemExit(f"Alpha 36 expected 119 static art screenshots: got {(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count,alpha32_raster_count,alpha32_raster_seam_count,alpha33_raster_count,alpha33_raster_seam_count,alpha34_raster_count,alpha34_raster_seam_count,alpha35_raster_count,alpha35_raster_seam_count,alpha36_raster_count,alpha36_raster_seam_count)}")
+          if (scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count,alpha32_raster_count,alpha32_raster_seam_count,alpha33_raster_count,alpha33_raster_seam_count,alpha34_raster_count,alpha34_raster_seam_count,alpha35_raster_count,alpha35_raster_seam_count,alpha36_raster_count,alpha36_raster_seam_count,alpha37_mid_count,alpha37_mid_seam_count,alpha37_world_count)!=(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2,4,4,2,4,2,4,2,4,2,2,1,4,2,4,2,2):
+              raise SystemExit(f"Alpha 37 expected 127 static art screenshots: got {(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count,alpha32_raster_count,alpha32_raster_seam_count,alpha33_raster_count,alpha33_raster_seam_count,alpha34_raster_count,alpha34_raster_seam_count,alpha35_raster_count,alpha35_raster_seam_count,alpha36_raster_count,alpha36_raster_seam_count,alpha37_mid_count,alpha37_mid_seam_count,alpha37_world_count)}")
           PY
           # Alpha 26: use actual decompressed Chrome PNG pixels, not file counts,
           # to reject a bright repeat-border stroke like the Alpha 25 defect.
@@ -657,7 +699,7 @@ jobs:
             v4-game-qa/headless-narrow-readability.json
           retention-days: 7
           if-no-files-found: warn
-      - name: Keep 119 browser artwork shots and eleven actual 1600px RGBA study outputs
+      - name: Keep 127 browser artwork shots and thirteen actual 1600px RGBA study outputs
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -678,6 +720,9 @@ jobs:
             v4-art-qa/alpha36-outline/*.png
             v4-art-qa/alpha36-original-outline-metrics.json
             v4-art-qa/alpha36-actual-chrome-ab-diffs.json
+            v4-art-qa/alpha37-midrange/*.png
+            v4-art-qa/alpha37-natural-midrange-metrics.json
+            v4-art-qa/alpha37-browser-mountain-diff.json
             v4-art-qa/headless-painted-pilot-seams.json
             v4-art-qa/server.log
             v4-art-qa/chrome.log
