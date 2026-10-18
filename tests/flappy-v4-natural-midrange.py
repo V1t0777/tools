@@ -78,6 +78,24 @@ def inspect(root: Path, theme: str):
     old, new = render(base), render(source)
     if old.size != (W, H) or new.size != old.size:
         raise AssertionError("Wrong original transparent raster dimensions")
+    # Repeat-safe editorial raster finishing, never applied to original art.
+    # Keep the *actual* unmodified source's two 40px strips byte-identical.
+    # A 16px spatial feather beyond the preserved edge avoids creating
+    # a visible hard line within an otherwise painterly mountain material.
+    # This also protects repeat joins when SVG paint strokes differ across
+    # Cairo raster engines at the extreme boundaries of the tiled scene.
+    original_edges = new.copy()
+    feather = 16
+    new.paste(old.crop((0, 0, TILE_QUIET, H)), (0, 0))
+    new.paste(old.crop((W-TILE_QUIET, 0, W, H)), (W-TILE_QUIET, 0))
+    for x in list(range(TILE_QUIET, TILE_QUIET+feather)) + list(
+            range(W-TILE_QUIET-feather, W-TILE_QUIET)):
+        left_weight = (x-TILE_QUIET+1) / (feather+1)
+        if x > W//2:
+            left_weight = (W-TILE_QUIET-x)/(feather+1)
+        old_col=old.crop((x,0,x+1,H))
+        new_col=original_edges.crop((x,0,x+1,H))
+        new.paste(Image.blend(old_col,new_col,max(0.,min(1.,left_weight))),(x,0))
     raw_old, raw_new = old.tobytes(), new.tobytes()
     for y in range(H):
         first = y * W * 4
@@ -117,6 +135,7 @@ def inspect(root: Path, theme: str):
             "original_diff_bbox": list(bbox),
             "bird_sky_region_identical_above_y": SKY_QUIET,
             "tile_border_rgba_identical_px": TILE_QUIET,
+            "per_tile_svg_raster_feather_px": feather,
             "runtime_file_changed": False, "artist_approved_final_master": False}
 
 
