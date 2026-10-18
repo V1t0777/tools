@@ -97,7 +97,7 @@ test('V4 browser evidence shows actual repeating layer joins at mid-screen witho
   const workflow=read('.github/workflows/flappy-v4-art-qa.yml');
   assert.match(workflow,/for view in scene seam/);
   assert.match(workflow,/fragment="\$theme-seam"/);
-  assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count\)!=\(8,8,12,4,6,2,4,4,2,4,4,2\)/);
+  assert.match(workflow,/if \(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count\)!=\(8,8,12,4,8,2,4,4,2,4,4,2,4,4\)/);
   assert.match(workflow,/for phase in power recovery glide/);
   assert.match(workflow,/review-v4\.html#\$theme-\$phase/);
 });
@@ -198,4 +198,24 @@ test('Alpha 27 authentic valley fog isolates original vs pilot and far+mid+mist 
  assert.match(html,/#slate-atmo-pilot:target~\.frame \.far-pilot/);
  assert.doesNotMatch(html,/<script\b/i);
  assert.doesNotMatch(game,/pilot\/warm\/mist|pilot\/slate\/mist|atmo-pilot/);
+});
+
+
+test('Alpha 28 sky and four-layer luminous composite are opt-in with the real atlas',()=>{
+ assert.match(html,/id="paint-sky-pilot"/);
+ assert.match(html,/#paint-sky-pilot:checked~\.worlds \.world \.sky-base\{display:none\}/);
+ assert.match(html,/#paint-sky-pilot:checked~\.worlds \.world \.sky-pilot\{display:block\}/);
+ for(const th of ['warm','slate']){
+   assert.match(html,new RegExp('id="'+th+'-sky-pilot"'));
+   assert.match(html,new RegExp('id="'+th+'-light-pilot"'));
+   assert.match(html,new RegExp('class="layer sky sky-base" src="\\./assets/v4/'+th+'/sky\\.svg"'));
+   assert.match(html,new RegExp('class="layer sky sky-pilot" src="\\./assets/v4/pilot/'+th+'/sky\\.svg"'));
+ }
+ assert.match(html,/#warm-light-pilot:target~\.frame \.sky-base/);
+ assert.match(html,/#slate-light-pilot:target~\.frame \.far-pilot/);
+ assert.match(html,/\.warm \.layer\.sky\{transform:translateX\(-73\.125%\)\}/);
+ assert.match(html,/\.slate \.layer\.sky\{transform:translateX\(-76\.875%\)\}/);
+ assert.match(html,/background-image:url\("\.\/assets\/v3\/warm-flight\.svg"\)/);
+ assert.doesNotMatch(html,/<script\b/i);
+ assert.doesNotMatch(game,/pilot\/warm\/sky|pilot\/slate\/sky|sky-master-pilot/);
 });
