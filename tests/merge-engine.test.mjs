@@ -85,8 +85,8 @@ test('order completion consumes matching item once and advances order',()=>{
   const r=fulfillOrder(s,'o0');
   assert.equal(r.ok,true);
   assert.equal(r.state.board.filter(Boolean).length,originalCount-1);
-  assert.equal(r.state.coins,12);
-  assert.equal(r.state.xp,6);
+  assert.equal(r.state.coins,s.orders[0].coins);
+  assert.equal(r.state.xp,s.orders[0].xp);
   assert.equal(r.state.orders.length,3);
   assert.equal(fulfillOrder(r.state,'o0').ok,false);
 });

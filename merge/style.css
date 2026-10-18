@@ -14,3 +14,18 @@ body{background:radial-gradient(circle at 5% 12%,rgba(221,194,136,.23),transpare
 @media(min-width:620px){.town{height:195px}.orders{gap:13px}.order{padding:17px}.cell .glyph{font-size:42px}.board{gap:7px;padding:12px}.board-section{padding:18px}.cell .tier{font-size:11px}.cell .charge{font-size:11px}}
 @media(max-width:360px){.resource small{display:none}.resource{gap:5px;padding:8px 6px}.resource-symbol{width:25px;height:25px}.resource strong{font-size:12px}.board{padding:5px}.cell{border-radius:9px}.orders{gap:5px}.order{padding:8px}.order-item{font-size:22px}.order-name{font-size:11px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition:none!important;scroll-behavior:auto!important}}
+
+/* P2 systems: logic-first functional management controls; visual assets are developed separately. */
+.progress-note{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:10px 12px;margin:-9px 0 18px;border:1px solid var(--line);border-radius:12px;background:#fffaf2;color:#738682;font-size:11px}
+.progress-note strong{font-size:14px;color:#476c62}
+.secondary-action{display:block;width:100%;margin:9px 0 4px;min-height:42px;background:#e4eee7;color:#385c53;border:1px solid #c2d1c3;border-radius:12px;font-weight:800;font-size:12px}
+.secondary-action:disabled,.small-action:disabled{opacity:.55;cursor:not-allowed}
+.management-section{margin-top:22px;padding:15px 13px;border:1px solid var(--line);border-radius:20px;background:#fffdf6cc;box-shadow:0 8px 18px #64705d11}
+.warehouse{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:5px;margin:12px 0 7px}
+.warehouse-slot{aspect-ratio:1;min-width:0;display:grid;place-items:center;border:1px solid #c4d2c3;border-radius:11px;background:#f0f5e9;font-size:clamp(18px,4vw,31px);touch-action:manipulation}
+.warehouse-slot.locked{background:#dddcd2;border-color:#e1e0d7;opacity:.58}
+.upgrade-list{display:grid;gap:8px}
+.upgrade-row{display:flex;align-items:center;justify-content:space-between;gap:9px;padding:10px 9px;border:1px solid #dce5d7;border-radius:13px;background:#fffdf9}
+.upgrade-row strong{font-size:13px;color:#3d665d}.upgrade-row p{margin:5px 0 0;font-size:11px;line-height:1.4;color:#8a9587}
+.small-action{flex:none;max-width:105px;min-height:38px;border:0;border-radius:10px;background:#658d7d;color:white;padding:5px 9px;font-size:11px;font-weight:800}
+@media(max-width:360px){.warehouse{gap:3px}.warehouse-slot{border-radius:7px;font-size:19px}.upgrade-row{padding:8px 6px}.small-action{max-width:85px}}

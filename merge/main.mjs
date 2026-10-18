@@ -1,5 +1,8 @@
 import { WIDTH, CELL_COUNT, MAX_ENERGY, ENERGY_REGEN_MS, CHAINS, createInitialState,
-  advanceTime, moveOrMerge, produce, fulfillOrder, getItemIcon, getItemName } from './engine.mjs';
+  advanceTime, moveOrMerge, produce, fulfillOrder, getItemIcon, getItemName,
+  storeItem, withdrawItem, upgradeWarehouse, upgradeProducer, upgradeBuilding,
+  getLevelProgress, getMaxOrderTier, getProducerUpgrade, getWarehouseUpgrade } from './engine.mjs';
+import { BUILDINGS } from './economy.mjs';
 import { loadLocal, saveLocal, SAVE_KEY } from './storage.mjs';
 
 const byId = id => document.getElementById(id);
@@ -13,6 +16,7 @@ let selected = -1;
 let drag = null;
 let ignoreNextClick = false;
 let noticeTimer = 0;
+if (loaded.migrated) window.setTimeout(() => hint('已保留旧版试玩进度，并升级为 P2 存档'), 250);
 
 function hint(text) {
   notice.textContent = text;
@@ -52,6 +56,10 @@ function renderResources(now = Date.now()) {
   byId('energy').textContent = `${state.energy} / ${MAX_ENERGY}`;
   byId('coins').textContent = state.coins.toLocaleString('zh-CN');
   byId('xp').textContent = state.xp.toLocaleString('zh-CN');
+  const progress = getLevelProgress(state.xp);
+  byId('level').textContent = `Lv.${progress.level}`;
+  byId('level-progress').textContent = progress.next === null ? '已达到当前等级上限' : `升级还需 ${progress.next - state.xp} 经验`;
+  byId('tier-cap').textContent = `当前委托最高 ${getMaxOrderTier(state.xp)} 阶`;
   const remaining = state.energy >= MAX_ENERGY ? '已满' : formatSeconds(ENERGY_REGEN_MS - (now - state.energyAt));
   byId('recovery').textContent = remaining;
 }
@@ -94,7 +102,7 @@ function renderOrders() {
     const name = document.createElement('div'); name.className = 'order-name';
     name.textContent = CHAINS[order.chain].names[order.tier - 1];
     const prize = document.createElement('p'); prize.className = 'order-prize';
-    prize.textContent = `◈ ${order.coins} · ✦ ${order.xp}`;
+    prize.textContent = `◈ ${order.coins} · ✦ ${order.xp} · 估算体力 ${order.estimatedEnergy || '—'}`;
     const can = state.board.some(item => item?.kind === 'material' && item.chain === order.chain && item.tier === order.tier);
     const button = document.createElement('button');button.type = 'button';button.className='order-button';
     button.textContent = can ? '交付委托' : '尚缺材料';button.disabled = !can;
@@ -104,7 +112,56 @@ function renderOrders() {
   }
   orders.append(fragment);
 }
-function render() { renderResources(); renderBoard(); renderOrders(); }
+
+function actionButton(label, description, action, disabled = false) {
+  const row = document.createElement('div'); row.className = 'upgrade-row';
+  const detail = document.createElement('div');
+  const title = document.createElement('strong'); title.textContent = label;
+  const text = document.createElement('p'); text.textContent = description;
+  detail.append(title, text);
+  const btn = document.createElement('button'); btn.type = 'button';btn.className='small-action';
+  btn.disabled = disabled;btn.textContent = disabled ? '暂不可用' : '解锁 / 升级';
+  if(!disabled)btn.addEventListener('click',action);
+  row.append(detail, btn);return row;
+}
+function renderSystems() {
+  const warehouse = byId('warehouse');warehouse.replaceChildren();
+  const slots=document.createDocumentFragment();
+  state.warehouse.slots.forEach((item,i)=>{
+    const btn=document.createElement('button');btn.type='button';
+    btn.className = `warehouse-slot${i>=state.warehouse.capacity?' locked':''}`;
+    btn.disabled=!item || i>=state.warehouse.capacity;
+    btn.title = item ? `取出${getItemName(item)}` : i>=state.warehouse.capacity ? '尚未解锁' : '空位';
+    btn.setAttribute('aria-label',btn.title);
+    btn.textContent = i>=state.warehouse.capacity?'🔒':item?getItemIcon(item):'＋';
+    if(item)btn.addEventListener('click',()=>commit(withdrawItem(state,i)));
+    slots.append(btn);
+  });warehouse.append(slots);
+  byId('warehouse-count').textContent=`${state.warehouse.slots.filter(Boolean).length}/${state.warehouse.capacity}`;
+  const selectedItem=state.board[selected];
+  byId('store-selected').disabled = selectedItem?.kind!=='material' ||
+    state.warehouse.slots.slice(0,state.warehouse.capacity).every(Boolean);
+  const w= getWarehouseUpgrade(state.warehouse.capacity);
+  const wbtn=byId('warehouse-upgrade');
+  wbtn.textContent=w?`扩容至 ${w.newCapacity} 格 · ${w.coins} 金币（Lv.${w.minLevel}）`:'仓库已满级';
+  wbtn.disabled = !w || state.coins < w.coins || getLevelProgress(state.xp).level < w.minLevel;
+  const upgrades=byId('producers');upgrades.replaceChildren();
+  const buildings=byId('buildings');buildings.replaceChildren();
+  const level=getLevelProgress(state.xp).level;
+  for(const p of state.board.filter(item=>item?.kind==='producer')){
+    const rule=getProducerUpgrade(p.level);
+    upgrades.append(actionButton(`${CHAINS[p.chain].name}工坊 · Lv.${p.level}`,
+      rule?`${rule.coins} 金币 · 需要 Lv.${rule.minLevel} · 下一等级提升高阶产物概率`:'生产器已达到最高等级',
+      ()=>commit(upgradeProducer(state,p.id)),!rule||state.coins<rule.coins||level<rule.minLevel));
+  }
+  for(const [id,rule] of Object.entries(BUILDINGS)){
+    const complete=state.buildings[id]===1;
+    buildings.append(actionButton(`${rule.name}${complete?' · 已建成':''}`,
+      complete?'此区域已完成基础建设':`${rule.coins} 金币 · 需要 Lv.${rule.minLevel}`,
+      ()=>commit(upgradeBuilding(state,id)),complete||state.coins<rule.coins||level<rule.minLevel));
+  }
+}
+function render() { renderResources(); renderBoard(); renderOrders(); renderSystems(); }
 
 board.addEventListener('click', event => {
   if (ignoreNextClick) { ignoreNextClick = false; return; }
@@ -151,6 +208,12 @@ function completeDrag(event, cancelled = false) {
 }
 board.addEventListener('pointerup', event => completeDrag(event));
 board.addEventListener('pointercancel', event => completeDrag(event, true));
+
+byId('store-selected').addEventListener('click',()=>{
+  if(selected < 0){hint('先点击选择一个原料');return;}
+  commit(storeItem(state,selected));
+});
+byId('warehouse-upgrade').addEventListener('click',()=>commit(upgradeWarehouse(state)));
 
 byId('reset').addEventListener('click', () => {
   if (!window.confirm('确定重置本地试玩进度吗？当前棋盘、金币和订单会被清空，且无法恢复。')) return;
