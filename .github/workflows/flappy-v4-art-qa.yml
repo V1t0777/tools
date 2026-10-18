@@ -74,6 +74,13 @@ jobs:
           for theme in warm slate; do
             cp "flappy/assets/v4/pilot/$theme/near-raster-alpha33.png" "v4-art-qa/alpha33-masked/$theme-near-rgba-1600x1000.png"
           done
+          # Alpha34: newly authored per-tree 2x editable SVG paint art, offline only.
+          .alpha31-art-venv/bin/python tests/flappy-v4-editorial-gouache.py
+          mkdir -p v4-art-qa/alpha34-editorial
+          for theme in warm slate; do
+            cp "flappy/assets/v4/pilot/$theme/near-raster-alpha34.png" "v4-art-qa/alpha34-editorial/$theme-near-rgba-1600x1000.png"
+          done
+          test -s v4-art-qa/alpha34-editorial-composition-metrics.json
           test -s v4-art-qa/alpha33-local-material-metrics.json
           test -s v4-art-qa/alpha32-directional-paint-metrics.json
           test -s v4-art-qa/alpha31-pigment-study-metrics.json
@@ -487,6 +494,28 @@ jobs:
               >/dev/null 2>v4-art-qa/chrome.log
             test -s "v4-art-qa/alpha33-raster-seam-$theme-320x568.png"
           done
+          # Alpha34 original composed artwork: 4 A/B phone frames and 2 seams.
+          for theme in warm slate; do
+            for shape in "320 568" "390 844"; do
+              read -r W H <<<"$shape"
+              png="v4-art-qa/alpha34-raster-$theme-$W"x"$H.png"
+              "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+                --hide-scrollbars --force-device-scale-factor=1 \
+                --virtual-time-budget=2200 --window-size="$W,$H" \
+                "--screenshot=$png" \
+                "http://127.0.0.1:8765/flappy/review-v4.html#$theme-raster-alpha34" \
+                >/dev/null 2>v4-art-qa/chrome.log
+              test -s "$png"
+              ! cmp -s "$png" "v4-art-qa/alpha33-raster-$theme-$W"x"$H.png"
+            done
+            "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+              --hide-scrollbars --force-device-scale-factor=1 \
+              --virtual-time-budget=2200 --window-size="320,568" \
+              "--screenshot=v4-art-qa/alpha34-raster-seam-$theme-320x568.png" \
+              "http://127.0.0.1:8765/flappy/review-v4.html#$theme-raster-alpha34-seam" \
+              >/dev/null 2>v4-art-qa/chrome.log
+            test -s "v4-art-qa/alpha34-raster-seam-$theme-320x568.png"
+          done
           # Unchanged warm route is exercised by the loop above:
           # http://127.0.0.1:8765/flappy/review-v4.html#warm-pilot
           # pilot-warm-far-$W, master-warm-far-3200x2000.png
@@ -532,9 +561,11 @@ jobs:
           alpha32_raster_seam_count=len(list(Path("v4-art-qa").glob("alpha32-raster-seam-*.png")))
           alpha33_raster_count=len(list(Path("v4-art-qa").glob("alpha33-raster-*.png")))-len(list(Path("v4-art-qa").glob("alpha33-raster-seam-*.png")))
           alpha33_raster_seam_count=len(list(Path("v4-art-qa").glob("alpha33-raster-seam-*.png")))
+          alpha34_raster_count=len(list(Path("v4-art-qa").glob("alpha34-raster-*.png")))-len(list(Path("v4-art-qa").glob("alpha34-raster-seam-*.png")))
+          alpha34_raster_seam_count=len(list(Path("v4-art-qa").glob("alpha34-raster-seam-*.png")))
           master_count=len(list(Path("v4-art-qa").glob("master-*.png")))
-          if (scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count,alpha32_raster_count,alpha32_raster_seam_count,alpha33_raster_count,alpha33_raster_seam_count)!=(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2,4,4,2,4,2,4,2):
-              raise SystemExit(f"Alpha 33 expected 104 static art screenshots: got {(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count,alpha32_raster_count,alpha32_raster_seam_count,alpha33_raster_count,alpha33_raster_seam_count)}")
+          if (scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count,alpha32_raster_count,alpha32_raster_seam_count,alpha33_raster_count,alpha33_raster_seam_count,alpha34_raster_count,alpha34_raster_seam_count)!=(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2,4,4,2,4,2,4,2,4,2):
+              raise SystemExit(f"Alpha 34 expected 110 static art screenshots: got {(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count,alpha32_raster_count,alpha32_raster_seam_count,alpha33_raster_count,alpha33_raster_seam_count,alpha34_raster_count,alpha34_raster_seam_count)}")
           PY
           # Alpha 26: use actual decompressed Chrome PNG pixels, not file counts,
           # to reject a bright repeat-border stroke like the Alpha 25 defect.
@@ -565,7 +596,7 @@ jobs:
             v4-game-qa/headless-narrow-readability.json
           retention-days: 7
           if-no-files-found: warn
-      - name: Keep 104 browser artwork shots and six actual 1600px RGBA study outputs
+      - name: Keep 110 browser artwork shots and eight actual 1600px RGBA study outputs
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -578,6 +609,8 @@ jobs:
             v4-art-qa/alpha32-directional-paint-metrics.json
             v4-art-qa/alpha33-masked/*.png
             v4-art-qa/alpha33-local-material-metrics.json
+            v4-art-qa/alpha34-editorial/*.png
+            v4-art-qa/alpha34-editorial-composition-metrics.json
             v4-art-qa/headless-painted-pilot-seams.json
             v4-art-qa/server.log
             v4-art-qa/chrome.log
