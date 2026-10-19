@@ -75,6 +75,9 @@ export function createOfflineCommandQueue({ uid, storage, transport, clock = () 
     catch { phase = 'storage-error'; return false; }
   }
   const status = (extra = {}) => ({ phase, blocked:journal.blocked, pending:journal.pending.length,
+    // This survives reloads in the journal. An attempt is NOT proof of either
+    // success or failure; the server might have committed without an ACK.
+    attemptedPending:journal.pending.filter(entry => entry.attempts > 0).length,
     firstOperationId:journal.pending[0]?.operationId ?? null,
     nextRetryAt:journal.pending[0]?.nextRetryAt ?? 0,
     revision:journal.confirmed?.revision ?? null,
