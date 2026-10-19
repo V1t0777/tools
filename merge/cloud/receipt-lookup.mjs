@@ -21,7 +21,23 @@ const missing = () => Object.freeze({
  * in-memory limiter in production: Edge instances are distributed/restarted.
  * SQL draft uses an atomic per-user fixed-window gate, never the client IP.
  */
-export function createReceiptLookupService({repository,limiter}={}) {
+export function createReceiptLookupService({repository,limiter,deadlineMs=5_000}={}) {
+  if (!Number.isSafeInteger(deadlineMs) || deadlineMs < 1 || deadlineMs > 30_000)
+    throw Error('Invalid receipt deadline');
+  // The HTTP/RPC may still complete after a timeout. This is safe here
+  // because the gate only consumes quota and lookup only reads a receipt.
+  // Late replies MUST NOT become a successful result after 503 is returned.
+  async function bounded(task) {
+    let timer;
+    try {
+      return await Promise.race([
+        Promise.resolve().then(task),
+        new Promise((_,reject)=>{
+          timer=setTimeout(()=>reject(Error('Receipt deadline exceeded')),deadlineMs);
+        })
+      ]);
+    } finally {clearTimeout(timer);}
+  }
   if (typeof repository?.findOperation !== 'function' ||
       typeof limiter?.consume !== 'function')
     throw Error('Trusted read-only repository and durable limiter required');
@@ -36,14 +52,14 @@ export function createReceiptLookupService({repository,limiter}={}) {
       const id=operationId.toLowerCase();
 
       let permitted;
-      try {permitted=await limiter.consume(uid);}
+      try {permitted=await bounded(()=>limiter.consume(uid));}
       catch {return blocked('RECEIPT_SERVICE_UNAVAILABLE',503);}
       if (permitted !== true) return permitted===false ?
         blocked('RECEIPT_RATE_LIMITED',429) :
         blocked('RECEIPT_SERVICE_UNAVAILABLE',503);
 
       let record;
-      try {record=await repository.findOperation(uid,id);}
+      try {record=await bounded(()=>repository.findOperation(uid,id));}
       catch {return blocked('RECEIPT_SERVICE_UNAVAILABLE',503);}
       if (record===null) return missing();
       // Do not reflect arbitrary repository values, snapshots, user IDs,
