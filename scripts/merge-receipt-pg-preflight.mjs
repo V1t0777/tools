@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 /**
- * P3.17: disposable LOCAL PostgreSQL probe only; NEVER production.
- * Requires opt-in and a new local database named merge_receipt_test_*.
- * This mutates the disposable DB and may create NOLOGIN test-cluster roles.
+ * P3.20: disposable LOCAL PostgreSQL probe only; NEVER production.
+ * Requires opt-in, a NEW empty local database and three pre-provisioned
+ * NOLOGIN roles in a separate disposable PostgreSQL CLUSTER.
+ * Refuses unexpected server address, database owner, schema or objects.
+ * Never creates cluster-global roles or changes existing database content.
  */
 import {fileURLToPath} from 'node:url';
 import {spawn,spawnSync} from 'node:child_process';
@@ -39,21 +41,69 @@ function queryAsync(env,sql) {
   });
 }
 function ensure(ok,message){if(!ok)throw Error(message);}
+
+/**
+ * Refuse databases that merely have a safe-looking name but contain any
+ * user schema, public relation/function/type, extension or DB-level object.
+ * All checks are read-only and precede the first mutating psql call.
+ */
+const pristineSql=[
+  'SELECT CASE WHEN',
+  "NOT EXISTS (SELECT 1 FROM pg_catalog.pg_namespace WHERE nspname NOT IN ('public','pg_catalog','information_schema') AND nspname NOT LIKE 'pg_%')",
+  "AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public')",
+  "AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public')",
+  "AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_type t JOIN pg_catalog.pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='public')",
+  "AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_extension WHERE extname<>'plpgsql')",
+  "AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_foreign_server)",
+  "AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_publication)",
+  "AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_event_trigger)",
+  "THEN 't' ELSE 'f' END"
+].join('\n');
+
+export function acceptsDisposableFingerprint(env,fingerprint){
+  return !!env && !!fingerprint &&
+    /^merge_receipt_test_[a-z0-9_]{3,48}$/.test(env.PGDATABASE) &&
+    ['localhost','127.0.0.1','::1'].includes(env.PGHOST) &&
+    /^[0-9]{1,5}$/.test(env.PGPORT) && Number(env.PGPORT)>0 && Number(env.PGPORT)<=65535 &&
+    /^[a-z_][a-z0-9_]{0,62}$/i.test(env.PGUSER) &&
+    env.PGHOSTADDR==='' && env.PGSERVICE==='' && env.PGSSLMODE==='disable' &&
+    ['127.0.0.1','::1'].includes(fingerprint.serverAddress) &&
+    fingerprint.database===env.PGDATABASE &&
+    fingerprint.owner===env.PGUSER &&
+    fingerprint.preparedRoles==='3' &&
+    fingerprint.pristine==='t';
+}
+
 export async function runDisposablePostgresProbe(env){
   if(!env||!/^merge_receipt_test_[a-z0-9_]{3,48}$/.test(env.PGDATABASE)||
-    !['localhost','127.0.0.1','::1'].includes(env.PGHOST))
+    !['localhost','127.0.0.1','::1'].includes(env.PGHOST)||
+    !/^[0-9]{1,5}$/.test(env.PGPORT)||
+    Number(env.PGPORT)<1||Number(env.PGPORT)>65535||
+    !/^[a-z_][a-z0-9_]{0,62}$/i.test(env.PGUSER)||
+    env.PGHOSTADDR!==''||env.PGSERVICE!==''||env.PGSSLMODE!=='disable')
     throw Error('Refusing non-disposable target');
+
+  const fingerprint={
+    serverAddress:querySync(env,'SELECT pg_catalog.inet_server_addr()::text'),
+    database:querySync(env,'SELECT pg_catalog.current_database()'),
+    owner:querySync(env,'SELECT pg_catalog.pg_get_userbyid(datdba) FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()'),
+    preparedRoles:querySync(env,"SELECT count(*) FROM pg_catalog.pg_roles WHERE rolname IN ('anon','authenticated','service_role') AND NOT rolcanlogin"),
+    pristine:querySync(env,pristineSql)
+  };
+  ensure(acceptsDisposableFingerprint(env,fingerprint),
+    'Refusing a non-empty, non-local or non-owned database / missing NOLOGIN test roles');
   ensure(querySync(env,"SELECT pg_catalog.to_regclass('auth.users') IS NULL")==='t',
     'Refusing an existing Supabase schema');
+
+  // The script deliberately does NOT CREATE ROLE: PostgreSQL roles are
+  // cluster-global. Provision the three NOLOGIN roles in a fresh cluster
+  // before running this probe; never mutate a shared local cluster.
   const bootstrap=[
+    'BEGIN;',
     'CREATE SCHEMA auth;',
     'CREATE TABLE auth.users(id uuid PRIMARY KEY);',
     "INSERT INTO auth.users(id) VALUES ('"+uidA+"'),('"+uidB+"');",
-    'DO $roles$ BEGIN',
-    "IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname='anon') THEN CREATE ROLE anon NOLOGIN; END IF;",
-    "IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname='authenticated') THEN CREATE ROLE authenticated NOLOGIN; END IF;",
-    "IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname='service_role') THEN CREATE ROLE service_role NOLOGIN; END IF;",
-    'END $roles$;'
+    'COMMIT;'
   ].join('\n');
   querySync(env,bootstrap);
   querySync(env,fileURLToPath(draftSql),{file:true});

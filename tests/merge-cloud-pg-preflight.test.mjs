@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {parseDisposableDbUrl,runDisposablePostgresProbe} from '../scripts/merge-receipt-pg-preflight.mjs';
+import {parseDisposableDbUrl,runDisposablePostgresProbe,acceptsDisposableFingerprint} from '../scripts/merge-receipt-pg-preflight.mjs';
 import {createReceiptLookupService} from '../merge/cloud/receipt-lookup.mjs';
 
 const uid='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -127,4 +127,51 @@ test('deadline failure reports no private operation IDs or server errors',async(
   const response=await lookup.read(uid,op);
   assert.doesNotMatch(JSON.stringify(response),/aaaaaaaa-aaaa|00000000-0000|secret/);
   assert.equal(response.canResumeCloudWrites,undefined);
+});
+
+
+test('P3.20 fingerprint rejects non-loopback server, mismatched DB/owner, nonempty schema and absent NOLOGIN roles',()=>{
+  const env=parseDisposableDbUrl(local);
+  const good={serverAddress:'127.0.0.1',database:env.PGDATABASE,
+    owner:env.PGUSER,preparedRoles:'3',pristine:'t'};
+  assert.equal(acceptsDisposableFingerprint(env,good),true);
+  assert.equal(acceptsDisposableFingerprint(env,{...good,serverAddress:'::1'}),true);
+  for(const patch of [
+    {serverAddress:'203.0.113.7'},
+    {serverAddress:'::ffff:127.0.0.1'},
+    {database:'production'},
+    {owner:'postgres'},
+    {preparedRoles:'2'},
+    {preparedRoles:'0'},
+    {pristine:'f'},
+    {pristine:''}
+  ])assert.equal(acceptsDisposableFingerprint(env,{...good,...patch}),false);
+});
+
+test('P3.20 direct runner rejects invalid libpq routing or invalid port before connecting',async()=>{
+  const base=parseDisposableDbUrl(local);
+  for(const override of [
+    {PGHOSTADDR:'203.0.113.7'},
+    {PGSERVICE:'production'},
+    {PGSSLMODE:'require'},
+    {PGPORT:'0'},
+    {PGPORT:'65536'},
+    {PGPORT:'5432;other'},
+    {PGUSER:'test role'}
+  ])await assert.rejects(runDisposablePostgresProbe({...base,...override}),/Refusing/);
+});
+
+test('P3.20 requires empty DB, ownership and pre-provisioned NOLOGIN roles before any writes',()=>{
+  const source=readFileSync(new URL('../scripts/merge-receipt-pg-preflight.mjs',import.meta.url),'utf8');
+  for(const check of [
+    'pg_catalog.inet_server_addr()','pg_catalog.current_database()',
+    'pg_catalog.pg_get_userbyid','pg_catalog.pg_namespace',
+    'pg_catalog.pg_class','pg_catalog.pg_proc','pg_catalog.pg_type',
+    'pg_catalog.pg_extension','pg_catalog.pg_foreign_server',
+    'pg_catalog.pg_publication','pg_catalog.pg_event_trigger',
+    'NOT rolcanlogin','acceptsDisposableFingerprint(env,fingerprint)'
+  ])assert.ok(source.includes(check),'missing preflight guard: '+check);
+  assert.ok(source.indexOf('const fingerprint={')<source.indexOf('const bootstrap=['));
+  for(const unsafe of ['CREATE ROLE anon','CREATE ROLE authenticated','CREATE ROLE service_role'])
+    assert.equal(source.includes(unsafe),false,'probe must not mutate cluster roles');
 });
