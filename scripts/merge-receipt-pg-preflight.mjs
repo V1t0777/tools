@@ -7,7 +7,8 @@
  * Never creates cluster-global roles or changes existing database content.
  */
 import {fileURLToPath} from 'node:url';
-import {spawn,spawnSync} from 'node:child_process';
+import {spawnSync} from 'node:child_process';
+import {runBoundedChild} from './merge-pg-bounded-child.mjs';
 
 const uidA='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const uidB='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
@@ -32,13 +33,10 @@ function querySync(env,sql,{file=false}={}){
   return r.stdout.trim();
 }
 function queryAsync(env,sql) {
-  return new Promise((resolve,reject)=>{
-    const p=spawn('psql',['-X','-q','-t','-A','-v','ON_ERROR_STOP=1','-c',sql],
-      {env:{...process.env,...env,PGHOSTADDR:''},stdio:['ignore','pipe','ignore']});
-    let value='';p.stdout.on('data',b=>{value+=String(b)});
-    p.on('error',()=>reject(Error('psql unavailable')));
-    p.on('close',code=>code===0?resolve(value.trim()):reject(Error('Postgres query failed')));
-  });
+  // Each of the 40 independent local sessions must terminate within 15s;
+  // untrusted stdout cannot accumulate without a bound. No stderr exposure.
+  return runBoundedChild('psql',['-X','-q','-t','-A','-v','ON_ERROR_STOP=1','-c',sql],
+    {env:{...process.env,...env,PGHOSTADDR:''},timeoutMs:15_000,maxOutputBytes:4_096});
 }
 function ensure(ok,message){if(!ok)throw Error(message);}
 
