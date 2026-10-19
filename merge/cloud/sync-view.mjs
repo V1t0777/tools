@@ -41,7 +41,7 @@ export function formatCloudSyncStatus(status, now = Date.now()) {
   if (status.phase === 'offline')
     return {tone:'warning',title:'连接暂不可用',detail:`${status.pending} 个操作保留在此设备；未确认的奖励不会计入云端`};
   if (status.pending > 0)
-    return {tone:'info',title:'待同步操作',detail:`${status.pending} 个尚未尝试发送的操作等待云端核对；不能视为已完成`};
+    return {tone:'info',title:'待同步操作',detail:`${status.pending} 个操作尚未尝试发送，等待云端核对；不能视为已完成`};
   if (status.phase === 'synced' && status.verified)
     return {tone:'success',title:'云端进度已确认',detail:`已校验版本 ${status.revision}`};
   return {tone:'muted',title:'等待连接云存档',detail:'当前仅能显示本设备缓存；尚未从服务器验证'};
