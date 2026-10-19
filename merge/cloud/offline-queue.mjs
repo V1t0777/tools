@@ -36,14 +36,29 @@ export function createOfflineCommandQueue({ uid, storage, transport, clock = () 
       !Array.isArray(value.pending) || value.pending.length > maxPending ||
       !['conflict','rejected','protocol-error'].includes(value.blocked) && value.blocked !== null) return false;
     if (value.confirmed !== null && !validSnapshot(value.confirmed)) return false;
+    // The queue can only block an existing unresolved head. Do not silently
+    // accept impossible persisted states after a crash or external mutation.
+    if (value.blocked !== null && value.pending.length === 0) return false;
     const ids = new Set();
-    return value.pending.every(entry => {
-      if (!plain(entry) || !UUID.test(entry.operationId) || ids.has(entry.operationId) ||
+    return value.pending.every((entry, index) => {
+      if (!plain(entry) || !UUID.test(entry.operationId) ||
         (entry.expectedRevision !== null && (!Number.isSafeInteger(entry.expectedRevision) || entry.expectedRevision < 0)) ||
         !Number.isSafeInteger(entry.attempts) || entry.attempts < 0 || entry.attempts > 100_000 ||
         !Number.isSafeInteger(entry.nextRetryAt) || entry.nextRetryAt < 0) return false;
-      ids.add(entry.operationId);
+      // UUIDs are case-insensitive; the server normalizes them to lowercase.
+      // Two differently cased entries must never alias the same remote action.
+      const operationId = entry.operationId.toLowerCase();
+      if (ids.has(operationId)) return false;
+      ids.add(operationId);
       if (entry.attempts > 0 && entry.expectedRevision === null) return false;
+      if (entry.nextRetryAt > 0 && entry.attempts === 0) return false;
+      // Only the first pending command may be pinned/sent. All later commands
+      // remain completely unsent until the earlier outcome is durable.
+      if (index > 0 && (entry.expectedRevision !== null ||
+          entry.attempts !== 0 || entry.nextRetryAt !== 0)) return false;
+      // A pinned or attempted operation requires a remotely confirmed base.
+      if (value.confirmed === null && (entry.expectedRevision !== null ||
+          entry.attempts !== 0 || entry.nextRetryAt !== 0)) return false;
       return normalizeCommand({operationId:entry.operationId, expectedRevision:entry.expectedRevision ?? 0,
         action:entry.action}) !== null;
     });
@@ -54,8 +69,12 @@ export function createOfflineCommandQueue({ uid, storage, transport, clock = () 
   let damaged = false;
   try {
     const raw = storage.getItem(key);
-    if (!raw) journal = empty();
-    else if (raw.length > MAX_STORED_BYTES) damaged = true;
+    // Only the actual absence of a key is a new journal. An existing key with
+    // an empty or non-string value is damaged, not permission to reset the
+    // queue and discard an operation whose server outcome may be unknown.
+    if (raw === null) journal = empty();
+    else if (typeof raw !== 'string' || raw.length === 0 ||
+        raw.length > MAX_STORED_BYTES) damaged = true;
     else {
       const parsed = JSON.parse(raw);
       if (validJournal(parsed)) journal = parsed;
