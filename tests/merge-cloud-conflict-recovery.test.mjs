@@ -48,8 +48,8 @@ test('conflict review shows original intent and a detached latest canonical snap
 });
 
 test('no consent, wrong original operation ID or invalid replacement can clear conflict',async()=>{
-  const x=setup();const id=await x.conflict();const rev=x.queue.inspectConflict().revision;
-  const args={originalOperationId:id,expectedRevision:rev,newAction:freshMove};
+  const x=setup();const id=await x.conflict();const review=x.queue.inspectConflict();
+  const args={originalOperationId:id,expectedRevision:review.revision,reviewedState:review.state,newAction:freshMove};
   assert.equal((await x.queue.replaceConflicted(args)).code,'REVIEW_CONFIRMATION_REQUIRED');
   assert.equal((await x.queue.replaceConflicted({...args,confirmedByUser:true,originalOperationId:'bad'})).code,'REVIEW_CONFIRMATION_REQUIRED');
   assert.equal((await x.queue.replaceConflicted({...args,confirmedByUser:true,newAction:{...freshMove,coins:1}})).code,'BAD_COMMAND');
@@ -61,7 +61,7 @@ test('no consent, wrong original operation ID or invalid replacement can clear c
 test('explicit replacement makes a fresh ID, does not send until flush, and preserves remote state',async()=>{
   const x=setup();const old=await x.conflict();const r=x.queue.inspectConflict();
   const out=await x.queue.replaceConflicted({confirmedByUser:true,originalOperationId:old,
-    expectedRevision:r.revision,newAction:freshMove});
+    expectedRevision:r.revision,reviewedState:r.state,newAction:freshMove});
   assert.equal(out.ok,true);assert.notEqual(out.operationId,old);
   assert.equal(out.discarded,1);assert.equal(out.pending,1);
   assert.equal(x.sends,2,'replacement is only durable queue mutation');
@@ -82,7 +82,7 @@ test('second device updating after review invalidates confirmation and leaves or
   assert.equal((await x.authority.execute(uid,{operationId:'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
     expectedRevision:1,action:freshMove})).status,'applied');
   const out=await x.queue.replaceConflicted({confirmedByUser:true,originalOperationId:old,
-    expectedRevision:r.revision,newAction:{type:'produce',slot:42}});
+    expectedRevision:r.revision,reviewedState:r.state,newAction:{type:'produce',slot:42}});
   assert.equal(out.code,'REVIEW_STALE');
   assert.equal(out.blocked,'conflict');assert.equal(out.revision,2);
   assert.equal(x.queue.preview().firstOperationId,old);
@@ -92,7 +92,7 @@ test('second device updating after review invalidates confirmation and leaves or
 test('queued dependent actions cannot be silently reinterpreted after conflict',async()=>{
   const x=setup({tail:true});const old=await x.conflict();const r=x.queue.inspectConflict();
   assert.equal(r.pending,2);assert.equal(r.followingUnsent,true);
-  const args={confirmedByUser:true,originalOperationId:old,expectedRevision:r.revision,newAction:freshMove};
+  const args={confirmedByUser:true,originalOperationId:old,expectedRevision:r.revision,reviewedState:r.state,newAction:freshMove};
   assert.equal((await x.queue.replaceConflicted(args)).code,'FOLLOWING_ACTIONS_NEED_REVIEW');
   assert.equal(x.queue.preview().pending,2);
   const out=await x.queue.replaceConflicted({...args,discardFollowing:true});
@@ -103,7 +103,7 @@ test('network failure during review preserves conflicted command and never sends
   const x=setup();const old=await x.conflict();const r=x.queue.inspectConflict();
   x.setOffline(true);
   const out=await x.queue.replaceConflicted({confirmedByUser:true,originalOperationId:old,
-    expectedRevision:r.revision,newAction:freshMove});
+    expectedRevision:r.revision,reviewedState:r.state,newAction:freshMove});
   assert.equal(out.code,'NETWORK_UNAVAILABLE');
   assert.equal(x.queue.preview().firstOperationId,old);
   assert.equal(x.queue.preview().blocked,'conflict');
@@ -124,7 +124,7 @@ test('replacement write failure retains original journal bytes and does not send
   const failing={getItem:x.storage.getItem,setItem:()=>{throw Error('quota')}};
   const restarted=createOfflineCommandQueue({...x.options,storage:failing,makeId:()=> 'ffffffff-ffff-4fff-8fff-ffffffffffff'});
   const out=await restarted.replaceConflicted({confirmedByUser:true,originalOperationId:old,
-    expectedRevision:r.revision,newAction:freshMove});
+    expectedRevision:r.revision,reviewedState:r.state,newAction:freshMove});
   assert.equal(out.code,'STORAGE_ERROR');
   assert.equal(x.storage.getItem(queueStorageKey(uid)),before);
   assert.equal(x.sends,2);
@@ -140,7 +140,7 @@ test('coordinator reviews and replaces under the Web Lock after fresh reload',as
   const review=await coordinated.inspectConflict();
   assert.equal(review.ok,true);assert.equal(review.originalOperationId,old);
   const result=await coordinated.replaceConflicted({confirmedByUser:true,
-    originalOperationId:old,expectedRevision:review.revision,newAction:freshMove});
+    originalOperationId:old,expectedRevision:review.revision,reviewedState:review.state,newAction:freshMove});
   assert.equal(result.ok,true);assert.equal(locked,false);
   assert.equal((await x.authority.read(uid)).revision,1);
   assert.equal((await coordinated.flush()).ok,true);
@@ -151,4 +151,78 @@ test('status copy explains explicit review, not automatic rebasing',()=>{
   const presentation=formatCloudSyncStatus({phase:'blocked',blocked:'conflict',pending:2});
   assert.match(presentation.detail,/核对最新云端物品/);
   assert.match(presentation.detail,/重新发起/);
+});
+test('same-revision remote state change after review cannot authorize a replacement',async()=>{
+  const x=setup();const original=await x.conflict();
+  const reviewed=x.queue.inspectConflict();
+  const sendsBefore=x.sends, pendingBefore=x.queue.preview().pending;
+  const ordinaryRead=x.transport.read;
+  x.transport.read=async()=> {
+    const remote=await ordinaryRead();
+    return {...remote,state:{...remote.state,coins:remote.state.coins+1}};
+  };
+  const stale=await x.queue.replaceConflicted({confirmedByUser:true,
+    originalOperationId:original,expectedRevision:reviewed.revision,
+    reviewedState:reviewed.state,newAction:freshMove});
+  assert.equal(stale.code,'REVIEW_STALE');
+  assert.equal(stale.blocked,'conflict');
+  assert.equal(x.queue.preview().firstOperationId,original);
+  assert.equal(x.queue.preview().pending,pendingBefore);
+  assert.equal(x.sends,sendsBefore,'no new action was sent');
+  assert.equal(x.queue.inspectConflict().revision,reviewed.revision);
+  assert.notDeepEqual(x.queue.inspectConflict().state,reviewed.state);
+  const fresh=x.queue.inspectConflict();
+  const retry=await x.queue.replaceConflicted({confirmedByUser:true,
+    originalOperationId:original,expectedRevision:fresh.revision,
+    reviewedState:fresh.state,newAction:freshMove});
+  assert.equal(retry.ok,true,'fresh human review unblocks a new unsent operation');
+  assert.notEqual(retry.operationId,original);
+  assert.equal(x.sends,sendsBefore);
+});
+
+test('confirmed replacement without the state shown to the player fails closed',async()=>{
+  const x=setup();const original=await x.conflict();
+  const reviewed=x.queue.inspectConflict(),sendCount=x.sends;
+  const options={confirmedByUser:true,originalOperationId:original,
+    expectedRevision:reviewed.revision,newAction:freshMove};
+  assert.equal((await x.queue.replaceConflicted(options)).code,'REVIEW_CONFIRMATION_REQUIRED');
+  assert.equal((await x.queue.replaceConflicted({
+    ...options,reviewedState:{...reviewed.state,coins:reviewed.state.coins+1}
+  })).code,'REVIEW_STALE');
+  assert.equal(x.queue.preview().firstOperationId,original);
+  assert.equal(x.queue.preview().blocked,'conflict');
+  assert.equal(x.sends,sendCount);
+});
+
+test('another tab refreshing an equal-revision snapshot invalidates prior conflict review',async()=>{
+  const x=setup();const original=await x.conflict();let lockHeld=false;
+  const locks={async request(_name, options, callback) {
+    assert.equal(options.mode,'exclusive');
+    assert.equal(lockHeld,false);
+    lockHeld=true;try{return await callback();}finally{lockHeld=false;}
+  }};
+  const first=createCoordinatedCloudQueue({...x.options,locks,
+    makeId:()=> 'ffffffff-ffff-4fff-8fff-ffffffffffff'});
+  const review=await first.inspectConflict();
+  assert.equal(review.ok,true);
+  const ordinaryRead=x.transport.read;
+  x.transport.read=async()=>{
+    const remote=await ordinaryRead();
+    return {...remote,state:{...remote.state,coins:remote.state.coins+1}};
+  };
+  const second=createCoordinatedCloudQueue({...x.options,locks});
+  assert.equal((await second.connect()).ok,true);
+  assert.equal(second.preview().revision,review.revision);
+  const sendsBefore=x.sends;
+  const result=await first.replaceConflicted({confirmedByUser:true,
+    originalOperationId:original,expectedRevision:review.revision,
+    reviewedState:review.state,newAction:freshMove});
+  assert.equal(result.code,'REVIEW_STALE');
+  assert.equal(result.blocked,'conflict');
+  assert.equal(result.firstOperationId,original);
+  assert.equal(x.sends,sendsBefore);
+  assert.equal(lockHeld,false);
+  const journal=JSON.parse(x.storage.getItem(queueStorageKey(uid)));
+  assert.equal(journal.pending[0].operationId,original);
+  assert.equal(journal.blocked,'conflict');
 });

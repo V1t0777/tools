@@ -203,17 +203,29 @@ export function createOfflineCommandQueue({ uid, storage, transport, clock = () 
   /** A conflict response is definitive: that operation was not committed.
    * Do NOT silently rebase its slot-based intent. The player must inspect the
    * current server state and explicitly choose a NEW action, which receives a
-   * NEW ID. No command is sent until a separate flush().
+   * NEW ID. A reviewedState snapshot is required and rechecked before creating
+   * the replacement, even if revision is unchanged. No command is sent until
+   * a separate flush().
    */
   async function replaceConflicted({confirmedByUser=false,originalOperationId,
-    expectedRevision,newAction,discardFollowing=false}={}) {
+    expectedRevision,reviewedState,newAction,discardFollowing=false}={}) {
     if (damaged || phase === 'storage-error') return {ok:false,code:'STORAGE_ERROR',...status()};
     if (journal.blocked !== 'conflict' || !journal.pending.length)
       return {ok:false,code:'NO_CONFLICT',...status()};
-    if (!confirmedByUser || !journal.confirmed ||
+    // A revision is not an exact view of the state: energy regeneration and
+    // other authoritative time updates can change a snapshot at equal revision.
+    // The caller MUST supply the detached state shown at inspectConflict().
+    if (!confirmedByUser || !journal.confirmed || !validateSave(reviewedState) ||
         originalOperationId !== journal.pending[0].operationId ||
         expectedRevision !== journal.confirmed.revision)
       return {ok:false,code:'REVIEW_CONFIRMATION_REQUIRED',...status()};
+    // Take the comparison bytes before the first await. A different tab can
+    // refresh this durable journal (same revision) after the user reviews it.
+    const reviewedBytes=JSON.stringify(reviewedState);
+    if (JSON.stringify(journal.confirmed.state) !== reviewedBytes) {
+      phase='blocked';
+      return {ok:false,code:'REVIEW_STALE',...status()};
+    }
     if (!isValidAction(newAction)) return {ok:false,code:'BAD_COMMAND',...status()};
     if (journal.pending.slice(1).some(e=>e.attempts!==0))
       return {ok:false,code:'FOLLOWING_OUTCOME_UNKNOWN',...status()};
@@ -223,7 +235,8 @@ export function createOfflineCommandQueue({ uid, storage, transport, clock = () 
     // the confirmation; another device may have changed the server meanwhile.
     const fresh=await readRemote();
     if (!fresh.ok) return fresh;
-    if (journal.confirmed.revision !== expectedRevision) {
+    if (journal.confirmed.revision !== expectedRevision ||
+        JSON.stringify(journal.confirmed.state) !== reviewedBytes) {
       phase='blocked';
       return {ok:false,code:'REVIEW_STALE',...status()};
     }
