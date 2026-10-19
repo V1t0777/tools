@@ -1,5 +1,5 @@
 /**
- * P3.18 server-side request-body quota for a future, UNDEPLOYED Edge endpoint.
+ * P3.19 constant-space request-body quota for a future, UNDEPLOYED Edge endpoint.
  * Enforce byte limits DURING streaming, not after unbounded Request.text().
  * No logging, network, storage or gameplay side effects.
  */
@@ -27,8 +27,11 @@ export async function readBoundedJson(request,{maxBytes=4096,deadlineMs=5000}={}
   catch {return invalid();}
   if (!reader) return invalid();
 
-  let timer,finished=false,total=0;
-  const parts=[];
+  let timer,finished=false,total=0,chunks=0;
+  // Fixed-size allocation; a hostile peer must not force one retained array
+  // per tiny or empty chunk. The chunk cap also bounds CPU per request.
+  const bytes=new Uint8Array(maxBytes);
+  const maxChunks=8192;
   const expired=new Promise((_,reject)=>{
     timer=setTimeout(()=>reject(Error('Request body deadline exceeded')),deadlineMs);
   });
@@ -38,16 +41,15 @@ export async function readBoundedJson(request,{maxBytes=4096,deadlineMs=5000}={}
       if (!part || typeof part.done!=='boolean') return invalid();
       if (part.done) break;
       if (!(part.value instanceof Uint8Array)) return invalid();
+      if (++chunks>maxChunks) return refusal('REQUEST_TOO_LARGE',413);
       if (part.value.byteLength > maxBytes-total) return refusal('REQUEST_TOO_LARGE',413);
+      // Copy immediately: upstream readers may reuse/mutate their buffers.
+      bytes.set(part.value,total);
       total+=part.value.byteLength;
-      parts.push(part.value);
     }
     finished=true;
-    const bytes=new Uint8Array(total);
-    let at=0;
-    for (const part of parts) {bytes.set(part,at);at+=part.byteLength;}
     let value;
-    try { value=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes)); }
+    try { value=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes.subarray(0,total))); }
     catch {return invalid();}
     return Object.freeze({ok:true,value});
   } catch {

@@ -92,3 +92,47 @@ test('Edge draft uses bounded reader, not whole-body Request.text()',()=>{
   const parser=readFileSync(new URL('../merge/cloud/bounded-json.mjs',import.meta.url),'utf8');
   assert.ok(parser.includes("refusal('REQUEST_TOO_LARGE',413)"));
 });
+
+
+test('P3.19 4096 one-byte chunks parse with fixed allocation',async()=>{
+  const json='"'+'x'.repeat(4094)+'"';
+  const s=streamed([...utf8(json)].map(byte=>new Uint8Array([byte])));
+  const r=await readBoundedJson(s.request);
+  assert.equal(r.ok,true);assert.equal(r.value.length,4094);
+  assert.equal(s.emitted,4096);
+});
+
+test('P3.19 repeated zero-byte chunks are capped and cancelled',async()=>{
+  const s=streamed(Array.from({length:8193},()=>new Uint8Array(0)));
+  const r=await readBoundedJson(s.request);
+  assert.equal(r.code,'REQUEST_TOO_LARGE');
+  assert.equal(r.httpStatus,413);
+  assert.equal(s.cancelled,true);
+  assert.equal(s.emitted,8193);
+});
+
+test('P3.19 copies reused source buffers before the next read',async()=>{
+  const pieces=['{"a":','true','}'];
+  const shared=new Uint8Array(8);
+  let i=0;
+  const request={headers:new Headers(),body:{getReader:()=>({
+    read:async()=>{
+      if(i===pieces.length)return {done:true};
+      const bytes=utf8(pieces[i++]);
+      shared.fill(0);shared.set(bytes);
+      return {done:false,value:shared.subarray(0,bytes.length)};
+    },
+    cancel:async()=>{}
+  })}};
+  const r=await readBoundedJson(request);
+  assert.equal(r.ok,true);
+  assert.deepEqual(r.value,{a:true});
+});
+
+test('P3.19 bounded parser retains no per-chunk array and caps chunk count',()=>{
+  const source=readFileSync(new URL('../merge/cloud/bounded-json.mjs',import.meta.url),'utf8');
+  assert.ok(source.includes('new Uint8Array(maxBytes)'));
+  assert.ok(source.includes('const maxChunks=8192'));
+  assert.ok(source.includes('bytes.set(part.value,total)'));
+  assert.ok(!source.includes('parts.push('));
+});
