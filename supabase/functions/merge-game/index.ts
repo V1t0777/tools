@@ -5,6 +5,7 @@
  */
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 import { createDatabaseAuthority } from '../../../merge/cloud/db-authority.mjs';
+import { createReceiptLookupService } from '../../../merge/cloud/receipt-lookup.mjs';
 
 const URL = Deno.env.get('SUPABASE_URL');
 const PUBLIC_KEY = Deno.env.get('SUPABASE_ANON_KEY');
@@ -36,6 +37,25 @@ const repository = {
     return data;
   }
 };
+// Draft-only endpoint. Until the atomic per-account SQL limiter is authorized
+// and applied, receipt requests fail closed with 503 (no memory fallback).
+const receiptLookup = createReceiptLookupService({
+  repository: {
+    async findOperation(uid,operationId) {
+      const {data,error}=await admin.from('merge_operations')
+        .select('request_hash,status').eq('user_id',uid).eq('operation_id',operationId).maybeSingle();
+      if(error)throw Error('Receipt lookup unavailable');
+      return data;
+    }
+  },
+  limiter: {
+    async consume(uid) {
+      const {data,error}=await admin.rpc('merge_consume_receipt_quota',{p_user_id:uid});
+      if(error || typeof data !== 'boolean')throw Error('Shared receipt limiter unavailable');
+      return data;
+    }
+  }
+});
 const game = createDatabaseAuthority(repository);
 const cors = {'Access-Control-Allow-Origin':ORIGIN,'Vary':'Origin',
   'Access-Control-Allow-Headers':'authorization, apikey, content-type',
@@ -66,11 +86,15 @@ Deno.serve(async request => {
       result=await game.read(data.user.id);
     } else if(exactKeys(body,['mode','command']) && body.mode==='command') {
       result=await game.execute(data.user.id,body.command);
+    } else if(exactKeys(body,['mode','operationId']) && body.mode==='receipt') {
+      result=await receiptLookup.read(data.user.id,body.operationId);
     } else return response({code:'BAD_COMMAND'},400);
     const status=result.status==='conflict'?409:
       result.code==='OPERATION_ID_REUSE'?409:
       result.code==='AUTH_REQUIRED'?401:
-      result.code==='BAD_COMMAND'?400:200;
+      result.code==='INVALID_OPERATION_ID'||result.code==='BAD_COMMAND'?400:
+      result.code==='RECEIPT_RATE_LIMITED'?429:
+      result.code==='RECEIPT_SERVICE_UNAVAILABLE'?503:200;
     return response(result,status);
   }catch {
     // Never echo database, JWT, request content or service-role errors to the client.
