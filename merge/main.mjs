@@ -4,6 +4,7 @@ import { WIDTH, CELL_COUNT, MAX_ENERGY, ENERGY_REGEN_MS, CHAINS, createInitialSt
   getLevelProgress, getMaxOrderTier, getProducerUpgrade, getWarehouseUpgrade } from './engine.mjs';
 import { BUILDINGS } from './economy.mjs';
 import { loadLocal, saveLocal, SAVE_KEY } from './storage.mjs';
+import { getBoardGuidance } from './board-guidance.mjs';
 
 const byId = id => document.getElementById(id);
 const board = byId('board');
@@ -16,6 +17,7 @@ let selected = -1;
 let drag = null;
 let ignoreNextClick = false;
 let noticeTimer = 0;
+let activeGuidance = null;
 let saveIssue = loaded.blocked ? loaded.reason : null;
 let persistedRaw = loaded.raw;
 if (loaded.migrated) window.setTimeout(() => hint('已保留旧版试玩进度，并升级为 P2 存档'), 250);
@@ -36,7 +38,7 @@ function persist({confirmedReset=false}={}) {
 }
 function commit(result) {
   if (result.state !== state) state = result.state;
-  if (result.ok) { selected = -1; persist(); render(); }
+  if (result.ok) { selected = -1; activeGuidance = null; persist(); render(); }
   else { render(); }
   hint(result.message);
 }
@@ -75,7 +77,7 @@ function renderBoard(now = Date.now()) {
   const fragment = document.createDocumentFragment();
   state.board.forEach((item, i) => {
     const button = document.createElement('button');
-    button.className = `cell${item?' filled':''}${item?.kind === 'producer'?' producer':''}${selected === i?' selected':''}`;
+    button.className = `cell${item?' filled':''}${item?.kind === 'producer'?' producer':''}${selected === i?' selected':''}${activeGuidance?.boardSlots.includes(i)?' guidance-target':''}`;
     button.type = 'button';
     button.dataset.slot = String(i);
     if (item) {
@@ -94,6 +96,7 @@ function renderBoard(now = Date.now()) {
       }
     }
     button.setAttribute('aria-label', `第${Math.floor(i/WIDTH)+1}行第${i%WIDTH+1}列，${item?getItemName(item):'空格'}${item?.tier?`，等级${item.tier}`:''}`);
+    if (activeGuidance?.boardSlots.includes(i)) button.setAttribute('aria-label', button.getAttribute('aria-label') + '，整理提示标记');
     fragment.append(button);
   });
   board.append(fragment);
@@ -113,6 +116,7 @@ function renderOrders() {
     const can = state.board.some(item => item?.kind === 'material' && item.chain === order.chain && item.tier === order.tier);
     const button = document.createElement('button');button.type = 'button';button.className='order-button';
     button.textContent = can ? '交付委托' : '尚缺材料';button.disabled = !can;
+    button.classList.toggle('guidance-target', activeGuidance?.orderId === order.id);
     button.addEventListener('click', () => commit(fulfillOrder(state, order.id)));
     card.append(icon,name,prize,button);
     fragment.append(card);
@@ -136,7 +140,7 @@ function renderSystems() {
   const slots=document.createDocumentFragment();
   state.warehouse.slots.forEach((item,i)=>{
     const btn=document.createElement('button');btn.type='button';
-    btn.className = `warehouse-slot${i>=state.warehouse.capacity?' locked':''}`;
+    btn.className = `warehouse-slot${i>=state.warehouse.capacity?' locked':''}${activeGuidance?.warehouseSlot===i?' guidance-target':''}`;
     btn.disabled=!item || i>=state.warehouse.capacity;
     btn.title = item ? `取出${getItemName(item)}` : i>=state.warehouse.capacity ? '尚未解锁' : '空位';
     btn.setAttribute('aria-label',btn.title);
@@ -152,6 +156,7 @@ function renderSystems() {
   const wbtn=byId('warehouse-upgrade');
   wbtn.textContent=w?`扩容至 ${w.newCapacity} 格 · ${w.coins} 金币（Lv.${w.minLevel}）`:'仓库已满级';
   wbtn.disabled = !w || state.coins < w.coins || getLevelProgress(state.xp).level < w.minLevel;
+  wbtn.classList.toggle('guidance-target', !!activeGuidance?.warehouseUpgrade);
   const upgrades=byId('producers');upgrades.replaceChildren();
   const buildings=byId('buildings');buildings.replaceChildren();
   const level=getLevelProgress(state.xp).level;
@@ -168,7 +173,18 @@ function renderSystems() {
       ()=>commit(upgradeBuilding(state,id)),complete||state.coins<rule.coins||level<rule.minLevel));
   }
 }
-function render() { renderResources(); renderBoard(); renderOrders(); renderSystems(); }
+function render() {
+  renderResources(); renderBoard(); renderOrders(); renderSystems();
+  byId('guidance-message').textContent = activeGuidance?.message ??
+    '棋盘太满时，可以点“整理提示”寻找合法操作。只提示，不自动操作。';
+  byId('board-guide').setAttribute('aria-pressed', String(!!activeGuidance));
+}
+
+byId('board-guide').addEventListener('click', () => {
+  if (activeGuidance) { activeGuidance = null; render(); return; }
+  try { activeGuidance = getBoardGuidance(state); selected = -1; render(); }
+  catch { hint('存档状态异常，请保留原始数据，不要重置'); }
+});
 
 board.addEventListener('click', event => {
   if (ignoreNextClick) { ignoreNextClick = false; return; }
@@ -228,7 +244,7 @@ byId('reset').addEventListener('click', () => {
     : '确定重置本地试玩进度吗？当前棋盘、金币和订单会被清空，且无法恢复。';
   if (!window.confirm(warning)) return;
   state = createInitialState();
-  selected = -1;
+  selected = -1; activeGuidance = null;
   const saved = persist({confirmedReset:true}); render();
   hint(saved ? '已重置试玩进度' : '重置未保存，请勿关闭页面');
 });
@@ -247,13 +263,13 @@ window.addEventListener('storage', event => {
   if (fresh.recovered && fresh.raw !== persistedRaw &&
       fresh.state.revision >= state.revision) {
     if (saveIssue) { hint('其他标签页更新了存档，当前页面存在未保存进度'); return; }
-    state = advanceTime(fresh.state); persistedRaw = fresh.raw;
+    state = advanceTime(fresh.state); persistedRaw = fresh.raw; activeGuidance = null;
     selected = -1; persist(); render(); hint('已从其他标签页恢复更新进度');
   }
 });
 window.setInterval(() => {
   const updated = advanceTime(state);
-  if (updated !== state) { state = updated;persist();render(); }
+  if (updated !== state) { state = updated; if (activeGuidance) activeGuidance = getBoardGuidance(state);persist();render(); }
   else renderResources();
 }, 1000);
 persist(); render();

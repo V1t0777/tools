@@ -38,6 +38,10 @@
       <section class="board-section" aria-labelledby="board-title">
         <div class="section-heading"><div><p class="overline">WORK TABLE</p><h2 id="board-title">合成工作台</h2></div><span id="free-cells" class="capacity" aria-live="polite"></span></div>
         <p class="help-line">点击相同物品合成，也可按住拖动；点击 <strong>🧺</strong> 生产器获取原料。</p>
+        <div class="guidance-panel">
+          <button id="board-guide" class="guide-action" type="button" aria-controls="guidance-message" aria-pressed="false">整理提示</button>
+          <p id="guidance-message" class="guidance-message" role="status" aria-live="polite">棋盘太满时，可以点“整理提示”寻找合法操作。只提示，不自动操作。</p>
+        </div>
         <div id="board" class="board" role="group" aria-label="七列八行的合成棋盘"></div>
         <div class="board-footer"><span id="save-status" role="status">本地试玩档 · 不上传云端</span><button id="reset" class="text-button" type="button">重置试玩进度</button></div><button id="store-selected" class="secondary-action" type="button" disabled>将选中的原料收入仓库</button>
       </section>
@@ -69,6 +73,7 @@
       <p>② 用手指拖动两个完全相同的物品，或依次点击它们，就能合成下一阶物品。</p>
       <p>③ 拿到委托需要的物品后，点击「交付」领取金币与经验。体力随时间恢复。</p>
       <p>④ 用金币升级生产器、扩充仓库和建设街区；等级决定新订单难度。P1 存档可以自动迁移。</p>
+      <p>⑤ 棋盘太满时，可以点击「整理提示」，标出可以交付、合成、收纳或升级的合法操作；提示不会自动执行操作或扣费。</p>
       <p class="dialog-caution">当前只是 P2 研发预览：采用占位物品图标，进度仅保存在当前浏览器，不会同步至 Supabase。</p>
       <button class="primary" id="close-guide" type="button">明白了</button>
     </div>
