@@ -25,40 +25,68 @@ export function createCoordinatedCloudQueue({uid, storage, transport,
   const name = cloudQueueLockName(uid);
   const capable = !!locks && typeof locks.request === 'function';
   let active = null;
-  let verifiedRevision = null;
+  // An in-memory, session-only proof of the EXACT remote-confirmed snapshot.
+  // Revision alone is insufficient: time-based regeneration may change state
+  // without advancing the command revision.
+  let verifiedSnapshot = null;
   let lastPhase = 'unverified';
+  let lastFailure = null;
+  const snapshotToken = snapshot => snapshot.state !== null &&
+    Number.isSafeInteger(snapshot.revision)
+    ? JSON.stringify([snapshot.revision, snapshot.state]) : null;
 
   function preview() {
     const result = create().preview();
-    // A cached snapshot is NOT evidence that this tab has read it remotely.
-    const verified = verifiedRevision !== null && verifiedRevision === result.revision;
-    return { ...result, verified, phase:verified ? lastPhase : result.phase,
+    // A persisted cache, or another tab's same-revision update, is unverified.
+    // Never show a green "synced" status during an unfinished lock operation.
+    const verified = capable && active === null && verifiedSnapshot !== null &&
+      verifiedSnapshot === snapshotToken(result);
+    return { ...result, verified,
+      phase:verified ? lastPhase : lastFailure?.phase ?? result.phase,
+      ...(lastFailure?.code ? {code:lastFailure.code} : {}),
       lockAvailable:capable };
   }
   const unavailable = () => ({ok:false,code:'MULTITAB_LOCK_UNAVAILABLE',
     phase:'blocked',...{pending:preview().pending}});
 
   async function exclusive(callback) {
-    if (!capable) return unavailable();
+    if (!capable) {
+      verifiedSnapshot = null;
+      return unavailable();
+    }
     // Serialize calls issued by this SAME adapter as well as between tabs.
     if (active) await active.catch(()=>{});
+    // A pending lock, a failed remote read, or a write must never continue to
+    // advertise a previous successful verification.
+    verifiedSnapshot = null;
+    const lockFailed = () => {
+      verifiedSnapshot = null;
+      lastPhase = 'blocked';
+      lastFailure = {code:'LOCK_REQUEST_FAILED',phase:'blocked'};
+      return {ok:false,code:'LOCK_REQUEST_FAILED',phase:'blocked'};
+    };
     let operation;
     try {
       operation = Promise.resolve(locks.request(name,{mode:'exclusive'}, async () => {
         // IMPORTANT: never reuse an instance created before waiting for lock.
         const queue = create();
         const response = await callback(queue);
-        if (response?.verified === true && Number.isSafeInteger(response.revision))
-          verifiedRevision = response.revision;
-        lastPhase = response?.phase || 'unverified';
+        const snapshot = queue.preview();
+        // Only a successful operation that actually read the remote server in
+        // this locked queue instance can verify these exact state bytes.
+        verifiedSnapshot = response?.ok === true && snapshot.verified === true
+          ? snapshotToken(snapshot) : null;
+        lastPhase = response?.phase || snapshot.phase || 'unverified';
+        lastFailure = response?.ok === true ? null :
+          {code:response?.code,phase:response?.phase || snapshot.phase};
         return response;
       }));
     } catch {
-      return {ok:false,code:'LOCK_REQUEST_FAILED',phase:'blocked'};
+      return lockFailed();
     }
     active = operation;
     try {return await operation;}
-    catch {return {ok:false,code:'LOCK_REQUEST_FAILED',phase:'blocked'};}
+    catch {return lockFailed();}
     finally {if (active === operation) active = null;}
   }
 

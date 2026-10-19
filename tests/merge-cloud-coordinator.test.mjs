@@ -119,3 +119,88 @@ test('two tab cancellation attempts serialize and do not unexpectedly erase late
   assert.equal(cancel.ok,true);assert.equal(newEntry.ok,true);
   assert.equal(a.preview().pending,1);
 });
+test('same-revision remote refresh in another tab invalidates the old verified snapshot',async()=>{
+  const {factory,transport}=setup(),first=factory(1);
+  assert.equal((await first.connect()).ok,true);
+  assert.equal(first.preview().verified,true);
+  const other=factory(100,{transport:{
+    read:async()=>{
+      const fresh=await transport.read();
+      return {...fresh,state:{...fresh.state,coins:fresh.state.coins+1}};
+    },
+    execute:transport.execute
+  }});
+  assert.equal((await other.connect()).ok,true);
+  assert.equal(other.preview().verified,true);
+  assert.equal(other.preview().revision,first.preview().revision);
+  assert.equal(first.preview().verified,false,'equal revisions do not prove equal game state');
+});
+
+test('same-revision local journal edit cannot retain a remote verification badge',async()=>{
+  const {factory,storage}=setup(),tab=factory(1);
+  await tab.connect();
+  const key=queueStorageKey(uid),journal=JSON.parse(storage.getItem(key));
+  const revision=journal.confirmed.revision;
+  journal.confirmed.state.coins++;
+  storage.setItem(key,JSON.stringify(journal));
+  assert.equal(tab.preview().revision,revision);
+  assert.equal(tab.preview().verified,false);
+});
+
+test('failed remote re-verification revokes the old proof and shows offline status',async()=>{
+  const {factory,transport}=setup();
+  let offline=false;
+  const tab=factory(1,{transport:{
+    read:()=>offline ? Promise.reject(Error('disconnected')) : transport.read(),
+    execute:transport.execute
+  }});
+  assert.equal((await tab.connect()).ok,true);
+  assert.equal(tab.preview().verified,true);
+  offline=true;
+  assert.equal((await tab.connect()).code,'NETWORK_UNAVAILABLE');
+  assert.equal(tab.preview().verified,false);
+  assert.equal(tab.preview().phase,'offline');
+});
+
+test('lock request failure revokes prior verified state and exposes blocking status',async()=>{
+  const {factory,locks}=setup();
+  let deny=false;
+  const tab=factory(1,{locks:{
+    request:(...args)=>deny ? Promise.reject(Error('lock denied')) : locks.request(...args)
+  }});
+  assert.equal((await tab.connect()).ok,true);
+  assert.equal(tab.preview().verified,true);
+  deny=true;
+  assert.equal((await tab.connect()).code,'LOCK_REQUEST_FAILED');
+  assert.equal(tab.preview().verified,false);
+  assert.equal(tab.preview().code,'LOCK_REQUEST_FAILED');
+  assert.equal(tab.preview().phase,'blocked');
+});
+
+test('in-flight remote validation never retains an earlier synced proof',async()=>{
+  const {factory,transport}=setup();
+  let delayed=false,release,signal;
+  const entered=new Promise(resolve=>{signal=resolve;});
+  const gate=new Promise(resolve=>{release=resolve;});
+  const tab=factory(1,{transport:{
+    read:async()=>{if(delayed){signal();await gate;}return transport.read();},
+    execute:transport.execute
+  }});
+  assert.equal((await tab.connect()).ok,true);
+  assert.equal(tab.preview().verified,true);
+  delayed=true;
+  const pending=tab.connect();
+  await entered;
+  assert.equal(tab.preview().verified,false);
+  release();
+  assert.equal((await pending).ok,true);
+  assert.equal(tab.preview().verified,true);
+});
+
+test('successful second server read with unchanged snapshot restores verification',async()=>{
+  const {factory}=setup(),tab=factory(1);
+  assert.equal((await tab.connect()).ok,true);
+  assert.equal(tab.preview().verified,true);
+  assert.equal((await tab.connect()).ok,true);
+  assert.equal(tab.preview().verified,true);
+});
