@@ -110,10 +110,12 @@ export function createOfflineCommandQueue({ uid, storage, transport, clock = () 
   function networkFailure(head) {
     const next=copy(journal);
     const item=next.pending.find(e=>e.operationId===head.operationId);
-    if (!item) return;
+    if (!item) { phase='storage-error'; return false; }
     // Retry using the SAME operation ID and pinned revision: outcome may be unknown.
     item.nextRetryAt=clock()+Math.min(RETRY_CEILING_MS,RETRY_BASE_MS * 2 ** Math.min(item.attempts-1,6));
-    if (write(next)) phase='offline';
+    if (!write(next)) { phase='storage-error'; return false; }
+    phase='offline';
+    return true;
   }
   async function readRemote() {
     let reply;
@@ -153,7 +155,14 @@ export function createOfflineCommandQueue({ uid, storage, transport, clock = () 
       if (!write(sending)) {phase='storage-error';return {ok:false,code:'STORAGE_ERROR',...status()};}
       let reply;
       try {reply=await transport.execute(outbound);}
-      catch {networkFailure(outbound);return {ok:false,code:'NETWORK_UNAVAILABLE',...status()};}
+      catch {
+        // The command may already be committed remotely. If the durable retry
+        // plan cannot be saved, report STORAGE_ERROR rather than hiding the
+        // persistence failure behind an ordinary connectivity warning.
+        if (!networkFailure(outbound))
+          return {ok:false,code:'STORAGE_ERROR',...status()};
+        return {ok:false,code:'NETWORK_UNAVAILABLE',...status()};
+      }
       const canonical=validSnapshot(reply);
       if (!canonical || journal.confirmed && reply.revision < journal.confirmed.revision) {
         const next=copy(journal);next.blocked='protocol-error';
