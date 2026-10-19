@@ -10,16 +10,20 @@ const missing = () => Object.freeze({
   canReplay:false,canReset:false,canResumeCloudWrites:false
 });
 
-export function createReceiptLookupService({repository,limiter,deadlineMs=5_000}={}) {
+export function createReceiptLookupService({repository,limiter,deadlineMs=5_000,now=()=>performance.now()}={}) {
   if (!Number.isSafeInteger(deadlineMs) || deadlineMs < 1 || deadlineMs > 30_000)
     throw Error('Invalid receipt deadline');
-  async function bounded(task) {
+  if (typeof now!=='function') throw Error('Invalid monotonic clock');
+  // Quota and receipt share one monotonic deadline, never two full budgets.
+  async function bounded(task,deadlineAt) {
+    const remaining=deadlineAt-now();
+    if (remaining<=0) throw Error('Receipt deadline exceeded');
     let timer;
     try {
       return await Promise.race([
         Promise.resolve().then(task),
         new Promise((_,reject)=>{
-          timer=setTimeout(()=>reject(Error('Receipt deadline exceeded')),deadlineMs);
+          timer=setTimeout(()=>reject(Error('Receipt deadline exceeded')),remaining);
         })
       ]);
     } finally {clearTimeout(timer);}
@@ -37,15 +41,16 @@ export function createReceiptLookupService({repository,limiter,deadlineMs=5_000}
       const uid=verifiedUid.toLowerCase();
       const id=operationId.toLowerCase();
 
+      const deadlineAt=now()+deadlineMs;
       let permitted;
-      try {permitted=await bounded(()=>limiter.consume(uid));}
+      try {permitted=await bounded(()=>limiter.consume(uid),deadlineAt);}
       catch {return blocked('RECEIPT_SERVICE_UNAVAILABLE',503);}
       if (permitted !== true) return permitted===false ?
         blocked('RECEIPT_RATE_LIMITED',429) :
         blocked('RECEIPT_SERVICE_UNAVAILABLE',503);
 
       let record;
-      try {record=await bounded(()=>repository.findOperation(uid,id));}
+      try {record=await bounded(()=>repository.findOperation(uid,id),deadlineAt);}
       catch {return blocked('RECEIPT_SERVICE_UNAVAILABLE',503);}
       if (record===null) return missing();
       const receipt=validateReceiptRow(record);
