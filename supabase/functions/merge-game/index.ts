@@ -6,6 +6,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 import { createDatabaseAuthority } from '../../../merge/cloud/db-authority.mjs';
 import { createReceiptLookupService } from '../../../merge/cloud/receipt-lookup.mjs';
+import { readBoundedJson } from '../../../merge/cloud/bounded-json.mjs';
 
 const URL = Deno.env.get('SUPABASE_URL');
 const PUBLIC_KEY = Deno.env.get('SUPABASE_ANON_KEY');
@@ -77,10 +78,11 @@ Deno.serve(async request => {
   try {
     const {data,error}=await anon.auth.getUser(bearer);
     if(error||!data.user?.id)return response({code:'AUTH_REQUIRED'},401);
-    const text=await request.text();
-    if(new TextEncoder().encode(text).length>4096)return response({code:'REQUEST_TOO_LARGE'},413);
-    let body:any;
-    try{body=JSON.parse(text);}catch{return response({code:'BAD_JSON'},400);}
+    // Stream and enforce the 4 KiB limit BEFORE materializing/parsing JSON.
+    // A missing or forged Content-Length never bypasses byte counting.
+    const parsed=await readBoundedJson(request);
+    if(!parsed.ok)return response({code:parsed.code},parsed.httpStatus);
+    const body:any=parsed.value;
     let result;
     if(exactKeys(body,['mode']) && body.mode==='read') {
       result=await game.read(data.user.id);
