@@ -8,7 +8,7 @@ import { validateSave } from '../engine.mjs';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const VERSION = 1;
 const MAX_PENDING = 32;
-const MAX_STORED_BYTES = 160_000;
+export const MAX_STORED_BYTES = 160_000;
 const RETRY_BASE_MS = 1_000;
 const RETRY_CEILING_MS = 60_000;
 const copy = value => structuredClone(value);
