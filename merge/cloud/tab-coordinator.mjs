@@ -39,11 +39,15 @@ export function createCoordinatedCloudQueue({uid, storage, transport,
     const result = create().preview();
     // A persisted cache, or another tab's same-revision update, is unverified.
     // Never show a green "synced" status during an unfinished lock operation.
-    const verified = capable && active === null && verifiedSnapshot !== null &&
-      verifiedSnapshot === snapshotToken(result);
+    const storageDamaged = result.phase === 'storage-error';
+    const verified = capable && !storageDamaged && active === null &&
+      verifiedSnapshot !== null && verifiedSnapshot === snapshotToken(result);
+    // Newly detected journal corruption outranks an older network/lock failure.
+    // Otherwise the status view could hide the need to preserve local bytes.
     return { ...result, verified,
-      phase:verified ? lastPhase : lastFailure?.phase ?? result.phase,
-      ...(lastFailure?.code ? {code:lastFailure.code} : {}),
+      phase:storageDamaged ? result.phase :
+        verified ? lastPhase : lastFailure?.phase ?? result.phase,
+      ...(!storageDamaged && lastFailure?.code ? {code:lastFailure.code} : {}),
       lockAvailable:capable };
   }
   const unavailable = () => ({ok:false,code:'MULTITAB_LOCK_UNAVAILABLE',

@@ -204,3 +204,35 @@ test('successful second server read with unchanged snapshot restores verificatio
   assert.equal((await tab.connect()).ok,true);
   assert.equal(tab.preview().verified,true);
 });
+
+test('new journal corruption overrides a previous offline status with a storage warning',async()=>{
+  const {factory,storage,transport}=setup();
+  let offline=false;
+  const tab=factory(1,{transport:{
+    read:()=>offline ? Promise.reject(Error('network lost')) : transport.read(),
+    execute:transport.execute
+  }});
+  assert.equal((await tab.connect()).ok,true);
+  offline=true;
+  assert.equal((await tab.connect()).code,'NETWORK_UNAVAILABLE');
+  assert.equal(tab.preview().phase,'offline');
+  storage.setItem(queueStorageKey(uid),'{corrupt');
+  assert.equal(tab.preview().phase,'storage-error');
+  assert.equal(tab.preview().code,undefined);
+  assert.equal(tab.preview().verified,false);
+});
+
+test('new journal corruption overrides a previous lock failure',async()=>{
+  const {factory,storage,locks}=setup();
+  let deny=false;
+  const tab=factory(1,{locks:{
+    request:(...args)=>deny ? Promise.reject(Error('lock denied')) : locks.request(...args)
+  }});
+  assert.equal((await tab.connect()).ok,true);
+  deny=true;
+  assert.equal((await tab.connect()).code,'LOCK_REQUEST_FAILED');
+  storage.setItem(queueStorageKey(uid),'{corrupt');
+  assert.equal(tab.preview().phase,'storage-error');
+  assert.equal(tab.preview().code,undefined);
+  assert.equal(tab.preview().verified,false);
+});

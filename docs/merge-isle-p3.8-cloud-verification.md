@@ -12,13 +12,13 @@
 
 - 开始下一次独占操作即清除旧验证状态；锁请求尚未完成时不显示“已确认”。
 - 网络重验失败、存档校验失败、持久化失败或 Web Lock 请求异常：撤销旧标记，不根据旧 revision 恢复成功状态。
-- 锁请求失败标注 `LOCK_REQUEST_FAILED`；网络失败保留 `offline` 状态，供现有中文只读状态展示模块显示警告。
+- 锁请求失败标注 `LOCK_REQUEST_FAILED`；网络失败保留 `offline` 状态，供现有中文只读状态展示模块显示警告。若后续检测到本地 journal 损坏，优先展示 `storage-error`，不允许较早的网络/锁异常掩盖存储损坏。
 - Web Locks 不可用时继续拒绝云端操作；**不**使用不安全的 `localStorage` 假锁。
 - `enqueue` 和其他未读取服务器的成功调用不会凭本地缓存建立新的“已验证”标记。
 
 ## 回归测试
 
-在 `tests/merge-cloud-coordinator.test.mjs` 增加六种场景：
+在 `tests/merge-cloud-coordinator.test.mjs` 增加八种场景：
 
 1. 第二标签同 revision、不同快照的服务端读取使原标签的核验标记失效。
 2. 本地 journal 被改写但 revision 未变时失效。
@@ -26,6 +26,8 @@
 4. 锁请求失败时失效，并提供阻断错误码。
 5. 请求进行期间不可沿用上一次已验证状态。
 6. 重新读取同一未改变的服务端快照后，恢复验证标记。
+7. 先断网、后损坏本地 journal 时，必须优先显示 `storage-error` 而非过期的 `offline`。
+8. 先丢失 Web Lock、后损坏本地 journal 时，必须优先显示 `storage-error` 而非旧锁错误。
 
 验证命令：
 
