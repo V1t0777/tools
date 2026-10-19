@@ -89,5 +89,6 @@ test('Edge draft uses bounded reader, not whole-body Request.text()',()=>{
   assert.ok(code.includes('readBoundedJson(request)'));
   assert.ok(!code.includes('await request.text()'));
   assert.ok(code.includes('parsed.httpStatus'));
-  assert.ok(code.includes('REQUEST_TOO_LARGE'));
+  const parser=readFileSync(new URL('../merge/cloud/bounded-json.mjs',import.meta.url),'utf8');
+  assert.ok(parser.includes("refusal('REQUEST_TOO_LARGE',413)"));
 });

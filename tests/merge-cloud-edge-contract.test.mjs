@@ -10,7 +10,9 @@ test('Edge draft keeps keys on server, verifies JWT, and never uses request user
   assert.ok(!/body\.userId|body\.coins|body\.nextState/.test(code));
   assert.ok(code.includes("'Cache-Control':'no-store'"));
   assert.ok(code.includes('ORIGIN_NOT_ALLOWED'));
-  assert.ok(code.includes('REQUEST_TOO_LARGE'));
+  assert.ok(code.includes('readBoundedJson(request)'));
+  const parser=readFileSync(new URL('../merge/cloud/bounded-json.mjs',import.meta.url),'utf8');
+  assert.ok(parser.includes("refusal('REQUEST_TOO_LARGE',413)"));
 });
 test('operation envelope boundary excludes self-specified user and future rewards',()=>{
   const good={operationId:'00000000-0000-4000-8000-000000000001',expectedRevision:0,action:{type:'order',orderId:'o0'}};
