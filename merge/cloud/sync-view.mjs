@@ -8,12 +8,15 @@ export function formatCloudSyncStatus(status, now = Date.now()) {
   // committed even if this browser never received or saved the acknowledgment.
   const attempted = Number.isSafeInteger(status.attemptedPending) &&
     status.attemptedPending > 0 ? status.attemptedPending : 0;
+  // A damaged journal or failed durable write must be shown before stale
+  // Web Lock errors: changing browsers or clearing site data could destroy
+  // the only evidence of an operation whose server outcome is still unknown.
+  if (status.phase === 'storage-error' || status.code === 'STORAGE_ERROR')
+    return {tone:'danger',title:'本地队列无法安全保存',detail:'已暂停发送；请勿清理浏览器数据'};
   if (status.lockAvailable === false || status.code === 'MULTITAB_LOCK_UNAVAILABLE')
     return {tone:'danger',title:'此浏览器暂不支持安全云同步',detail:'已停止云端写入；请使用支持 Web Locks 的浏览器'};
   if (status.code === 'LOCK_REQUEST_FAILED')
     return {tone:'danger',title:'无法获取云存档独占锁',detail:'已暂停写入，避免其他标签页进度被覆盖'};
-  if (status.phase === 'storage-error')
-    return {tone:'danger',title:'本地队列无法安全保存',detail:'已暂停发送；请勿清理浏览器数据'};
   if (status.phase === 'protocol-error')
     return {tone:'danger',title:'存档响应异常',detail:'已停止自动重试，防止错误覆盖'};
   if (status.blocked === 'conflict') {
