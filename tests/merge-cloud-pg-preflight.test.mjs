@@ -175,3 +175,20 @@ test('P3.20 requires empty DB, ownership and pre-provisioned NOLOGIN roles befor
   for(const unsafe of ['CREATE ROLE anon','CREATE ROLE authenticated','CREATE ROLE service_role'])
     assert.equal(source.includes(unsafe),false,'probe must not mutate cluster roles');
 });
+
+test('P3.21 schema guard requires literal pg_ prefix rather than SQL LIKE wildcard',()=>{
+  const src=readFileSync(new URL('../scripts/merge-receipt-pg-preflight.mjs',import.meta.url),'utf8');
+  assert.ok(src.includes("pg_catalog.left(nspname,3) <> 'pg_'"));
+  assert.ok(!src.includes("nspname NOT LIKE 'pg_%'"));
+  const isSystemPrefix=name=>name.slice(0,3)==='pg_';
+  for(const custom of ['pgfoo','pgX','pg1','pg','customer','pguser'])
+    assert.equal(isSystemPrefix(custom),false);
+  for(const system of ['pg_toast','pg_temp_7','pg_toast_temp_7'])
+    assert.equal(isSystemPrefix(system),true);
+});
+test('P3.21 pristine SQL still gates first database mutation',()=>{
+  const src=readFileSync(new URL('../scripts/merge-receipt-pg-preflight.mjs',import.meta.url),'utf8');
+  assert.ok(src.includes("nspname NOT IN ('public','pg_catalog','information_schema') AND pg_catalog.left(nspname,3) <> 'pg_'"));
+  assert.ok(src.indexOf('pristine:querySync(env,pristineSql)')<src.indexOf('const bootstrap=['));
+  assert.ok(src.includes("fingerprint.pristine==='t'"));
+});
