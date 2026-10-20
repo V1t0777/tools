@@ -2,7 +2,7 @@
  * Three models differ in player efficiency and action cadence and MUST NOT be
  * interpreted as an observational estimate of actual player behavior.
  */
-import {getLevel,XP_THRESHOLDS} from './economy.mjs';
+import {XP_THRESHOLDS} from './economy.mjs';
 import {MAX_ENERGY} from './engine.mjs';
 import {simulateEconomy} from './economy-simulator.mjs';
 import {simulateFriction} from './economy-friction-simulator.mjs';
@@ -30,12 +30,12 @@ export function auditProgression({
   const friction=simulateFriction({seed,days,sessionsPerDay,sessionMinutes,behavior,policy:'balanced'});
   const supplies=simulateSupplyEconomy({seed,days,sessionsPerDay,
     actionsPerSession:supplyActionsPerSession});
-  const describe=(result,{kind,notes,cumulative=false})=>{
+  const describe=(result,{kind,notes})=>{
     const dayOne=firstDay(result.daily);
     return {
       kind,notes,capReachedDay:firstCapDay(result.daily),
       dayOneLevel:dayOne.level,
-      dayOneOrders:cumulative?dayOne.orders:dayOne.orders,
+      dayOneOrders:dayOne.orders,
       finalLevel:result.final.level,
       finalXp:result.final.xp,
       finalCoins:result.final.coins,
@@ -50,7 +50,7 @@ export function auditProgression({
       notes:'优先交付与合成，尽量购买建筑/生产器升级；无玩家失误或补给消费'}),
     friction:describe(friction,{kind:'friction',
       notes:`非理想模拟：${behavior} 操作习惯、漏合成、仓库拥堵；不使用补给`}),
-    supply:describe(supplies,{kind:'supply',cumulative:true,
+    supply:describe(supplies,{kind:'supply',
       notes:'每动作 10 秒、按存档永久限购自动购买并使用补给；无其他升级投资'})
   };
   const cautions=[];
