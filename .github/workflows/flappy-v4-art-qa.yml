@@ -888,6 +888,37 @@ jobs:
               assert src.stat().st_size<=260000
           print("Alpha46 Draft original 8 Chrome captures and editable source checked")
           PY
+          # Additional Alpha46A botanical candidate: independently captured,
+          # does not silently replace the earlier Alpha46 screenshots.
+          .alpha31-art-venv/bin/python tests/flappy-v4-batch-chrome.py \
+            --chrome "$CHROME" \
+            --base-url "http://127.0.0.1:8766/flappy/review-v4.html" \
+            --output v4-art-qa/alpha46a-botanical --stage alpha46a
+          .alpha31-art-venv/bin/python - <<'PY'
+          import json, pathlib, xml.etree.ElementTree as ET
+          from PIL import Image, ImageChops
+          folder=pathlib.Path("v4-art-qa/alpha46a-botanical")
+          pngs=sorted(folder.glob("*.png"))
+          assert len(pngs)==8, ("Alpha46A screenshots missing",len(pngs))
+          metrics=json.loads((folder/"alpha46a-batch-chrome-metrics.json").read_text())
+          assert metrics["independent_capture_count"]==8
+          previous=pathlib.Path("v4-art-qa/alpha46-trees")
+          for theme in ("warm","slate"):
+              fn=f"alpha46a-world-{theme}-320x568.png"
+              old=previous/f"alpha46-world-{theme}-320x568.png"
+              with Image.open(folder/fn).convert("RGB") as a, Image.open(old).convert("RGB") as b:
+                  delta=ImageChops.difference(a,b)
+                  assert delta.getbbox() is not None, f"{theme} new art looks identical to Alpha46"
+              src=pathlib.Path(f"flappy/assets/v4/masters/{theme}/near-botanical-alpha46a.svg")
+              root=ET.parse(src).getroot()
+              trees=[el for el in root.iter() if el.get("data-alpha46-tree")]
+              masks=[el for el in root.iter() if el.tag.endswith("mask")]
+              saplings=[el for el in root.iter() if el.get("data-understory")]
+              assert len(trees)==9 and len(masks)==9 and len(saplings)==6
+              assert src.stat().st_size<290000
+              assert all(x.attrib.get("maskUnits")=="userSpaceOnUse" for x in masks)
+          print("Alpha46A botany A/B images, true alpha masks and budget: PASS")
+          PY
       - name: Keep 219 browser artwork shots, true wing-pose backgrounds, thirty-four original RGBA studies
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -945,6 +976,8 @@ jobs:
             v4-art-qa/alpha45-actual-wing-readability.json
             v4-art-qa/alpha46-trees/*.png
             v4-art-qa/alpha46-trees/*.json
+            v4-art-qa/alpha46a-botanical/*.png
+            v4-art-qa/alpha46a-botanical/*.json
             v4-art-qa/headless-painted-pilot-seams.json
             v4-art-qa/server.log
             v4-art-qa/chrome.log
