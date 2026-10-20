@@ -3,11 +3,13 @@ import { BUILDINGS, DROP_DISTRIBUTIONS, MAX_PRODUCER_LEVEL, WAREHOUSE_SLOTS,
   getLevel, getLevelProgress, getMaxOrderTier, getProducerUpgrade,
   getWarehouseUpgrade, makeOrder } from './economy.mjs';
 export { getLevel, getLevelProgress, getMaxOrderTier, getProducerUpgrade, getWarehouseUpgrade } from './economy.mjs';
+import {SUPPLY_ITEMS,ACHIEVEMENT_RULES,createSupplyFields,validateSupplyFields,recordSupplyProgress} from './supplies.mjs';
+export {SUPPLY_ITEMS,ACHIEVEMENT_RULES} from './supplies.mjs';
 export const WIDTH = 7;
 export const HEIGHT = 8;
 export const CELL_COUNT = WIDTH * HEIGHT;
-export const SAVE_VERSION = 2;
-export const MAX_ENERGY = 80;
+export const SAVE_VERSION = 3;
+export const MAX_ENERGY = 120;
 export const ENERGY_REGEN_MS = 180_000;
 export const PRODUCER_CHARGES = 12;
 export const PRODUCER_RECHARGE_MS = 45_000;
@@ -25,7 +27,9 @@ const validIndex = i => Number.isInteger(i) && i >= 0 && i < CELL_COUNT;
 const clone = state => ({ ...state, board: state.board.map(x => x ? { ...x } : null),
   orders: state.orders.map(x => ({ ...x })),
   warehouse: { capacity: state.warehouse.capacity, slots: state.warehouse.slots.map(x => x ? { ...x } : null) },
-  buildings: { ...state.buildings } });
+  buildings: { ...state.buildings },
+  bag:{...state.bag},progress:{...state.progress},achievements:{...state.achievements},
+  shop:{purchases:{...state.shop.purchases}} });
 const nextId = state => `m${state.nextId++}`;
 const material = (state, chain, tier = 1) => ({ id: nextId(state), kind: 'material', chain, tier });
 const producer = (state, chain) => ({ id: nextId(state), kind: 'producer', chain, level: 1, pity: 0, charges: PRODUCER_CHARGES, cooldownUntil: 0 });
@@ -35,7 +39,8 @@ export function createInitialState(now = Date.now()) {
   const s = { schemaVersion: SAVE_VERSION, revision: 0, nextId: 1, energy: MAX_ENERGY,
     energyAt: now, coins: 0, xp: 0, board: Array(CELL_COUNT).fill(null),
     warehouse: { capacity: 4, slots: Array(WAREHOUSE_SLOTS).fill(null) },
-    buildings: { storefront: 0, garden: 0, harbor: 0 }, orders: [], orderIndex: 3 };
+    buildings: { storefront: 0, garden: 0, harbor: 0 }, orders: [], orderIndex: 3,
+    ...createSupplyFields() };
   for (const [slot, chain, tier] of [
     [0,'tea',1],[1,'tea',1],[3,'bakery',1],[4,'bakery',1],
     [9,'floral',1],[10,'floral',1],[16,'tea',2],[18,'bakery',2]
@@ -49,7 +54,7 @@ export function createInitialState(now = Date.now()) {
 export function upgradeLegacySave(legacy) {
   if (!legacy || legacy.schemaVersion !== 1) throw Error('Not a legacy save');
   const next = {
-    ...legacy, schemaVersion: SAVE_VERSION,
+    ...legacy, schemaVersion: SAVE_VERSION, ...createSupplyFields(),
     board: legacy.board.map(x => x ? { ...x, ...(x.kind === 'producer' ? { level: 1, pity: 0 } : {}) } : null),
     warehouse: { capacity: 4, slots: Array(WAREHOUSE_SLOTS).fill(null) },
     buildings: { storefront: 0, garden: 0, harbor: 0 },
@@ -61,6 +66,19 @@ export function upgradeLegacySave(legacy) {
   next.orders = next.orders.map(order => order.tier <= maxTier ? order : makeOrder(next.orderIndex++, next.xp, next.buildings));
   if (!validateSave(next)) throw Error('Failed to migrate legacy save');
   return next;
+}
+
+/** Existing P2 saves are migrated only after their original invariants pass. */
+export function validateV2Save(legacy) {
+  if(!legacy||legacy.schemaVersion!==2||!Number.isInteger(legacy.energy)||
+    legacy.energy>80 || ['bag','progress','achievements','shop'].some(k=>Object.hasOwn(legacy,k)))
+    return false;
+  try{return validateSave({...legacy,schemaVersion:SAVE_VERSION,...createSupplyFields()});}
+  catch{return false;}
+}
+export function upgradeV2Save(legacy) {
+  if(!validateV2Save(legacy))throw Error('Invalid P2 save');
+  return {...legacy,schemaVersion:SAVE_VERSION,...createSupplyFields()};
 }
 
 export function advanceTime(state, now = Date.now()) {
@@ -90,7 +108,8 @@ export function moveOrMerge(state, from, to) {
     s.board[to] = { ...s.board[to], tier: dst.tier + 1 };
     s.board[from] = null;
     s.revision++;
-    return OK(s, `合成成功：${getItemName(s.board[to])}`, 'merge');
+    const earned=recordSupplyProgress(s,'merges');
+    return OK(s, `合成成功：${getItemName(s.board[to])}${earned.length?' · 解锁一次性补给奖励':''}`, 'merge');
   }
   s.board[to] = s.board[from]; s.board[from] = dst; s.revision++;
   return OK(s, '已交换位置', 'swap');
@@ -151,8 +170,9 @@ export function fulfillOrder(state, orderId) {
   const newOrder = makeOrder(next.orderIndex++, next.xp, next.buildings);
   next.orders = next.orders.map(o => o.id === orderId ? newOrder : o);
   next.revision++;
+  const earned=recordSupplyProgress(next,'orders');
   const newLevel = getLevel(next.xp);
-  return OK(next, `订单完成！+${order.coins} 金币${newLevel > oldLevel ? `，升至 ${newLevel} 级` : ''}`, 'order');
+  return OK(next, `订单完成！+${order.coins} 金币${newLevel > oldLevel ? `，升至 ${newLevel} 级` : ''}${earned.length?' · 获得一次性补给奖励':''}`, 'order');
 }
 export function storeItem(state, slot) {
   if (!validIndex(slot) || state.board[slot]?.kind !== 'material') return FAIL(state, '请选择棋盘上的物品');
@@ -203,9 +223,54 @@ export function upgradeBuilding(state, id) {
   next.coins -= rule.coins; next.buildings[id] = 1; next.revision++;
   return OK(next, `建成${rule.name}`, 'building-upgrade');
 }
+
+/** All supplies are stored inside the same revisioned P3 local snapshot. */
+export function useSupply(state,itemId,producerId=null,now=Date.now()){
+  if(!Object.hasOwn(SUPPLY_ITEMS,itemId)||!Number.isFinite(now)||now<0)
+    return FAIL(state,'道具请求无效');
+  const current=advanceTime(state,now);
+  if(current.bag[itemId]<1)return FAIL(current,'该道具数量不足');
+  const def=SUPPLY_ITEMS[itemId];
+  const next=clone(current);
+  if(def.energy){
+    if(current.energy>=MAX_ENERGY)return FAIL(current,'体力已满，请稍后使用');
+    next.energy=Math.min(MAX_ENERGY,current.energy+def.energy);
+    if(next.energy===MAX_ENERGY)next.energyAt=now;
+  }else{
+    const slot=next.board.findIndex(p=>p?.kind==='producer'&&p.id===producerId);
+    if(slot<0)return FAIL(current,'请选择有效工坊');
+    const p=next.board[slot];
+    if(p.charges!==0 || p.cooldownUntil<=now)return FAIL(current,'该工坊没有正在进行的冷却');
+    if(itemId==='speed'){
+      const remaining=Math.floor((p.cooldownUntil-now)/2);
+      p.cooldownUntil=remaining<=0?0:now+remaining;
+      if(remaining<=0)p.charges=PRODUCER_CHARGES;
+    }else{
+      p.charges=PRODUCER_CHARGES;p.cooldownUntil=0;
+    }
+  }
+  next.bag[itemId]--;next.revision++;
+  return OK(next,`已使用${def.name}`,'supply');
+}
+
+/** Offline finite-stock shop: no clock-based restock or reusable coin loop. */
+export function purchaseSupply(state,itemId){
+  if(!Object.hasOwn(SUPPLY_ITEMS,itemId))return FAIL(state,'未知补给');
+  const def=SUPPLY_ITEMS[itemId];
+  if(state.shop.purchases[itemId]>=def.limit)return FAIL(state,'本地存档购买次数已达到上限');
+  if(state.coins<def.price)return FAIL(state,'金币不足');
+  const next=clone(state);
+  next.coins-=def.price;
+  next.shop.purchases[itemId]++;
+  next.bag[itemId]++;
+  next.revision++;
+  return OK(next,`已购买${def.name}`,'supply-purchase');
+}
+
 /** Validator is strict because localStorage is untrusted and can be manually edited. */
 export function validateSave(value) {
-  if (!value || typeof value !== 'object' || Array.isArray(value) || value.schemaVersion !== SAVE_VERSION) return false;
+  if (!value || typeof value !== 'object' || Array.isArray(value) || value.schemaVersion !== SAVE_VERSION ||
+      !validateSupplyFields(value)) return false;
   if (!Array.isArray(value.board) || value.board.length !== CELL_COUNT || !Array.isArray(value.orders) || value.orders.length !== 3) return false;
   if (!Number.isSafeInteger(value.nextId) || value.nextId < 1 || !Number.isSafeInteger(value.revision) || value.revision < 0) return false;
   if (!Number.isInteger(value.energy) || value.energy < 0 || value.energy > MAX_ENERGY || !Number.isFinite(value.energyAt) || value.energyAt < 0) return false;
