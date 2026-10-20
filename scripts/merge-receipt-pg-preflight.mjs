@@ -69,6 +69,7 @@ export function acceptsDisposableFingerprint(env,fingerprint){
     fingerprint.database===env.PGDATABASE &&
     fingerprint.owner===env.PGUSER &&
     fingerprint.preparedRoles==='3' &&
+    fingerprint.safeRoles==='3' &&
     fingerprint.pristine==='t';
 }
 
@@ -86,6 +87,7 @@ export async function runDisposablePostgresProbe(env){
     database:querySync(env,'SELECT pg_catalog.current_database()'),
     owner:querySync(env,'SELECT pg_catalog.pg_get_userbyid(datdba) FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()'),
     preparedRoles:querySync(env,"SELECT count(*) FROM pg_catalog.pg_roles WHERE rolname IN ('anon','authenticated','service_role') AND NOT rolcanlogin"),
+    safeRoles:querySync(env,"SELECT count(*) FROM pg_catalog.pg_roles WHERE rolname IN ('anon','authenticated','service_role') AND NOT rolsuper AND NOT rolcreatedb AND NOT rolcreaterole AND NOT rolreplication AND NOT rolbypassrls"),
     pristine:querySync(env,pristineSql)
   };
   ensure(acceptsDisposableFingerprint(env,fingerprint),
