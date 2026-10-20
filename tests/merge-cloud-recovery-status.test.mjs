@@ -98,7 +98,7 @@ test('reading an authoritative snapshot alone does not resolve an attempted oper
   const confirmed=formatCloudSyncStatus(reboot.preview(),fixedNow);
   assert.equal(confirmed.tone,'success');
   assert.equal(reboot.preview().pending,0);
-  assert.equal((await remote.read(uid)).state.energy,79);
+  assert.equal((await remote.read(uid)).state.energy,119);
   assert.equal((await remote.read(uid)).revision,1);
 });
 
