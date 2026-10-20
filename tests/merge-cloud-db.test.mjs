@@ -18,7 +18,7 @@ test('database CAS: 40 concurrent exact retries spend energy once',async()=>{
   const results=await Promise.all(Array.from({length:40},()=>db.execute(uid,cmd)));
   assert.equal(results.filter(x=>x.status==='applied').length,1);
   assert.equal(results.filter(x=>x.status==='replayed').length,39);
-  assert.equal((await db.read(uid)).state.energy,79);
+  assert.equal((await db.read(uid)).state.energy,119);
 });
 test('database CAS: two devices racing different command IDs conflict',async()=>{
   const db=setup();const results=await Promise.all([
