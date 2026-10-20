@@ -52,11 +52,12 @@ test('rejects invalid budgets, seeds and policy rather than silently truncating'
   }
 });
 
+// P2.9 reviewed baseline: +50% energy ceiling changes achievable actions; retain exact ledger golden.
 test('golden 30-day campaign captures baseline economy drift for explicit review',()=>{
   const r=simulateEconomy({seed:42,days:30,sessionsPerDay:2,sessionMinutes:12,policy:'balanced'});
   // Baseline numbers are not balance targets. A change requires reviewing the report.
   assert.deepEqual({orders:r.totals.orders,produced:r.totals.produced,
     upgrades:r.totals.upgrades,spent:r.totals.spent,coins:r.final.coins,
     maxLevelDay:r.milestones.level8},
-    {orders:1406,produced:4980,upgrades:11,spent:1490,coins:69286,maxLevelDay:2});
+    {orders:2082,produced:7380,upgrades:11,spent:1490,coins:103688,maxLevelDay:1});
 });
