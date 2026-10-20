@@ -40,6 +40,15 @@ def scenes(stage="alpha39"):
         for name in ("alpha39","alpha40","alpha41","alpha42","alpha43","alpha44","alpha45"):
             yield from scenes(name)
         return
+    if stage=="alpha46a":
+        # Same near-only candidate workflow; retain all prior Alpha45/46 A/B.
+        # Capture full scenes at narrow + typical iPhone widths and seam slices.
+        for theme in ("warm","slate"):
+            for w,h in ((320,568),(390,844)):
+                yield f"alpha46a-world-{theme}-{w}x{h}.png", f"#{theme}-world-alpha46a",w,h
+            yield f"alpha46a-near-{theme}-320x568.png", f"#{theme}-near-alpha46a",320,568
+            yield f"alpha46a-near-seam-{theme}-320x568.png", f"#{theme}-near-alpha46a-seam",320,568
+        return
     if stage=="alpha46":
         # Only the rejected near forest changes against real Alpha45/Alpha44
         # world evidence; 320px and 390px full scenes and tree-source seams.
@@ -256,7 +265,7 @@ if __name__=="__main__":
     parser.add_argument("--chrome",required=True)
     parser.add_argument("--base-url",required=True)
     parser.add_argument("--output",default="v4-art-qa")
-    parser.add_argument("--stage",choices=("alpha39","alpha40","alpha41","alpha42","alpha43","alpha44","alpha45","alpha46","recent"),default="alpha39")
+    parser.add_argument("--stage",choices=("alpha39","alpha40","alpha41","alpha42","alpha43","alpha44","alpha45","alpha46","alpha46a","recent"),default="alpha39")
     args=parser.parse_args()
     if not args.base_url.startswith("http://127.0.0.1:"):
         raise SystemExit("Alpha39 screenshot target must be local QA HTTP server")
