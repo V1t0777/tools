@@ -13,7 +13,7 @@
   <div class="shell">
     <header class="topbar">
       <a href="../games/" class="back-link" aria-label="返回小游戏目录">← 小游戏</a>
-      <div class="eyebrow">ISLE & OBJECTS <span class="alpha-mark">P2 PREVIEW</span></div>
+      <div class="eyebrow">ISLE & OBJECTS <span class="alpha-mark">P2.9 PREVIEW</span></div>
       <button id="how-to" class="icon-button" type="button" aria-label="玩法说明">?</button>
     </header>
     <main>
@@ -30,11 +30,23 @@
         </div>
       </section>
       <section class="resource-bar" aria-label="游戏资源">
-        <div class="resource"><span class="resource-symbol" aria-hidden="true">⚡</span><div><span class="resource-label">体力</span><strong id="energy">80 / 80</strong></div><small id="recovery">已满</small></div>
+        <div class="resource"><span class="resource-symbol" aria-hidden="true">⚡</span><div><span class="resource-label">体力</span><strong id="energy">120 / 120</strong></div><small id="recovery">已满</small></div>
         <div class="resource"><span class="resource-symbol" aria-hidden="true">◈</span><div><span class="resource-label">金币</span><strong id="coins">0</strong></div></div>
         <div class="resource"><span class="resource-symbol" aria-hidden="true">✦</span><div><span class="resource-label">经验</span><strong id="xp">0</strong></div></div>
       </section>
       <div class="progress-note" aria-label="等级和解锁进度"><strong id="level">Lv.1</strong><span id="level-progress">升级进度</span><span id="tier-cap">最高委托等级</span></div>
+      <section class="management-section supply-section" aria-labelledby="supply-title">
+        <div class="section-heading"><div><p class="overline">SEASIDE SUPPLIES</p><h2 id="supply-title">海风补给</h2></div><span class="capacity">本地试玩 · 无云端奖励</span></div>
+        <p class="help-line">补给从背包消耗；体力满时不会浪费道具。冷却卡仅对正在冷却的工坊生效。</p>
+        <label class="supply-label" for="supply-producer">指定工坊</label>
+        <select class="supply-select" id="supply-producer" aria-label="选择要加速的工坊"></select>
+        <div id="supply-bag" class="supply-list" aria-label="补给背包"></div>
+        <h3 class="supply-subtitle">一次性成就</h3>
+        <div id="supply-achievements" class="supply-achievements" aria-label="一次性成就进度"></div>
+        <h3 class="supply-subtitle">金币补给商店</h3>
+        <p class="help-line">每份本地存档固定限购，不按系统日期刷新；全部购买耗费金币，不会自动补货。</p>
+        <div id="supply-shop" class="supply-list" aria-label="限量金币补给商店"></div>
+      </section>
       <section class="board-section" aria-labelledby="board-title">
         <div class="section-heading"><div><p class="overline">WORK TABLE</p><h2 id="board-title">合成工作台</h2></div><span id="free-cells" class="capacity" aria-live="polite"></span></div>
         <p class="help-line">点击相同物品合成，也可按住拖动；点击 <strong>🧺</strong> 生产器获取原料。</p>
