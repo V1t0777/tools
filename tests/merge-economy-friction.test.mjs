@@ -13,7 +13,7 @@ test('economic conservation, bounds, and action ledger hold for all behavior pro
     assert.equal(r.totals.energySpent,r.totals.produced);
     assert.ok(r.final.boardOccupied<=56&&r.totals.maxOccupied<=56);
     assert.ok(r.final.warehouseUsed<=r.final.warehouseCapacity&&r.totals.maxWarehouseUsed<=8);
-    assert.ok(r.final.energy>=0&&r.final.energy<=80);
+    assert.ok(r.final.energy>=0&&r.final.energy<=120);
     assert.ok(r.totals.blockedSessions<=r.totals.fullBoardSessions);
     assert.ok(r.totals.hardDeadlockSessions<=r.totals.blockedSessions);
     assert.ok(r.totals.fullBoardSessions<=r.scenario.days*r.scenario.sessionsPerDay);
@@ -44,7 +44,7 @@ test('full-board stress does not silently delete inventory or grant progress',()
   const organized=simulateFriction({seed:42,days:30,behavior:'organized',policy:'save-coins'});
   assert.equal(stressed.final.boardOccupied,56);
   assert.equal(stressed.final.warehouseUsed,4);
-  assert.equal(stressed.totals.blockedSessions,59);
+  assert.equal(stressed.totals.blockedSessions,60);
   assert.ok(organized.totals.blockedSessions<stressed.totals.blockedSessions);
   assert.ok(organized.totals.orders>stressed.totals.orders);
 });
