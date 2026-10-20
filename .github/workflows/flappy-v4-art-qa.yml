@@ -846,6 +846,48 @@ jobs:
             v4-game-qa/headless-narrow-readability.json
           retention-days: 7
           if-no-files-found: warn
+      - name: Alpha46 source-tree 320px and 390px A/B browser evidence (Draft-only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if command -v google-chrome >/dev/null; then
+            CHROME="$(command -v google-chrome)"
+          elif command -v chromium >/dev/null; then
+            CHROME="$(command -v chromium)"
+          else
+            exit 1
+          fi
+          python3 -m http.server 8766 --bind 127.0.0.1 >v4-art-qa/alpha46-server.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 25); do
+            if curl -fsS "http://127.0.0.1:8766/flappy/review-v4.html" >/dev/null; then break; fi
+            sleep .25
+          done
+          .alpha31-art-venv/bin/python tests/flappy-v4-batch-chrome.py \
+            --chrome "$CHROME" \
+            --base-url "http://127.0.0.1:8766/flappy/review-v4.html" \
+            --output v4-art-qa/alpha46-trees --stage alpha46
+          .alpha31-art-venv/bin/python - <<'PY'
+          import json, pathlib, xml.etree.ElementTree as ET
+          from PIL import Image
+          out=pathlib.Path("v4-art-qa/alpha46-trees")
+          pngs=sorted(out.glob("*.png"))
+          assert len(pngs)==8, ("missing alpha46 browser captures",len(pngs))
+          data=json.loads((out/"alpha46-batch-chrome-metrics.json").read_text())
+          assert data["independent_capture_count"]==8
+          for path in pngs:
+              with Image.open(path) as im:
+                  assert im.size in ((320,568),(390,844))
+          for theme in ("warm","slate"):
+              src=pathlib.Path(f"flappy/assets/v4/masters/{theme}/near-structure-alpha46.svg")
+              root=ET.parse(src).getroot()
+              assert root.attrib["viewBox"]=="0 0 3200 2000"
+              trees=[e for e in root.iter() if "data-alpha46-tree" in e.attrib]
+              assert len(trees)==9
+              assert src.stat().st_size<=260000
+          print("Alpha46 Draft original 8 Chrome captures and editable source checked")
+          PY
       - name: Keep 219 browser artwork shots, true wing-pose backgrounds, thirty-four original RGBA studies
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -901,6 +943,8 @@ jobs:
             v4-art-qa/alpha44-batch-chrome-metrics.json
             v4-art-qa/alpha45-batch-chrome-metrics.json
             v4-art-qa/alpha45-actual-wing-readability.json
+            v4-art-qa/alpha46-trees/*.png
+            v4-art-qa/alpha46-trees/*.json
             v4-art-qa/headless-painted-pilot-seams.json
             v4-art-qa/server.log
             v4-art-qa/chrome.log
