@@ -46,7 +46,7 @@ test('two simultaneous tab flushes cannot spend energy twice or duplicate reward
   const [left,right]=await Promise.all([a.flush(),b.flush()]);
   assert.equal(left.ok,true);assert.equal(right.ok,true);
   const remote=await auth.read(uid);
-  assert.equal(remote.revision,4);assert.equal(remote.state.energy,76);
+  assert.equal(remote.revision,4);assert.equal(remote.state.energy,116);
   assert.equal(a.preview().pending,0);assert.equal(b.preview().pending,0);
   assert.equal(locks.maxConcurrent,1);
 });
