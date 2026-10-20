@@ -520,3 +520,32 @@ test('Alpha46 self-contained natural trees remain an opt-in QA-only art redesign
     assert.match(build,new RegExp('masters/\\$theme/near-structure-alpha46\\.svg'));
   }
 });
+
+
+// Alpha46A deliberately retains Alpha46 and Alpha45 as visible A/B baselines.
+test('Alpha46A refines natural botanical crowns without rewriting the game',()=>{
+  const wf=read('.github/workflows/flappy-v4-art-qa.yml');
+  const batch=read('tests/flappy-v4-batch-chrome.py');
+  assert.match(wf,/Alpha46A botany A\/B images/);
+  assert.match(wf,/alpha46a-botanical\/\*\.png/);
+  assert.match(batch,/if stage=="alpha46a"/);
+  assert.doesNotMatch(game,/near-botanical-alpha46a/);
+  assert.doesNotMatch(read('scripts/build-public.sh'),/near-botanical-alpha46a/);
+  for(const theme of ['warm','slate']){
+    const svg=read('flappy/assets/v4/masters/'+theme+'/near-botanical-alpha46a.svg');
+    assert.equal((svg.match(/data-alpha46-tree="/g)||[]).length,9);
+    assert.equal((svg.match(/<mask id="a46a-crown-/g)||[]).length,9);
+    assert.equal((svg.match(/data-understory="/g)||[]).length,6);
+    assert.match(svg,/maskUnits="userSpaceOnUse"/);
+    assert.match(svg,/id="seam-matched-ground" d="M0 1650 /);
+    assert.match(svg,/3200 1650 L3200 2000 L0 2000Z"/);
+    assert.ok(Buffer.byteLength(svg,'utf8')<290000);
+    assert.doesNotMatch(svg,/<script|<foreignObject|<image\b|<filter\b|\bonload\s*=|xlink:href|href="https?:/i);
+    assert.match(html,new RegExp('id="'+theme+'-world-alpha46a"'));
+    assert.match(html,new RegExp('id="'+theme+'-near-alpha46a-seam"'));
+    assert.ok(html.includes('src="./assets/v4/masters/'+theme+'/near-botanical-alpha46a.svg"'));
+    assert.match(build,/near-botanical-alpha46a\.svg/);
+    if(theme==='warm')assert.equal((svg.match(/data-alpha46a-canopy="true"/g)||[]).length,9);
+    else assert.ok((svg.match(/mask="url\(#a46a-crown-slate-/g)||[]).length>=500);
+  }
+});
