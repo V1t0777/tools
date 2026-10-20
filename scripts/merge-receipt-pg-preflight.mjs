@@ -26,9 +26,25 @@ export function parseDisposableDbUrl(value) {
     PGPORT:u.port||'5432',PGDATABASE:db,PGUSER:decodeURIComponent(u.username),
     PGPASSWORD:decodeURIComponent(u.password),PGSSLMODE:'disable',PGSERVICE:'',PGHOSTADDR:''});
 }
+/**
+ * Spawn psql with an explicit environment. Never inherit libpq routing,
+ * session options, passfile locations or unrelated parent-process secrets.
+ * PATH is retained solely to locate the operator-installed local psql.
+ */
+export function disposablePsqlEnvironment(env,hostEnv=process.env) {
+  const binaryPath=hostEnv.PATH??hostEnv.Path??'';
+  return {
+    PATH:binaryPath,
+    ...(typeof hostEnv.SystemRoot==='string'?{SystemRoot:hostEnv.SystemRoot}:{}),
+    LANG:'C',LC_ALL:'C',PGCLIENTENCODING:'UTF8',PGCONNECT_TIMEOUT:'5',
+    PGHOST:env.PGHOST,PGPORT:env.PGPORT,PGDATABASE:env.PGDATABASE,
+    PGUSER:env.PGUSER,PGPASSWORD:env.PGPASSWORD,
+    PGSSLMODE:env.PGSSLMODE,PGSERVICE:'',PGHOSTADDR:''
+  };
+}
 function querySync(env,sql,{file=false}={}){
   const r=spawnSync('psql',['-X','-q','-t','-A','-v','ON_ERROR_STOP=1',file?'-f':'-c',sql],
-    {env:{...process.env,...env,PGHOSTADDR:''},encoding:'utf8',timeout:15000,maxBuffer:100000});
+    {env:disposablePsqlEnvironment(env),encoding:'utf8',timeout:15000,maxBuffer:100000});
   if(r.status!==0)throw Error('Disposable PostgreSQL command failed');
   return r.stdout.trim();
 }
@@ -36,7 +52,7 @@ function queryAsync(env,sql) {
   // Each of the 40 independent local sessions must terminate within 15s;
   // untrusted stdout cannot accumulate without a bound. No stderr exposure.
   return runBoundedChild('psql',['-X','-q','-t','-A','-v','ON_ERROR_STOP=1','-c',sql],
-    {env:{...process.env,...env,PGHOSTADDR:''},timeoutMs:15_000,maxOutputBytes:4_096});
+    {env:disposablePsqlEnvironment(env),timeoutMs:15_000,maxOutputBytes:4_096});
 }
 function ensure(ok,message){if(!ok)throw Error(message);}
 
