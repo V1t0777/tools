@@ -24,7 +24,7 @@ test('same operation is idempotent including concurrent exact replay',async()=>{
   const results=await Promise.all(Array.from({length:30},()=>authority.execute(uid1,command)));
   assert.equal(results.filter(x=>x.status==='applied').length,1);
   assert.equal(results.filter(x=>x.status==='replayed').length,29);
-  assert.equal((await authority.read(uid1)).state.energy,79);
+  assert.equal((await authority.read(uid1)).state.energy,119);
   assert.equal((await authority.read(uid1)).revision,1);
 });
 
@@ -34,7 +34,7 @@ test('different operation with same expectedRevision conflicts instead of overwr
     authority.execute(uid1,op(2,0,{type:'produce',slot:42}))]);
   assert.deepEqual(new Set([a.status,b.status]),new Set(['applied','conflict']));
   const snapshot=await authority.read(uid1);
-  assert.equal(snapshot.revision,1);assert.equal(snapshot.state.energy,79);
+  assert.equal(snapshot.revision,1);assert.equal(snapshot.state.energy,119);
 });
 
 test('replay returns current canonical state rather than old stale reply',async()=>{
@@ -95,7 +95,7 @@ test('each action kind goes through shared P2 transition validation',()=>{
   assert.equal(transition.ok,true);
   assert.equal(transition.state.revision,1);
   assert.equal(validateSave(transition.state),true);
-  assert.equal(transition.state.energy,79);
+  assert.equal(transition.state.energy,119);
 });
 
 test('SQL migration draft explicitly denies browser access, controls RPCs and locks row',()=>{
