@@ -24,8 +24,11 @@ const record = value => value !== null && typeof value === 'object' &&
   (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
 const keysAre = (value,keys) => record(value) &&
   Object.keys(value).length === keys.length && keys.every(key=>own(value,key));
-const validId = value => typeof value === 'string' && idPattern.test(value);
-const validPackId = value => typeof value === 'string' && packPattern.test(value);
+const reservedNames = new Set(['__proto__','constructor','prototype']);
+const validId = value => typeof value === 'string' &&
+  idPattern.test(value) && !reservedNames.has(value);
+const validPackId = value => typeof value === 'string' &&
+  packPattern.test(value) && value.split('.').every(part=>!reservedNames.has(part));
 const boundedUniqueIds = value => Array.isArray(value) &&
   value.length <= MAX_TRACKED_NODES &&
   value.every(validId) && new Set(value).size === value.length;
