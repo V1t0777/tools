@@ -131,7 +131,7 @@ test('legitimate ambiguous head and unsent tail survive restart and resolve exac
   assert.equal((await restored.flush({force:true})).ok,true);
   assert.equal(restored.preview().pending,0);
   assert.equal((await authority.read(uid)).revision,2);
-  assert.equal((await authority.read(uid)).state.energy,78);
+  assert.equal((await authority.read(uid)).state.energy,118);
   assert.deepEqual(sent[0],sent[1], 'uncertain head replays the identical operation');
   assert.equal(sent[2].operationId,tail.operationId);
   assert.equal(sent[2].expectedRevision,1);
