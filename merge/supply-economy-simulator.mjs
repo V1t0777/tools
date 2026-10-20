@@ -5,6 +5,7 @@
 import {createInitialState,advanceTime,moveOrMerge,produce,fulfillOrder,
   purchaseSupply,useSupply,validateSave,SUPPLY_ITEMS,ACHIEVEMENT_RULES,
   MAX_ENERGY,CELL_COUNT} from './engine.mjs';
+import {getLevel} from './economy.mjs';
 
 const DAY=86_400_000;
 function random(seed){
@@ -112,13 +113,14 @@ export function simulateSupplyEconomy({seed=1,days=30,sessionsPerDay=3,actionsPe
       }
       checkConservation(s,consumed,earned,spent);
     }
-    daily.push({day:day+1,coins:s.coins,orders:totals.orders,merges:totals.merges,
+    daily.push({day:day+1,coins:s.coins,xp:s.xp,level:getLevel(s.xp),
+      energy:s.energy,orders:totals.orders,merges:totals.merges,
       purchases:totals.purchases,consumed:totals.used});
   }
   totals.earned=earned;totals.spent=spent;
   checkConservation(s,consumed,earned,spent);
   return {scenario:{seed,days,sessionsPerDay,actionsPerSession},totals,daily,
-    final:{coins:s.coins,energy:s.energy,bag:{...s.bag},
+    final:{coins:s.coins,xp:s.xp,level:getLevel(s.xp),energy:s.energy,bag:{...s.bag},
       purchases:{...s.shop.purchases},achievements:{...s.achievements},
       consumed:{...consumed},revision:s.revision}};
 }
