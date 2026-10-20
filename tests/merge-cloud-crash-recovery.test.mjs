@@ -65,7 +65,7 @@ test('server commit then acknowledgment storage failure is replayed after restar
   assert.equal((await retry.flush()).ok,true);
   assert.equal(retry.preview().pending,0);
   assert.deepEqual(sent[0],sent[1], 'reboot must use identical operationId and pinned revision');
-  assert.equal((await authority.read(uid)).state.energy,79);
+  assert.equal((await authority.read(uid)).state.energy,119);
   assert.equal((await authority.read(uid)).revision,1);
 });
 
@@ -96,7 +96,7 @@ test('network unknown plus retry-backoff write denial reports STORAGE_ERROR, ret
   assert.equal((await recovered.flush()).ok,true);
   assert.deepEqual(sent[0],sent[1]);
   assert.equal((await authority.read(uid)).revision,1);
-  assert.equal((await authority.read(uid)).state.energy,79);
+  assert.equal((await authority.read(uid)).state.energy,119);
 });
 
 test('failed durable attempt marker prevents any network send before a restart',async()=>{
@@ -118,7 +118,7 @@ test('failed durable attempt marker prevents any network send before a restart',
   assert.equal((await reboot.flush()).ok,true);
   assert.equal(sent.length,1);
   assert.equal(sent[0].operationId,op.operationId);
-  assert.equal((await authority.read(uid)).state.energy,79);
+  assert.equal((await authority.read(uid)).state.energy,119);
 });
 
 test('failed first acknowledgment cannot send dependent second command until recovery',async()=>{
@@ -146,7 +146,7 @@ test('failed first acknowledgment cannot send dependent second command until rec
   assert.equal(sent[2].operationId,second.operationId);
   assert.equal(sent[2].expectedRevision,1);
   assert.equal((await authority.read(uid)).revision,2);
-  assert.equal((await authority.read(uid)).state.energy,78);
+  assert.equal((await authority.read(uid)).state.energy,118);
 });
 
 test('persisted backoff survives restart and force is not needed after the deadline',async()=>{
@@ -169,7 +169,7 @@ test('persisted backoff survives restart and force is not needed after the deadl
   now=1_001_000;
   assert.equal((await reboot.flush()).ok,true);
   assert.deepEqual(sent[0],sent[1]);
-  assert.equal((await authority.read(uid)).state.energy,79);
+  assert.equal((await authority.read(uid)).state.energy,119);
 });
 
 test('multiple restarts and repeated lost acknowledgments keep a single original operation',async()=>{
@@ -197,7 +197,7 @@ test('multiple restarts and repeated lost acknowledgments keep a single original
   assert.equal(sent.length,4);
   assert.ok(sent.every(command=>command.operationId===queued.operationId));
   assert.ok(sent.every(command=>command.expectedRevision===0));
-  assert.equal((await authority.read(uid)).state.energy,79);
+  assert.equal((await authority.read(uid)).state.energy,119);
   assert.equal((await authority.read(uid)).revision,1);
 });
 
@@ -223,5 +223,5 @@ test('corrupted pending journal after an ambiguous send fails closed across rest
   assert.equal(durable.raw(),corrupted);
   assert.equal(sends,calls.sends);
   assert.equal(reads,calls.reads);
-  assert.equal((await authority.read(uid)).state.energy,79);
+  assert.equal((await authority.read(uid)).state.energy,119);
 });
