@@ -23,6 +23,12 @@ mkdir -p "$OUT/flappy/assets/v4/warm"
 cp flappy/assets/v4/warm/{sky,far,mid,mist,near}.svg "$OUT/flappy/assets/v4/warm/"
 mkdir -p "$OUT/flappy/assets/v4/slate"
 cp flappy/assets/v4/slate/{sky,far,mid,mist,near}.svg "$OUT/flappy/assets/v4/slate/"
+# Alpha46 unsigned tree artwork is copied only into the Draft secure-review build.
+# Source trees are NOT included in the public Pages build or active game manifest.
+for theme in warm slate; do
+  mkdir -p "$OUT/flappy/assets/v4/masters/$theme"
+  cp "flappy/assets/v4/masters/$theme/near-structure-alpha46.svg" "$OUT/flappy/assets/v4/masters/$theme/"
+done
 
 cp games/index.html "$OUT/games/"
 cp stack/index.html "$OUT/stack/"
