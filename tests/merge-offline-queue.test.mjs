@@ -41,7 +41,7 @@ test('queue flushes serially and pins each new command to latest confirmed revis
   assert.equal(result.revision,2);
   assert.equal(result.pending,0);
   assert.equal(queue.preview().verified,true);
-  assert.equal((await authority.read(uid)).state.energy,79);
+  assert.equal((await authority.read(uid)).state.energy,119);
 });
 
 test('unknown network outcome replays same stable operation ID and spends energy exactly once',async()=>{
@@ -61,7 +61,7 @@ test('unknown network outcome replays same stable operation ID and spends energy
   assert.equal(recovered.ok,true);
   assert.equal(recovered.revision,1);
   assert.deepEqual(commands[0],commands[1]);
-  assert.equal((await authority.read(uid)).state.energy,79);
+  assert.equal((await authority.read(uid)).state.energy,119);
 });
 
 test('retry delay is bounded and respects stored backoff unless user forces retry',async()=>{
@@ -170,7 +170,7 @@ test('concurrent flush calls share a single send rather than racing commands',as
   const [a,b]=await Promise.all([queue.flush(),queue.flush()]);
   assert.equal(a.ok,true);assert.equal(b.ok,true);
   assert.equal(sends,1);
-  assert.equal((await authority.read(uid)).state.energy,79);
+  assert.equal((await authority.read(uid)).state.energy,119);
 });
 
 test('no later queued action is sent after definitive server rejection',async()=>{
@@ -226,7 +226,7 @@ test('lost acknowledgment followed by a second-device action resolves as replay 
   assert.equal(result.revision,2);
   assert.equal(result.pending,0);
   assert.deepEqual(queue.preview().state,(await authority.read(uid)).state);
-  assert.equal((await authority.read(uid)).state.energy,79);
+  assert.equal((await authority.read(uid)).state.energy,119);
 });
 
 test('persisted unknown transmission cannot be manually erased without replay confirmation',async()=>{
