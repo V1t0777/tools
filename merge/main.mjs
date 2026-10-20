@@ -6,6 +6,7 @@ import { WIDTH, CELL_COUNT, MAX_ENERGY, ENERGY_REGEN_MS, CHAINS, createInitialSt
 import { BUILDINGS } from './economy.mjs';
 import { loadLocal, saveLocal, SAVE_KEY } from './storage.mjs';
 import { getBoardGuidance } from './board-guidance.mjs';
+import { getSupplyControlSnapshot } from './supply-controls.mjs';
 
 const byId = id => document.getElementById(id);
 const board = byId('board');
@@ -174,21 +175,43 @@ function renderSystems() {
       ()=>commit(upgradeBuilding(state,id)),complete||state.coins<rule.coins||level<rule.minLevel));
   }
 }
+/** Update cooldown eligibility on selection and every clock tick.
+ * Avoid rebuilding a focused select or supply cards while the timer runs.
+ */
+function refreshSupplyControls(now=Date.now()) {
+  const select=byId('supply-producer');
+  const snapshot=getSupplyControlSnapshot(state,select.value,now);
+  const sameOptions=select.options.length===snapshot.options.length &&
+    snapshot.options.every((option,i)=>select.options[i]?.value===option.id);
+  if(!sameOptions){
+    const fragment=document.createDocumentFragment();
+    for(const item of snapshot.options){
+      const option=document.createElement('option');
+      option.value=item.id;option.textContent=item.label;
+      fragment.append(option);
+    }
+    select.replaceChildren(fragment);
+  }
+  if(select.value!==snapshot.producerId)select.value=snapshot.producerId??'';
+  for(let i=0;i<snapshot.options.length;i++){
+    const option=select.options[i];
+    if(option.textContent!==snapshot.options[i].label)
+      option.textContent=snapshot.options[i].label;
+  }
+  const status=byId('supply-cooldown-status');
+  const message=!snapshot.producerName?'没有可用工坊'
+    :snapshot.cooling
+      ?`${snapshot.producerName}剩余冷却 ${snapshot.remainingSeconds} 秒`
+      :`${snapshot.producerName}当前无需冷却道具`;
+  if(status.textContent!==message)status.textContent=message;
+  const bag=byId('supply-bag');
+  for(const [id,usable] of Object.entries(snapshot.usable)){
+    const button=bag.querySelector(`[data-supply-use="${id}"]`);
+    if(button)button.disabled=!usable;
+  }
+}
 function renderSupplies(now=Date.now()) {
   const select=byId('supply-producer');
-  const selected=select.value;
-  select.replaceChildren();
-  const producers=state.board.filter(p=>p?.kind==='producer');
-  for(const p of producers){
-    const option=document.createElement('option');
-    option.value=p.id;
-    option.textContent=`${CHAINS[p.chain].name}工坊 · ${p.charges===0
-      ? '冷却剩余'+Math.max(0,Math.ceil((p.cooldownUntil-now)/1000))+'秒' : '可生产'}`;
-    select.append(option);
-  }
-  if(producers.some(p=>p.id===selected))select.value=selected;
-  const chosen=producers.find(p=>p.id===select.value);
-  const cooling=chosen?.charges===0&&chosen.cooldownUntil>now;
   const bag=byId('supply-bag');bag.replaceChildren();
   const shop=byId('supply-shop');shop.replaceChildren();
   for(const [id,def] of Object.entries(SUPPLY_ITEMS)){
@@ -201,8 +224,8 @@ function renderSupplies(now=Date.now()) {
     details.append(title,sub);
     const button=document.createElement('button');
     button.type='button';button.className='small-action';
-    const usable=owned>0&&(def.energy?state.energy<MAX_ENERGY:cooling);
-    button.disabled=!usable;
+    button.disabled=true;
+    button.dataset.supplyUse=id;
     button.textContent='使用';
     button.setAttribute('aria-label',`使用${def.name}，当前有${owned}个`);
     button.addEventListener('click',()=>commit(useSupply(state,id,select.value)));
@@ -231,6 +254,7 @@ function renderSupplies(now=Date.now()) {
     line.textContent=`${done?'✓':'○'} ${rule.title} · ${rule.counter==='orders'?'完成委托':'合成'} ${Math.min(rule.threshold,state.progress[rule.counter])}/${rule.threshold} · ${SUPPLY_ITEMS[rule.reward].name} ×1${done?'（已领取）':''}`;
     milestones.append(line);
   }
+  refreshSupplyControls(now);
 }
 function render() {
   renderResources(); renderBoard(); renderOrders(); renderSystems(); renderSupplies();
@@ -296,6 +320,7 @@ byId('store-selected').addEventListener('click',()=>{
   commit(storeItem(state,selected));
 });
 byId('warehouse-upgrade').addEventListener('click',()=>commit(upgradeWarehouse(state)));
+byId('supply-producer').addEventListener('change',()=>refreshSupplyControls());
 
 byId('reset').addEventListener('click', () => {
   const warning = saveIssue
@@ -327,9 +352,10 @@ window.addEventListener('storage', event => {
   }
 });
 window.setInterval(() => {
-  const updated = advanceTime(state);
+  const now=Date.now();
+  const updated = advanceTime(state,now);
   if (updated !== state) { state = updated; if (activeGuidance) activeGuidance = getBoardGuidance(state);persist();render(); }
-  else renderResources();
+  else {renderResources(now);refreshSupplyControls(now);}
 }, 1000);
 persist(); render();
 if (loaded.blocked) hint('本地存档无法安全恢复，原始数据不会自动覆盖');
