@@ -60,7 +60,7 @@ test('valid legacy save is backed up byte-for-byte before migrating',()=>{
   const result=loadLocal(s);
   assert.equal(result.migrated,true);assert.equal(result.volatile,undefined);
   assert.equal(s.read(LEGACY_BACKUP_KEY),raw);
-  assert.equal(JSON.parse(s.read(SAVE_KEY)).schemaVersion,2);
+  assert.equal(JSON.parse(s.read(SAVE_KEY)).schemaVersion,3);
 });
 
 test('backup write denial keeps the only legacy save and marks the upgraded state volatile',()=>{
