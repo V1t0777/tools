@@ -133,7 +133,7 @@ test('deadline failure reports no private operation IDs or server errors',async(
 test('P3.20 fingerprint rejects non-loopback server, mismatched DB/owner, nonempty schema and absent NOLOGIN roles',()=>{
   const env=parseDisposableDbUrl(local);
   const good={serverAddress:'127.0.0.1',database:env.PGDATABASE,
-    owner:env.PGUSER,preparedRoles:'3',pristine:'t'};
+    owner:env.PGUSER,preparedRoles:'3',safeRoles:'3',pristine:'t'};
   assert.equal(acceptsDisposableFingerprint(env,good),true);
   assert.equal(acceptsDisposableFingerprint(env,{...good,serverAddress:'::1'}),true);
   for(const patch of [
@@ -143,6 +143,8 @@ test('P3.20 fingerprint rejects non-loopback server, mismatched DB/owner, nonemp
     {owner:'postgres'},
     {preparedRoles:'2'},
     {preparedRoles:'0'},
+    {safeRoles:'2'},
+    {safeRoles:'0'},
     {pristine:'f'},
     {pristine:''}
   ])assert.equal(acceptsDisposableFingerprint(env,{...good,...patch}),false);
@@ -191,4 +193,13 @@ test('P3.21 pristine SQL still gates first database mutation',()=>{
   assert.ok(src.includes("nspname NOT IN ('public','pg_catalog','information_schema') AND pg_catalog.left(nspname,3) <> 'pg_'"));
   assert.ok(src.indexOf('pristine:querySync(env,pristineSql)')<src.indexOf('const bootstrap=['));
   assert.ok(src.includes("fingerprint.pristine==='t'"));
+});
+
+
+test('P3.25 disposable test roles must lack cluster privileges and BYPASSRLS',()=>{
+  const src=readFileSync(new URL('../scripts/merge-receipt-pg-preflight.mjs',import.meta.url),'utf8');
+  for(const flag of ['NOT rolsuper','NOT rolcreatedb','NOT rolcreaterole','NOT rolreplication','NOT rolbypassrls'])
+    assert.ok(src.includes(flag),'missing safe role restriction: '+flag);
+  assert.ok(src.includes("fingerprint.safeRoles==='3'"));
+  assert.ok(src.indexOf('safeRoles:querySync')<src.indexOf('const bootstrap=['));
 });
