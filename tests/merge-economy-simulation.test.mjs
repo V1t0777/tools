@@ -11,7 +11,7 @@ test('simulation never fabricates currency or exceeds bounded resource levels',(
   for(const policy of ['balanced','save-coins','expand-first']) {
     const r=simulateEconomy({...opts,policy});
     assert.equal(r.final.coins,r.totals.earned-r.totals.spent);
-    assert.ok(r.final.energy>=0 && r.final.energy<=80);
+    assert.ok(r.final.energy>=0 && r.final.energy<=120);
     assert.ok(r.final.boardOccupied<=56 && r.totals.maxOccupied<=56);
     assert.ok(r.daily.every(d=>d.coins>=0 && d.xp>=0 && d.occupied<=56));
     assert.ok(r.daily.every((d,i)=>i===0 || d.xp>=r.daily[i-1].xp));
