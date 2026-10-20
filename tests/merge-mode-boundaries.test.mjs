@@ -86,7 +86,7 @@ test('P2.12 strict story mode validation rejects tampered resources and invalid 
     x=>{x.packs.core.completed.incident=['__proto__'];},
     x=>{x.packs.core.choices['intro']='';},
     x=>{x.packs.core.flags['finished']='yes';},
-    x=>{x.packs.core.flags['__proto__']=true;},
+    x=>{Object.defineProperty(x.packs.core.flags,'__proto__',{value:true,enumerable:true});},
     x=>{delete x.packs.core.completed.side;},
     x=>{x.packs.core.shop={purchases:{}};},
     x=>{x.packs['../outside']=createEmptyStoryPack();},
@@ -102,7 +102,8 @@ test('P2.12 strict story mode validation rejects tampered resources and invalid 
 test('P2.12 script-like IDs, fake pack names and invalid inputs cannot register',()=>{
   const save=createEmptyStoryProgress();
   for(const id of ['',null,4,'../outside','__proto__','constructor','Core',
-      'core/../evil','dlc.foo.bar','evil_name','x'.repeat(65)]){
+      'core/../evil','dlc.foo.bar','dlc.constructor','prototype',
+    'evil_name','x'.repeat(65)]){
     assert.throws(()=>registerStoryPack(save,id),TypeError);
   }
   assert.throws(()=>registerStoryPack(null,'core'),TypeError);
@@ -138,7 +139,7 @@ test('P2.12 story data budget prevents excessively long saves and malformed flag
   large.packs.core.completed.side=Array.from({length:512},(_,i)=>
     'quest-'+String(i).padStart(6,'0')+'a'.repeat(40));
   assert.equal(validateStoryProgress(large),true);
-  const tooLarge=structuredClone(story);
+  const tooLarge=createEmptyStoryProgress();
   for(let pack=0;pack<MAX_STORY_PACKS;pack++){
     const key='pack-'+pack;
     tooLarge.packs[key]=createEmptyStoryPack();
