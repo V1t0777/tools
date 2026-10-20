@@ -1,0 +1,709 @@
+{
+  "schema_version": 1,
+  "status": "DRAFT_SOURCE_HANDOFF_ONLY__PAINTERLY_MASTERS_NOT_DELIVERED",
+  "authoring_canvas": {
+    "width": 3200,
+    "height": 2000,
+    "aspect_ratio": "8:5",
+    "working_color_space": "sRGB",
+    "source_format": "editable_layered_native"
+  },
+  "runtime_canvas": {
+    "width": 1600,
+    "height": 1000,
+    "decode_policy": "five layers of one theme only",
+    "raster_format": "WebP_or_equivalent_after_hardware_QA",
+    "must_keep_svg_fallback_until_approved": true
+  },
+  "performance_note": "Per-layer sizes are initial compressed-delivery ceilings in KB, not guaranteed device budgets. Benchmark total decode/GPU memory, cold navigation and frame pacing before substitution.",
+  "layer_order": [
+    "sky",
+    "far",
+    "mid",
+    "mist",
+    "near"
+  ],
+  "themes": [
+    {
+      "id": "warm",
+      "name": "Dawn Valley",
+      "light_anchor_source_x": 1170,
+      "art_direction": "warm ochre sunrise, muted sage, restrained glowing valley mist",
+      "hero_atlas": "../v3/warm-flight.svg",
+      "layers": [
+        {
+          "id": "sky",
+          "existing_vector": "warm/sky.svg",
+          "repeat": false,
+          "transparent": false,
+          "notes": "Full-bleed sunrise/moonlit atmosphere; preserve light-source anchor (warm 1170, slate 1230) under mobile center crops",
+          "runtime_budget_kb": 140
+        },
+        {
+          "id": "far",
+          "existing_vector": "warm/far.svg",
+          "repeat": true,
+          "transparent": true,
+          "notes": "Far mountains and broad gouache value fields; tangent/tonal repetition at x=0/1600",
+          "runtime_budget_kb": 220
+        },
+        {
+          "id": "mid",
+          "existing_vector": "warm/mid.svg",
+          "repeat": true,
+          "transparent": true,
+          "notes": "Mid-range ridge material, softened intermediate contrast and readable rock facets",
+          "runtime_budget_kb": 240
+        },
+        {
+          "id": "mist",
+          "existing_vector": "warm/mist.svg",
+          "repeat": true,
+          "transparent": true,
+          "notes": "Sparse translucent atmosphere with no hard rectangular silhouettes or seams",
+          "runtime_budget_kb": 140
+        },
+        {
+          "id": "near",
+          "existing_vector": "warm/near.svg",
+          "repeat": true,
+          "transparent": true,
+          "notes": "Foreground forest tree silhouettes, restrained highlights, edge-accurate wrap",
+          "runtime_budget_kb": 260
+        }
+      ]
+    },
+    {
+      "id": "slate",
+      "name": "Blue Hour Range",
+      "light_anchor_source_x": 1230,
+      "art_direction": "lunar blue-hour alpine silhouettes and cool low-luminance mist",
+      "hero_atlas": "../v3/slate-flight.svg",
+      "layers": [
+        {
+          "id": "sky",
+          "existing_vector": "slate/sky.svg",
+          "repeat": false,
+          "transparent": false,
+          "notes": "Full-bleed sunrise/moonlit atmosphere; preserve light-source anchor (warm 1170, slate 1230) under mobile center crops",
+          "runtime_budget_kb": 140
+        },
+        {
+          "id": "far",
+          "existing_vector": "slate/far.svg",
+          "repeat": true,
+          "transparent": true,
+          "notes": "Far mountains and broad gouache value fields; tangent/tonal repetition at x=0/1600",
+          "runtime_budget_kb": 220
+        },
+        {
+          "id": "mid",
+          "existing_vector": "slate/mid.svg",
+          "repeat": true,
+          "transparent": true,
+          "notes": "Mid-range ridge material, softened intermediate contrast and readable rock facets",
+          "runtime_budget_kb": 240
+        },
+        {
+          "id": "mist",
+          "existing_vector": "slate/mist.svg",
+          "repeat": true,
+          "transparent": true,
+          "notes": "Sparse translucent atmosphere with no hard rectangular silhouettes or seams",
+          "runtime_budget_kb": 140
+        },
+        {
+          "id": "near",
+          "existing_vector": "slate/near.svg",
+          "repeat": true,
+          "transparent": true,
+          "notes": "Foreground forest tree silhouettes, restrained highlights, edge-accurate wrap",
+          "runtime_budget_kb": 260
+        }
+      ]
+    }
+  ],
+  "art_signoff_matrix": {
+    "viewports": [
+      "320x568",
+      "360x600",
+      "390x844",
+      "420x740"
+    ],
+    "scroll_offsets": [
+      0,
+      960
+    ],
+    "bird_pose_frames": [
+      0,
+      6,
+      12,
+      18
+    ],
+    "verify": "both theme scenes, no seam kink, no horizon stretch, clear true atlas silhouette, pipe gap honesty"
+  },
+  "release_gates": {
+    "master_art_accepted": false,
+    "physical_ios_safari_passed": false,
+    "physical_android_chrome_passed": false,
+    "sustained_high_score_playability_passed": false,
+    "draft_qa_removed": false,
+    "user_release_authorization": false
+  },
+  "pilots": [
+    {
+      "theme": "warm",
+      "layer": "far",
+      "source_master_path": "masters/warm/far-master-pilot.svg",
+      "preview_asset_path": "pilot/warm/far.svg",
+      "authoring_type": "editable_vector_gouache_study",
+      "authored_source_size": "3200x2000",
+      "preview_display_size": "1600x1000",
+      "production_asset": false,
+      "renderer_swap_enabled": false,
+      "art_direction_approved": false,
+      "notes": "Alpha 24 first one-of-ten original hand-composed painterly study. Raster-painted editable PSD/KRA masters and physical device signoff still not delivered. Compare original vs pilot only in Draft review-v4.html #warm / #warm-pilot."
+    },
+    {
+      "theme": "slate",
+      "layer": "far",
+      "source_master_path": "masters/slate/far-master-pilot.svg",
+      "preview_asset_path": "pilot/slate/far.svg",
+      "authoring_type": "editable_vector_gouache_study",
+      "authored_source_size": "3200x2000",
+      "preview_display_size": "1600x1000",
+      "production_asset": false,
+      "renderer_swap_enabled": false,
+      "art_direction_approved": false,
+      "notes": "Alpha 25 unique blue-hour distant mountain study; own long jagged ridge, pale moonlit scree and sparse pigment. Paired A/B and seam proof in Draft review only. This is NOT final high-resolution raster master art."
+    },
+    {
+      "theme": "warm",
+      "layer": "mid",
+      "source_master_path": "masters/warm/mid-master-pilot.svg",
+      "preview_asset_path": "pilot/warm/mid.svg",
+      "authoring_type": "editable_vector_gouache_study",
+      "authored_source_size": "3200x2000",
+      "preview_display_size": "1600x1000",
+      "production_asset": false,
+      "renderer_swap_enabled": false,
+      "art_direction_approved": false,
+      "notes": "Alpha 26 independently composed warm mid-distance foothills, amber stone facets and sage-shadow planes; preview supports mid-only or stack alongside warm far pilot. Never used by actual game."
+    },
+    {
+      "theme": "slate",
+      "layer": "mid",
+      "source_master_path": "masters/slate/mid-master-pilot.svg",
+      "preview_asset_path": "pilot/slate/mid.svg",
+      "authoring_type": "editable_vector_gouache_study",
+      "authored_source_size": "3200x2000",
+      "preview_display_size": "1600x1000",
+      "production_asset": false,
+      "renderer_swap_enabled": false,
+      "art_direction_approved": false,
+      "notes": "Alpha 26 independently composed cool slate midrange ridge with moonlit limestone facets and subdued blue-basin values. QA-only mid/stack preview; not approved for runtime."
+    },
+    {
+      "theme": "warm",
+      "layer": "mist",
+      "source_master_path": "masters/warm/mist-master-pilot.svg",
+      "preview_asset_path": "pilot/warm/mist.svg",
+      "authoring_type": "editable_vector_gouache_study",
+      "authored_source_size": "3200x2000",
+      "preview_display_size": "1600x1000",
+      "production_asset": false,
+      "renderer_swap_enabled": false,
+      "art_direction_approved": false,
+      "notes": "Alpha 27 warm valley air perspective, translucent cream/sage bands and separated pigment pools; QA-only original transparent study, not production."
+    },
+    {
+      "theme": "slate",
+      "layer": "mist",
+      "source_master_path": "masters/slate/mist-master-pilot.svg",
+      "preview_asset_path": "pilot/slate/mist.svg",
+      "authoring_type": "editable_vector_gouache_study",
+      "authored_source_size": "3200x2000",
+      "preview_display_size": "1600x1000",
+      "production_asset": false,
+      "renderer_swap_enabled": false,
+      "art_direction_approved": false,
+      "notes": "Alpha 27 slate blue-hour mist study, independently placed cool lunar haze pools and silver-blue envelope; QA-only non-runtime layer."
+    },
+    {
+      "theme": "warm",
+      "layer": "sky",
+      "source_master_path": "masters/warm/sky-master-pilot.svg",
+      "preview_asset_path": "pilot/warm/sky.svg",
+      "authoring_type": "editable_vector_gouache_study",
+      "authored_source_size": "3200x2000",
+      "preview_display_size": "1600x1000",
+      "production_asset": false,
+      "renderer_swap_enabled": false,
+      "art_direction_approved": false,
+      "notes": "Alpha 28 independent nonrepeating dawn gradient and warm sunrise anchored at 1170px game x; subdued sun disc, broad cloud and pigment bank QA only."
+    },
+    {
+      "theme": "slate",
+      "layer": "sky",
+      "source_master_path": "masters/slate/sky-master-pilot.svg",
+      "preview_asset_path": "pilot/slate/sky.svg",
+      "authoring_type": "editable_vector_gouache_study",
+      "authored_source_size": "3200x2000",
+      "preview_display_size": "1600x1000",
+      "production_asset": false,
+      "renderer_swap_enabled": false,
+      "art_direction_approved": false,
+      "notes": "Alpha 28 distinct nonrepeating blue-hour luminance palette, lunar halo anchored at 1230px game x, sparse stars and independent dusk cloud masses, QA only."
+    },
+    {
+      "theme": "warm",
+      "layer": "near",
+      "source_master_path": "masters/warm/near-master-pilot.svg",
+      "preview_asset_path": "pilot/warm/near.svg",
+      "authoring_type": "editable_vector_gouache_study",
+      "authored_source_size": "3200x2000",
+      "preview_display_size": "1600x1000",
+      "production_asset": false,
+      "renderer_swap_enabled": false,
+      "art_direction_approved": false,
+      "notes": "Alpha29 hand-authored dawn valley close broadleaf canopy; 11 independently drawn trees, restrained sandy foreground gouache, seamless ridge, no live runtime change. Alpha30: organic asymmetrical woodland canopy, 3+ crown families and layered branches, unchanged ridge."
+    },
+    {
+      "theme": "slate",
+      "layer": "near",
+      "source_master_path": "masters/slate/near-master-pilot.svg",
+      "preview_asset_path": "pilot/slate/near.svg",
+      "authoring_type": "editable_vector_gouache_study",
+      "authored_source_size": "3200x2000",
+      "preview_display_size": "1600x1000",
+      "production_asset": false,
+      "renderer_swap_enabled": false,
+      "art_direction_approved": false,
+      "notes": "Alpha29 independently hand-authored blue-hour alpine conifers, 11 slender spruce silhouettes, dark granite foothill washes and tile-aligned ridge, reviewer-only. Alpha30: uneven spruce/fir/larch crown silhouettes, asymmetric branching and fewer repeated triangular motifs, unchanged ridge."
+    }
+  ],
+  "pilot_completion": {
+    "completed_studies": 10,
+    "total_layer_targets": 10,
+    "completed_final_masters": 0
+  },
+  "pilot_refinements": [
+    {
+      "alpha": 30,
+      "stage": "near_forest_organic_geometry_pass_1",
+      "baseline": "Alpha 29 original masters and preview copies retained as masters/{theme}/near-master-alpha29.svg and pilot/{theme}/near-alpha29.svg",
+      "theme_layers": [
+        "warm/near",
+        "slate/near"
+      ],
+      "status": "QA_ONLY_NOT_FINAL",
+      "production_asset": false,
+      "art_direction_approved": false,
+      "notes": "Fresh variable organic contour/branches; high-res native painted textures, device playtests and professional art acceptance still missing."
+    },
+    {
+      "alpha": 31,
+      "stage": "offline_transparent_RGBA_pixel_pigment_study",
+      "themes": [
+        "warm",
+        "slate"
+      ],
+      "layers": [
+        "near"
+      ],
+      "source": "tests/flappy-v4-raster-pigment.py",
+      "generated_outputs": [
+        "flappy/assets/v4/pilot/warm/near-raster-alpha31.png",
+        "flappy/assets/v4/pilot/slate/near-raster-alpha31.png"
+      ],
+      "generated_in": "Draft GitHub Actions runner only; PNGs included in visual artifacts, not committed, not runtime-loaded",
+      "source_format": "transparent_RGBA_PNG_1600x1000",
+      "runtime_asset": false,
+      "production_asset": false,
+      "art_direction_approved": false,
+      "notes": "Actual offline per-pixel colored multi-frequency grain from editable 2x art, exact source alpha preservation and 20px border-taper check. Explicit first raster trial; not final hand-painted native source art."
+    },
+    {
+      "alpha": 32,
+      "stage": "material_directional_near_brush_study",
+      "themes": [
+        "warm",
+        "slate"
+      ],
+      "layers": [
+        "near"
+      ],
+      "source": "tests/flappy-v4-directional-paint.py",
+      "comparison": "Alpha 31 isotropic random-pigment bitmap retained as a separate before/after QA control; Alpha 32 directly re-rasterizes the same original 3200x2000 near master",
+      "generated_outputs": [
+        "flappy/assets/v4/pilot/warm/near-raster-alpha32.png",
+        "flappy/assets/v4/pilot/slate/near-raster-alpha32.png"
+      ],
+      "material_directions": [
+        "warm short angled leaf strokes",
+        "slate opposed fir/spruce needle diagonals",
+        "vertical bark grain",
+        "horizontal ground dry-brush"
+      ],
+      "generated_in": "Draft-only GitHub Actions, RGBA output kept only as downloadable QA artifacts",
+      "runtime_asset": false,
+      "production_asset": false,
+      "art_direction_approved": false,
+      "notes": "Reproducible geometry-guided brush direction in actual transparent PNG data; not artist-authorized native painterly production art."
+    },
+    {
+      "alpha": 33,
+      "stage": "source_geometry_clipped_per_species_canopy_illumination_and_ground",
+      "themes": [
+        "warm",
+        "slate"
+      ],
+      "layers": [
+        "near"
+      ],
+      "source": "tests/flappy-v4-local-material.py",
+      "baseline": "Alpha 32 two-world unmodified RGBA directional paint from its own original source; Alpha 33 renders and clips separate species material over that immutable raster in offline Draft QA.",
+      "generated_outputs": [
+        "flappy/assets/v4/pilot/warm/near-raster-alpha33.png",
+        "flappy/assets/v4/pilot/slate/near-raster-alpha33.png"
+      ],
+      "source_mask": "Original authored per-tree foliage paths and original foreground-ground-clip terrain path",
+      "generated_in": "Draft-only GitHub Actions artifacts, not committed binary files or loaded in any production runtime",
+      "additional_validation": "fix 1 missing slate Alpha32 preview node and 1 duplicated warm Alpha32 node; explicit exact-one-per-theme assertions",
+      "production_asset": false,
+      "runtime_asset": false,
+      "art_direction_approved": false,
+      "notes": "Original path-masked interior texture lighting and ground ribbons preserve exact 1600x1000 alpha and 40px repeat border. This remains algorithmic illustration QA, not artist-approved native production painting."
+    },
+    {
+      "alpha": 34,
+      "stage": "explicit_2x_editable_original_editorial_tree_value_and_ground_washes",
+      "themes": [
+        "warm",
+        "slate"
+      ],
+      "layers": [
+        "near"
+      ],
+      "source": [
+        "flappy/assets/v4/masters/warm/near-gouache-alpha34.svg",
+        "flappy/assets/v4/masters/slate/near-gouache-alpha34.svg"
+      ],
+      "renderer": "tests/flappy-v4-editorial-gouache.py",
+      "baseline": "Existing original authored source tree silhouettes and Alpha33 bitmap kept unmodified",
+      "per_theme": {
+        "tree_compositions": 11,
+        "curated_canopy_paths": 33,
+        "curated_terrain_paths": 9,
+        "source_size": "3200x2000",
+        "raster_QA_size": "1600x1000"
+      },
+      "generated_outputs": [
+        "flappy/assets/v4/pilot/warm/near-raster-alpha34.png",
+        "flappy/assets/v4/pilot/slate/near-raster-alpha34.png"
+      ],
+      "generated_in": "Draft-only CI and local QA; preview bitmaps are never source-committed or runtime-loaded",
+      "masking": "Original tree crown silhouettes and open ground ridge, original RGBA alpha and 40px boundary retained",
+      "production_asset": false,
+      "runtime_asset": false,
+      "art_direction_approved": false,
+      "notes": "Two independent human-directed path compositions for watercolor/gouache-like value structure, not algorithmically dispersed new brush marks. Remains SVG painting pilot, not artist-approved layered native bitmap master."
+    },
+    {
+      "alpha": 35,
+      "stage": "slate_original_tree_by_tree_conifer_internal_branch_placement_and_visible_mobile_ab_guard",
+      "themes": [
+        "slate"
+      ],
+      "layers": [
+        "near"
+      ],
+      "original_2x_source": "flappy/assets/v4/masters/slate/near-structure-alpha35.svg",
+      "renderer": "tests/flappy-v4-conifer-structure.py",
+      "original_tree_layout": "11 individually editable fir/spruce/larch tree groups with 8 path structures per crown (88 total)",
+      "baseline": "Alpha34 editable artwork and generated 1600x1000 RGBA source remain independent and unmodified",
+      "generated_output": "flappy/assets/v4/pilot/slate/near-raster-alpha35.png",
+      "qa": "Each tree's original crown SVG mask rasterized individually, preserving source RGB(A) edges, 600px image upper play lane, byte-identical source alpha and source bbox; actual both 320/390 Chrome A/B screenshot differences checked.",
+      "target_static_browser_screenshots": 113,
+      "target_decoded_painted_tile_seams": 17,
+      "production_asset": false,
+      "runtime_asset": false,
+      "final_original_master_approved": false,
+      "note": "This changes only interior illustrated tree value planes/branches, not exterior tree silhouettes, physics, player, leaderboard, nor V3.1."
+    },
+    {
+      "alpha": 36,
+      "stage": "two_original_irregular_silhouette_positive_negative_crown_studies",
+      "themes": [
+        "warm",
+        "slate"
+      ],
+      "layers": [
+        "near"
+      ],
+      "original_editable_2x": [
+        "flappy/assets/v4/masters/warm/near-outline-alpha36.svg",
+        "flappy/assets/v4/masters/slate/near-outline-alpha36.svg"
+      ],
+      "authoring_per_theme": "11 tree-specific groups, 33 positive shaped extensions and 22 negative sky-outline notches; 55 independent source paths",
+      "renderer": "tests/flappy-v4-outline-paint.py",
+      "generated_ci_only": "flappy/assets/v4/pilot/{warm,slate}/near-raster-alpha36.png",
+      "baseline": "warm Alpha34, slate Alpha35 RGBA; original source SVG Alpha30 tree crown paths",
+      "safety": "intentional alpha changes bounded to per-tree original crown morphology within 14 raster px, upper 600 pixels, outer 40px repeating edge always byte-identical; only source alpha bbox top may shift, by at most 28px; all other bbox edges unchanged; PNG max 4MB",
+      "browser_evidence": "two themes two mobile viewport real screenshot A/B RGB pixel comparisons and both actual tile joins, reject unchanged routes",
+      "static_art_browser_screenshots_target": 119,
+      "decoded_source_seam_audits_target": 19,
+      "production_runtime_changed": false,
+      "gameplay_physics_changed": false,
+      "master_approved": false,
+      "limitations": "Illustrated contour study improving irregularity, not signed-off true professional native textured artwork; no actual physical phone tests.",
+      "art_direction_followup": "First run revealed slate negative notches altered only 1 visible alpha pixel; revised slate source-authoring groups extend the notches into actual cone boughs and added minimum 40 carved pixels acceptance threshold."
+    },
+    {
+      "alpha": 37,
+      "stage": "two_independent_3200x2000_original_midrange_ridge_paintings",
+      "themes": [
+        "warm",
+        "slate"
+      ],
+      "layer": [
+        "mid"
+      ],
+      "editable_2x_sources": [
+        "flappy/assets/v4/masters/warm/mid-natural-alpha37.svg",
+        "flappy/assets/v4/masters/slate/mid-natural-alpha37.svg"
+      ],
+      "original_baselines": [
+        "flappy/assets/v4/masters/warm/mid-master-pilot.svg",
+        "flappy/assets/v4/masters/slate/mid-master-pilot.svg"
+      ],
+      "offline_renderer": "tests/flappy-v4-natural-midrange.py",
+      "source_art": "Continuous asymmetrical edited ridge contour duplicated exactly across terrain base, clip path and crest highlight; 7 separate authored value/brush facets per theme",
+      "offline_outputs": [
+        "flappy/assets/v4/pilot/warm/mid-raster-alpha37.png",
+        "flappy/assets/v4/pilot/slate/mid-raster-alpha37.png"
+      ],
+      "integration": "QA-only opt-in #warm-mid-alpha37 / #slate-mid-alpha37 and integrated far+mid+mist+Alpha36 near scenes; 2 tile seam examples",
+      "invariants": "1600x1000, entire upper 555 px source RGBA identical, 40px both repeat borders byte-identical, full lower canvas retained; 4MB bitmap cap",
+      "qa_targets": {
+        "browser_static_screenshots": 127,
+        "independent_decoded_tile_seams": 21,
+        "mobile_ab_viewports": [
+          320,
+          390
+        ]
+      },
+      "game_asset_swapped": false,
+      "runtime_modified": false,
+      "approved_final_art": false,
+      "limitations": "Midrange original authored SVG painted pilot, not final 4k layered native master; no phone hardware or artist signoff."
+    },
+    {
+      "alpha": 38,
+      "stage": "two_original_far_ridge_silhouette_and_painted_shadow_plane_recompositions",
+      "worlds": [
+        "warm",
+        "slate"
+      ],
+      "layer": "far",
+      "source_editable_2x_originals": [
+        "flappy/assets/v4/masters/warm/far-natural-alpha38.svg",
+        "flappy/assets/v4/masters/slate/far-natural-alpha38.svg"
+      ],
+      "kept_existing_original_sources": [
+        "flappy/assets/v4/masters/warm/far-master-pilot.svg",
+        "flappy/assets/v4/masters/slate/far-master-pilot.svg"
+      ],
+      "offline_script": "tests/flappy-v4-natural-far.py",
+      "qa_pngs": [
+        "flappy/assets/v4/pilot/warm/far-raster-alpha38.png",
+        "flappy/assets/v4/pilot/slate/far-raster-alpha38.png"
+      ],
+      "source_semantics": "One original SVG path synchronizes distant mountain base, original clip, edited ridge highlight; 7 distinct authored mountain-value paint marks per theme",
+      "safety": "Alpha38 offline RGBA protects top 430/1000 px exactly and first/last 40px of each row, feather 16px into edited far painting; no production asset mutation",
+      "CI_target": {
+        "static_browser_screenshots": 135,
+        "decoded_png_repeat_audits": 23,
+        "real_mobile_browser_AB": [
+          320,
+          390
+        ]
+      },
+      "review_hashes": [
+        "#warm-far-alpha38",
+        "#slate-far-alpha38",
+        "#warm-world-alpha38",
+        "#slate-world-alpha38"
+      ],
+      "professional_art_final_master_approved": false,
+      "game_runtime_modified": false
+    },
+    {
+      "alpha": 39,
+      "stage": "authored_rock_strata_gouache_value_unification_plus_safe_chrome_pooling",
+      "worlds": [
+        "warm",
+        "slate"
+      ],
+      "layers": [
+        "far"
+      ],
+      "editable_2x_art": [
+        "flappy/assets/v4/masters/warm/far-strata-alpha39.svg",
+        "flappy/assets/v4/masters/slate/far-strata-alpha39.svg"
+      ],
+      "baseline_source": "Alpha38 original far-authored mountain source and offline transparent RGBA only; zero runtime effect",
+      "generated_pngs": [
+        "flappy/assets/v4/pilot/warm/far-raster-alpha39.png",
+        "flappy/assets/v4/pilot/slate/far-raster-alpha39.png"
+      ],
+      "offline_compositor": "tests/flappy-v4-rock-strata.py",
+      "material": "4 independently shaped washes, 16-17 hand-positioned stratified rock line shapes, 4 mineral light/occlusion flecks per world; no new shader, random noise or alpha",
+      "protected": "original RGB(A) alpha exact; upper 430px, left/right 40px original RGBA byte-identical; 1600x1000 PNG under 4MB",
+      "screenshot_optimization": "tests/flappy-v4-batch-chrome.py captures 8 new phone/scene/join review PNGs using one loopback-only Chrome DevTools session, with image.decode/document.fonts ready and two animation frames, robust exact route loaded wait, without touching 135 historical screenshots",
+      "CI_targets": {
+        "chrome_static_screenshots": 143,
+        "decoded_source_tile_joins": 25,
+        "chrome_start_processes_for_alpha39_new_capture": 1
+      },
+      "runtime_modified": false,
+      "artist_approved_final": false,
+      "limitations": "still authored vector-painted gouache study, not accepted professional layered native painting; full screenshot capture may still be bottleneck until mature batch tool extends to historical evidence"
+    },
+    {
+      "alpha": 40,
+      "stage": "replace_geometric_facets_with_original_curved_complete_landform_value_painting",
+      "worlds": [
+        "warm",
+        "slate"
+      ],
+      "layers": [
+        "far",
+        "mid"
+      ],
+      "four_editable_2x_originals": [
+        "flappy/assets/v4/masters/warm/far-value-alpha40.svg",
+        "flappy/assets/v4/masters/warm/mid-value-alpha40.svg",
+        "flappy/assets/v4/masters/slate/far-value-alpha40.svg",
+        "flappy/assets/v4/masters/slate/mid-value-alpha40.svg"
+      ],
+      "original_art": "9/7 independent original broad asymmetric curved landform paint shapes and 6 original gradient feathered light/shade paths per far/mid, replacing original geometric gouache/facet source groups",
+      "preserved": "Alpha38 original skyline+clip+rim for far and Alpha37 skyline+clip+rim for mid, game runtime unchanged",
+      "offline_pipeline": "tests/flappy-v4-whole-landscape.py",
+      "art_pngs_only_CI": "flappy/assets/v4/pilot/{warm,slate}/{far,mid}-raster-alpha40.png",
+      "safety": "all 4 candidate RGBA skies above y430/555 and both 40px tile edges unchanged byte-by-byte, original source alpha byte-identical, 16px edge feather, max4MB texture, required broad A/B >750 real RGB screenshot pixels",
+      "CI_target": {
+        "static_original_browser_screenshots": 157,
+        "decoded_original_source_tile_seams": 29,
+        "pooled_chrome_startups_for_14_new_screenshots": 1
+      },
+      "blocked": "Draft only, 0/10 accepted professional native bitmap art, no real mobile/human 24-frame long-run release sign-off",
+      "production_modified": false
+    },
+    {
+      "alpha": 41,
+      "stage": "original_scene_depth_haze_and_independent_geological_scumble",
+      "worlds": [
+        "warm",
+        "slate"
+      ],
+      "layers": [
+        "far",
+        "mid"
+      ],
+      "source_originals": [
+        "flappy/assets/v4/masters/warm/far-atmos-alpha41.svg",
+        "flappy/assets/v4/masters/warm/mid-atmos-alpha41.svg",
+        "flappy/assets/v4/masters/slate/far-atmos-alpha41.svg",
+        "flappy/assets/v4/masters/slate/mid-atmos-alpha41.svg"
+      ],
+      "art_direction": "two independently curved distance-color fields and ten individually hand-positioned broken rock pigment paths per original source; warm sunrise and slate moonlight palettes distinct",
+      "rendering": "tests/flappy-v4-atmospheric-depth.py overlays source onto retained Alpha40 1600x1000 offline RGBA; 4 PNGs CI only",
+      "pixel_safety": "original Alpha40 transparent alpha bytes unchanged; top 430 far/555 mid and 40px repeating edge source RGBA byte-for-byte unchanged",
+      "reviewer": "warm/slate far/mid/world Alpha41 named hash routes and four repeated tile seam images, Draft only",
+      "browser": "tests/flappy-v4-batch-chrome.py --stage recent captures Alpha39 8 + Alpha40 14 + Alpha41 14 screenshots in ONE localhost Chrome process; all 135 original historical screenshots remain independent; 171 total, 33 decoded PNG tile seams",
+      "blockers": "0/10 professional native bitmap artist final signoffs, iOS/Android hardware and skilled user long-run still absent, explicit merge/release authorization absent",
+      "runtime_modified": false,
+      "artist_approved_final": false
+    },
+    {
+      "alpha": 42,
+      "stage": "original_slate_midrange_skyline_material_reauthored",
+      "original_editable_master": "flappy/assets/v4/masters/slate/mid-organic-alpha42.svg",
+      "comparison_master": "flappy/assets/v4/masters/slate/mid-value-alpha40.svg",
+      "comparison_bitmap": "flappy/assets/v4/pilot/slate/mid-raster-alpha41.png",
+      "original_landform_design": "One newly authored actual organic blue-hour crest reused identically across original midrange fill/clip/crest highlight; eight independently curved rock masses, four valley light/distance glazes, seven broken pigment stratum strokes",
+      "offline_renderer": "tests/flappy-v4-organic-midrange.py",
+      "output_only_in_CI": "flappy/assets/v4/pilot/slate/mid-raster-alpha42.png",
+      "safeguards": "Upper 555/1000 RGBA rows unchanged, 40px source repeated borders RGBA exactly retained, 16px transition feather; source crest/new removed alpha pixel checks; actual mobile 320/390 screenshot >2500 brightness changed",
+      "QA_targets": {
+        "static_browser_screenshots": 175,
+        "actual_decoded_png_tile_seam_tests": 34,
+        "shared_recent_browser_shots": 40
+      },
+      "production_approved": false,
+      "QA_only": true,
+      "live_v3_1_unchanged": true,
+      "production_release_blockers": "10/10 pilot original source scene layers; 0/10 final professionally accepted native raster masters; real phone hardware, long-session fairness and final explicit authorization missing"
+    },
+    {
+      "alpha": 43,
+      "stage": "two_original_distant_mountain_crest_and_material_reauthors",
+      "original_editable_2x_sources": [
+        "flappy/assets/v4/masters/warm/far-organic-alpha43.svg",
+        "flappy/assets/v4/masters/slate/far-organic-alpha43.svg"
+      ],
+      "source_paint": "Original warm and blue-hour complete far ridge crest, fill path and clip all edited consistently; 8 separately curved rock value masses, 6 directional light and shadow atmospheric glazes, 6 original broken mineral strata strokes for each scene.",
+      "reference": "Retain Alpha40 editable originals and Alpha41 offline RGBA unmodified for old-vs-new A/B and bounded sky/edge preservation.",
+      "CI_renderer": "tests/flappy-v4-organic-far.py",
+      "draft_art_pngs": [
+        "flappy/assets/v4/pilot/warm/far-raster-alpha43.png",
+        "flappy/assets/v4/pilot/slate/far-raster-alpha43.png"
+      ],
+      "scene_integration": "warm far43+mid41+mist+near36 and slate far43+mid42+mist+near36",
+      "guardrails": "both first/last 40px exact old RGBA, upper 430px bird sky unchanged, original 2x vector mask/rim/source base path identical, both changed skyline alpha directions required, mobile source actual A/B over 2500 pixels",
+      "target_screenshots": 183,
+      "target_real_decoded_png_seam_audits": 36,
+      "target_recent_browser_capture": 48,
+      "production_runtime_changed": false,
+      "final_professional_native_masters_approved": 0,
+      "must_not_deploy": true
+    },
+    {
+      "alpha": 44,
+      "stage": "full_scene_value_and_subject_readability_review",
+      "two_original_source_editable_2x_paintings": [
+        "flappy/assets/v4/masters/warm/depth-harmony-alpha44.svg",
+        "flappy/assets/v4/masters/slate/depth-harmony-alpha44.svg"
+      ],
+      "design": "Each separately authored original world includes 3 original curved paint regions per far/mid/near source depth (9 paths per world), independently directed atmospheric and shadow gradients with warm/cool palettes distinct. Six Draft-only clipped 1600x1000 RGBA images.",
+      "six_layer_baselines": "Warm far43 mid41 near36, slate far43 mid42 near36",
+      "offline_compositor": "tests/flappy-v4-depth-cohesion.py",
+      "player_and_obstacle_readability": "tests/flappy-v4-foreground-readability.py compares real mobile Chrome Alpha43/44 original player region and obstacle surface pixels unchanged, lower pipe local contrast at 320/390 stays above minimum and no >28 percent regression relative to Alpha43",
+      "preserve": "Original RGBA alpha, top y430 far y555 mid y665 near and 40px left/right tile repeats byte-for-byte unchanged, 16px edge feather; opt-in only",
+      "browser_capture": "64 recent Alpha39–44 screenshots captured in one isolated Chrome, original 135 independently rendered older static scenes still kept",
+      "ci_targets": {
+        "total_static_browser_screenshots": 199,
+        "decoded_png_rgb_tile_joins": 42,
+        "one_chrome_recent_screenshots": 64
+      },
+      "release": "PR57 DRAFT do not merge/deploy; only 10/10 editable production studies, 0/10 approved final native hand-painted layers; iOS Android performance touch audible game physical testing and human game fairness still outstanding",
+      "game_runtime_changed": false,
+      "final_artist_approved": false
+    },
+    {
+      "alpha": 45,
+      "stage": "real_chrome_24_frame_sprite_four_pose_and_blank_world_readability_coverage",
+      "scope": "real original v3 bird atlas frame 0/6/12/18 in warm and slate against the original Alpha44 far/mid/near scene at 320x568 and 390x844",
+      "original_assets_unchanged": "flappy/assets/v3/warm-flight.svg and flappy/assets/v3/slate-flight.svg; all Alpha44 painterly far/mid/near PNG sources remain exactly as previous draft",
+      "browser_capture": "tests/flappy-v4-batch-chrome.py, 20 real PNGs from 2 worlds * 2 widths * 5 poses (four wing plus no-bird scene) sharing prior 64+20=84 real Chrome captures in one isolated localhost CDP process",
+      "pixel_QA": "tests/flappy-v4-four-pose-readability.py; tests original source atlas four distinct poses vs real source transparent-world without bird and image-level pixel identical background/pipe outside original player bounds at both mobile widths",
+      "safety": "Pure CSS-only <span> route markers and :target wing selectors, no JavaScript or framework, no game runtime, no leaderboard/database deploy changes",
+      "expected_static_images": 219,
+      "expected_original_source_RGB_seam_audits": 42,
+      "honest_limit": "No professionally accepted final original bitmap source masters (0/10), no physical mobile performance/audio/thermal/play acceptance; not a finished sprite art upgrade",
+      "draft_only": true,
+      "artist_approved_final": false
+    }
+  ]
+}

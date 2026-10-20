@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3200" height="2000" viewBox="0 0 3200 2000" role="img" aria-label="Alpha35 original slate conifer irregular branch silhouettes and cold edge highlights">
+<title>Alpha 35 — Blue Hour Range 11 individually laid-out conifer internal brush skeletons</title>
+<desc>Editable original slate tree material art study with independent fir, spruce and larch geometries, each source-tree separately masked to avoid overlap. Not approved final professional production master. Nothing replaces runtime art.</desc>
+<g id="alpha35-individual-canopy-marks">
+<g data-alpha35-tree="1" data-species="fir" transform="translate(188 1418) scale(1 1.02)">
+<path data-alpha35-mark="volume" d="M-46 18 Q-31 -2 -17 -31 Q-8 -47 0 -56 Q15 -34 34 -12 Q26 3 4 -6 Q-17 11 -46 18Z" fill="#a6c6d4" fill-opacity="0.29"/>
+<path data-alpha35-mark="shade" d="M-41 64 Q-10 41 11 34 Q30 45 48 64 Q15 51 -11 70 Q-25 78 -41 64Z" fill="#0b273d" fill-opacity="0.28"/>
+<path data-alpha35-mark="rim" d="M-39 -15 Q-19 -30 -4 -51 M-43 33 Q-29 22 -10 13 M13 -18 Q29 -7 42 -4" fill="none" stroke="#a6c6d4" stroke-width="11" stroke-opacity="0.36" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="bough" d="M-42 12 Q-23 5 -8 -1 M-34 45 Q-8 32 21 38 M-42 77 Q-7 57 25 66" fill="none" stroke="#a6c6d4" stroke-width="8" stroke-opacity="0.38" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="needle" d="M-24 -1 L-39 -10 M-8 15 L-25 4 M-13 48 L-35 35 M7 63 L29 57 M12 31 L32 24" fill="none" stroke="#a6c6d4" stroke-width="5" stroke-opacity="0.32" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="dark-branch" d="M-24 53 Q0 43 29 50 M-5 8 Q11 9 32 20" fill="none" stroke="#0b273d" stroke-width="9" stroke-opacity="0.34" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="spark" d="M-22 -6 Q-8 -24 1 -40 M25 13 L39 24 M-25 65 L-44 79" fill="none" stroke="#a6c6d4" stroke-width="5" stroke-opacity="0.37" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="fleck" d="M-40 38 Q-18 25 -6 29 M6 81 Q25 76 37 69" fill="none" stroke="#a6c6d4" stroke-width="6" stroke-opacity="0.4" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<g data-alpha35-tree="2" data-species="spruce" transform="translate(410 1454) scale(0.91 0.92)">
+<path data-alpha35-mark="volume" d="M-28 -47 Q-15 -60 0 -66 Q13 -40 24 -28 Q8 -20 -8 -26 Q-20 -18 -34 -24Z" fill="#b2c5d8" fill-opacity="0.33"/>
+<path data-alpha35-mark="shade" d="M-46 39 Q-13 19 13 24 Q37 37 53 49 Q20 45 -3 58 Q-31 65 -46 39Z" fill="#16354c" fill-opacity="0.37"/>
+<path data-alpha35-mark="rim" d="M-27 -42 Q-11 -54 0 -57 M-33 -8 Q-17 -27 -1 -34 M-46 37 Q-27 20 -10 17 M-44 82 Q-17 56 7 59" fill="none" stroke="#b2c5d8" stroke-width="11" stroke-opacity="0.36" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="bough" d="M-37 7 Q-16 -8 1 2 M7 -3 Q26 8 36 15 M-43 55 Q-12 39 30 44" fill="none" stroke="#b2c5d8" stroke-width="7" stroke-opacity="0.38" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="needle" d="M-35 28 L-52 33 M-19 4 L-37 15 M19 10 L43 20 M20 48 L47 56 M-11 69 L-38 83" fill="none" stroke="#b2c5d8" stroke-width="5" stroke-opacity="0.32" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="dark-branch" d="M-19 32 Q4 30 34 36 M-27 80 Q0 69 34 82" fill="none" stroke="#16354c" stroke-width="8" stroke-opacity="0.34" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="spark" d="M-17 -35 L-23 -25 M-13 54 L-36 63 M15 71 L39 80" fill="none" stroke="#b2c5d8" stroke-width="5" stroke-opacity="0.37" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="fleck" d="M-41 66 Q-22 59 -3 59 M-9 15 Q8 9 28 19" fill="none" stroke="#b2c5d8" stroke-width="6" stroke-opacity="0.4" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<g data-alpha35-tree="3" data-species="larch" transform="translate(670 1363) scale(1.16 1.18)">
+<path data-alpha35-mark="volume" d="M-33 -32 Q-19 -51 -4 -66 Q5 -48 27 -39 Q17 -19 -1 -30 Q-17 -18 -33 -32Z" fill="#adc2c5" fill-opacity="0.26"/>
+<path data-alpha35-mark="shade" d="M-54 58 Q-18 43 1 44 Q23 46 48 62 Q23 69 5 66 Q-20 79 -54 58Z" fill="#173b53" fill-opacity="0.22"/>
+<path data-alpha35-mark="rim" d="M-29 -42 Q-6 -53 1 -64 M-50 8 Q-27 -1 -16 -15 M-55 50 Q-37 31 -12 28" fill="none" stroke="#adc2c5" stroke-width="8" stroke-opacity="0.36" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="bough" d="M-41 -1 Q-14 2 8 -7 M-53 32 Q-19 18 20 28 M-48 86 Q-2 59 46 88" fill="none" stroke="#adc2c5" stroke-width="5" stroke-opacity="0.38" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="needle" d="M-39 3 L-53 -3 M-31 24 L-46 13 M-9 32 L6 15 M15 42 L29 28 M13 72 L35 59" fill="none" stroke="#adc2c5" stroke-width="4" stroke-opacity="0.32" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="dark-branch" d="M-23 54 Q14 40 45 50 M-10 6 Q14 4 37 14" fill="none" stroke="#173b53" stroke-width="6" stroke-opacity="0.34" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="spark" d="M-26 -23 L-45 -8 M-44 72 L-59 83 M24 60 L44 73" fill="none" stroke="#adc2c5" stroke-width="5" stroke-opacity="0.37" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="fleck" d="M-35 48 Q-9 35 13 39 M-24 89 Q13 81 36 96" fill="none" stroke="#adc2c5" stroke-width="4" stroke-opacity="0.4" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<g data-alpha35-tree="4" data-species="fir" transform="translate(947 1360) scale(0.88 1.02)">
+<path data-alpha35-mark="volume" d="M-46 18 Q-31 -2 -17 -31 Q-8 -47 0 -56 Q15 -34 34 -12 Q26 3 4 -6 Q-17 11 -46 18Z" fill="#87b5ca" fill-opacity="0.29"/>
+<path data-alpha35-mark="shade" d="M-41 64 Q-10 41 11 34 Q30 45 48 64 Q15 51 -11 70 Q-25 78 -41 64Z" fill="#123048" fill-opacity="0.28"/>
+<path data-alpha35-mark="rim" d="M-39 -15 Q-19 -30 -4 -51 M-43 33 Q-29 22 -10 13 M13 -18 Q29 -7 42 -4" fill="none" stroke="#87b5ca" stroke-width="11" stroke-opacity="0.36" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="bough" d="M-42 12 Q-23 5 -8 -1 M-34 45 Q-8 32 21 38 M-42 77 Q-7 57 25 66" fill="none" stroke="#87b5ca" stroke-width="8" stroke-opacity="0.38" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="needle" d="M-24 -1 L-39 -10 M-8 15 L-25 4 M-13 48 L-35 35 M7 63 L29 57 M12 31 L32 24" fill="none" stroke="#87b5ca" stroke-width="5" stroke-opacity="0.32" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="dark-branch" d="M-24 53 Q0 43 29 50 M-5 8 Q11 9 32 20" fill="none" stroke="#123048" stroke-width="9" stroke-opacity="0.34" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="spark" d="M-22 -6 Q-8 -24 1 -40 M25 13 L39 24 M-25 65 L-44 79" fill="none" stroke="#87b5ca" stroke-width="5" stroke-opacity="0.37" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="fleck" d="M-40 38 Q-18 25 -6 29 M6 81 Q25 76 37 69" fill="none" stroke="#87b5ca" stroke-width="6" stroke-opacity="0.4" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<g data-alpha35-tree="5" data-species="spruce" transform="translate(1225 1455) scale(1.15 0.88)">
+<path data-alpha35-mark="volume" d="M-28 -47 Q-15 -60 0 -66 Q13 -40 24 -28 Q8 -20 -8 -26 Q-20 -18 -34 -24Z" fill="#a2c2cf" fill-opacity="0.33"/>
+<path data-alpha35-mark="shade" d="M-46 39 Q-13 19 13 24 Q37 37 53 49 Q20 45 -3 58 Q-31 65 -46 39Z" fill="#0f314e" fill-opacity="0.37"/>
+<path data-alpha35-mark="rim" d="M-27 -42 Q-11 -54 0 -57 M-33 -8 Q-17 -27 -1 -34 M-46 37 Q-27 20 -10 17 M-44 82 Q-17 56 7 59" fill="none" stroke="#a2c2cf" stroke-width="11" stroke-opacity="0.36" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="bough" d="M-39 5 Q-16 -8 1 2 M7 -3 Q26 8 36 15 M-45 57 Q-12 39 30 44" fill="none" stroke="#a2c2cf" stroke-width="7" stroke-opacity="0.38" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="needle" d="M-35 28 L-52 33 M-19 4 L-37 15 M19 10 L43 20 M20 48 L47 56 M-11 69 L-38 83" fill="none" stroke="#a2c2cf" stroke-width="5" stroke-opacity="0.32" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="dark-branch" d="M-19 32 Q4 30 34 36 M-27 80 Q0 69 34 82" fill="none" stroke="#0f314e" stroke-width="8" stroke-opacity="0.34" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="spark" d="M-17 -35 L-23 -25 M-13 54 L-36 63 M15 71 L39 80" fill="none" stroke="#a2c2cf" stroke-width="5" stroke-opacity="0.37" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="fleck" d="M-41 66 Q-22 59 -3 59 M-9 15 Q8 9 28 19" fill="none" stroke="#a2c2cf" stroke-width="6" stroke-opacity="0.4" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<g data-alpha35-tree="6" data-species="larch" transform="translate(1515 1346) scale(1.14 1.15)">
+<path data-alpha35-mark="volume" d="M-33 -32 Q-19 -51 -4 -66 Q5 -48 27 -39 Q17 -19 -1 -30 Q-17 -18 -33 -32Z" fill="#b7c6c0" fill-opacity="0.26"/>
+<path data-alpha35-mark="shade" d="M-54 58 Q-18 43 1 44 Q23 46 48 62 Q23 69 5 66 Q-20 79 -54 58Z" fill="#193d54" fill-opacity="0.22"/>
+<path data-alpha35-mark="rim" d="M-29 -42 Q-6 -53 1 -64 M-50 8 Q-27 -1 -16 -15 M-55 50 Q-37 31 -12 28" fill="none" stroke="#b7c6c0" stroke-width="8" stroke-opacity="0.36" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="bough" d="M-41 -1 Q-14 2 8 -7 M-53 32 Q-19 18 20 28 M-48 86 Q-2 59 46 88" fill="none" stroke="#b7c6c0" stroke-width="5" stroke-opacity="0.38" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="needle" d="M-39 3 L-53 -3 M-31 24 L-46 13 M-9 32 L6 15 M15 42 L29 28 M13 72 L35 59" fill="none" stroke="#b7c6c0" stroke-width="4" stroke-opacity="0.32" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="dark-branch" d="M-23 54 Q14 40 45 50 M-10 6 Q14 4 37 14" fill="none" stroke="#193d54" stroke-width="6" stroke-opacity="0.34" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="spark" d="M-26 -23 L-45 -8 M-44 72 L-59 83 M24 60 L44 73" fill="none" stroke="#b7c6c0" stroke-width="5" stroke-opacity="0.37" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="fleck" d="M-35 48 Q-9 35 13 39 M-24 89 Q13 81 36 96" fill="none" stroke="#b7c6c0" stroke-width="4" stroke-opacity="0.4" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<g data-alpha35-tree="7" data-species="fir" transform="translate(1803 1346) scale(1.03 1.03)">
+<path data-alpha35-mark="volume" d="M-46 18 Q-31 -2 -17 -31 Q-8 -47 0 -56 Q15 -34 34 -12 Q26 3 4 -6 Q-17 11 -46 18Z" fill="#8eafce" fill-opacity="0.29"/>
+<path data-alpha35-mark="shade" d="M-41 64 Q-10 41 11 34 Q30 45 48 64 Q15 51 -11 70 Q-25 78 -41 64Z" fill="#0f2e4b" fill-opacity="0.28"/>
+<path data-alpha35-mark="rim" d="M-39 -15 Q-19 -30 -4 -51 M-43 33 Q-29 22 -10 13 M13 -18 Q29 -7 42 -4" fill="none" stroke="#8eafce" stroke-width="11" stroke-opacity="0.36" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="bough" d="M-42 12 Q-23 5 -8 -1 M-34 45 Q-8 32 21 38 M-42 77 Q-7 57 25 66" fill="none" stroke="#8eafce" stroke-width="8" stroke-opacity="0.38" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="needle" d="M-24 -1 L-39 -10 M-8 15 L-25 4 M-13 48 L-35 35 M7 63 L29 57 M12 31 L32 24" fill="none" stroke="#8eafce" stroke-width="5" stroke-opacity="0.32" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="dark-branch" d="M-24 53 Q0 43 29 50 M-5 8 Q11 9 32 20" fill="none" stroke="#0f2e4b" stroke-width="9" stroke-opacity="0.34" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="spark" d="M-22 -6 Q-8 -24 1 -40 M25 13 L39 24 M-25 65 L-44 79" fill="none" stroke="#8eafce" stroke-width="5" stroke-opacity="0.37" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="fleck" d="M-40 38 Q-18 25 -6 29 M6 81 Q25 76 37 69" fill="none" stroke="#8eafce" stroke-width="6" stroke-opacity="0.4" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<g data-alpha35-tree="8" data-species="spruce" transform="translate(2072 1401) scale(1.06 1.08)">
+<path data-alpha35-mark="volume" d="M-28 -47 Q-15 -60 0 -66 Q13 -40 24 -28 Q8 -20 -8 -26 Q-20 -18 -34 -24Z" fill="#adc4d0" fill-opacity="0.33"/>
+<path data-alpha35-mark="shade" d="M-46 39 Q-13 19 13 24 Q37 37 53 49 Q20 45 -3 58 Q-31 65 -46 39Z" fill="#0e2c48" fill-opacity="0.37"/>
+<path data-alpha35-mark="rim" d="M-27 -42 Q-11 -54 0 -57 M-33 -8 Q-17 -27 -1 -34 M-46 37 Q-27 20 -10 17 M-44 82 Q-17 56 7 59" fill="none" stroke="#adc4d0" stroke-width="11" stroke-opacity="0.36" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="bough" d="M-37 7 Q-16 -8 1 2 M7 -3 Q26 8 36 15 M-43 55 Q-12 39 30 44" fill="none" stroke="#adc4d0" stroke-width="7" stroke-opacity="0.38" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="needle" d="M-35 28 L-52 33 M-19 4 L-37 15 M19 10 L43 20 M20 48 L47 56 M-11 69 L-38 83" fill="none" stroke="#adc4d0" stroke-width="5" stroke-opacity="0.32" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="dark-branch" d="M-19 32 Q4 30 34 36 M-27 80 Q0 69 34 82" fill="none" stroke="#0e2c48" stroke-width="8" stroke-opacity="0.34" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="spark" d="M-17 -35 L-23 -25 M-13 54 L-36 63 M15 71 L39 80" fill="none" stroke="#adc4d0" stroke-width="5" stroke-opacity="0.37" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="fleck" d="M-41 66 Q-22 59 -3 59 M-9 15 Q8 9 28 19" fill="none" stroke="#adc4d0" stroke-width="6" stroke-opacity="0.4" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<g data-alpha35-tree="9" data-species="larch" transform="translate(2356 1347) scale(1.2 1.25)">
+<path data-alpha35-mark="volume" d="M-33 -32 Q-19 -51 -4 -66 Q5 -48 27 -39 Q17 -19 -1 -30 Q-17 -18 -33 -32Z" fill="#d0d0bd" fill-opacity="0.26"/>
+<path data-alpha35-mark="shade" d="M-54 58 Q-18 43 1 44 Q23 46 48 62 Q23 69 5 66 Q-20 79 -54 58Z" fill="#15334e" fill-opacity="0.22"/>
+<path data-alpha35-mark="rim" d="M-29 -42 Q-6 -53 1 -64 M-50 8 Q-27 -1 -16 -15 M-55 50 Q-37 31 -12 28" fill="none" stroke="#d0d0bd" stroke-width="8" stroke-opacity="0.36" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="bough" d="M-41 -1 Q-14 2 8 -7 M-53 32 Q-19 18 20 28 M-48 86 Q-2 59 46 88" fill="none" stroke="#d0d0bd" stroke-width="5" stroke-opacity="0.38" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="needle" d="M-39 3 L-53 -3 M-31 24 L-46 13 M-9 32 L6 15 M15 42 L29 28 M13 72 L35 59" fill="none" stroke="#d0d0bd" stroke-width="4" stroke-opacity="0.32" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="dark-branch" d="M-23 54 Q14 40 45 50 M-10 6 Q14 4 37 14" fill="none" stroke="#15334e" stroke-width="6" stroke-opacity="0.34" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="spark" d="M-26 -23 L-45 -8 M-44 72 L-59 83 M24 60 L44 73" fill="none" stroke="#d0d0bd" stroke-width="5" stroke-opacity="0.37" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="fleck" d="M-35 48 Q-9 35 13 39 M-24 89 Q13 81 36 96" fill="none" stroke="#d0d0bd" stroke-width="4" stroke-opacity="0.4" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<g data-alpha35-tree="10" data-species="fir" transform="translate(2685 1453) scale(0.9 1.01)">
+<path data-alpha35-mark="volume" d="M-46 18 Q-31 -2 -17 -31 Q-8 -47 0 -56 Q15 -34 34 -12 Q26 3 4 -6 Q-17 11 -46 18Z" fill="#8fbbd1" fill-opacity="0.29"/>
+<path data-alpha35-mark="shade" d="M-41 64 Q-10 41 11 34 Q30 45 48 64 Q15 51 -11 70 Q-25 78 -41 64Z" fill="#1a3852" fill-opacity="0.28"/>
+<path data-alpha35-mark="rim" d="M-39 -15 Q-19 -30 -4 -51 M-43 33 Q-29 22 -10 13 M13 -18 Q29 -7 42 -4" fill="none" stroke="#8fbbd1" stroke-width="11" stroke-opacity="0.36" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="bough" d="M-42 12 Q-23 5 -8 -1 M-34 45 Q-8 32 21 38 M-42 77 Q-7 57 25 66" fill="none" stroke="#8fbbd1" stroke-width="8" stroke-opacity="0.38" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="needle" d="M-24 -1 L-39 -10 M-8 15 L-25 4 M-13 48 L-35 35 M7 63 L29 57 M12 31 L32 24" fill="none" stroke="#8fbbd1" stroke-width="5" stroke-opacity="0.32" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="dark-branch" d="M-24 53 Q0 43 29 50 M-5 8 Q11 9 32 20" fill="none" stroke="#1a3852" stroke-width="9" stroke-opacity="0.34" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="spark" d="M-22 -6 Q-8 -24 1 -40 M25 13 L39 24 M-25 65 L-44 79" fill="none" stroke="#8fbbd1" stroke-width="5" stroke-opacity="0.37" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="fleck" d="M-40 38 Q-18 25 -6 29 M6 81 Q25 76 37 69" fill="none" stroke="#8fbbd1" stroke-width="6" stroke-opacity="0.4" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<g data-alpha35-tree="11" data-species="spruce" transform="translate(2982 1473) scale(0.79 0.93)">
+<path data-alpha35-mark="volume" d="M-28 -47 Q-15 -60 0 -66 Q13 -40 24 -28 Q8 -20 -8 -26 Q-20 -18 -34 -24Z" fill="#acc6da" fill-opacity="0.33"/>
+<path data-alpha35-mark="shade" d="M-46 39 Q-13 19 13 24 Q37 37 53 49 Q20 45 -3 58 Q-31 65 -46 39Z" fill="#1a3754" fill-opacity="0.37"/>
+<path data-alpha35-mark="rim" d="M-27 -42 Q-11 -54 0 -57 M-33 -8 Q-17 -27 -1 -34 M-46 37 Q-27 20 -10 17 M-44 82 Q-17 56 7 59" fill="none" stroke="#acc6da" stroke-width="11" stroke-opacity="0.36" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="bough" d="M-39 5 Q-16 -8 1 2 M7 -3 Q26 8 36 15 M-45 57 Q-12 39 30 44" fill="none" stroke="#acc6da" stroke-width="7" stroke-opacity="0.38" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="needle" d="M-35 28 L-52 33 M-19 4 L-37 15 M19 10 L43 20 M20 48 L47 56 M-11 69 L-38 83" fill="none" stroke="#acc6da" stroke-width="5" stroke-opacity="0.32" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="dark-branch" d="M-19 32 Q4 30 34 36 M-27 80 Q0 69 34 82" fill="none" stroke="#1a3754" stroke-width="8" stroke-opacity="0.34" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="spark" d="M-17 -35 L-23 -25 M-13 54 L-36 63 M15 71 L39 80" fill="none" stroke="#acc6da" stroke-width="5" stroke-opacity="0.37" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-alpha35-mark="fleck" d="M-41 66 Q-22 59 -3 59 M-9 15 Q8 9 28 19" fill="none" stroke="#acc6da" stroke-width="6" stroke-opacity="0.4" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</g></svg>
