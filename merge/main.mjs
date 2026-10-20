@@ -1,7 +1,8 @@
 import { WIDTH, CELL_COUNT, MAX_ENERGY, ENERGY_REGEN_MS, CHAINS, createInitialState,
   advanceTime, moveOrMerge, produce, fulfillOrder, getItemIcon, getItemName,
   storeItem, withdrawItem, upgradeWarehouse, upgradeProducer, upgradeBuilding,
-  getLevelProgress, getMaxOrderTier, getProducerUpgrade, getWarehouseUpgrade } from './engine.mjs';
+  getLevelProgress, getMaxOrderTier, getProducerUpgrade, getWarehouseUpgrade,
+  SUPPLY_ITEMS, ACHIEVEMENT_RULES, useSupply, purchaseSupply } from './engine.mjs';
 import { BUILDINGS } from './economy.mjs';
 import { loadLocal, saveLocal, SAVE_KEY } from './storage.mjs';
 import { getBoardGuidance } from './board-guidance.mjs';
@@ -173,8 +174,66 @@ function renderSystems() {
       ()=>commit(upgradeBuilding(state,id)),complete||state.coins<rule.coins||level<rule.minLevel));
   }
 }
+function renderSupplies(now=Date.now()) {
+  const select=byId('supply-producer');
+  const selected=select.value;
+  select.replaceChildren();
+  const producers=state.board.filter(p=>p?.kind==='producer');
+  for(const p of producers){
+    const option=document.createElement('option');
+    option.value=p.id;
+    option.textContent=`${CHAINS[p.chain].name}工坊 · ${p.charges===0
+      ? '冷却剩余'+Math.max(0,Math.ceil((p.cooldownUntil-now)/1000))+'秒' : '可生产'}`;
+    select.append(option);
+  }
+  if(producers.some(p=>p.id===selected))select.value=selected;
+  const chosen=producers.find(p=>p.id===select.value);
+  const cooling=chosen?.charges===0&&chosen.cooldownUntil>now;
+  const bag=byId('supply-bag');bag.replaceChildren();
+  const shop=byId('supply-shop');shop.replaceChildren();
+  for(const [id,def] of Object.entries(SUPPLY_ITEMS)){
+    const owned=state.bag[id];
+    const row=document.createElement('div');row.className='supply-row';
+    const details=document.createElement('div');
+    const title=document.createElement('strong');
+    title.textContent=`${def.icon} ${def.name} · ×${owned}`;
+    const sub=document.createElement('p');sub.textContent=def.effect;
+    details.append(title,sub);
+    const button=document.createElement('button');
+    button.type='button';button.className='small-action';
+    const usable=owned>0&&(def.energy?state.energy<MAX_ENERGY:cooling);
+    button.disabled=!usable;
+    button.textContent='使用';
+    button.setAttribute('aria-label',`使用${def.name}，当前有${owned}个`);
+    button.addEventListener('click',()=>commit(useSupply(state,id,select.value)));
+    row.append(details,button);bag.append(row);
+
+    const used=state.shop.purchases[id];
+    const remaining=def.limit-used;
+    const sale=document.createElement('div');sale.className='supply-row';
+    const saleDetails=document.createElement('div');
+    const saleTitle=document.createElement('strong');saleTitle.textContent=`${def.icon} ${def.name}`;
+    const saleInfo=document.createElement('p');
+    saleInfo.textContent=`${def.price} 金币 · 剩余 ${remaining}/${def.limit}`;
+    saleDetails.append(saleTitle,saleInfo);
+    const buy=document.createElement('button');
+    buy.type='button';buy.className='small-action';
+    buy.disabled=remaining<=0||state.coins<def.price;
+    buy.textContent=remaining<=0?'已售罄':'兑换';
+    buy.setAttribute('aria-label',`用${def.price}金币兑换${def.name}`);
+    buy.addEventListener('click',()=>commit(purchaseSupply(state,id)));
+    sale.append(saleDetails,buy);shop.append(sale);
+  }
+  const milestones=byId('supply-achievements');milestones.replaceChildren();
+  for(const rule of ACHIEVEMENT_RULES){
+    const line=document.createElement('div');line.className='supply-milestone';
+    const done=state.achievements[rule.id]===1;
+    line.textContent=`${done?'✓':'○'} ${rule.title} · ${rule.counter==='orders'?'完成委托':'合成'} ${Math.min(rule.threshold,state.progress[rule.counter])}/${rule.threshold} · ${SUPPLY_ITEMS[rule.reward].name} ×1${done?'（已领取）':''}`;
+    milestones.append(line);
+  }
+}
 function render() {
-  renderResources(); renderBoard(); renderOrders(); renderSystems();
+  renderResources(); renderBoard(); renderOrders(); renderSystems(); renderSupplies();
   byId('guidance-message').textContent = activeGuidance?.message ??
     '棋盘太满时，可以点“整理提示”寻找合法操作。只提示，不自动操作。';
   byId('board-guide').setAttribute('aria-pressed', String(!!activeGuidance));
