@@ -490,3 +490,33 @@ test('Alpha45 original bird wing-state A/B selector has five unique static route
  assert.doesNotMatch(html,/<script\b/i);
  assert.doesNotMatch(game,/world-alpha45/);
 });
+
+
+test('Alpha46 self-contained natural trees remain an opt-in QA-only art redesign',()=>{
+  const workflow=read('.github/workflows/flappy-v4-art-qa.yml');
+  const batch=read('tests/flappy-v4-batch-chrome.py');
+  const pages=read('scripts/build-public.sh');
+  assert.match(workflow,/Alpha46 source-tree 320px and 390px A\/B browser evidence/);
+  assert.match(workflow,/alpha46-trees\/\*\.png/);
+  assert.match(batch,/if stage=="alpha46"/);
+  assert.doesNotMatch(game,/near-structure-alpha46/);
+  assert.doesNotMatch(pages,/near-structure-alpha46/);
+  for(const [theme,expected] of [['warm', ['oak','birch','alder','willow']],['slate',['fir','spruce','larch']]]){
+    const path='flappy/assets/v4/masters/'+theme+'/near-structure-alpha46.svg';
+    const svg=read(path);
+    assert.match(svg,/<svg xmlns="http:\/\/www.w3.org\/2000\/svg" width="3200" height="2000" viewBox="0 0 3200 2000"/);
+    assert.equal((svg.match(/data-alpha46-tree="/g)||[]).length,9,'unique original trees: '+theme);
+    assert.equal((svg.match(/data-tree-trunk="/g)||[]).length,9,'physical visible trunks: '+theme);
+    for(const species of expected)assert.match(svg,new RegExp('data-species="'+species+'"'));
+    assert.match(svg,/id="seam-matched-ground" d="M0 1650 /);
+    assert.match(svg,/3200 1650 L3200 2000 L0 2000Z"/);
+    assert.ok(Buffer.byteLength(svg,'utf8')<260000,'cap experimental source for QA');
+    assert.doesNotMatch(svg,/<script|<foreignObject|<image\b|<filter\b|\bonload\s*=|xlink:href|href="https?:/i);
+    if(theme==='warm')assert.ok((svg.match(/data-leaf-cluster="1"/g)||[]).length>=250);
+    else assert.ok((svg.match(/data-needle-fan="1"/g)||[]).length>=500);
+    assert.match(html,new RegExp('id="'+theme+'-world-alpha46"'));
+    assert.match(html,new RegExp('id="'+theme+'-near-alpha46-seam"'));
+    assert.match(html,new RegExp('src="\\./assets/v4/masters/'+theme+'/near-structure-alpha46\\.svg"'));
+    assert.match(build,new RegExp('masters/\\$theme/near-structure-alpha46\\.svg'));
+  }
+});
