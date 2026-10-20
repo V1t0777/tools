@@ -1,8 +1,9 @@
-import { createInitialState, upgradeLegacySave, validateSave } from './engine.mjs';
+import { createInitialState, upgradeLegacySave, upgradeV2Save, validateV2Save, validateSave } from './engine.mjs';
 import { validateSave as validateLegacySave } from './legacy-engine.mjs';
 
 export const SAVE_KEY = 'toolbox.merge-isle.local.v1';
 export const LEGACY_BACKUP_KEY = `${SAVE_KEY}.backup-v1`;
+export const V2_BACKUP_KEY = `${SAVE_KEY}.backup-v2`;
 // Much larger than a legitimate 56-cell save; bound parsing and writes from untrusted storage.
 export const MAX_LOCAL_SAVE_BYTES = 160_000;
 
@@ -22,18 +23,22 @@ export function loadLocal(storage, now = Date.now()) {
       return newSession(now, 'CORRUPT_SAVE');
     const parsed = JSON.parse(raw);
     if (validateSave(parsed)) return {state:parsed, recovered:true, migrated:false, raw};
-    if (parsed?.schemaVersion === 1 && validateLegacySave(parsed)) {
-      const upgraded = upgradeLegacySave(parsed);
-      // Never replace the sole valid legacy copy without a byte-for-byte backup.
-      let backedUp = false;
-      try {
-        const existing = storage.getItem(LEGACY_BACKUP_KEY);
-        if (existing === null) storage.setItem(LEGACY_BACKUP_KEY, raw);
-        backedUp = storage.getItem(LEGACY_BACKUP_KEY) === raw;
-      } catch { /* Keep the original save intact. */ }
-      if (!backedUp) return {state:upgraded,recovered:true,migrated:true,
+    const v1=parsed?.schemaVersion===1 && validateLegacySave(parsed);
+    const v2=parsed?.schemaVersion===2 && validateV2Save(parsed);
+    if(v1||v2){
+      const upgraded=v1?upgradeLegacySave(parsed):upgradeV2Save(parsed);
+      const backupKey=v1?LEGACY_BACKUP_KEY:V2_BACKUP_KEY;
+      // Keep the original bytes intact until a dedicated versioned backup
+      // exists. Never overwrite a mismatched or older backup.
+      let backedUp=false;
+      try{
+        const existing=storage.getItem(backupKey);
+        if(existing===null)storage.setItem(backupKey,raw);
+        backedUp=storage.getItem(backupKey)===raw;
+      }catch{/* Do not modify the only valid original. */}
+      if(!backedUp)return {state:upgraded,recovered:true,migrated:true,
         volatile:true,blocked:true,reason:'BACKUP_UNAVAILABLE'};
-      if (saveLocal(storage,upgraded,{migrationRaw:raw}))
+      if(saveLocal(storage,upgraded,{migrationRaw:raw}))
         return {state:upgraded,recovered:true,migrated:true,raw:JSON.stringify(upgraded)};
       return {state:upgraded,recovered:true,migrated:true,
         volatile:true,blocked:true,reason:'WRITE_FAILED'};
@@ -56,10 +61,13 @@ export function saveLocal(storage, state, {allowReset=false, migrationRaw=null, 
     if (!allowReset && expectedRaw !== undefined && current !== expectedRaw) return false;
     if (current !== null) {
       if (migrationRaw !== null) {
-        if (current !== migrationRaw || storage.getItem(LEGACY_BACKUP_KEY) !== migrationRaw)
-          return false;
-        const legacy = JSON.parse(current);
-        if (legacy?.schemaVersion !== 1 || !validateLegacySave(legacy)) return false;
+        if(current!==migrationRaw)return false;
+        const legacy=JSON.parse(current);
+        const isV1=legacy?.schemaVersion===1 && validateLegacySave(legacy);
+        const isV2=legacy?.schemaVersion===2 && validateV2Save(legacy);
+        if(!isV1&&!isV2)return false;
+        const backupKey=isV1?LEGACY_BACKUP_KEY:V2_BACKUP_KEY;
+        if(storage.getItem(backupKey)!==migrationRaw)return false;
       } else if (!allowReset) {
         if (typeof current !== 'string' || current.length > MAX_LOCAL_SAVE_BYTES) return false;
         const previous = JSON.parse(current);
