@@ -50,3 +50,6 @@ body{background:radial-gradient(circle at 5% 12%,rgba(221,194,136,.23),transpare
 .supply-achievements{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
 .supply-milestone{padding:9px;background:#f3f3e9;border:1px solid #e0e4d7;border-radius:11px;font-size:11px;line-height:1.6;color:#596f62}
 @media(max-width:480px){.supply-list,.supply-achievements{grid-template-columns:1fr}}
+
+/* P2.10 stable countdown: update text only, never rebuild list on each tick. */
+.supply-cooldown-status{min-height:20px;margin:6px 2px 12px;color:#5e766a;font-size:12px;font-variant-numeric:tabular-nums}
