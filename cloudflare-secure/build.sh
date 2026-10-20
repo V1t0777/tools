@@ -28,6 +28,7 @@ cp flappy/assets/v4/slate/{sky,far,mid,mist,near}.svg "$OUT/flappy/assets/v4/sla
 for theme in warm slate; do
   mkdir -p "$OUT/flappy/assets/v4/masters/$theme"
   cp "flappy/assets/v4/masters/$theme/near-structure-alpha46.svg" "$OUT/flappy/assets/v4/masters/$theme/"
+  cp "flappy/assets/v4/masters/$theme/near-botanical-alpha46a.svg" "$OUT/flappy/assets/v4/masters/$theme/"
 done
 
 cp games/index.html "$OUT/games/"
