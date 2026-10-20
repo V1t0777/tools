@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {parseDisposableDbUrl,runDisposablePostgresProbe,acceptsDisposableFingerprint} from '../scripts/merge-receipt-pg-preflight.mjs';
+import {parseDisposableDbUrl,runDisposablePostgresProbe,acceptsDisposableFingerprint,disposablePsqlEnvironment} from '../scripts/merge-receipt-pg-preflight.mjs';
 import {createReceiptLookupService} from '../merge/cloud/receipt-lookup.mjs';
 
 const uid='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -202,4 +202,55 @@ test('P3.25 disposable test roles must lack cluster privileges and BYPASSRLS',()
     assert.ok(src.includes(flag),'missing safe role restriction: '+flag);
   assert.ok(src.includes("fingerprint.safeRoles==='3'"));
   assert.ok(src.indexOf('safeRoles:querySync')<src.indexOf('const bootstrap=['));
+});
+
+test('P3.26 psql subprocess environment explicitly pins only disposable connection settings',()=>{
+  const target=parseDisposableDbUrl(local);
+  const child=disposablePsqlEnvironment(target,{
+    PATH:'/test/psql-bin',
+    PGHOST:'db.other.invalid',
+    PGHOSTADDR:'203.0.113.5',
+    PGDATABASE:'production',
+    PGUSER:'other_user',
+    PGPASSWORD:'ignored-parent-value',
+    PGSSLMODE:'require',
+    PGSERVICE:'wrong-service',
+    PGOPTIONS:'-c search_path=other',
+    PGSERVICEFILE:'/untrusted/service',
+    PGPASSFILE:'/untrusted/passfile',
+    PGTARGETSESSIONATTRS:'read-write',
+    PGCONNECT_TIMEOUT:'90',
+    PGCLIENTENCODING:'LATIN1',
+    LC_ALL:'other',
+    NODE_OPTIONS:'--inspect',
+    UNRELATED_PRIVATE_FIELD:'discard'
+  });
+  assert.deepEqual(child,{
+    PATH:'/test/psql-bin',
+    LANG:'C',LC_ALL:'C',PGCLIENTENCODING:'UTF8',PGCONNECT_TIMEOUT:'5',
+    PGHOST:'localhost',PGPORT:'5432',PGDATABASE:'merge_receipt_test_clean',
+    PGUSER:'tester',PGPASSWORD:'',PGSSLMODE:'disable',PGSERVICE:'',PGHOSTADDR:''
+  });
+});
+
+test('P3.26 extra caller-supplied PG fields cannot enter psql subprocess environment',()=>{
+  const target=parseDisposableDbUrl(local);
+  const polluted={...target,PGOPTIONS:'-c search_path=other',
+    PGSERVICEFILE:'/other/service',PGPASSFILE:'/other/passfile',
+    PGHOSTADDR:'203.0.113.8',UNRELATED_PRIVATE_FIELD:'discard'};
+  const child=disposablePsqlEnvironment(polluted,{Path:'/test/windows-path',
+    PGHOST:'other.invalid',PGOPTIONS:'-c other=1'});
+  assert.equal(child.PATH,'/test/windows-path');
+  for(const forbidden of ['PGOPTIONS','PGSERVICEFILE','PGPASSFILE','UNRELATED_PRIVATE_FIELD'])
+    assert.equal(Object.hasOwn(child,forbidden),false);
+  assert.equal(child.PGHOSTADDR,'');
+  assert.equal(child.PGHOST,target.PGHOST);
+  assert.equal(child.PGDATABASE,target.PGDATABASE);
+});
+
+test('P3.26 both synchronous preflight and 40 concurrent sessions use the sanitized child environment',()=>{
+  const src=readFileSync(new URL('../scripts/merge-receipt-pg-preflight.mjs',import.meta.url),'utf8');
+  assert.match(src,/env:disposablePsqlEnvironment\(env\),encoding:'utf8'/);
+  assert.match(src,/env:disposablePsqlEnvironment\(env\),timeoutMs:15_000/);
+  assert.equal(src.includes('...process.env,...env'),false);
 });
