@@ -1,0 +1,152 @@
+import {CORE_STORY_PACK} from './core-pack.mjs';
+import {availableStoryEntries,completedStoryEntries,completeStoryEntry,startCoreStory,dailyStoryIncident} from './runtime.mjs';
+import {readStorySave,writeStorySave} from './local-storage.mjs';
+import {createEmptyStoryProgress,STORY_SAVE_KEY} from '../mode-boundaries.mjs';
+
+const $=id=>document.getElementById(id);
+const store=(()=>{try{return window.localStorage;}catch{return null;}})();
+const loaded=readStorySave(store);
+let progress=loaded.progress,raw=loaded.raw,blocked=loaded.blocked,reason=loaded.reason;
+let kind='main',selected=null,selectedChoice=null;
+const entries=CORE_STORY_PACK.entries;
+const main=entries.filter(x=>x.kind==='main');
+const choicesById=Object.fromEntries(entries.map(e=>[e.id,e]));
+function localDay(){
+  const date=new Date();
+  const pad=n=>String(n).padStart(2,'0');
+  return date.getFullYear()+'-'+pad(date.getMonth()+1)+'-'+pad(date.getDate());
+}
+function save(next,reset=false){
+  if(!writeStorySave(store,next,{expectedRaw:raw,confirmedReset:reset})){
+    blocked=true;reason='WRITE_CONFLICT';render();return false;
+  }
+  progress=next;raw=JSON.stringify(next);blocked=false;reason=null;return true;
+}
+if(!blocked&&!progress.packs.core){
+  const next=startCoreStory(progress,CORE_STORY_PACK);
+  save(next);
+}
+function status(){
+  $('save-state').textContent=blocked
+    ? reason==='CORRUPT_SAVE'
+      ? '检测到异常剧情存档：原始数据已保留，禁止自动覆盖；请确认重置或自行备份后处理。'
+      : reason==='STORAGE_UNAVAILABLE'
+        ? '浏览器存储不可用：当前只能阅读，无法安全保存剧情。'
+        : '存档已被其他标签页改动或写入失败：请重新打开页面核对进度。'
+    : '剧情进度已保存到此浏览器；不与普通模式共享经济，也不提供云存档。';
+}
+function completed(entry){return !!progress.packs.core?.completed[entry.kind].includes(entry.id);}
+function card(entry,done=false){
+  const wrapper=document.createElement('article');wrapper.className='story-card';
+  const head=document.createElement('div');head.className='story-head';
+  const title=document.createElement('h3');title.textContent=entry.title;
+  const state=document.createElement('span');state.className='status';
+  state.textContent=done?'已阅读':'可体验';
+  head.append(title,state);
+  const place=document.createElement('p');place.textContent=entry.chapter+' · '+entry.place;
+  const button=document.createElement('button');button.type='button';
+  button.textContent=done?'回看剧情':'阅读故事';
+  button.addEventListener('click',()=>open(entry));
+  wrapper.append(head,place,button);
+  return wrapper;
+}
+function render(){
+  status();
+  const count=progress.packs.core?.completed.main.length??0;
+  $('progress-count').textContent=count+' / '+main.length;
+  $('progress-track').setAttribute('aria-valuenow',String(count));
+  $('progress-fill').style.width=(100*count/main.length)+'%';
+  const next=main.find(item=>!completed(item));
+  $('chapter-hint').textContent=next?'下一段 · '+next.chapter+' · '+next.title:'第一卷完结：灯火重新亮起，但远方仍有未讲完的故事。';
+  document.querySelectorAll('.tabs [data-kind]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.kind===kind)));
+  const list=$('story-list');list.replaceChildren();
+  if(kind==='incident'){
+    const todays=dailyStoryIncident(progress,CORE_STORY_PACK,localDay());
+    if(todays)list.append(card(todays,completed(todays)));
+    const note=document.createElement('p');note.className='muted';
+    note.textContent='每日根据本地日期选择一件岛屿小事。重复阅读不会获得金币或道具；离线不会错失主线。';
+    list.append(note);
+  }else{
+    const unlocked=availableStoryEntries(progress,CORE_STORY_PACK,kind);
+    const finished=completedStoryEntries(progress,CORE_STORY_PACK,kind);
+    for(const item of unlocked)list.append(card(item));
+    for(const item of finished.slice().reverse())list.append(card(item,true));
+  }
+  if(!list.querySelector('.story-card')){
+    const empty=document.createElement('div');empty.className='empty';
+    empty.textContent=kind==='side'?'暂时没有新支线。继续主线后，居民会带来新的故事。':'故事已全部读完，或者还未满足事件前置条件。';
+    list.append(empty);
+  }
+  $('reset-story').disabled=reason==='STORAGE_UNAVAILABLE';
+}
+function lineElement(line){
+  const row=document.createElement('div');row.className='dialog-line';
+  const name=document.createElement('strong');name.textContent=line.speaker;
+  const text=document.createElement('p');text.textContent=line.text;
+  row.append(name,text);return row;
+}
+function open(entry){
+  selected=entry;selectedChoice=null;
+  const done=completed(entry);
+  $('dialog-chapter').textContent=entry.chapter;
+  $('dialog-title').textContent=entry.title;
+  $('dialog-place').textContent=entry.place;
+  $('dialog-lines').replaceChildren(...entry.lines.map(lineElement));
+  $('dialog-choices').replaceChildren();
+  $('dialog-reply').textContent='';
+  const previous=progress.packs.core?.choices[entry.id]??null;
+  if(done&&previous){
+    const picked=entry.choices.find(c=>c.id===previous);
+    if(picked)$('dialog-reply').textContent='上次选择：'+picked.label+'。'+picked.reply;
+  }
+  if(!done){
+    for(const choice of entry.choices){
+      const button=document.createElement('button');button.type='button';
+      button.textContent=choice.label;
+      button.setAttribute('aria-pressed','false');
+      button.addEventListener('click',()=>{
+        selectedChoice=choice.id;
+        $('dialog-choices').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));
+        $('dialog-reply').textContent=choice.reply;
+        $('complete-story').disabled=blocked;
+      });
+      $('dialog-choices').append(button);
+    }
+  }
+  const finish=$('complete-story');
+  finish.textContent=done?'已阅读 · 关闭':entry.choices.length?'确认选择并继续':'完成阅读并继续';
+  finish.disabled=!done&&(blocked||entry.choices.length>0);
+  $('story-dialog').showModal();
+}
+$('close-dialog').addEventListener('click',()=>$('story-dialog').close());
+$('complete-story').addEventListener('click',()=>{
+  if(!selected)return;
+  if(completed(selected)){$('story-dialog').close();return;}
+  try{
+    const next=completeStoryEntry(progress,CORE_STORY_PACK,selected.id,selectedChoice);
+    if(save(next)){
+      $('story-dialog').close();render();
+    }
+  }catch{
+    $('dialog-reply').textContent='当前剧情暂不可完成，请确认前置故事是否已解锁。';
+  }
+});
+document.querySelectorAll('.tabs [data-kind]').forEach(btn=>btn.addEventListener('click',()=>{
+  kind=btn.dataset.kind;render();
+}));
+$('reset-story').addEventListener('click',()=>{
+  if(!window.confirm('确认重置此浏览器的剧情进度吗？此操作不影响普通经营存档，但剧情选择与已读记录不可恢复。'))return;
+  const current=readStorySave(store);
+  if(current.reason==='STORAGE_UNAVAILABLE')return;
+  if(current.raw!==raw){
+    blocked=true;reason='WRITE_CONFLICT';render();return;
+  }
+  const next=startCoreStory(createEmptyStoryProgress(),CORE_STORY_PACK);
+  if(save(next,true))render();
+});
+window.addEventListener('storage',event=>{
+  if(event.key===STORY_SAVE_KEY){
+    blocked=true;reason='WRITE_CONFLICT';render();
+  }
+});
+render();

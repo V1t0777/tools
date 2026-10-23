@@ -21,7 +21,7 @@ export function writeStorySave(storage,progress,{expectedRaw,confirmedReset=fals
   try{
     if(typeof storage?.getItem!=='function'||typeof storage?.setItem!=='function')return false;
     const current=storage.getItem(STORY_SAVE_KEY);
-    if(!confirmedReset&&current!==expectedRaw)return false;
+    if(current!==expectedRaw)return false;
     if(!confirmedReset&&current!==null){
       if(typeof current!=='string'||current.length>MAX_STORY_SAVE_BYTES)return false;
       const previous=JSON.parse(current);

@@ -64,3 +64,7 @@ body{background:radial-gradient(circle at 5% 12%,rgba(221,194,136,.23),transpare
 .normal-milestone-row progress::-webkit-progress-value{background:#5a8c79;border-radius:99px}
 .normal-milestone-row progress::-moz-progress-bar{background:#5a8c79;border-radius:99px}
 @media(max-width:480px){.normal-milestone-list{grid-template-columns:1fr}}
+
+.story-entry-link{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:8px 17px;margin:2px 0 15px;background:#ebf1e9;border:1px solid #bccfc2;border-radius:13px;color:#3b675a;font-size:13px;font-weight:800;text-decoration:none}
+.story-entry-link:focus-visible{outline:3px solid #547ec4;outline-offset:3px}
+@media(prefers-color-scheme:dark){.story-entry-link{background:#25443a;border-color:#628c7a;color:#e8f3e9}}
