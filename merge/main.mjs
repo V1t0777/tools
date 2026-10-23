@@ -8,6 +8,7 @@ import { loadLocal, saveLocal, SAVE_KEY } from './storage.mjs';
 import { getBoardGuidance } from './board-guidance.mjs';
 import { getSupplyControlSnapshot } from './supply-controls.mjs';
 import { deriveNormalMilestones } from './normal-milestones.mjs';
+import { prepareLocalSaveExport } from './save-export.mjs';
 
 const byId = id => document.getElementById(id);
 const board = byId('board');
@@ -365,6 +366,34 @@ byId('store-selected').addEventListener('click',()=>{
 });
 byId('warehouse-upgrade').addEventListener('click',()=>commit(upgradeWarehouse(state)));
 byId('supply-producer').addEventListener('change',()=>refreshSupplyControls());
+
+byId('export-local-save').addEventListener('click', () => {
+  const result=prepareLocalSaveExport(store);
+  if(!result.ok){
+    hint(result.reason==='NO_SAVED_DATA'?'此浏览器还没有可导出的存档':
+      result.reason==='EXPORT_TOO_LARGE'?'原始存档超过安全导出上限，请勿重置或清理浏览器数据':
+      '浏览器存储不可访问，无法读取原始存档');
+    return;
+  }
+  let url=null;
+  try{
+    const blob=new Blob([result.content],{type:result.mime});
+    url=URL.createObjectURL(blob);
+    const link=document.createElement('a');
+    link.href=url;
+    link.download=result.filename;
+    document.body.append(link);
+    try{link.click();}finally{link.remove();}
+    // iOS Safari may start a download asynchronously; avoid early revocation.
+    const downloadUrl=url;
+    window.setTimeout(()=>URL.revokeObjectURL(downloadUrl),30_000);
+    url=null;
+    hint(result.verified?'已请求下载当前浏览器的原始存档':'原始数据可能异常，已请求下载文本备份；请勿直接作为有效存档导入');
+  }catch{
+    if(url)URL.revokeObjectURL(url);
+    hint('浏览器未能启动下载，请勿重置或清理存档');
+  }
+});
 
 byId('reset').addEventListener('click', () => {
   const warning = saveIssue
