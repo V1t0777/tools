@@ -7,6 +7,7 @@ import { BUILDINGS } from './economy.mjs';
 import { loadLocal, saveLocal, SAVE_KEY } from './storage.mjs';
 import { getBoardGuidance } from './board-guidance.mjs';
 import { getSupplyControlSnapshot } from './supply-controls.mjs';
+import { deriveNormalMilestones } from './normal-milestones.mjs';
 
 const byId = id => document.getElementById(id);
 const board = byId('board');
@@ -256,8 +257,51 @@ function renderSupplies(now=Date.now()) {
   }
   refreshSupplyControls(now);
 }
+const normalMilestoneLabels=Object.freeze({
+  'orders-50':'街坊熟客 · 50 单',
+  'orders-200':'街坊信赖 · 200 单',
+  'orders-800':'远洋声望 · 800 单',
+  'merges-150':'巧手初成 · 150 次合成',
+  'merges-600':'工艺渐精 · 600 次合成',
+  'merges-2400':'百物匠心 · 2400 次合成',
+  'buildings-all':'海湾建设 · 三处街区',
+  'warehouse-full':'库房扩建 · 八格仓库',
+  'workshops-mastered':'工坊精进 · 三座满级工坊'
+});
+function renderNormalMilestones() {
+  const container=byId('normal-milestones');
+  const summary=byId('normal-milestone-summary');
+  const fragment=document.createDocumentFragment();
+  try{
+    const report=deriveNormalMilestones(state);
+    for(const milestone of report.milestones){
+      const item=document.createElement('div');
+      item.className='normal-milestone-row';
+      const name=document.createElement('strong');
+      name.textContent=normalMilestoneLabels[milestone.id]??milestone.id;
+      const details=document.createElement('span');
+      details.className='normal-milestone-count';
+      details.textContent=milestone.complete?'已完成 · 无额外奖励':
+        `${milestone.progress} / ${milestone.target}`;
+      const bar=document.createElement('progress');
+      bar.max=milestone.target;
+      bar.value=milestone.progress;
+      bar.setAttribute('aria-label',`${name.textContent}：${milestone.percent}%`);
+      item.append(name,details,bar);
+      fragment.append(item);
+    }
+    summary.textContent=`${report.completedCount} / ${report.totalCount} 已完成`;
+  }catch{
+    const note=document.createElement('p');
+    note.className='help-line';
+    note.textContent='存档状态异常，暂不能计算经营目标；请保留原始存档。';
+    summary.textContent='进度不可用';
+    fragment.append(note);
+  }
+  container.replaceChildren(fragment);
+}
 function render() {
-  renderResources(); renderBoard(); renderOrders(); renderSystems(); renderSupplies();
+  renderResources(); renderBoard(); renderOrders(); renderSystems(); renderSupplies(); renderNormalMilestones();
   byId('guidance-message').textContent = activeGuidance?.message ??
     '棋盘太满时，可以点“整理提示”寻找合法操作。只提示，不自动操作。';
   byId('board-guide').setAttribute('aria-pressed', String(!!activeGuidance));
