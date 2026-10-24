@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {runInNewContext} from 'node:vm';
 import {createInitialState,advanceTime,ENERGY_REGEN_MS,MAX_ENERGY,PRODUCER_CHARGES,validateSave} from '../merge/engine.mjs';
 import {isSafeSameRevisionClockUpdate as safe} from '../merge/storage-event-policy.mjs';
 const now=1_000_000;
@@ -60,7 +61,8 @@ test('current storage listener blocks same-revision economic divergence without 
   assert.ok(handler.includes('fresh.state.revision === state.revision'));
   assert.ok(handler.includes('!isSafeSameRevisionClockUpdate(state,fresh.state)'));
   assert.ok(handler.includes("saveIssue = 'CURRENT_SAVE_CHANGED'"));
-  assert.ok(handler.indexOf('isSafeSameRevisionClockUpdate')<handler.indexOf('state = advanceTime(fresh.state)'));
+  assert.ok(handler.indexOf('isSafeSameRevisionClockUpdate')<handler.indexOf('state = fresh.state;'));
+  assert.equal(handler.includes('advanceTime(fresh.state)'),false);
   assert.equal(/\bpersist\s*\(/.test(handler.replace(/\/\/[^\n]*/g,'')),false);
   assert.equal(handler.includes('setItem('),false);
 });
@@ -118,4 +120,42 @@ test('P2.31 future clock marker cannot piggyback on a due producer refill',()=>{
   assert.equal(restored.board[index].charges,PRODUCER_CHARGES);
   assert.equal(safe(exhausted,restored,now+ENERGY_REGEN_MS),false);
   assert.equal(safe(exhausted,restored,now+2*ENERGY_REGEN_MS),true);
+});
+
+test('P2.32 storage listener adopts remote bytes without inventing unpersisted clock gains',()=>{
+  const main=readFileSync(new URL('../merge/main.mjs',import.meta.url),'utf8');
+  const start=main.indexOf("window.addEventListener('storage', event => {");
+  const end=main.indexOf('window.setInterval(() => {',start);
+  assert.ok(start>=0&&end>start);
+  const handler=main.slice(start,end);
+  const saveKey='toolbox.merge-isle.local.v1';
+  const old=createInitialState(now);
+  const local={...old,energy:MAX_ENERGY-2};
+  const remote=advanceTime(local,now+ENERGY_REGEN_MS);
+  assert.notEqual(remote,local);
+  assert.ok(remote.energy>local.energy);
+  for(const [label,from,to] of [
+    ['higher revision',local,{...local,revision:local.revision+1}],
+    ['equal revision clock',local,remote]
+  ]) {
+    const fresh={ok:true,state:to,raw:JSON.stringify(to)};
+    const status={textContent:''};
+    const ctx={
+      window:{addEventListener(type,fn){if(type==='storage')this.onStorage=fn;}},
+      SAVE_KEY:saveKey,store:{},peekLocalV3(){return fresh;},
+      isSafeSameRevisionClockUpdate(){return true;},
+      advanceTime(){throw Error('unverified time advance: '+label);},
+      state:from,persistedRaw:JSON.stringify(from),saveIssue:null,
+      selected:3,activeGuidance:{boardSlots:[]},
+      byId(id){assert.equal(id,'save-status');return status;},
+      render(){},hint(){}
+    };
+    runInNewContext(handler,ctx);
+    ctx.window.onStorage({key:saveKey});
+    assert.equal(JSON.stringify(ctx.state),fresh.raw,label);
+    assert.equal(ctx.persistedRaw,fresh.raw,label);
+    assert.equal(ctx.selected,-1);
+    assert.equal(ctx.activeGuidance,null);
+    assert.match(status.textContent,/已同步其他标签页进度/);
+  }
 });
