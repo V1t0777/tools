@@ -62,8 +62,10 @@ test('second chapter tea-table requires actual garden construction, not order co
   assert.equal(storyWorkshopRequirement('tea-table',state).description,'修复后院花园');
   assert.equal(storyWorkshopRequirement('tea-table',null).met,false);
   assert.equal(inspectStoryWorkshopRequirement('tea-table',storage).met,false);
-  const prepared=structuredClone(state);
-  prepared.xp=200;prepared.coins=160;prepared.progress.orders=8;
+  const delivered=fulfillOrder(state,state.orders[0].id);
+  assert.equal(delivered.ok,true);
+  const prepared=structuredClone(delivered.state);
+  prepared.xp=200;prepared.coins=160;
   assert.equal(validateSave(prepared),true);
   assert.equal(storyWorkshopRequirement('tea-table',prepared).met,false);
   const upgrade=upgradeBuilding(prepared,'garden');
