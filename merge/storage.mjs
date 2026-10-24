@@ -38,8 +38,18 @@ export function loadLocal(storage, now = Date.now()) {
       }catch{/* Do not modify the only valid original. */}
       if(!backedUp)return {state:upgraded,recovered:true,migrated:true,
         volatile:true,blocked:true,reason:'BACKUP_UNAVAILABLE',raw};
-      if(saveLocal(storage,upgraded,{migrationRaw:raw}))
-        return {state:upgraded,recovered:true,migrated:true,raw:JSON.stringify(upgraded)};
+      if(saveLocal(storage,upgraded,{migrationRaw:raw})){
+        // setItem returning is not proof that bytes persisted. A browser,
+        // storage shim or concurrent tab can still yield different data.
+        // Never expose a migrated baseline until exact readback succeeds.
+        const encoded=JSON.stringify(upgraded);
+        try{
+          if(storage.getItem(SAVE_KEY)===encoded)
+            return {state:upgraded,recovered:true,migrated:true,raw:encoded};
+        }catch{/* A post-write read failure leaves the outcome uncertain. */}
+        return {state:upgraded,recovered:true,migrated:true,
+          volatile:true,blocked:true,reason:'WRITE_VERIFY_FAILED',raw};
+      }
       return {state:upgraded,recovered:true,migrated:true,
         volatile:true,blocked:true,reason:'WRITE_FAILED',raw};
     }
