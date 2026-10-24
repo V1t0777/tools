@@ -253,3 +253,59 @@ test('P2.39 ignores same-key and clear events from other storage areas',()=>{
   assert.equal(reads,1,'actual localStorage save event still handled');
   assert.equal(ctx.saveIssue,'SAVE_REMOVED');
 });
+
+test('P2.40 remote save adoption cancels an active drag and its stale click',()=>{
+  const main=readFileSync(new URL('../merge/main.mjs',import.meta.url),'utf8');
+  const start=main.indexOf("window.addEventListener('storage', event => {");
+  const end=main.indexOf('window.setInterval(() => {',start);
+  assert.ok(start>=0&&end>start);
+  const handler=main.slice(start,end);
+  const local=initial();
+  const remote={...local,revision:local.revision+1};
+  const originalRaw=JSON.stringify(local),remoteRaw=JSON.stringify(remote);
+  let removed=0,rendered=0;
+  const ghost={remove(){removed++;}};
+  const ctx={
+    window:{addEventListener(type,fn){if(type==='storage')this.onStorage=fn;}},
+    SAVE_KEY:'toolbox.merge-isle.local.v1',store:{},
+    state:local,persistedRaw:originalRaw,saveIssue:null,
+    drag:{id:7,origin:1,moved:true,ghost},ignoreNextClick:false,
+    selected:1,activeGuidance:null,
+    peekLocalV3(){return {ok:true,state:remote,raw:remoteRaw};},
+    byId(){return {textContent:''};},
+    render(){rendered++;},hint(){}
+  };
+  runInNewContext(handler,ctx);
+  ctx.window.onStorage({storageArea:ctx.store,key:ctx.SAVE_KEY});
+  assert.equal(removed,1,'drag ghost must not survive remote board replacement');
+  assert.equal(ctx.drag,null,'old pointerup must not act on a new board');
+  assert.equal(ctx.ignoreNextClick,true,'synthetic click must be suppressed');
+  assert.equal(ctx.state,remote);
+  assert.equal(ctx.persistedRaw,remoteRaw);
+  assert.equal(rendered,1);
+});
+
+test('P2.40 unchanged or unrelated storage events do not cancel a live drag',()=>{
+  const main=readFileSync(new URL('../merge/main.mjs',import.meta.url),'utf8');
+  const start=main.indexOf("window.addEventListener('storage', event => {");
+  const end=main.indexOf('window.setInterval(() => {',start);
+  const handler=main.slice(start,end);
+  const local=initial(),raw=JSON.stringify(local);
+  let removed=0;
+  const drag={id:9,origin:1,moved:false,ghost:{remove(){removed++;}}};
+  const ctx={
+    window:{addEventListener(type,fn){if(type==='storage')this.onStorage=fn;}},
+    SAVE_KEY:'toolbox.merge-isle.local.v1',store:{},
+    state:local,persistedRaw:raw,saveIssue:null,
+    drag,ignoreNextClick:false,selected:1,activeGuidance:null,
+    peekLocalV3(){return {ok:true,state:local,raw};},
+    byId(){throw Error('unexpected status change');},
+    render(){throw Error('unexpected render');},hint(){throw Error('unexpected hint');}
+  };
+  runInNewContext(handler,ctx);
+  ctx.window.onStorage({storageArea:ctx.store,key:'unrelated'});
+  ctx.window.onStorage({storageArea:ctx.store,key:ctx.SAVE_KEY});
+  assert.equal(ctx.drag,drag);
+  assert.equal(ctx.ignoreNextClick,false);
+  assert.equal(removed,0);
+});

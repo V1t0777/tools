@@ -508,6 +508,16 @@ window.addEventListener('storage', event => {
     hint('其他标签页存在不同的经营进度，请先备份并重新打开页面核对');
     return;
   }
+  // An in-progress pointer gesture refers to the OLD board. Cancel it before
+  // rendering the remote snapshot, including its ghost, so a late pointerup
+  // or synthetic click cannot move an unrelated item on the new board.
+  if (drag) {
+    drag.ghost?.remove();
+    drag = null;
+    // Keep this until the next board click: replacing captured DOM nodes may
+    // prevent pointerup, so a timer alone cannot reliably suppress that click.
+    ignoreNextClick = true;
+  }
   // Adopt only the exact verified remote snapshot. Advancing its clock here
   // would show energy/cooldowns that this tab has not persisted. The regular
   // timer performs regeneration through the verified save-before-publish path.
