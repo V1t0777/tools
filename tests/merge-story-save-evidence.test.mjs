@@ -67,3 +67,24 @@ test('P10 narrative export UI is opt-in, offline, and warns before damaged reset
   for(const dangerous of ['innerHTML','insertAdjacentHTML','fetch(','sendBeacon(','localStorage.setItem'])
     assert.equal(ui.includes(dangerous),false,dangerous);
 });
+
+test('P11 corrupt evidence export is restricted to story keys before any storage read',()=>{
+  const store=storage(),normal=store.getItem(SAVE_KEY);
+  let reads=0;
+  const guarded={getItem(key){reads++;return store.getItem(key);}};
+  assert.deepEqual(captureStoryWorkshopEvidence(guarded,{
+    key:SAVE_KEY,expectedRaw:normal,confirmedByUser:true
+  }),{ok:false,code:'INVALID_KEY'});
+  assert.deepEqual(captureStoryWorkshopEvidence(guarded,{
+    key:'unrelated.personal.key',expectedRaw:'private',confirmedByUser:true
+  }),{ok:false,code:'INVALID_KEY'});
+  assert.equal(reads,0,'invalid keys must be rejected without reading storage');
+  assert.equal(store.getItem(SAVE_KEY),normal);
+  assert.equal(captureStoryWorkshopEvidence(guarded,{
+    key:STORY_WORKSHOP_KEY,expectedRaw:store.getItem(STORY_WORKSHOP_KEY),confirmedByUser:true
+  }).code,'OK');
+  store.setItem(STORY_SAVE_KEY,'{damaged narrative');
+  assert.equal(captureStoryWorkshopEvidence(guarded,{
+    key:STORY_SAVE_KEY,expectedRaw:'{damaged narrative',confirmedByUser:true
+  }).code,'OK');
+});
