@@ -20,3 +20,11 @@
 ## 自动化与人工验收
 
 执行 `node --test tests/merge-story-workshop.test.mjs tests/merge-story-runtime.test.mjs tests/merge-story-ui-contract.test.mjs`、全仓库 Node、`bash scripts/security-check.sh`。iPhone Safari、微信 WebView、Windows、断电/存储不足/多标签并发与无障碍实机验证仍待进行。
+
+
+## P2：第二章花园建设与小屏幕棋盘（2026-10-24；未发布）
+
+- 《两个人的下午茶》（`tea-table`）首次完成前要求剧情工作台中真实建成 `garden`；旧已完成剧情不会倒退。采用 V3 `upgradeBuilding` 的既有门槛：**等级 4、160 金币**，不自定义剧情折扣或赠送资源。
+- 剧情工作台新增建造按钮，显示实时等级、金币、建设状态；不满足条件时禁用按钮，仍可继续接单。
+- 7×8 棋盘最小触控格 44×44 CSS 像素，小屏幕采用可聚焦横向滚动容器，避免将格子压缩到约 30 像素；需进一步 iPhone 真机评估滚动、手势误触与 8 行纵向占屏。
+- 新增花园实际建设、独立存档、损坏存档拒绝、移动端 CSS 结构回归。仍无正式美术、完整后续章节联动、云端验收或真机证据。

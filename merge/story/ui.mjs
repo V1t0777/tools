@@ -43,7 +43,7 @@ function card(entry,done=false){
   const title=document.createElement('h3');title.textContent=entry.title;
   const state=document.createElement('span');state.className='status';
   const requirement=inspectStoryWorkshopRequirement(entry.id,store);
-  state.textContent=done?'已阅读':requirement.required&&!requirement.met?'待完成委托':'可体验';
+  state.textContent=done?'已阅读':requirement.required&&!requirement.met?'待完成经营目标':'可体验';
   head.append(title,state);
   const place=document.createElement('p');place.textContent=entry.chapter+' · '+entry.place;
   const button=document.createElement('button');button.type='button';
@@ -104,7 +104,7 @@ function open(entry){
   const requirement=inspectStoryWorkshopRequirement(entry.id,store);
   if(!done&&requirement.required&&!requirement.met){
     const notice=document.createElement('p');notice.className='muted';
-    notice.textContent=requirement.blocked?'剧情工作台进度不可用，请保留存档并检查工作台状态。':'先在剧情工作台完成一笔街坊委托，再返回继续此幕。';
+    notice.textContent=requirement.blocked?'剧情工作台进度不可用，请保留存档并检查工作台状态。':'请先在剧情工作台'+requirement.description+'，再返回继续此幕。';
     const link=document.createElement('a');link.className='back';link.href='./story-workshop.html';link.textContent='前往剧情工作台 →';
     $('dialog-choices').append(notice,link);
   }
@@ -156,7 +156,7 @@ $('reset-story').addEventListener('click',()=>{
   const next=startCoreStory(createEmptyStoryProgress(),CORE_STORY_PACK);
   if(save(next,true))render();
 });
-window.addEventListener('pageshow',()=>{if(!$('story-dialog').open)render();});
+window.addEventListener('pageshow',()=>{if($('story-dialog').open)$('story-dialog').close();render();});
 window.addEventListener('storage',event=>{
   if(event.key===STORY_SAVE_KEY){
     blocked=true;reason='WRITE_CONFLICT';render();

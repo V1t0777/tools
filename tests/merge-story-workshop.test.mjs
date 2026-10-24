@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {createInitialState,createInitialState as createNormal,moveOrMerge,fulfillOrder,validateSave} from '../merge/engine.mjs';
+import {createInitialState,createInitialState as createNormal,moveOrMerge,fulfillOrder,upgradeBuilding,validateSave} from '../merge/engine.mjs';
 import {STORY_WORKSHOP_KEY,readStoryWorkshop,writeStoryWorkshop} from '../merge/story/workshop-storage.mjs';
 import {storyWorkshopRequirement,inspectStoryWorkshopRequirement} from '../merge/story/workshop-gate.mjs';
 import {SAVE_KEY} from '../merge/storage.mjs';
@@ -12,6 +12,7 @@ test('new story workshop is a valid independently initialized 7x8 game',()=>{
  assert.equal(validateSave(loaded.state),true);
  assert.equal(storyWorkshopRequirement('first-order',loaded.state).met,false);
  assert.equal(storyWorkshopRequirement('arrival',null).met,true);
+ assert.equal(storyWorkshopRequirement('tea-table',loaded.state).met,false);
  assert.notEqual(STORY_WORKSHOP_KEY,SAVE_KEY);
 });
 test('actual story-only fulfillment unlocks first-order without transferring normal economy',()=>{
@@ -52,4 +53,41 @@ test('story workshop UI uses own state writer and a genuine engine, not normal s
  assert.ok(ui.includes('readStoryWorkshop(storage)'));
  for(const dangerous of ['innerHTML','insertAdjacentHTML','fetch(','sendBeacon(','localStorage.setItem','SAVE_KEY'])
    assert.equal(ui.includes(dangerous),false,dangerous);
+});
+
+test('second chapter tea-table requires actual garden construction, not order count',()=>{
+  const storage=db();
+  const state=createInitialState(1000000);
+  assert.equal(storyWorkshopRequirement('tea-table',state).required,true);
+  assert.equal(storyWorkshopRequirement('tea-table',state).description,'修复后院花园');
+  assert.equal(storyWorkshopRequirement('tea-table',null).met,false);
+  assert.equal(inspectStoryWorkshopRequirement('tea-table',storage).met,false);
+  const prepared=structuredClone(state);
+  prepared.xp=200;prepared.coins=160;prepared.progress.orders=8;
+  assert.equal(validateSave(prepared),true);
+  assert.equal(storyWorkshopRequirement('tea-table',prepared).met,false);
+  const upgrade=upgradeBuilding(prepared,'garden');
+  assert.equal(upgrade.ok,true);
+  assert.equal(upgrade.state.buildings.garden,1);
+  assert.equal(upgrade.state.coins,0);
+  assert.equal(storyWorkshopRequirement('tea-table',upgrade.state).met,true);
+  assert.equal(writeStoryWorkshop(storage,upgrade.state,{expectedRaw:null}),true);
+  assert.equal(inspectStoryWorkshopRequirement('tea-table',storage).met,true);
+  assert.equal(storyWorkshopRequirement('first-order',upgrade.state).met,true);
+  storage.setItem(STORY_WORKSHOP_KEY,'invalid');
+  assert.equal(inspectStoryWorkshopRequirement('tea-table',storage).met,false);
+  assert.equal(inspectStoryWorkshopRequirement('tea-table',storage).blocked,true);
+});
+test('chapter-two UI exposes real building action and mobile-safe touch targets',()=>{
+  const html=readFileSync(new URL('../merge/story-workshop.html',import.meta.url),'utf8');
+  const ui=readFileSync(new URL('../merge/story/workshop.mjs',import.meta.url),'utf8');
+  const css=readFileSync(new URL('../merge/story/workshop.css',import.meta.url),'utf8');
+  const story=readFileSync(new URL('../merge/story/ui.mjs',import.meta.url),'utf8');
+  for(const id of ['build-garden','garden-status','garden-hint'])assert.ok(html.includes('id="'+id+'"'));
+  assert.ok(ui.includes("commit(upgradeBuilding(state,'garden'))"));
+  assert.ok(story.includes("requirement.description"));
+  assert.ok(css.includes('min-width:44px'));
+  assert.ok(css.includes('min-height:44px'));
+  assert.ok(css.includes('overflow-x:auto'));
+  assert.ok(html.includes('可横向滚动的合成棋盘'));
 });

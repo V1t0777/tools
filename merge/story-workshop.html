@@ -33,13 +33,21 @@
     <section class="stories workshop" aria-label="剧情合成棋盘">
       <div class="resource-line"><span>⚡ <strong id="energy"></strong></span><span>◈ <strong id="coins"></strong></span><span>✦ <strong id="xp"></strong></span></div>
       <h2>七列八行合成台</h2>
-      <p class="muted">点击 🧺 工坊生产材料；依次点击两个相同物品即可合成。物品可移动或交换。</p>
-      <div id="workshop-board" class="workshop-board" role="group" aria-label="七列八行的剧情合成棋盘"></div>
+      <p class="muted">点击 🧺 工坊生产材料；依次点击两个相同物品即可合成。物品可移动或交换。小屏幕可左右滑动棋盘。</p>
+      <div class="workshop-board-wrap" role="region" aria-label="可横向滚动的合成棋盘" tabindex="0">
+        <div id="workshop-board" class="workshop-board" role="group" aria-label="七列八行的剧情合成棋盘"></div>
+      </div>
       <p id="board-notice" role="status" aria-live="polite">请选择一个物品，或点击工坊生产。</p>
     </section>
     <section class="stories">
       <h2>街坊委托</h2>
       <div id="workshop-orders" class="workshop-orders"></div>
+    </section>
+    <section class="stories" aria-labelledby="garden-title">
+      <div class="progress-heading"><h2 id="garden-title">第二章 · 后院花园</h2><span id="garden-status">未修复</span></div>
+      <p id="garden-hint" class="muted">花园修复需要等级与金币，完成后解锁《两个人的下午茶》。</p>
+      <button type="button" id="build-garden" class="workshop-build">修复后院花园</button>
+      <p class="muted">本次建设仅使用剧情工作台资源，不会改变普通模式的建筑。</p>
     </section>
     <div class="foot-actions">
       <button type="button" class="quiet" id="reset-workshop">重置剧情工作台（不清除剧情对白）</button>

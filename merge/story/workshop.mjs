@@ -1,4 +1,5 @@
-import {WIDTH,MAX_ENERGY,CHAINS,advanceTime,moveOrMerge,produce,fulfillOrder,getItemIcon,getItemName} from '../engine.mjs';
+import {WIDTH,MAX_ENERGY,CHAINS,getLevel,moveOrMerge,produce,fulfillOrder,upgradeBuilding,getItemIcon,getItemName} from '../engine.mjs';
+import {BUILDINGS} from '../economy.mjs';
 import {readStoryWorkshop,writeStoryWorkshop,STORY_WORKSHOP_KEY} from './workshop-storage.mjs';
 const $=id=>document.getElementById(id);
 const storage=(()=>{try{return window.localStorage;}catch{return null;}})();
@@ -49,6 +50,12 @@ function render(){
     btn.addEventListener('click',()=>commit(fulfillOrder(state,order.id)));
     row.append(mark,btn);list.append(row);
   }
+  const garden=BUILDINGS.garden,level=getLevel(state.xp),built=state.buildings.garden===1;
+  $('garden-status').textContent=built?'已修复':'未修复';
+  $('garden-hint').textContent=built
+    ? '花园已修复。返回剧情页继续《两个人的下午茶》。'
+    : '需要 '+garden.minLevel+' 级和 '+garden.coins+' 金币；当前 '+level+' 级、'+state.coins+' 金币。通过交付委托积累资源。';
+  $('build-garden').disabled=blocked||built||level<garden.minLevel||state.coins<garden.coins;
   $('reset-workshop').disabled=reason==='STORAGE_UNAVAILABLE';
 }
 function commit(result){
@@ -68,6 +75,7 @@ function touch(index){
   if(selected===index){selected=-1;render();return;}
   commit(moveOrMerge(state,selected,index));
 }
+$('build-garden').addEventListener('click',()=>{if(!blocked)commit(upgradeBuilding(state,'garden'));});
 $('reset-workshop').addEventListener('click',()=>{
   if(!window.confirm('确认重置剧情工作台？此处的金币、物品和订单进度将丢失，不影响普通经营或已读剧情。'))return;
   const current=readStoryWorkshop(storage);
