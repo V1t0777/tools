@@ -50,8 +50,8 @@ test('P16 UI invalidates queued actions and closes stale dialogue after cross-ta
     assert.ok(file.includes("window.addEventListener('storage',event=>{"));
     assert.ok(file.includes('shouldBlockStoryStorageEvent(event,'));
   }
-  assert.ok(workshop.includes('function commit(result){\n  // A queued click'));
-  assert.ok(workshop.includes('if(blocked)return;\n  if(!result.ok)'));
+  assert.ok(workshop.includes('async function commit(result){\n  // One in-flight action'));
+  assert.ok(workshop.includes('if(blocked||saving)return;\n  if(!result.ok)'));
   assert.ok(workshop.includes("selected=-1;render();"));
   assert.ok(dialogue.includes("if(blocked&&!reset)return false;"));
   assert.ok(dialogue.includes("selectedChoice=null;"));

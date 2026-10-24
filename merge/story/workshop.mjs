@@ -4,13 +4,16 @@ import {readStoryWorkshop,writeStoryWorkshop,STORY_WORKSHOP_KEY} from './worksho
 import {readStorySave} from './local-storage.mjs';
 import {captureStoryWorkshopEvidence} from './save-evidence.mjs';
 import {checkStoryResumeSnapshot} from './resume-guard.mjs';
+import {runStoryWriteWithLock} from './write-lock.mjs';
 import {shouldBlockStoryStorageEvent} from './storage-event-guard.mjs';
 import {shouldRefreshWorkshopForStoryEvent} from './storage-event-guard.mjs';
 import {storyGardenBuildAvailable,storyHarborBuildAvailable,storyStorefrontBuildAvailable} from './workshop-gate.mjs';
 const $=id=>document.getElementById(id);
 const storage=(()=>{try{return window.localStorage;}catch{return null;}})();
+const webLocks=(()=>{try{return window.navigator?.locks??null;}catch{return null;}})();
 const loaded=readStoryWorkshop(storage);
 let state=loaded.state,raw=loaded.raw,blocked=loaded.blocked,reason=loaded.reason,selected=-1;
+let saving=false;
 function status(){
   $('workshop-status').textContent=blocked
     ? reason==='CORRUPT_SAVE'
@@ -33,7 +36,7 @@ function render(){
   state.board.forEach((item,i)=>{
     const button=document.createElement('button');button.type='button';
     button.className='workshop-cell'+(item?.kind==='producer'?' producer':'')+(selected===i?' selected':'');
-    button.disabled=blocked;
+    button.disabled=blocked||saving;
     button.dataset.slot=String(i);
     button.setAttribute('aria-label','第'+(Math.floor(i/WIDTH)+1)+'行第'+(i%WIDTH+1)+'列，'+(item?getItemName(item):'空格'));
     if(item){
@@ -55,7 +58,7 @@ function render(){
   const selectedMaterial=selected>=0&&state.board[selected]?.kind==='material';
   $('board-occupancy').textContent=used+' / '+state.board.length;
   $('warehouse-occupancy').textContent=stored+' / '+state.warehouse.capacity;
-  $('store-selected').disabled=blocked||!selectedMaterial||!warehouseHasSpace;
+  $('store-selected').disabled=blocked||saving||!selectedMaterial||!warehouseHasSpace;
   $('warehouse-hint').textContent=blocked
     ? '存档处于保护状态，仓库操作已暂停；请先核对存档提示。'
     : !boardHasSpace
@@ -73,7 +76,7 @@ function render(){
     const item=state.warehouse.slots[i];
     const button=document.createElement('button');button.type='button';
     button.className='workshop-warehouse-slot';
-    button.disabled=blocked||!item||!boardHasSpace;
+    button.disabled=blocked||saving||!item||!boardHasSpace;
     button.setAttribute('aria-label','仓库第'+(i+1)+'格，'+(item?'取回'+getItemName(item):'空位'));
     button.textContent=item
       ? getItemIcon(item)+' '+getItemName(item)+' · Lv.'+item.tier+' · 取回'
@@ -88,7 +91,7 @@ function render(){
     const mark=document.createElement('span');
     mark.textContent=CHAINS[order.chain].icon[order.tier-1]+' '+CHAINS[order.chain].names[order.tier-1]+' · ◈'+order.coins;
     const btn=document.createElement('button');btn.type='button';btn.textContent='交付';
-    btn.disabled=blocked||!state.board.some(item=>item?.kind==='material'&&item.chain===order.chain&&item.tier===order.tier);
+    btn.disabled=blocked||saving||!state.board.some(item=>item?.kind==='material'&&item.chain===order.chain&&item.tier===order.tier);
     btn.addEventListener('click',()=>commit(fulfillOrder(state,order.id)));
     row.append(mark,btn);list.append(row);
   }
@@ -101,7 +104,7 @@ function render(){
     : !gardenStoryReady
       ? '先在剧情页完成《没有开花的花圃》，再来修复后院花园。'
       : '需要 '+garden.minLevel+' 级和 '+garden.coins+' 金币；当前 '+level+' 级、'+state.coins+' 金币。通过交付委托积累资源。';
-  $('build-garden').disabled=blocked||built||!gardenStoryReady||level<garden.minLevel||state.coins<garden.coins;
+  $('build-garden').disabled=blocked||saving||built||!gardenStoryReady||level<garden.minLevel||state.coins<garden.coins;
   const harbor=BUILDINGS.harbor,harborBuilt=state.buildings.harbor===1;
   const harborStoryReady=!narrative.blocked&&storyHarborBuildAvailable(narrative.progress);
   $('harbor-status').textContent=harborBuilt?'已修缮':'未修缮';
@@ -110,7 +113,7 @@ function render(){
     : !harborStoryReady
       ? '先完成《第一次独立修理》，确认学徒与岚叔的安全准备，再进行港湾修缮。'
       : '需要 '+harbor.minLevel+' 级和 '+harbor.coins+' 金币；当前 '+level+' 级、'+state.coins+' 金币。';
-  $('build-harbor').disabled=blocked||harborBuilt||!harborStoryReady||level<harbor.minLevel||state.coins<harbor.coins;
+  $('build-harbor').disabled=blocked||saving||harborBuilt||!harborStoryReady||level<harbor.minLevel||state.coins<harbor.coins;
   const storefront=BUILDINGS.storefront,storefrontBuilt=state.buildings.storefront===1;
   const storefrontStoryReady=!narrative.blocked&&storyStorefrontBuildAvailable(narrative.progress);
   $('storefront-status').textContent=storefrontBuilt?'已修整':'未修整';
@@ -119,15 +122,21 @@ function render(){
     : !storefrontStoryReady
       ? '先读完《海雾里的灯》，再为居民们准备开张庆典。'
       : '修整门面需要 '+storefront.minLevel+' 级和 '+storefront.coins+' 金币；目前 '+level+' 级、'+state.coins+' 金币。';
-  $('build-storefront').disabled=blocked||storefrontBuilt||!storefrontStoryReady||level<storefront.minLevel||state.coins<storefront.coins;
-  $('reset-workshop').disabled=reason==='STORAGE_UNAVAILABLE';
-  $('export-corrupt-workshop').disabled=reason!=='CORRUPT_SAVE'||typeof raw!=='string';
+  $('build-storefront').disabled=blocked||saving||storefrontBuilt||!storefrontStoryReady||level<storefront.minLevel||state.coins<storefront.coins;
+  $('reset-workshop').disabled=saving||reason==='STORAGE_UNAVAILABLE';
+  $('export-corrupt-workshop').disabled=saving||reason!=='CORRUPT_SAVE'||typeof raw!=='string';
 }
-function commit(result){
-  // A queued click from a stale DOM must not commit after another tab invalidates us.
-  if(blocked)return;
+async function commit(result){
+  // One in-flight action per tab; Web Locks serializes participating tabs.
+  // The existing exact-raw CAS remains mandatory inside the lock callback.
+  if(blocked||saving)return;
   if(!result.ok){$('board-notice').textContent=result.message;return;}
-  if(!writeStoryWorkshop(storage,result.state,{expectedRaw:raw})){
+  saving=true;render();
+  const expectedRaw=raw;
+  const attempt=await runStoryWriteWithLock(webLocks,STORY_WORKSHOP_KEY,
+    ()=>!blocked&&writeStoryWorkshop(storage,result.state,{expectedRaw}));
+  saving=false;
+  if(!attempt.ok||attempt.value!==true||blocked){
     blocked=true;reason='WRITE_CONFLICT';render();return;
   }
   state=result.state;raw=JSON.stringify(state);selected=-1;
@@ -135,7 +144,7 @@ function commit(result){
   render();
 }
 function touch(index){
-  if(blocked)return;
+  if(blocked||saving)return;
   const item=state.board[index];
   if(item?.kind==='producer'){commit(produce(state,index));return;}
   if(selected===-1){if(item){selected=index;render();}return;}
@@ -143,14 +152,14 @@ function touch(index){
   commit(moveOrMerge(state,selected,index));
 }
 $('store-selected').addEventListener('click',()=>{
-  if(blocked)return;
+  if(blocked||saving)return;
   if(selected<0||state.board[selected]?.kind!=='material'){
     $('board-notice').textContent='请先选中棋盘上的一件材料。';return;
   }
   commit(storeItem(state,selected));
 });
 $('build-garden').addEventListener('click',()=>{
-  if(blocked)return;
+  if(blocked||saving)return;
   const story=readStorySave(storage);
   if(story.blocked||!storyGardenBuildAvailable(story.progress)){
     $('board-notice').textContent='请先完成第二章《没有开花的花圃》，再修复花园。';return;
@@ -158,7 +167,7 @@ $('build-garden').addEventListener('click',()=>{
   commit(upgradeBuilding(state,'garden'));
 });
 $('build-harbor').addEventListener('click',()=>{
-  if(blocked)return;
+  if(blocked||saving)return;
   const story=readStorySave(storage);
   if(story.blocked||!storyHarborBuildAvailable(story.progress)){
     $('board-notice').textContent='请先完成《第一次独立修理》，再修缮港湾街角。';return;
@@ -166,7 +175,7 @@ $('build-harbor').addEventListener('click',()=>{
   commit(upgradeBuilding(state,'harbor'));
 });
 $('build-storefront').addEventListener('click',()=>{
-  if(blocked)return;
+  if(blocked||saving)return;
   const story=readStorySave(storage);
   if(story.blocked||!storyStorefrontBuildAvailable(story.progress)){
     $('board-notice').textContent='请先完成《海雾里的灯》，再为庆典修整百物铺门面。';return;
@@ -198,6 +207,7 @@ $('export-corrupt-workshop').addEventListener('click',()=>{
   }
 });
 $('reset-workshop').addEventListener('click',()=>{
+  if(saving)return;
   if(reason==='CORRUPT_SAVE'&&!window.confirm('异常原始记录会被重置覆盖。建议先导出并确认备份文件可用。仍要继续重置吗？'))return;
   if(!window.confirm('确认重置剧情工作台？此处的金币、物品和订单进度将丢失，不影响普通经营或已读剧情。'))return;
   const current=readStoryWorkshop(storage);
