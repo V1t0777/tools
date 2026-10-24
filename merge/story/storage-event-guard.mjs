@@ -26,3 +26,10 @@ export function shouldRefreshStoryDependencyEvent(event,{ownKey,dependencyKey,st
   if(ownKey!==STORY_SAVE_KEY&&ownKey!==STORY_WORKSHOP_KEY)return false;
   return shouldBlockStoryStorageEvent(event,{key:dependencyKey,storage});
 }
+
+/** Keep normal-mode save identifiers out of the workshop UI source itself. */
+export function shouldRefreshWorkshopForStoryEvent(event,storage){
+  return shouldRefreshStoryDependencyEvent(event,{
+    ownKey:STORY_WORKSHOP_KEY,dependencyKey:STORY_SAVE_KEY,storage
+  });
+}

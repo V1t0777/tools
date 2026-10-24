@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {shouldBlockStoryStorageEvent,shouldRefreshStoryDependencyEvent} from '../merge/story/storage-event-guard.mjs';
+import {shouldBlockStoryStorageEvent,shouldRefreshStoryDependencyEvent,shouldRefreshWorkshopForStoryEvent} from '../merge/story/storage-event-guard.mjs';
 import {STORY_SAVE_KEY} from '../merge/mode-boundaries.mjs';
 import {STORY_WORKSHOP_KEY,readStoryWorkshop,writeStoryWorkshop} from '../merge/story/workshop-storage.mjs';
 import {inspectStoryWorkshopRequirement} from '../merge/story/workshop-gate.mjs';
@@ -18,6 +18,7 @@ test('P18 a story save event refreshes workshop building eligibility without inv
   const area={};
   const event={key:STORY_SAVE_KEY,storageArea:area};
   assert.equal(shouldRefreshStoryDependencyEvent(event,{ownKey:STORY_WORKSHOP_KEY,dependencyKey:STORY_SAVE_KEY,storage:area}),true);
+  assert.equal(shouldRefreshWorkshopForStoryEvent(event,area),true);
   assert.equal(shouldBlockStoryStorageEvent(event,{key:STORY_WORKSHOP_KEY,storage:area}),false);
 });
 test('P18 clear, normal-mode, unrelated storage, malformed events and self keys never trigger dependency refresh',()=>{
@@ -58,5 +59,6 @@ test('P18 both pages keep own-key conflict blocking, and refresh only on the oth
   }
   assert.ok(story.includes('ownKey:STORY_SAVE_KEY,dependencyKey:STORY_WORKSHOP_KEY,storage:store'));
   assert.ok(story.includes("selectedChoice=null;\n    if($('story-dialog').open)$('story-dialog').close();\n    render();"));
-  assert.ok(workshop.includes('ownKey:STORY_WORKSHOP_KEY,dependencyKey:STORY_SAVE_KEY,storage'));
+  assert.ok(workshop.includes('shouldRefreshWorkshopForStoryEvent(event,storage)'));
+  assert.equal(workshop.includes('SAVE_KEY'),false,'normal-mode key and overlapping name must not enter workshop UI');
 });
