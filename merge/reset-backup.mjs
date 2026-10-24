@@ -3,10 +3,10 @@
  * This module NEVER resets, restores or touches the story-mode namespace.
  * A same-origin backup is NOT a substitute for a downloaded backup.
  */
-import {SAVE_KEY} from './storage.mjs';
+import {SAVE_KEY,ABNORMAL_RESET_BACKUP_KEY} from './storage.mjs';
+export {ABNORMAL_RESET_BACKUP_KEY} from './storage.mjs';
 import {MAX_EXPORT_BYTES} from './save-export.mjs';
 
-export const ABNORMAL_RESET_BACKUP_KEY=`${SAVE_KEY}.abnormal-reset-backup-v3`;
 const reject=reason=>Object.freeze({ok:false,reason});
 
 /** Fail closed on a stale tab, occupied backup slot or unverified storage. */

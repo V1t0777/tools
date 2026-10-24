@@ -69,6 +69,6 @@ body{background:radial-gradient(circle at 5% 12%,rgba(221,194,136,.23),transpare
 .board-footer{flex-wrap:wrap;gap:6px 10px}
 .save-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:flex-end}
 .save-actions .text-button{min-height:44px;padding:9px 10px;border-radius:9px}
-.save-actions #export-local-save{background:#edf2e9;color:#385f54;text-decoration:none;border:1px solid #bfd2c4}
+.save-actions #export-local-save,.save-actions #export-abnormal-reset-backup{background:#edf2e9;color:#385f54;text-decoration:none;border:1px solid #bfd2c4}
 .save-export-note{margin:3px 4px 8px;color:#6e8077;font-size:11px;line-height:1.55;overflow-wrap:anywhere}
 @media(max-width:380px){.board-footer{align-items:flex-start}.save-actions{width:100%;justify-content:space-between}}

@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createInitialState,validateSave} from '../merge/engine.mjs';
-import {SAVE_KEY,MAX_LOCAL_SAVE_BYTES} from '../merge/storage.mjs';
+import {SAVE_KEY,ABNORMAL_RESET_BACKUP_KEY,MAX_LOCAL_SAVE_BYTES} from '../merge/storage.mjs';
 import {STORY_SAVE_KEY,createEmptyStoryProgress} from '../merge/mode-boundaries.mjs';
-import {MAX_EXPORT_BYTES,prepareLocalSaveExport} from '../merge/save-export.mjs';
+import {MAX_EXPORT_BYTES,prepareLocalSaveExport,prepareAbnormalResetBackupExport} from '../merge/save-export.mjs';
 
 function mockStorage(entries={}){
   const map=new Map(Object.entries(entries));
@@ -196,4 +196,67 @@ test('P2.34 UI distinguishes encoded recovery envelope from ordinary raw downloa
     main.indexOf("byId('reset').addEventListener"));
   assert.ok(action.includes("result.wrapped?'检测到异常字符"));
   assert.ok(action.includes('不可直接导入'));
+});
+
+test('P2.36 exports historical abnormal-reset bytes, not the newer active save',()=>{
+  const original='{damaged\\\\uD800';
+  const active=JSON.stringify(createInitialState(1_000_000));
+  const story=JSON.stringify(createEmptyStoryProgress());
+  const s=mockStorage({
+    [SAVE_KEY]:active,[ABNORMAL_RESET_BACKUP_KEY]:original,[STORY_SAVE_KEY]:story
+  });
+  const result=prepareAbnormalResetBackupExport(s);
+  assert.equal(result.ok,true);
+  assert.equal(result.verified,false);
+  assert.equal(result.backup,true);
+  assert.equal(result.filename,'yunyu-abnormal-reset-original.txt');
+  assert.equal(result.content,original);
+  assert.deepEqual(s.reads,[ABNORMAL_RESET_BACKUP_KEY]);
+  assert.deepEqual(s.writes,[]);
+  assert.equal(s.read(SAVE_KEY),active);
+  assert.equal(s.read(STORY_SAVE_KEY),story);
+});
+
+test('P2.36 absent backup fails without falling back to current normal save',()=>{
+  const active=JSON.stringify(createInitialState(1_000_000));
+  const s=mockStorage({[SAVE_KEY]:active});
+  assert.deepEqual(prepareAbnormalResetBackupExport(s),
+    {ok:false,reason:'NO_SAVED_DATA'});
+  assert.deepEqual(s.reads,[ABNORMAL_RESET_BACKUP_KEY]);
+  assert.deepEqual(s.writes,[]);
+});
+
+test('P2.36 abnormal backup supports lossless UTF-16 wrapper and size rejection',()=>{
+  const damaged=String.fromCharCode(0xD800);
+  const s=mockStorage({[ABNORMAL_RESET_BACKUP_KEY]:damaged});
+  const result=prepareAbnormalResetBackupExport(s);
+  assert.equal(result.ok,true);
+  assert.equal(result.wrapped,true);
+  assert.equal(result.verified,false);
+  assert.equal(result.filename,'yunyu-abnormal-reset-utf16-escaped.json');
+  assert.equal(JSON.parse(result.content).raw,damaged);
+  assert.deepEqual(s.writes,[]);
+  const huge=mockStorage({[ABNORMAL_RESET_BACKUP_KEY]:'中'.repeat(MAX_EXPORT_BYTES)});
+  assert.deepEqual(prepareAbnormalResetBackupExport(huge),
+    {ok:false,reason:'EXPORT_TOO_LARGE'});
+  assert.deepEqual(huge.writes,[]);
+});
+
+test('P2.36 dedicated backup download remains read-only and touch accessible',()=>{
+  const html=source('../merge/index.html');
+  const main=source('../merge/main.mjs');
+  const css=source('../merge/style.css');
+  assert.equal(html.split('id="export-abnormal-reset-backup"').length-1,1);
+  assert.ok(html.includes('下载不等于恢复'));
+  assert.ok(css.includes('.save-actions .text-button{min-height:44px'));
+  assert.ok(main.includes('prepareAbnormalResetBackupExport(store)'));
+  const start=main.indexOf("byId('export-abnormal-reset-backup').addEventListener");
+  const end=main.indexOf("byId('reset').addEventListener",start);
+  assert.ok(start>0&&end>start);
+  const action=main.slice(start,end);
+  for(const forbidden of ['persist(', 'setItem(', 'fetch(', 'XMLHttpRequest', 'sendBeacon(', 'allowReset:true']) {
+    assert.equal(action.includes(forbidden),false,forbidden);
+  }
+  assert.ok(action.includes('new Blob([result.content],{type:result.mime})'));
+  assert.ok(action.includes('URL.revokeObjectURL(downloadUrl)'));
 });

@@ -56,7 +56,7 @@
           <p id="guidance-message" class="guidance-message" role="status" aria-live="polite">棋盘太满时，可以点“整理提示”寻找合法操作。只提示，不自动操作。</p>
         </div>
         <div id="board" class="board" role="group" aria-label="七列八行的合成棋盘"></div>
-        <div class="board-footer"><span id="save-status" role="status">本地试玩档 · 不上传云端</span><div class="save-actions"><button id="export-local-save" class="text-button" type="button">导出原始存档</button><button id="reset" class="text-button" type="button">重置试玩进度</button></div></div><p class="save-export-note">可下载当前浏览器保存的原始数据作为人工备份；此功能不导入存档，也不会上传网络。异常存档将以文本格式导出。</p><button id="store-selected" class="secondary-action" type="button" disabled>将选中的原料收入仓库</button>
+        <div class="board-footer"><span id="save-status" role="status">本地试玩档 · 不上传云端</span><div class="save-actions"><button id="export-local-save" class="text-button" type="button">导出原始存档</button><button id="export-abnormal-reset-backup" class="text-button" type="button">导出重置前备份</button><button id="reset" class="text-button" type="button">重置试玩进度</button></div></div><p class="save-export-note">可下载当前浏览器保存的原始数据作为人工备份；此功能不导入存档，也不会上传网络。异常存档将以文本格式导出。若曾在异常状态下重置，可单独导出当时保留的重置前备份；下载不等于恢复。</p><button id="store-selected" class="secondary-action" type="button" disabled>将选中的原料收入仓库</button>
       </section>
       <section class="orders-section" aria-labelledby="orders-title">
         <div class="section-heading"><div><p class="overline">CUSTOMER REQUESTS</p><h2 id="orders-title">街坊委托</h2></div><span class="capacity">完成即可得奖励</span></div>
