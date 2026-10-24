@@ -377,6 +377,17 @@ function completeDrag(event, cancelled = false) {
 board.addEventListener('pointerup', event => completeDrag(event));
 board.addEventListener('pointercancel', event => completeDrag(event, true));
 
+// Mobile browsers can suspend a page mid-drag without delivering pointerup.
+// Drop the stale gesture when the page is hidden; never move a board item or
+// write a save based on a pointer that began before backgrounding.
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden || !drag) return;
+  completeDrag({pointerId:drag.id}, true);
+  // A delayed pointer click must not select a stale board slot. P2.42 clears
+  // this guard on the next genuine primary pointerdown.
+  ignoreNextClick = true;
+});
+
 byId('store-selected').addEventListener('click',()=>{
   if(selected < 0){hint('先点击选择一个原料');return;}
   commit(storeItem(state,selected));

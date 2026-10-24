@@ -405,3 +405,50 @@ test('P2.42 stale synthetic click is consumed without eating next genuine tap',(
   assert.equal(taps,2,'the canceled pointer click is still consumed');
   assert.equal(ctx.ignoreNextClick,false);
 });
+
+test('P2.43 hiding the page cancels a live drag without a gameplay write',()=>{
+  const main=readFileSync(new URL('../merge/main.mjs',import.meta.url),'utf8');
+  const start=main.indexOf('function completeDrag(event, cancelled = false) {');
+  const end=main.indexOf("byId('store-selected').addEventListener",start);
+  assert.ok(start>=0&&end>start);
+  const handlers=main.slice(start,end);
+  const board={listeners:{},addEventListener(type,fn){this.listeners[type]=fn;}};
+  const document={hidden:false,listeners:{},
+    addEventListener(type,fn){this.listeners[type]=fn;}};
+  let removed=0,mutations=0;
+  const drag={id:41,origin:2,moved:true,ghost:{remove(){removed++;}}};
+  const ctx={board,document,drag,ignoreNextClick:false,
+    moveOrMerge(){mutations++;throw Error('stale drag must not merge');},
+    commit(){mutations++;throw Error('stale drag must not commit');},
+    render(){mutations++;throw Error('stale drag must not render');},
+    hint(){mutations++;throw Error('stale drag must not hint');},
+    setTimeout(){throw Error('cancel must not schedule click timer');}};
+  runInNewContext(handlers,ctx);
+  assert.equal(typeof document.listeners.visibilitychange,'function');
+  document.listeners.visibilitychange();
+  assert.equal(ctx.drag,drag,'visible page must retain live gesture');
+  assert.equal(removed,0);
+  document.hidden=true;
+  document.listeners.visibilitychange();
+  assert.equal(ctx.drag,null,'backgrounding must cancel the pointer');
+  assert.equal(removed,1,'floating drag ghost must be removed');
+  assert.equal(ctx.ignoreNextClick,true,'late synthetic click must be blocked');
+  board.listeners.pointerup({pointerId:41,clientX:0,clientY:0});
+  assert.equal(mutations,0,'late pointerup must never modify the board');
+  document.listeners.visibilitychange();
+  assert.equal(removed,1,'repeated hidden events must be idempotent');
+});
+
+test('P2.43 visibility handling leaves unrelated idle state unchanged',()=>{
+  const main=readFileSync(new URL('../merge/main.mjs',import.meta.url),'utf8');
+  const start=main.indexOf("document.addEventListener('visibilitychange', () => {");
+  const end=main.indexOf("byId('store-selected').addEventListener",start);
+  assert.ok(start>=0&&end>start);
+  const document={hidden:true,addEventListener(type,fn){this.listener=fn;}};
+  const ctx={document,drag:null,ignoreNextClick:false,
+    completeDrag(){throw Error('no drag to cancel');}};
+  runInNewContext(main.slice(start,end),ctx);
+  document.listener();
+  assert.equal(ctx.drag,null);
+  assert.equal(ctx.ignoreNextClick,false,'idle hidden event must not swallow a tap');
+});
