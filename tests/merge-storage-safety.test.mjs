@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {createInitialState, moveOrMerge, validateSave} from '../merge/engine.mjs';
 import {loadLocal, saveLocal, SAVE_KEY, LEGACY_BACKUP_KEY, MAX_LOCAL_SAVE_BYTES} from '../merge/storage.mjs';
 import {createInitialState as createLegacy} from '../merge/legacy-engine.mjs';
@@ -22,7 +23,9 @@ test('invalid JSON is quarantined: loading and ordinary saving never overwrite t
 test('a user-confirmed reset can intentionally replace invalid bytes',()=>{
   const s=storage({[SAVE_KEY]:'{invalid'});
   assert.equal(saveLocal(s,start()),false);
-  assert.equal(saveLocal(s,start(),{allowReset:true}),true);
+  const observed=loadLocal(s);
+  assert.equal(observed.raw,'{invalid');
+  assert.equal(saveLocal(s,start(),{allowReset:true,expectedRaw:observed.raw}),true);
   assert.equal(loadLocal(s).recovered,true);
 });
 
@@ -141,7 +144,7 @@ test('stale tab cannot overwrite a reset save even when its revision is higher',
   const old=moveOrMerge(start(),0,1).state;
   const s=storage({[SAVE_KEY]:JSON.stringify(old)}),stale=loadLocal(s);
   const reset=start();
-  assert.equal(saveLocal(s,reset,{allowReset:true}),true);
+  assert.equal(saveLocal(s,reset,{allowReset:true,expectedRaw:stale.raw}),true);
   assert.equal(saveLocal(s,old,{expectedRaw:stale.raw}),false);
   assert.deepEqual(loadLocal(s).state,reset);
 });
@@ -181,10 +184,15 @@ test('successful legacy migration exposes the new stored bytes as its baseline',
   assert.equal(saveLocal(s,moveOrMerge(loaded.state,0,1).state,{expectedRaw:loaded.raw}),true);
 });
 
-test('confirmed reset intentionally overrides a mismatched baseline, not an ordinary save',()=>{
+test('confirmed reset cannot bypass the observed raw baseline',()=>{
   const s=storage({[SAVE_KEY]:'{invalid'}),initial=start();
-  assert.equal(saveLocal(s,initial,{expectedRaw:null}),false);
-  assert.equal(saveLocal(s,initial,{allowReset:true,expectedRaw:null}),true);
+  const raw=loadLocal(s).raw;
+  assert.equal(raw,'{invalid');
+  assert.equal(saveLocal(s,initial,{expectedRaw:raw}),false);
+  assert.equal(saveLocal(s,initial,{allowReset:true}),false);
+  assert.equal(saveLocal(s,initial,{allowReset:true,expectedRaw:null}),false);
+  assert.equal(s.read(SAVE_KEY),raw);
+  assert.equal(saveLocal(s,initial,{allowReset:true,expectedRaw:raw}),true);
   assert.equal(loadLocal(s).recovered,true);
 });
 
@@ -195,4 +203,47 @@ test('failed compare-before-write does not call setItem or mutate the stored byt
   assert.equal(saveLocal(guarded,initial,{expectedRaw:'outdated'}),false);
   assert.equal(writes,0);
   assert.equal(s.read(SAVE_KEY),raw);
+});
+
+
+test('confirmed reset refuses stale same-revision tab data and preserves the newer save',()=>{
+  const s=storage({[SAVE_KEY]:JSON.stringify(start())});
+  const tabA=loadLocal(s),tabB=loadLocal(s);
+  const changed={...tabB.state,energyAt:tabB.state.energyAt+1};
+  assert.equal(validateSave(changed),true);
+  assert.equal(saveLocal(s,changed,{expectedRaw:tabB.raw}),true);
+  const newerRaw=s.read(SAVE_KEY);
+  assert.equal(saveLocal(s,start(),{allowReset:true,expectedRaw:tabA.raw}),false);
+  assert.equal(s.read(SAVE_KEY),newerRaw);
+  assert.equal(saveLocal(s,start(),{allowReset:true,expectedRaw:newerRaw}),true);
+});
+
+test('damaged or oversized observed data is retained and never reset after another tab changes it',()=>{
+  for(const raw of ['{broken', 'x'.repeat(MAX_LOCAL_SAVE_BYTES+1)]){
+    const s=storage({[SAVE_KEY]:raw});
+    const loaded=loadLocal(s);
+    assert.equal(loaded.reason,'CORRUPT_SAVE');
+    assert.equal(loaded.raw,raw);
+    const newer=raw+'!';
+    s.setItem(SAVE_KEY,newer);
+    assert.equal(saveLocal(s,start(),{allowReset:true,expectedRaw:loaded.raw}),false);
+    assert.equal(s.read(SAVE_KEY),newer);
+  }
+});
+
+test('reset cannot proceed when storage baseline was never read',()=>{
+  const s=storage();
+  assert.equal(saveLocal(s,start(),{allowReset:true}),false);
+  assert.equal(saveLocal(s,start(),{allowReset:true,expectedRaw:null}),true);
+  assert.equal(saveLocal(s,start(),{allowReset:true,expectedRaw:null}),false);
+});
+
+test('reset UI keeps previous in-memory board when persistence fails',()=>{
+  const main=readFileSync(new URL('../merge/main.mjs',import.meta.url),'utf8');
+  const handler=main.slice(main.indexOf("byId('reset').addEventListener"),main.indexOf("const dialog = byId('guide')"));
+  assert.ok(handler.includes('const beforeReset=state;'));
+  assert.ok(handler.includes('const saved = persist({confirmedReset:true});'));
+  assert.ok(handler.includes('if (!saved) {'));
+  assert.ok(handler.includes('state=beforeReset;'));
+  assert.ok(handler.includes('重置已中止'));
 });

@@ -400,10 +400,19 @@ byId('reset').addEventListener('click', () => {
     ? '当前存档无法安全保存。重置会永久覆盖原始存档数据（可能仍可人工修复），确定继续吗？'
     : '确定重置本地试玩进度吗？当前棋盘、金币和订单会被清空，且无法恢复。';
   if (!window.confirm(warning)) return;
+  const beforeReset=state;
   state = createInitialState();
   selected = -1; activeGuidance = null;
-  const saved = persist({confirmedReset:true}); render();
-  hint(saved ? '已重置试玩进度' : '重置未保存，请勿关闭页面');
+  const saved = persist({confirmedReset:true});
+  if (!saved) {
+    // Do not display an unsaved blank board as if the reset succeeded.
+    state=beforeReset;
+    render();
+    hint('重置已中止：存档可能被其他标签页修改或写入受限，请重新打开页面核对');
+    return;
+  }
+  render();
+  hint('已重置试玩进度');
 });
 const dialog = byId('guide');
 byId('how-to').addEventListener('click', () => dialog.showModal());
