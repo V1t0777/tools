@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createInitialState,createInitialState as createNormal,moveOrMerge,fulfillOrder,upgradeBuilding,validateSave} from '../merge/engine.mjs';
 import {STORY_WORKSHOP_KEY,readStoryWorkshop,writeStoryWorkshop} from '../merge/story/workshop-storage.mjs';
-import {storyWorkshopRequirement,inspectStoryWorkshopRequirement} from '../merge/story/workshop-gate.mjs';
+import {storyWorkshopRequirement,inspectStoryWorkshopRequirement,storyGardenBuildAvailable} from '../merge/story/workshop-gate.mjs';
+import {createEmptyStoryProgress} from '../merge/mode-boundaries.mjs';
+import {CORE_STORY_PACK} from '../merge/story/core-pack.mjs';
+import {startCoreStory,completeStoryEntry} from '../merge/story/runtime.mjs';
 import {SAVE_KEY} from '../merge/storage.mjs';
 const db=()=>{const map=new Map();return {map,getItem:key=>map.has(key)?map.get(key):null,setItem:(key,val)=>map.set(key,val)};};
 test('new story workshop is a valid independently initialized 7x8 game',()=>{
@@ -92,4 +95,22 @@ test('chapter-two UI exposes real building action and mobile-safe touch targets'
   assert.ok(css.includes('min-height:44px'));
   assert.ok(css.includes('overflow-x:auto'));
   assert.ok(html.includes('可横向滚动的合成棋盘'));
+});
+
+test('garden construction requires chapter-two seed conversation before any spend',()=>{
+  let story=startCoreStory(createEmptyStoryProgress(),CORE_STORY_PACK);
+  assert.equal(storyGardenBuildAvailable(story),false);
+  const chapters=CORE_STORY_PACK.entries.filter(e=>e.kind==='main').slice(0,6);
+  for(const entry of chapters.slice(0,5)){
+    story=completeStoryEntry(story,CORE_STORY_PACK,entry.id,entry.choices[0]?.id??null);
+  }
+  assert.equal(storyGardenBuildAvailable(story),false);
+  const seed=chapters[5];
+  story=completeStoryEntry(story,CORE_STORY_PACK,seed.id,seed.choices[0]?.id??null);
+  assert.equal(storyGardenBuildAvailable(story),true);
+  const invalid=structuredClone(story);invalid.revision=-1;
+  assert.equal(storyGardenBuildAvailable(invalid),false);
+  const ui=readFileSync(new URL('../merge/story/workshop.mjs',import.meta.url),'utf8');
+  assert.ok(ui.includes('!gardenStoryReady'));
+  assert.ok(ui.includes("!storyGardenBuildAvailable(story.progress)"));
 });

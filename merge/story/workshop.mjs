@@ -1,6 +1,8 @@
 import {WIDTH,MAX_ENERGY,CHAINS,getLevel,moveOrMerge,produce,fulfillOrder,upgradeBuilding,getItemIcon,getItemName} from '../engine.mjs';
 import {BUILDINGS} from '../economy.mjs';
 import {readStoryWorkshop,writeStoryWorkshop,STORY_WORKSHOP_KEY} from './workshop-storage.mjs';
+import {readStorySave} from './local-storage.mjs';
+import {storyGardenBuildAvailable} from './workshop-gate.mjs';
 const $=id=>document.getElementById(id);
 const storage=(()=>{try{return window.localStorage;}catch{return null;}})();
 const loaded=readStoryWorkshop(storage);
@@ -51,11 +53,15 @@ function render(){
     row.append(mark,btn);list.append(row);
   }
   const garden=BUILDINGS.garden,level=getLevel(state.xp),built=state.buildings.garden===1;
+  const narrative=readStorySave(storage);
+  const gardenStoryReady=!narrative.blocked&&storyGardenBuildAvailable(narrative.progress);
   $('garden-status').textContent=built?'已修复':'未修复';
   $('garden-hint').textContent=built
     ? '花园已修复。返回剧情页继续《两个人的下午茶》。'
-    : '需要 '+garden.minLevel+' 级和 '+garden.coins+' 金币；当前 '+level+' 级、'+state.coins+' 金币。通过交付委托积累资源。';
-  $('build-garden').disabled=blocked||built||level<garden.minLevel||state.coins<garden.coins;
+    : !gardenStoryReady
+      ? '先在剧情页完成《没有开花的花圃》，再来修复后院花园。'
+      : '需要 '+garden.minLevel+' 级和 '+garden.coins+' 金币；当前 '+level+' 级、'+state.coins+' 金币。通过交付委托积累资源。';
+  $('build-garden').disabled=blocked||built||!gardenStoryReady||level<garden.minLevel||state.coins<garden.coins;
   $('reset-workshop').disabled=reason==='STORAGE_UNAVAILABLE';
 }
 function commit(result){
@@ -75,7 +81,14 @@ function touch(index){
   if(selected===index){selected=-1;render();return;}
   commit(moveOrMerge(state,selected,index));
 }
-$('build-garden').addEventListener('click',()=>{if(!blocked)commit(upgradeBuilding(state,'garden'));});
+$('build-garden').addEventListener('click',()=>{
+  if(blocked)return;
+  const story=readStorySave(storage);
+  if(story.blocked||!storyGardenBuildAvailable(story.progress)){
+    $('board-notice').textContent='请先完成第二章《没有开花的花圃》，再修复花园。';return;
+  }
+  commit(upgradeBuilding(state,'garden'));
+});
 $('reset-workshop').addEventListener('click',()=>{
   if(!window.confirm('确认重置剧情工作台？此处的金币、物品和订单进度将丢失，不影响普通经营或已读剧情。'))return;
   const current=readStoryWorkshop(storage);

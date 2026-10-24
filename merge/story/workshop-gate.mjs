@@ -5,6 +5,13 @@
  */
 import {validateSave} from '../engine.mjs';
 import {readStoryWorkshop} from './workshop-storage.mjs';
+import {validateStoryProgress} from '../mode-boundaries.mjs';
+
+/** Building a garden before meeting Wanhe would break chapter-two causality. */
+export function storyGardenBuildAvailable(storyProgress){
+  return validateStoryProgress(storyProgress)&&
+    storyProgress.packs.core?.completed.main.includes('seed')===true;
+}
 
 const GOALS=Object.freeze({
   'first-order':Object.freeze({type:'orders',goal:1,description:'完成一笔街坊委托'}),
