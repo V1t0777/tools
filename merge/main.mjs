@@ -4,11 +4,12 @@ import { WIDTH, CELL_COUNT, MAX_ENERGY, ENERGY_REGEN_MS, CHAINS, createInitialSt
   getLevelProgress, getMaxOrderTier, getProducerUpgrade, getWarehouseUpgrade,
   SUPPLY_ITEMS, ACHIEVEMENT_RULES, useSupply, purchaseSupply } from './engine.mjs';
 import { BUILDINGS } from './economy.mjs';
-import { loadLocal, saveLocal, SAVE_KEY } from './storage.mjs';
+import { loadLocal, peekLocalV3, SAVE_KEY } from './storage.mjs';
 import { getBoardGuidance } from './board-guidance.mjs';
 import { getSupplyControlSnapshot } from './supply-controls.mjs';
 import { deriveNormalMilestones } from './normal-milestones.mjs';
 import { prepareLocalSaveExport } from './save-export.mjs';
+import { commitNormalSnapshot } from './save-transaction.mjs';
 
 const byId = id => document.getElementById(id);
 const board = byId('board');
@@ -31,20 +32,26 @@ function hint(text) {
   window.clearTimeout(noticeTimer);
   noticeTimer = window.setTimeout(() => { notice.textContent = ''; }, 2400);
 }
-function persist({confirmedReset=false}={}) {
-  const saved = saveLocal(store, state, {allowReset:confirmedReset, expectedRaw:persistedRaw});
-  if (saved) { saveIssue = null; persistedRaw = JSON.stringify(state); }
-  else saveIssue ??= 'WRITE_FAILED';
-  byId('save-status').textContent = saved ? '已保存于此浏览器 · 未上传云端'
-    : saveIssue === 'CORRUPT_SAVE' ? '检测到异常存档，原始数据已保留；确认重置后才会覆盖'
-    : '无法安全保存，原始存档未被覆盖 · 请勿关闭页面';
-  return saved;
+function persist(nextState=state,{confirmedReset=false}={}) {
+  const receipt=commitNormalSnapshot(store,nextState,{expectedRaw:persistedRaw,confirmedReset});
+  if(receipt.ok) { saveIssue=null; persistedRaw=receipt.raw; }
+  else saveIssue ??= receipt.reason;
+  byId('save-status').textContent=receipt.ok ? '已保存于此浏览器 · 未上传云端'
+    : saveIssue==='CORRUPT_SAVE' ? '检测到异常存档，原始数据已保留；确认重置后才会覆盖'
+    : '无法确认安全保存 · 游戏操作已暂停，请备份并重新打开页面核对';
+  return receipt.ok;
 }
 function commit(result) {
-  if (result.state !== state) state = result.state;
-  if (result.ok) { selected = -1; activeGuidance = null; persist(); render(); }
-  else { render(); }
-  hint(result.message);
+  if(!result.ok) { render(); hint(result.message); return; }
+  if(saveIssue) { hint('存档状态未确认，已暂停操作；请先备份并重新打开页面核对'); return; }
+  if(!persist(result.state)) {
+    render();
+    hint('操作未确认保存，画面保持原进度；请备份并重新打开页面核对');
+    return;
+  }
+  state=result.state;
+  selected=-1; activeGuidance=null;
+  render(); hint(result.message);
 }
 function maybeProduce(slot) {
   commit(produce(state, slot));
@@ -400,17 +407,14 @@ byId('reset').addEventListener('click', () => {
     ? '当前存档无法安全保存。重置会永久覆盖原始存档数据（可能仍可人工修复），确定继续吗？'
     : '确定重置本地试玩进度吗？当前棋盘、金币和订单会被清空，且无法恢复。';
   if (!window.confirm(warning)) return;
-  const beforeReset=state;
-  state = createInitialState();
-  selected = -1; activeGuidance = null;
-  const saved = persist({confirmedReset:true});
-  if (!saved) {
-    // Do not display an unsaved blank board as if the reset succeeded.
-    state=beforeReset;
+  const resetState=createInitialState();
+  if(!persist(resetState,{confirmedReset:true})) {
     render();
     hint('重置已中止：存档可能被其他标签页修改或写入受限，请重新打开页面核对');
     return;
   }
+  state=resetState;
+  selected=-1; activeGuidance=null;
   render();
   hint('已重置试玩进度');
 });
@@ -420,24 +424,49 @@ byId('close-guide').addEventListener('click', () => dialog.close());
 // Local preview has no account/session hooks and intentionally sends no game data to the network.
 window.addEventListener('storage', event => {
   if (event.key !== SAVE_KEY || !store) return;
-  const fresh = loadLocal(store);
-  if (fresh.blocked) {
-    saveIssue = fresh.reason;persist();return;
+  // Storage events must be read-only. loadLocal can migrate legacy saves and
+  // write backup keys; never run it while reacting to another tab's write.
+  const fresh = peekLocalV3(store);
+  if (!fresh.ok) {
+    saveIssue = fresh.reason;
+    byId('save-status').textContent =
+      '其他标签页的存档异常或已移除，已暂停同步 · 请勿关闭页面';
+    hint('跨标签存档发生变化，请先导出原始存档并核对');
+    return;
   }
-  // Same-revision saves can still differ (e.g. energy recharge); do not
-  // overwrite them using a stale tab's old raw bytes.
-  if (fresh.recovered && fresh.raw !== persistedRaw &&
-      fresh.state.revision >= state.revision) {
-    if (saveIssue) { hint('其他标签页更新了存档，当前页面存在未保存进度'); return; }
-    state = advanceTime(fresh.state); persistedRaw = fresh.raw; activeGuidance = null;
-    selected = -1; persist(); render(); hint('已从其他标签页恢复更新进度');
+  if (fresh.raw === persistedRaw) return;
+  if (saveIssue) {
+    hint('其他标签页更新了存档，当前页面存在未保存进度');
+    return;
   }
+  if (fresh.state.revision < state.revision) {
+    // Never replace a newer in-memory board with older remote progress.
+    // Keep the existing expectedRaw so subsequent writes fail closed.
+    saveIssue = 'CURRENT_SAVE_CHANGED';
+    byId('save-status').textContent =
+      '检测到其他标签页的旧版进度，已暂停保存 · 请勿关闭页面';
+    hint('跨标签进度冲突，请先核对并备份存档');
+    return;
+  }
+  state = advanceTime(fresh.state);
+  persistedRaw = fresh.raw;
+  selected = -1; activeGuidance = null;
+  // No persist() here: avoid cross-tab write-back loops. Any later gameplay
+  // mutation or energy tick still uses the existing guarded save path.
+  byId('save-status').textContent = '已同步其他标签页进度 · 未上传云端';
+  render();
+  hint('已从其他标签页读取更新进度');
 });
 window.setInterval(() => {
   const now=Date.now();
   const updated = advanceTime(state,now);
-  if (updated !== state) { state = updated; if (activeGuidance) activeGuidance = getBoardGuidance(state);persist();render(); }
-  else {renderResources(now);refreshSupplyControls(now);}
+  if (!saveIssue && updated !== state) {
+    if(persist(updated)) {
+      state=updated;
+      if(activeGuidance)activeGuidance=getBoardGuidance(state);
+      render();
+    } else {renderResources(now);refreshSupplyControls(now);}
+  } else {renderResources(now);refreshSupplyControls(now);}
 }, 1000);
 persist(); render();
 if (loaded.blocked) hint('本地存档无法安全恢复，原始数据不会自动覆盖');

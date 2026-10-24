@@ -38,13 +38,46 @@ export function loadLocal(storage, now = Date.now()) {
       }catch{/* Do not modify the only valid original. */}
       if(!backedUp)return {state:upgraded,recovered:true,migrated:true,
         volatile:true,blocked:true,reason:'BACKUP_UNAVAILABLE',raw};
-      if(saveLocal(storage,upgraded,{migrationRaw:raw}))
-        return {state:upgraded,recovered:true,migrated:true,raw:JSON.stringify(upgraded)};
+      if(saveLocal(storage,upgraded,{migrationRaw:raw})){
+        // setItem returning is not proof that bytes persisted. A browser,
+        // storage shim or concurrent tab can still yield different data.
+        // Never expose a migrated baseline until exact readback succeeds.
+        const encoded=JSON.stringify(upgraded);
+        try{
+          if(storage.getItem(SAVE_KEY)===encoded)
+            return {state:upgraded,recovered:true,migrated:true,raw:encoded};
+        }catch{/* A post-write read failure leaves the outcome uncertain. */}
+        return {state:upgraded,recovered:true,migrated:true,
+          volatile:true,blocked:true,reason:'WRITE_VERIFY_FAILED',raw};
+      }
       return {state:upgraded,recovered:true,migrated:true,
         volatile:true,blocked:true,reason:'WRITE_FAILED',raw};
     }
   } catch { /* Do not replace malformed or unrecognized stored bytes. */ }
   return {...newSession(now, 'CORRUPT_SAVE'),raw};
+}
+
+/**
+ * P2.25 — read-only inspection for cross-tab storage events.
+ * Unlike loadLocal, this MUST NOT run legacy migrations or write backups.
+ * A missing, corrupt or legacy save is a conflict, not a new empty session.
+ */
+export function peekLocalV3(storage) {
+  let raw;
+  try {
+    if(typeof storage?.getItem!=='function')
+      return Object.freeze({ok:false,reason:'STORAGE_UNAVAILABLE'});
+    raw=storage.getItem(SAVE_KEY);
+  } catch {return Object.freeze({ok:false,reason:'STORAGE_UNAVAILABLE'});}
+  if(raw===null)return Object.freeze({ok:false,reason:'SAVE_REMOVED'});
+  if(typeof raw!=='string'||raw.length>MAX_LOCAL_SAVE_BYTES)
+    return Object.freeze({ok:false,reason:'CORRUPT_SAVE'});
+  try {
+    const state=JSON.parse(raw);
+    if(!validateSave(state))
+      return Object.freeze({ok:false,reason:'UNSUPPORTED_OR_CORRUPT_SAVE'});
+    return Object.freeze({ok:true,raw,state});
+  } catch {return Object.freeze({ok:false,reason:'CORRUPT_SAVE'});}
 }
 
 /** Refuse corrupt saves, stale-tab rollback and unsafe legacy overwrite.
