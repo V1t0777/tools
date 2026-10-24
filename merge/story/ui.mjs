@@ -1,6 +1,7 @@
 import {CORE_STORY_PACK} from './core-pack.mjs';
 import {availableStoryEntries,completedStoryEntries,completeStoryEntry,startCoreStory,dailyStoryIncident} from './runtime.mjs';
 import {readStorySave,writeStorySave} from './local-storage.mjs';
+import {captureStoryWorkshopEvidence} from './save-evidence.mjs';
 import {inspectStoryWorkshopRequirement} from './workshop-gate.mjs';
 import {createEmptyStoryProgress,STORY_SAVE_KEY} from '../mode-boundaries.mjs';
 
@@ -80,6 +81,7 @@ function render(){
     list.append(empty);
   }
   $('reset-story').disabled=reason==='STORAGE_UNAVAILABLE';
+  $('export-corrupt-story').disabled=reason!=='CORRUPT_SAVE'||typeof raw!=='string';
 }
 function lineElement(line){
   const row=document.createElement('div');row.className='dialog-line';
@@ -146,7 +148,32 @@ $('complete-story').addEventListener('click',()=>{
 document.querySelectorAll('.tabs [data-kind]').forEach(btn=>btn.addEventListener('click',()=>{
   kind=btn.dataset.kind;render();
 }));
+$('export-corrupt-story').addEventListener('click',()=>{
+  if(reason!=='CORRUPT_SAVE'||typeof raw!=='string')return;
+  if(!window.confirm('将异常剧情对白存档保存为本地文本文件？文件可能包含个人游玩信息，不会上传或修改浏览器存档。'))return;
+  const evidence=captureStoryWorkshopEvidence(store,{key:STORY_SAVE_KEY,expectedRaw:raw,confirmedByUser:true});
+  if(!evidence.ok){
+    if(evidence.code==='STALE_SNAPSHOT'){blocked=true;reason='WRITE_CONFLICT';render();}
+    $('save-state').textContent=evidence.code==='TOO_LARGE'
+      ? '异常记录过大，已拒绝导出；原数据仍保留，请勿重置。'
+      : '原始记录已变化或无法读取，已拒绝导出；请重新打开页面核对。';
+    return;
+  }
+  let url;
+  try{
+    url=URL.createObjectURL(new Blob([evidence.content],{type:'text/plain;charset=utf-8'}));
+    const link=document.createElement('a');
+    link.href=url;link.download='yunyu-story-dialogue-corrupt-save.txt';
+    document.body.append(link);link.click();link.remove();
+    window.setTimeout(()=>URL.revokeObjectURL(url),60000);
+    $('save-state').textContent='已尝试下载异常对白记录。请先在设备“文件”中确认备份存在；原浏览器存档未修改。';
+  }catch{
+    if(url)URL.revokeObjectURL(url);
+    $('save-state').textContent='设备未能触发文件导出；原浏览器存档未修改，请勿重置。';
+  }
+});
 $('reset-story').addEventListener('click',()=>{
+  if(reason==='CORRUPT_SAVE'&&!window.confirm('异常剧情对白存档会被重置覆盖。建议先导出并确认备份文件可用。仍要继续重置吗？'))return;
   if(!window.confirm('确认重置此浏览器的剧情进度吗？此操作不影响普通经营存档，但剧情选择与已读记录不可恢复。'))return;
   const current=readStorySave(store);
   if(current.reason==='STORAGE_UNAVAILABLE')return;
