@@ -53,7 +53,7 @@ export function projectStoryEconomy({selection='fifo',maxOrders=250}={}){
     buildAvailable();
     if(phaseIndex===PHASES.length)break;
     const position=selection==='fifo'
-      ? active.reduce((best,o,i)=>o.id<active[best].id?i:best,0)
+      ? active.reduce((best,o,i)=>Number(o.id.slice(1))<Number(active[best].id.slice(1))?i:best,0)
       : active.reduce((best,o,i)=>
         o.estimatedEnergy<active[best].estimatedEnergy ||
         (o.estimatedEnergy===active[best].estimatedEnergy &&
