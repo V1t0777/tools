@@ -56,12 +56,45 @@ test('P6 seed-42 regression distinguishes actual production from P5 heuristic',(
   assert.match(result.limitations,/绝非真实通关时间/);
 });
 
+test('P7 novice strategy stresses real board with 24 reproducible seeds',()=>{
+  const seeds=Array.from({length:24},(_,i)=>i*7919+1);
+  const results=seeds.map(seed=>simulateStoryBoard({seed,strategy:'novice',maxActions:10_000}));
+  assert.ok(results.every(x=>x.strategy==='novice'&&x.actions<=10_000));
+  assert.ok(results.every(x=>x.peakBoardUsed<=56&&x.boardUsed<=56));
+  assert.ok(results.every(x=>x.energy>=0&&x.energy<=MAX_ENERGY&&x.coins>=0));
+  assert.ok(results.every(x=>x.reason!=='invalid-state'));
+  assert.ok(results.some(x=>x.peakBoardUsed>=20),'novice policy must exercise crowded boards');
+  assert.ok(results.some(x=>x.offTargetProductions>0),'round-robin must produce off-target items');
+  for(const result of results){
+    if(result.complete)assert.deepEqual(result.buildings,{storefront:1,garden:1,harbor:1});
+    assert.deepEqual(result,simulateStoryBoard({
+      seed:result.seed,strategy:'novice',maxActions:10_000
+    }));
+  }
+  const failureCounts={};
+  for(const result of results)if(!result.complete){
+    failureCounts[result.reason]=(failureCounts[result.reason]??0)+1;
+  }
+  console.log('P7 novice stress (24 seeds): '+JSON.stringify({
+    complete:results.filter(x=>x.complete).length,
+    failures:failureCounts,
+    peakBoardUsed:[
+      Math.min(...results.map(x=>x.peakBoardUsed)),
+      Math.max(...results.map(x=>x.peakBoardUsed))
+    ],
+    offTargetProductions:[
+      Math.min(...results.map(x=>x.offTargetProductions)),
+      Math.max(...results.map(x=>x.offTargetProductions))
+    ]
+  }));
+});
+
 test('P6 bounded failure and invalid seed/options are explicit',()=>{
   const truncated=simulateStoryBoard({seed:1,maxActions:1});
   assert.equal(truncated.complete,false);
   assert.equal(truncated.reason,'action-cap');
   assert.deepEqual(truncated.milestones.map(x=>x.id),['first-order']);
-  for(const options of [{seed:-1},{seed:0x100000000},{seed:1.2},
+  for(const options of [{strategy:'magic'},{seed:-1},{seed:0x100000000},{seed:1.2},
     {seed:NaN},{maxActions:0},{maxActions:50_001},{maxActions:1.1}]){
     assert.throws(()=>simulateStoryBoard(options),RangeError);
   }
