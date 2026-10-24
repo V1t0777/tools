@@ -81,3 +81,50 @@ test('P2.35 real reset click path reserves backup before calling persist',()=>{
   assert.ok(main.includes("import { prepareAbnormalResetBackup } from './reset-backup.mjs';"));
   assert.equal(handler.includes('removeItem('),false);
 });
+
+test('P2.37 refuses abnormal reset backup that exceeds actual UTF-8 export budget',()=>{
+  // Below the UTF-16 code-unit cap, but beyond the download byte cap.
+  const raw='中'.repeat(Math.ceil(2_000_000/3));
+  assert.ok(raw.length<2_000_000);
+  const db=storage(raw);
+  assert.deepEqual(reserve(db,{expectedRaw:raw}),
+    {ok:false,reason:'BACKUP_TOO_LARGE'});
+  assert.deepEqual(db.writes,[]);
+  assert.equal(db.read(SAVE_KEY),raw);
+  assert.equal(db.read(ABNORMAL_RESET_BACKUP_KEY),null);
+});
+
+test('P2.37 rejects unexportable escaped UTF-16 backup envelope',()=>{
+  // The malformed raw itself fits the encoder budget, but its escaped
+  // JSON envelope exceeds it. No backup or reset may be authorized.
+  const raw=String.fromCharCode(0xD800).repeat(Math.ceil(2_000_000/6));
+  assert.ok(new TextEncoder().encode(raw).byteLength<2_000_000);
+  const db=storage(raw);
+  assert.deepEqual(reserve(db,{expectedRaw:raw}),
+    {ok:false,reason:'BACKUP_TOO_LARGE'});
+  assert.deepEqual(db.writes,[]);
+  assert.equal(db.read(SAVE_KEY),raw);
+});
+
+test('P2.37 accepts an exportable malformed original without altering it',()=>{
+  const raw='异常'+String.fromCharCode(0xD800)+'原文';
+  const db=storage(raw);
+  const result=reserve(db,{expectedRaw:raw});
+  assert.equal(result.ok,true);
+  assert.equal(result.verifiedReadback,true);
+  assert.deepEqual(db.writes,[[ABNORMAL_RESET_BACKUP_KEY,raw]]);
+  assert.equal(db.read(SAVE_KEY),raw);
+});
+
+test('P2.37 refuses backup if the browser cannot encode it',()=>{
+  const raw='{broken';
+  const db=storage(raw);
+  const previous=globalThis.TextEncoder;
+  try {
+    globalThis.TextEncoder=undefined;
+    assert.deepEqual(reserve(db,{expectedRaw:raw}),
+      {ok:false,reason:'BACKUP_ENCODING_UNAVAILABLE'});
+    assert.deepEqual(db.writes,[]);
+    assert.equal(db.read(SAVE_KEY),raw);
+  } finally {globalThis.TextEncoder=previous;}
+});
