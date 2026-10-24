@@ -100,7 +100,7 @@ test('P2.16 preview UI offers export without cloud transfer, import or overwrite
   assert.equal(html.split('id="export-local-save"').length-1,1);
   assert.ok(html.includes('原始数据作为人工备份'));
   assert.ok(html.includes('此功能不导入存档'));
-  assert.ok(main.includes("import { prepareLocalSaveExport } from './save-export.mjs';"));
+  assert.ok(main.includes("import { prepareLocalSaveExport, prepareAbnormalResetBackupExport } from './save-export.mjs';"));
   assert.ok(main.includes("byId('export-local-save').addEventListener('click'"));
   assert.ok(main.includes('const result=prepareLocalSaveExport(store);'));
   assert.ok(main.includes('new Blob([result.content],{type:result.mime})'));
