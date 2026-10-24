@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f2eadc">
+  <meta name="description" content="云屿百物铺，原创合成经营游戏的 P2 本地开发预览版。">
+  <title>云屿百物铺 · 开发预览</title>
+  <link rel="stylesheet" href="./style.css">
+  <script type="module" src="./main.mjs"></script>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <a href="../games/" class="back-link" aria-label="返回小游戏目录">← 小游戏</a>
+      <div class="eyebrow">ISLE & OBJECTS <span class="alpha-mark">P2.9 PREVIEW</span></div>
+      <button id="how-to" class="icon-button" type="button" aria-label="玩法说明">?</button>
+    </header>
+    <main>
+      <section class="masthead" aria-label="云屿百物铺">
+        <p class="chapter">第一章 · 初见云屿</p>
+        <h1>云屿百物铺</h1>
+        <p class="tagline">拾起小小物件，慢慢点亮海边的店铺。</p>
+        <div class="town" role="img" aria-label="柔和海天背景中的小岛杂货铺示意图">
+          <div class="town-sun"></div><div class="town-cloud cloud-one"></div><div class="town-cloud cloud-two"></div>
+          <div class="town-sea"></div><div class="town-shore"></div>
+          <div class="town-shop"><div class="town-roof"></div><div class="town-door"></div><div class="town-window"></div></div>
+          <div class="town-grass"></div>
+          <span class="town-note">小店开张了 · 场景美术待精修</span>
+        </div>
+      </section>
+      <section class="resource-bar" aria-label="游戏资源">
+        <div class="resource"><span class="resource-symbol" aria-hidden="true">⚡</span><div><span class="resource-label">体力</span><strong id="energy">120 / 120</strong></div><small id="recovery">已满</small></div>
+        <div class="resource"><span class="resource-symbol" aria-hidden="true">◈</span><div><span class="resource-label">金币</span><strong id="coins">0</strong></div></div>
+        <div class="resource"><span class="resource-symbol" aria-hidden="true">✦</span><div><span class="resource-label">经验</span><strong id="xp">0</strong></div></div>
+      </section>
+      <div class="progress-note" aria-label="等级和解锁进度"><strong id="level">Lv.1</strong><span id="level-progress">升级进度</span><span id="tier-cap">最高委托等级</span></div>
+      <section class="management-section supply-section" aria-labelledby="supply-title">
+        <div class="section-heading"><div><p class="overline">SEASIDE SUPPLIES</p><h2 id="supply-title">海风补给</h2></div><span class="capacity">本地试玩 · 无云端奖励</span></div>
+        <p class="help-line">补给从背包消耗；体力满时不会浪费道具。冷却卡仅对正在冷却的工坊生效。</p>
+        <label class="supply-label" for="supply-producer">指定工坊</label>
+        <select class="supply-select" id="supply-producer" aria-label="选择要加速的工坊" aria-describedby="supply-cooldown-status"></select>
+        <p class="supply-cooldown-status" id="supply-cooldown-status" aria-live="off">选择工坊后，查看冷却状态。</p>
+        <div id="supply-bag" class="supply-list" aria-label="补给背包"></div>
+        <h3 class="supply-subtitle">一次性成就</h3>
+        <div id="supply-achievements" class="supply-achievements" aria-label="一次性成就进度"></div>
+        <h3 class="supply-subtitle">金币补给商店</h3>
+        <p class="help-line">每份本地存档固定限购，不按系统日期刷新；全部购买耗费金币，不会自动补货。</p>
+        <div id="supply-shop" class="supply-list" aria-label="限量金币补给商店"></div>
+      </section>
+      <section class="board-section" aria-labelledby="board-title">
+        <div class="section-heading"><div><p class="overline">WORK TABLE</p><h2 id="board-title">合成工作台</h2></div><span id="free-cells" class="capacity" aria-live="polite"></span></div>
+        <p class="help-line">点击相同物品合成，也可按住拖动；点击 <strong>🧺</strong> 生产器获取原料。</p>
+        <div class="guidance-panel">
+          <button id="board-guide" class="guide-action" type="button" aria-controls="guidance-message" aria-pressed="false">整理提示</button>
+          <p id="guidance-message" class="guidance-message" role="status" aria-live="polite">棋盘太满时，可以点“整理提示”寻找合法操作。只提示，不自动操作。</p>
+        </div>
+        <div id="board" class="board" role="group" aria-label="七列八行的合成棋盘"></div>
+        <div class="board-footer"><span id="save-status" role="status">本地试玩档 · 不上传云端</span><div class="save-actions"><button id="export-local-save" class="text-button" type="button">导出原始存档</button><button id="reset" class="text-button" type="button">重置试玩进度</button></div></div><p class="save-export-note">可下载当前浏览器保存的原始数据作为人工备份；此功能不导入存档，也不会上传网络。异常存档将以文本格式导出。</p><button id="store-selected" class="secondary-action" type="button" disabled>将选中的原料收入仓库</button>
+      </section>
+      <section class="orders-section" aria-labelledby="orders-title">
+        <div class="section-heading"><div><p class="overline">CUSTOMER REQUESTS</p><h2 id="orders-title">街坊委托</h2></div><span class="capacity">完成即可得奖励</span></div>
+        <div id="orders" class="orders"></div>
+      </section>
+      <section class="management-section" aria-labelledby="warehouse-title">
+        <div class="section-heading"><div><p class="overline">STORE & GROW</p><h2 id="warehouse-title">仓库与成长</h2></div><span id="warehouse-count" class="capacity">0 / 4</span></div>
+        <p class="help-line">选中棋盘原料后点击「收入仓库」，再点击仓库中的物品将其取回棋盘。生产器不可入库。</p>
+        <div id="warehouse" class="warehouse" aria-label="仓库格子"></div>
+        <button class="secondary-action" id="warehouse-upgrade" type="button">升级仓库</button>
+      </section>
+      <section class="management-section" aria-labelledby="producer-title">
+        <div class="section-heading"><div><p class="overline">MAKER UPGRADES</p><h2 id="producer-title">生产器成长</h2></div></div>
+        <div id="producers" class="upgrade-list"></div>
+      </section>
+      <section class="management-section" aria-labelledby="buildings-title">
+        <div class="section-heading"><div><p class="overline">TOWN GROWTH</p><h2 id="buildings-title">经营建设</h2></div></div>
+        <div id="buildings" class="upgrade-list"></div>
+      </section>
+      <section class="management-section normal-milestone-section" aria-labelledby="normal-milestone-title">
+        <div class="section-heading">
+          <div><p class="overline">LONG-TERM GOALS</p><h2 id="normal-milestone-title">远航经营目标</h2></div>
+          <span class="capacity" id="normal-milestone-summary" aria-live="polite">0 / 9 已完成</span>
+        </div>
+        <p class="help-line">完成委托、持续合成与经营建设都会推动长期目标。这些目标不额外发放金币或道具，不改变现有存档与等级。</p>
+        <div id="normal-milestones" class="normal-milestone-list" aria-label="普通模式长期经营进度"></div>
+      </section>
+      <div id="notice" class="notice" role="status" aria-live="polite"></div>
+    </main>
+    <footer>云屿百物铺 · 原创游戏开发原型 · 本地存档 · 非正式版本</footer>
+  </div>
+  <dialog id="guide" class="dialog" aria-labelledby="guide-title">
+    <div class="dialog-inner"><h2 id="guide-title">如何游玩</h2>
+      <p>① 点击 🧺 生产器消耗一点体力，获得该类原料。</p>
+      <p>② 用手指拖动两个完全相同的物品，或依次点击它们，就能合成下一阶物品。</p>
+      <p>③ 拿到委托需要的物品后，点击「交付」领取金币与经验。体力随时间恢复。</p>
+      <p>④ 用金币升级生产器、扩充仓库和建设街区；等级决定新订单难度。P1 存档可以自动迁移。</p>
+      <p>⑤ 棋盘太满时，可以点击「整理提示」，标出可以交付、合成、收纳或升级的合法操作；提示不会自动执行操作或扣费。</p>
+      <p class="dialog-caution">当前只是 P2 研发预览：采用占位物品图标，进度仅保存在当前浏览器，不会同步至 Supabase。</p>
+      <button class="primary" id="close-guide" type="button">明白了</button>
+    </div>
+  </dialog>
+</body>
+</html>
