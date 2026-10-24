@@ -18,6 +18,7 @@ test('P6 seeded real-engine playthrough reaches first order and all three story 
     assert.ok(result.orders>=35&&result.orders<=70);
     assert.ok(result.productions>0);
     assert.ok(result.boardUsed<=56);
+    assert.ok(result.peakBoardUsed>=result.boardUsed&&result.peakBoardUsed<=56);
     assert.ok(result.energy>=0&&result.energy<=MAX_ENERGY);
     assert.ok(result.coins>=0&&result.xp>=0);
     for(const id of ['garden','harbor','storefront']){
@@ -39,7 +40,7 @@ test('P6 64 deterministic RNG seeds all finish under bounded action budget',()=>
   console.log('P6 actual-board audit (64 seeds): '+JSON.stringify({
     orders:range('orders'),productions:range('productions'),
     merges:range('merges'),forcedWaitMinutes:range('elapsedMinutes'),
-    maximumBoardUsed:Math.max(...results.map(x=>x.boardUsed))
+    maximumPeakBoardUsed:Math.max(...results.map(x=>x.peakBoardUsed))
   }));
 });
 

@@ -27,6 +27,7 @@ export function simulateStoryBoard({seed=1,maxActions=20_000}={}){
 
   let now=START_TIME,state=createInitialState(now),randomState=seed>>>0;
   let orders=0,productions=0,merges=0,waits=0,phase=0,actions=0;
+  let peakBoardUsed=usedSlots(state);
   let reason='action-cap';
   const milestones=[];
   const rng=()=>((randomState=(Math.imul(randomState,1664525)+1013904223)>>>0)/2**32);
@@ -38,6 +39,7 @@ export function simulateStoryBoard({seed=1,maxActions=20_000}={}){
 
   for(let step=0;step<maxActions;step++){
     actions=step+1;
+    peakBoardUsed=Math.max(peakBoardUsed,usedSlots(state));
     if(!validateSave(state)){reason='invalid-state';break;}
 
     // Narrative prerequisites are assumed; only real engine level/coin rules
@@ -111,7 +113,8 @@ export function simulateStoryBoard({seed=1,maxActions=20_000}={}){
     seed,complete:reason==='complete',reason,actions,orders,productions,
     merges,waits,elapsedMinutes:(now-START_TIME)/60_000,
     coins:state.coins,xp:state.xp,energy:state.energy,
-    boardUsed:usedSlots(state),buildings:Object.freeze({...state.buildings}),
+    boardUsed:usedSlots(state),peakBoardUsed:Math.max(peakBoardUsed,usedSlots(state)),
+    buildings:Object.freeze({...state.buildings}),
     milestones:Object.freeze(milestones),
     limitations:'真实引擎与7×8棋盘、种子随机掉落及冷却；单一贪心策略，忽略玩家点击耗时、故事阅读、仓库、升级、补给、付费和存档冲突。模拟耗时绝非真实通关时间。'
   });
