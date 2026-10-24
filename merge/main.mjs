@@ -10,6 +10,7 @@ import { getSupplyControlSnapshot } from './supply-controls.mjs';
 import { deriveNormalMilestones } from './normal-milestones.mjs';
 import { prepareLocalSaveExport } from './save-export.mjs';
 import { commitNormalSnapshot } from './save-transaction.mjs';
+import { prepareNormalStartup } from './startup-persist.mjs';
 
 const byId = id => document.getElementById(id);
 const board = byId('board');
@@ -17,15 +18,16 @@ const orders = byId('orders');
 const notice = byId('notice');
 const store = (() => { try { return window.localStorage; } catch { return null; } })();
 const loaded = loadLocal(store);
-let state = advanceTime(loaded.state);
+const startup = prepareNormalStartup(loaded,store);
+let state = startup.state;
 let selected = -1;
 let drag = null;
 let ignoreNextClick = false;
 let noticeTimer = 0;
 let activeGuidance = null;
-let saveIssue = loaded.blocked ? loaded.reason : null;
-let persistedRaw = loaded.raw;
-if (loaded.migrated) window.setTimeout(() => hint('已保留旧版试玩进度，并升级为 P2 存档'), 250);
+let saveIssue = startup.blocked ? startup.reason : null;
+let persistedRaw = startup.raw;
+if (loaded.migrated && !startup.blocked) window.setTimeout(() => hint('已保留旧版试玩进度，并升级为 P2 存档'), 250);
 
 function hint(text) {
   notice.textContent = text;
@@ -468,6 +470,10 @@ window.setInterval(() => {
     } else {renderResources(now);refreshSupplyControls(now);}
   } else {renderResources(now);refreshSupplyControls(now);}
 }, 1000);
-persist(); render();
-if (loaded.blocked) hint('本地存档无法安全恢复，原始数据不会自动覆盖');
+byId('save-status').textContent = saveIssue
+  ? saveIssue === 'CORRUPT_SAVE' ? '检测到异常存档，原始数据已保留；确认重置后才会覆盖'
+    : '无法确认安全保存 · 游戏操作已暂停，请备份并重新打开页面核对'
+  : '已保存于此浏览器 · 未上传云端';
+render();
+if (startup.blocked) hint('本地存档无法安全恢复或确认写入，原始数据不会自动覆盖');
 else if (!loaded.recovered) hint('欢迎来到云屿百物铺！试试合成两片茶芽。');
