@@ -3,6 +3,7 @@ import {BUILDINGS} from '../economy.mjs';
 import {readStoryWorkshop,writeStoryWorkshop,STORY_WORKSHOP_KEY} from './workshop-storage.mjs';
 import {readStorySave} from './local-storage.mjs';
 import {captureStoryWorkshopEvidence} from './save-evidence.mjs';
+import {checkStoryResumeSnapshot} from './resume-guard.mjs';
 import {storyGardenBuildAvailable,storyHarborBuildAvailable,storyStorefrontBuildAvailable} from './workshop-gate.mjs';
 const $=id=>document.getElementById(id);
 const storage=(()=>{try{return window.localStorage;}catch{return null;}})();
@@ -202,6 +203,17 @@ $('reset-workshop').addEventListener('click',()=>{
   if(writeStoryWorkshop(storage,fresh.state,{expectedRaw:raw,confirmedReset:true})){
     state=fresh.state;raw=JSON.stringify(state);blocked=false;reason=null;selected=-1;render();
   }else{blocked=true;reason='WRITE_CONFLICT';render();}
+});
+function recheckWorkshopOnResume(){
+  if(!blocked){
+    const check=checkStoryResumeSnapshot(storage,{key:STORY_WORKSHOP_KEY,expectedRaw:raw});
+    if(!check.ok){blocked=true;reason=check.reason;selected=-1;}
+  }
+  render();
+}
+window.addEventListener('pageshow',recheckWorkshopOnResume);
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible')recheckWorkshopOnResume();
 });
 window.addEventListener('storage',event=>{
   if(event.key===STORY_WORKSHOP_KEY){blocked=true;reason='WRITE_CONFLICT';render();}

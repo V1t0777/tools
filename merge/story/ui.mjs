@@ -2,6 +2,7 @@ import {CORE_STORY_PACK} from './core-pack.mjs';
 import {availableStoryEntries,completedStoryEntries,completeStoryEntry,startCoreStory,dailyStoryIncident} from './runtime.mjs';
 import {readStorySave,writeStorySave} from './local-storage.mjs';
 import {captureStoryWorkshopEvidence} from './save-evidence.mjs';
+import {checkStoryResumeSnapshot} from './resume-guard.mjs';
 import {inspectStoryWorkshopRequirement} from './workshop-gate.mjs';
 import {createEmptyStoryProgress,STORY_SAVE_KEY} from '../mode-boundaries.mjs';
 
@@ -183,7 +184,18 @@ $('reset-story').addEventListener('click',()=>{
   const next=startCoreStory(createEmptyStoryProgress(),CORE_STORY_PACK);
   if(save(next,true))render();
 });
-window.addEventListener('pageshow',()=>{if($('story-dialog').open)$('story-dialog').close();render();});
+function recheckStoryOnResume(){
+  if(!blocked){
+    const check=checkStoryResumeSnapshot(store,{key:STORY_SAVE_KEY,expectedRaw:raw});
+    if(!check.ok){blocked=true;reason=check.reason;}
+  }
+  if($('story-dialog').open)$('story-dialog').close();
+  render();
+}
+window.addEventListener('pageshow',recheckStoryOnResume);
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible')recheckStoryOnResume();
+});
 window.addEventListener('storage',event=>{
   if(event.key===STORY_SAVE_KEY){
     blocked=true;reason='WRITE_CONFLICT';render();
