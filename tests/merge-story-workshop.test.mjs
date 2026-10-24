@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createInitialState,createInitialState as createNormal,moveOrMerge,fulfillOrder,upgradeBuilding,validateSave} from '../merge/engine.mjs';
 import {STORY_WORKSHOP_KEY,readStoryWorkshop,writeStoryWorkshop} from '../merge/story/workshop-storage.mjs';
-import {storyWorkshopRequirement,inspectStoryWorkshopRequirement,storyGardenBuildAvailable} from '../merge/story/workshop-gate.mjs';
+import {storyWorkshopRequirement,inspectStoryWorkshopRequirement,storyGardenBuildAvailable,storyHarborBuildAvailable} from '../merge/story/workshop-gate.mjs';
 import {createEmptyStoryProgress} from '../merge/mode-boundaries.mjs';
 import {CORE_STORY_PACK} from '../merge/story/core-pack.mjs';
 import {startCoreStory,completeStoryEntry} from '../merge/story/runtime.mjs';
@@ -113,4 +113,49 @@ test('garden construction requires chapter-two seed conversation before any spen
   const ui=readFileSync(new URL('../merge/story/workshop.mjs',import.meta.url),'utf8');
   assert.ok(ui.includes('!gardenStoryReady'));
   assert.ok(ui.includes("!storyGardenBuildAvailable(story.progress)"));
+});
+
+test('chapter-three harbor repair requires real building and cannot be inferred from garden or orders',()=>{
+  const storage=db();
+  const state=createInitialState(1000000);
+  assert.equal(storyWorkshopRequirement('harbor-light',state).met,false);
+  const prepared=structuredClone(state);
+  prepared.xp=590;prepared.coins=330;
+  assert.equal(validateSave(prepared),true);
+  assert.equal(storyWorkshopRequirement('harbor-light',prepared).met,false);
+  const built=upgradeBuilding(prepared,'harbor');
+  assert.equal(built.ok,true);
+  assert.equal(built.state.buildings.harbor,1);
+  assert.equal(built.state.coins,0);
+  assert.equal(storyWorkshopRequirement('harbor-light',built.state).met,true);
+  assert.equal(storyWorkshopRequirement('tea-table',built.state).met,false);
+  assert.equal(writeStoryWorkshop(storage,built.state,{expectedRaw:null}),true);
+  assert.equal(inspectStoryWorkshopRequirement('harbor-light',storage).met,true);
+  storage.setItem(STORY_WORKSHOP_KEY,'corrupted');
+  assert.equal(inspectStoryWorkshopRequirement('harbor-light',storage).met,false);
+  assert.equal(inspectStoryWorkshopRequirement('harbor-light',storage).blocked,true);
+});
+
+test('chapter-three harbor construction follows apprentice story and preserves optional side quests',()=>{
+  let story=startCoreStory(createEmptyStoryProgress(),CORE_STORY_PACK);
+  assert.equal(storyHarborBuildAvailable(story),false);
+  for(const entry of CORE_STORY_PACK.entries.filter(e=>e.kind==='main')){
+    if(entry.id==='apprentice')break;
+    story=completeStoryEntry(story,CORE_STORY_PACK,entry.id,entry.choices[0]?.id??null);
+  }
+  assert.equal(storyHarborBuildAvailable(story),false);
+  const apprentice=CORE_STORY_PACK.entries.find(e=>e.id==='apprentice');
+  story=completeStoryEntry(story,CORE_STORY_PACK,apprentice.id,apprentice.choices[0]?.id??null);
+  assert.equal(storyHarborBuildAvailable(story),true);
+  assert.equal(story.packs.core.completed.side.length,0);
+  const invalid=structuredClone(story);invalid.revision=-1;
+  assert.equal(storyHarborBuildAvailable(invalid),false);
+  const html=readFileSync(new URL('../merge/story-workshop.html',import.meta.url),'utf8');
+  const ui=readFileSync(new URL('../merge/story/workshop.mjs',import.meta.url),'utf8');
+  assert.ok(html.includes('id="build-harbor"'));
+  assert.ok(html.includes('id="harbor-hint"'));
+  assert.ok(html.includes('id="harbor-status"'));
+  assert.ok(ui.includes("commit(upgradeBuilding(state,'harbor'))"));
+  assert.ok(ui.includes('!storyHarborBuildAvailable(story.progress)'));
+  assert.ok(ui.includes('!harborStoryReady'));
 });

@@ -12,10 +12,16 @@ export function storyGardenBuildAvailable(storyProgress){
   return validateStoryProgress(storyProgress)&&
     storyProgress.packs.core?.completed.main.includes('seed')===true;
 }
+/** Harbor repair follows the apprentice's safety lesson, not just a coin threshold. */
+export function storyHarborBuildAvailable(storyProgress){
+  return validateStoryProgress(storyProgress)&&
+    storyProgress.packs.core?.completed.main.includes('apprentice')===true;
+}
 
 const GOALS=Object.freeze({
   'first-order':Object.freeze({type:'orders',goal:1,description:'完成一笔街坊委托'}),
-  'tea-table':Object.freeze({type:'building',building:'garden',goal:1,description:'修复后院花园'})
+  'tea-table':Object.freeze({type:'building',building:'garden',goal:1,description:'修复后院花园'}),
+  'harbor-light':Object.freeze({type:'building',building:'harbor',goal:1,description:'修缮港湾街角'})
 });
 export function storyWorkshopRequirement(entryId,workshopState){
   const spec=Object.hasOwn(GOALS,entryId)?GOALS[entryId]:null;
