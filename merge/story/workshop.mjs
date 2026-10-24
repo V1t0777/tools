@@ -2,6 +2,7 @@ import {WIDTH,MAX_ENERGY,CHAINS,getLevel,moveOrMerge,produce,fulfillOrder,storeI
 import {BUILDINGS} from '../economy.mjs';
 import {readStoryWorkshop,writeStoryWorkshop,STORY_WORKSHOP_KEY} from './workshop-storage.mjs';
 import {readStorySave} from './local-storage.mjs';
+import {captureStoryWorkshopEvidence} from './save-evidence.mjs';
 import {storyGardenBuildAvailable,storyHarborBuildAvailable,storyStorefrontBuildAvailable} from './workshop-gate.mjs';
 const $=id=>document.getElementById(id);
 const storage=(()=>{try{return window.localStorage;}catch{return null;}})();
@@ -10,7 +11,7 @@ let state=loaded.state,raw=loaded.raw,blocked=loaded.blocked,reason=loaded.reaso
 function status(){
   $('workshop-status').textContent=blocked
     ? reason==='CORRUPT_SAVE'
-      ? '剧情工作台存档损坏：原数据未覆盖。只有明确确认重置才会重新开始。'
+      ? '剧情工作台存档损坏：原数据未覆盖。请先考虑导出异常原始记录备份，再决定是否重置。'
       : reason==='STORAGE_UNAVAILABLE'
         ? '无法访问浏览器存储，经营操作已暂停。'
         : '存档变化或写入失败：已停止操作，请重新打开页面核对。'
@@ -117,6 +118,7 @@ function render(){
       : '修整门面需要 '+storefront.minLevel+' 级和 '+storefront.coins+' 金币；目前 '+level+' 级、'+state.coins+' 金币。';
   $('build-storefront').disabled=blocked||storefrontBuilt||!storefrontStoryReady||level<storefront.minLevel||state.coins<storefront.coins;
   $('reset-workshop').disabled=reason==='STORAGE_UNAVAILABLE';
+  $('export-corrupt-workshop').disabled=reason!=='CORRUPT_SAVE'||typeof raw!=='string';
 }
 function commit(result){
   if(!result.ok){$('board-notice').textContent=result.message;return;}
@@ -166,7 +168,32 @@ $('build-storefront').addEventListener('click',()=>{
   }
   commit(upgradeBuilding(state,'storefront'));
 });
+$('export-corrupt-workshop').addEventListener('click',()=>{
+  if(reason!=='CORRUPT_SAVE'||typeof raw!=='string')return;
+  if(!window.confirm('将异常剧情工作台记录保存为本地文本文件？文件可能包含个人游玩信息，请妥善保管；不会上传或修改浏览器存档。'))return;
+  const evidence=captureStoryWorkshopEvidence(storage,{key:STORY_WORKSHOP_KEY,expectedRaw:raw,confirmedByUser:true});
+  if(!evidence.ok){
+    if(evidence.code==='STALE_SNAPSHOT'){blocked=true;reason='WRITE_CONFLICT';render();}
+    $('board-notice').textContent=evidence.code==='TOO_LARGE'
+      ? '异常记录过大，已拒绝导出；原存档仍在浏览器，请勿重置或清除数据。'
+      : '原始记录已变化或无法读取，已拒绝导出；请重新打开页面核对。';
+    return;
+  }
+  let url;
+  try{
+    url=URL.createObjectURL(new Blob([evidence.content],{type:'text/plain;charset=utf-8'}));
+    const a=document.createElement('a');
+    a.href=url;a.download='yunyu-story-workshop-corrupt-save.txt';
+    document.body.append(a);a.click();a.remove();
+    window.setTimeout(()=>URL.revokeObjectURL(url),60000);
+    $('board-notice').textContent='已尝试下载异常记录，请先在设备“文件”中确认备份存在；原浏览器存档未修改。';
+  }catch{
+    if(url)URL.revokeObjectURL(url);
+    $('board-notice').textContent='设备未能触发文件导出。原浏览器存档未修改，请勿重置。';
+  }
+});
 $('reset-workshop').addEventListener('click',()=>{
+  if(reason==='CORRUPT_SAVE'&&!window.confirm('异常原始记录会被重置覆盖。建议先导出并确认备份文件可用。仍要继续重置吗？'))return;
   if(!window.confirm('确认重置剧情工作台？此处的金币、物品和订单进度将丢失，不影响普通经营或已读剧情。'))return;
   const current=readStoryWorkshop(storage);
   if(current.reason==='STORAGE_UNAVAILABLE')return;
