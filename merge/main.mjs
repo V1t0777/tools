@@ -382,6 +382,7 @@ byId('export-local-save').addEventListener('click', () => {
   if(!result.ok){
     hint(result.reason==='NO_SAVED_DATA'?'此浏览器还没有可导出的存档':
       result.reason==='EXPORT_TOO_LARGE'?'原始存档超过安全导出上限，请勿重置或清理浏览器数据':
+      result.reason==='EXPORT_ENCODING_UNAVAILABLE'?'当前浏览器无法安全编码备份文件，请勿重置或清理存档':
       '浏览器存储不可访问，无法读取原始存档');
     return;
   }

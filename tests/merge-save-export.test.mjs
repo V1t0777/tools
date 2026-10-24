@@ -115,3 +115,41 @@ test('P2.16 preview UI offers export without cloud transfer, import or overwrite
     assert.equal(action.includes(forbidden),false,`Unexpected export side effect: ${forbidden}`);
   }
 });
+
+test('P2.33 export limit uses actual UTF-8 bytes for CJK and emoji',()=>{
+  const exactly='中'.repeat(Math.floor(MAX_EXPORT_BYTES/3))+'ab';
+  assert.equal(new TextEncoder().encode(exactly).byteLength,MAX_EXPORT_BYTES);
+  const exact=mockStorage({[SAVE_KEY]:exactly});
+  const receipt=prepareLocalSaveExport(exact);
+  assert.equal(receipt.ok,true);
+  assert.equal(receipt.verified,false);
+  assert.equal(receipt.content,exactly);
+  assert.deepEqual(exact.writes,[]);
+  const tooLarge=mockStorage({[SAVE_KEY]:exactly+'中'});
+  assert.ok((exactly+'中').length<MAX_EXPORT_BYTES);
+  assert.deepEqual(prepareLocalSaveExport(tooLarge),
+    {ok:false,reason:'EXPORT_TOO_LARGE'});
+  assert.deepEqual(tooLarge.writes,[]);
+  const emoji='🌊'.repeat(Math.floor(MAX_EXPORT_BYTES/4)+1);
+  assert.ok(emoji.length<MAX_EXPORT_BYTES);
+  assert.deepEqual(prepareLocalSaveExport(mockStorage({[SAVE_KEY]:emoji})),
+    {ok:false,reason:'EXPORT_TOO_LARGE'});
+});
+
+test('P2.33 rejects missing UTF-8 encoder without claiming a safe download',()=>{
+  const encoder=globalThis.TextEncoder;
+  const raw='中文存档';
+  try {
+    globalThis.TextEncoder=undefined;
+    assert.deepEqual(prepareLocalSaveExport(mockStorage({[SAVE_KEY]:raw})),
+      {ok:false,reason:'EXPORT_ENCODING_UNAVAILABLE'});
+  } finally {globalThis.TextEncoder=encoder;}
+});
+
+test('P2.33 preview displays explicit encoding-unavailable guidance',()=>{
+  const main=source('../merge/main.mjs');
+  const action=main.slice(main.indexOf("byId('export-local-save').addEventListener"),
+    main.indexOf("byId('reset').addEventListener"));
+  assert.ok(action.includes("result.reason==='EXPORT_ENCODING_UNAVAILABLE'"));
+  assert.ok(action.includes('当前浏览器无法安全编码备份文件'));
+});
