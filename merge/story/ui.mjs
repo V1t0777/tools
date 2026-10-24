@@ -3,6 +3,7 @@ import {availableStoryEntries,completedStoryEntries,completeStoryEntry,startCore
 import {readStorySave,writeStorySave} from './local-storage.mjs';
 import {captureStoryWorkshopEvidence} from './save-evidence.mjs';
 import {checkStoryResumeSnapshot} from './resume-guard.mjs';
+import {shouldBlockStoryStorageEvent} from './storage-event-guard.mjs';
 import {inspectStoryWorkshopRequirement} from './workshop-gate.mjs';
 import {createEmptyStoryProgress,STORY_SAVE_KEY} from '../mode-boundaries.mjs';
 
@@ -20,6 +21,8 @@ function localDay(){
   return date.getFullYear()+'-'+pad(date.getMonth()+1)+'-'+pad(date.getDate());
 }
 function save(next,reset=false){
+  // A stale dialog cannot save after a cross-tab invalidation; explicit reset keeps its CAS flow.
+  if(blocked&&!reset)return false;
   if(!writeStorySave(store,next,{expectedRaw:raw,confirmedReset:reset})){
     blocked=true;reason='WRITE_CONFLICT';render();return false;
   }
@@ -197,8 +200,10 @@ document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState==='visible')recheckStoryOnResume();
 });
 window.addEventListener('storage',event=>{
-  if(event.key===STORY_SAVE_KEY){
-    blocked=true;reason='WRITE_CONFLICT';render();
+  if(shouldBlockStoryStorageEvent(event,{key:STORY_SAVE_KEY,storage:store})){
+    blocked=true;reason='WRITE_CONFLICT';selectedChoice=null;
+    if($('story-dialog').open)$('story-dialog').close();
+    render();
   }
 });
 render();

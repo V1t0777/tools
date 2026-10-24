@@ -4,6 +4,7 @@ import {readStoryWorkshop,writeStoryWorkshop,STORY_WORKSHOP_KEY} from './worksho
 import {readStorySave} from './local-storage.mjs';
 import {captureStoryWorkshopEvidence} from './save-evidence.mjs';
 import {checkStoryResumeSnapshot} from './resume-guard.mjs';
+import {shouldBlockStoryStorageEvent} from './storage-event-guard.mjs';
 import {storyGardenBuildAvailable,storyHarborBuildAvailable,storyStorefrontBuildAvailable} from './workshop-gate.mjs';
 const $=id=>document.getElementById(id);
 const storage=(()=>{try{return window.localStorage;}catch{return null;}})();
@@ -122,6 +123,8 @@ function render(){
   $('export-corrupt-workshop').disabled=reason!=='CORRUPT_SAVE'||typeof raw!=='string';
 }
 function commit(result){
+  // A queued click from a stale DOM must not commit after another tab invalidates us.
+  if(blocked)return;
   if(!result.ok){$('board-notice').textContent=result.message;return;}
   if(!writeStoryWorkshop(storage,result.state,{expectedRaw:raw})){
     blocked=true;reason='WRITE_CONFLICT';render();return;
@@ -216,6 +219,8 @@ document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState==='visible')recheckWorkshopOnResume();
 });
 window.addEventListener('storage',event=>{
-  if(event.key===STORY_WORKSHOP_KEY){blocked=true;reason='WRITE_CONFLICT';render();}
+  if(shouldBlockStoryStorageEvent(event,{key:STORY_WORKSHOP_KEY,storage})){
+    blocked=true;reason='WRITE_CONFLICT';selected=-1;render();
+  }
 });
 render();
