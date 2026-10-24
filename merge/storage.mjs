@@ -47,6 +47,29 @@ export function loadLocal(storage, now = Date.now()) {
   return {...newSession(now, 'CORRUPT_SAVE'),raw};
 }
 
+/**
+ * P2.25 — read-only inspection for cross-tab storage events.
+ * Unlike loadLocal, this MUST NOT run legacy migrations or write backups.
+ * A missing, corrupt or legacy save is a conflict, not a new empty session.
+ */
+export function peekLocalV3(storage) {
+  let raw;
+  try {
+    if(typeof storage?.getItem!=='function')
+      return Object.freeze({ok:false,reason:'STORAGE_UNAVAILABLE'});
+    raw=storage.getItem(SAVE_KEY);
+  } catch {return Object.freeze({ok:false,reason:'STORAGE_UNAVAILABLE'});}
+  if(raw===null)return Object.freeze({ok:false,reason:'SAVE_REMOVED'});
+  if(typeof raw!=='string'||raw.length>MAX_LOCAL_SAVE_BYTES)
+    return Object.freeze({ok:false,reason:'CORRUPT_SAVE'});
+  try {
+    const state=JSON.parse(raw);
+    if(!validateSave(state))
+      return Object.freeze({ok:false,reason:'UNSUPPORTED_OR_CORRUPT_SAVE'});
+    return Object.freeze({ok:true,raw,state});
+  } catch {return Object.freeze({ok:false,reason:'CORRUPT_SAVE'});}
+}
+
 /** Refuse corrupt saves, stale-tab rollback and unsafe legacy overwrite.
  * expectedRaw is the exact last-read/successfully-written value for this tab.
  * It detects sequential same-revision edits and intervening resets, but cannot

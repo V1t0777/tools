@@ -4,7 +4,7 @@ import { WIDTH, CELL_COUNT, MAX_ENERGY, ENERGY_REGEN_MS, CHAINS, createInitialSt
   getLevelProgress, getMaxOrderTier, getProducerUpgrade, getWarehouseUpgrade,
   SUPPLY_ITEMS, ACHIEVEMENT_RULES, useSupply, purchaseSupply } from './engine.mjs';
 import { BUILDINGS } from './economy.mjs';
-import { loadLocal, saveLocal, SAVE_KEY } from './storage.mjs';
+import { loadLocal, saveLocal, peekLocalV3, SAVE_KEY } from './storage.mjs';
 import { getBoardGuidance } from './board-guidance.mjs';
 import { getSupplyControlSnapshot } from './supply-controls.mjs';
 import { deriveNormalMilestones } from './normal-milestones.mjs';
@@ -420,18 +420,38 @@ byId('close-guide').addEventListener('click', () => dialog.close());
 // Local preview has no account/session hooks and intentionally sends no game data to the network.
 window.addEventListener('storage', event => {
   if (event.key !== SAVE_KEY || !store) return;
-  const fresh = loadLocal(store);
-  if (fresh.blocked) {
-    saveIssue = fresh.reason;persist();return;
+  // Storage events must be read-only. loadLocal can migrate legacy saves and
+  // write backup keys; never run it while reacting to another tab's write.
+  const fresh = peekLocalV3(store);
+  if (!fresh.ok) {
+    saveIssue = fresh.reason;
+    byId('save-status').textContent =
+      '其他标签页的存档异常或已移除，已暂停同步 · 请勿关闭页面';
+    hint('跨标签存档发生变化，请先导出原始存档并核对');
+    return;
   }
-  // Same-revision saves can still differ (e.g. energy recharge); do not
-  // overwrite them using a stale tab's old raw bytes.
-  if (fresh.recovered && fresh.raw !== persistedRaw &&
-      fresh.state.revision >= state.revision) {
-    if (saveIssue) { hint('其他标签页更新了存档，当前页面存在未保存进度'); return; }
-    state = advanceTime(fresh.state); persistedRaw = fresh.raw; activeGuidance = null;
-    selected = -1; persist(); render(); hint('已从其他标签页恢复更新进度');
+  if (fresh.raw === persistedRaw) return;
+  if (saveIssue) {
+    hint('其他标签页更新了存档，当前页面存在未保存进度');
+    return;
   }
+  if (fresh.state.revision < state.revision) {
+    // Never replace a newer in-memory board with older remote progress.
+    // Keep the existing expectedRaw so subsequent writes fail closed.
+    saveIssue = 'CURRENT_SAVE_CHANGED';
+    byId('save-status').textContent =
+      '检测到其他标签页的旧版进度，已暂停保存 · 请勿关闭页面';
+    hint('跨标签进度冲突，请先核对并备份存档');
+    return;
+  }
+  state = advanceTime(fresh.state);
+  persistedRaw = fresh.raw;
+  selected = -1; activeGuidance = null;
+  // No persist() here: avoid cross-tab write-back loops. Any later gameplay
+  // mutation or energy tick still uses the existing guarded save path.
+  byId('save-status').textContent = '已同步其他标签页进度 · 未上传云端';
+  render();
+  hint('已从其他标签页读取更新进度');
 });
 window.setInterval(() => {
   const now=Date.now();
