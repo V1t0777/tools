@@ -1,4 +1,4 @@
-import {WIDTH,MAX_ENERGY,CHAINS,getLevel,moveOrMerge,produce,fulfillOrder,upgradeBuilding,getItemIcon,getItemName} from '../engine.mjs';
+import {WIDTH,MAX_ENERGY,CHAINS,getLevel,moveOrMerge,produce,fulfillOrder,storeItem,withdrawItem,upgradeBuilding,getItemIcon,getItemName} from '../engine.mjs';
 import {BUILDINGS} from '../economy.mjs';
 import {readStoryWorkshop,writeStoryWorkshop,STORY_WORKSHOP_KEY} from './workshop-storage.mjs';
 import {readStorySave} from './local-storage.mjs';
@@ -42,6 +42,42 @@ function render(){
     button.addEventListener('click',()=>touch(i));fragment.append(button);
   });
   board.append(fragment);
+
+  // Real story-only warehouse actions: never read/write normal-mode storage.
+  const used=state.board.filter(Boolean).length;
+  const stored=state.warehouse.slots.slice(0,state.warehouse.capacity).filter(Boolean).length;
+  const boardHasSpace=used<state.board.length;
+  const warehouseHasSpace=stored<state.warehouse.capacity;
+  const selectedMaterial=selected>=0&&state.board[selected]?.kind==='material';
+  $('board-occupancy').textContent=used+' / '+state.board.length;
+  $('warehouse-occupancy').textContent=stored+' / '+state.warehouse.capacity;
+  $('store-selected').disabled=blocked||!selectedMaterial||!warehouseHasSpace;
+  $('warehouse-hint').textContent=blocked
+    ? '存档处于保护状态，仓库操作已暂停；请先核对存档提示。'
+    : !boardHasSpace
+      ? warehouseHasSpace
+        ? '棋盘已满：选择一件材料后点击“收纳选中材料”，腾出生产空间；也可以合成同类同等级材料。'
+        : '棋盘和仓库都满：先合成两件同类同等级材料，腾出棋盘空间。'
+      : selectedMaterial
+        ? warehouseHasSpace
+          ? '已选中'+getItemName(state.board[selected])+'；可收纳至仓库。'
+          : '仓库已满：请先取回物品并合成，或继续整理棋盘。'
+        : '点选棋盘上的材料，再收纳到仓库；点击仓库中已存放的物品可取回。';
+  const bank=$('workshop-warehouse');bank.replaceChildren();
+  const bankFragment=document.createDocumentFragment();
+  for(let i=0;i<state.warehouse.capacity;i++){
+    const item=state.warehouse.slots[i];
+    const button=document.createElement('button');button.type='button';
+    button.className='workshop-warehouse-slot';
+    button.disabled=blocked||!item||!boardHasSpace;
+    button.setAttribute('aria-label','仓库第'+(i+1)+'格，'+(item?'取回'+getItemName(item):'空位'));
+    button.textContent=item
+      ? getItemIcon(item)+' '+getItemName(item)+' · Lv.'+item.tier+' · 取回'
+      : '第'+(i+1)+'格 · 空位';
+    button.addEventListener('click',()=>commit(withdrawItem(state,i)));
+    bankFragment.append(button);
+  }
+  bank.append(bankFragment);
   const list=$('workshop-orders');list.replaceChildren();
   for(const order of state.orders){
     const row=document.createElement('div');row.className='workshop-order';
@@ -99,6 +135,13 @@ function touch(index){
   if(selected===index){selected=-1;render();return;}
   commit(moveOrMerge(state,selected,index));
 }
+$('store-selected').addEventListener('click',()=>{
+  if(blocked)return;
+  if(selected<0||state.board[selected]?.kind!=='material'){
+    $('board-notice').textContent='请先选中棋盘上的一件材料。';return;
+  }
+  commit(storeItem(state,selected));
+});
 $('build-garden').addEventListener('click',()=>{
   if(blocked)return;
   const story=readStorySave(storage);

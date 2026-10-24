@@ -13,3 +13,12 @@
 
 .workshop-build{display:block;width:100%;min-height:48px;border:0;border-radius:12px;background:var(--accent);color:white;font-weight:800;padding:10px 16px}
 .workshop-build:disabled{opacity:.5;cursor:not-allowed}
+
+/* P8: story-only inventory; mobile-first touch targets and horizontal-safe labels. */
+.workshop-warehouse{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}
+.workshop-warehouse-slot{min-width:0;min-height:48px;padding:10px 8px;border:1px solid #a7c2ae;border-radius:12px;background:#f4f7ed;color:#315b4e;font-size:13px;line-height:1.45;overflow-wrap:anywhere;text-align:left;touch-action:manipulation}
+.workshop-warehouse-slot:disabled{opacity:.55;cursor:not-allowed}
+.workshop-warehouse-slot:focus-visible,.workshop-build:focus-visible{outline:3px solid #6587bb;outline-offset:2px}
+@media(min-width:600px){.workshop-warehouse{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(prefers-color-scheme:dark){.workshop-warehouse-slot{background:#355046;color:var(--ink);border-color:#597568}}
+@media(prefers-reduced-motion:reduce){.workshop-warehouse-slot{transition:none}}

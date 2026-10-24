@@ -39,6 +39,14 @@
       </div>
       <p id="board-notice" role="status" aria-live="polite">请选择一个物品，或点击工坊生产。</p>
     </section>
+    <section class="stories workshop" aria-labelledby="warehouse-title">
+      <div class="progress-heading"><h2 id="warehouse-title">临时仓库 · 整理材料</h2><span id="warehouse-occupancy">0 / 4</span></div>
+      <p class="muted">当前棋盘占用：<strong id="board-occupancy">—</strong>。棋盘满时可收纳材料，避免生产受阻。</p>
+      <p id="warehouse-hint" class="muted" role="status" aria-live="polite">选择棋盘材料即可收纳，仓库物品可点按取回。</p>
+      <button type="button" id="store-selected" class="workshop-build" disabled>收纳选中材料</button>
+      <div id="workshop-warehouse" class="workshop-warehouse" role="group" aria-label="剧情工作台临时仓库"></div>
+      <p class="muted">仓库中的材料需要先取回棋盘，才能用于合成或交付委托；仓库容量与普通经营完全独立。</p>
+    </section>
     <section class="stories">
       <h2>街坊委托</h2>
       <div id="workshop-orders" class="workshop-orders"></div>
