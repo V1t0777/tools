@@ -205,6 +205,14 @@ $('reset-story').addEventListener('click',async()=>{
     blocked=true;reason='WRITE_CONFLICT';render();return;
   }
   const next=startCoreStory(createEmptyStoryProgress(),CORE_STORY_PACK);
+  // A reset must change the snapshot even if the current save is already blank.
+  // Monotonic revision prevents ABA: stale tabs must not replay an old choice.
+  if(!current.blocked&&current.raw!==null){
+    if(current.progress.revision===Number.MAX_SAFE_INTEGER){
+      blocked=true;reason='WRITE_CONFLICT';render();return;
+    }
+    next.revision=current.progress.revision+1;
+  }
   await save(next,true);
 });
 function recheckStoryOnResume(){

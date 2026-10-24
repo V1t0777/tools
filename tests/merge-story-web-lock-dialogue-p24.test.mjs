@@ -51,7 +51,7 @@ test('P24 a queued confirmed reset cannot erase a newly completed dialogue',asyn
   assert.equal(writeStorySave(storage,base,{expectedRaw:null}),true);
   const expectedRaw=storage.getItem(STORY_SAVE_KEY);
   const next=completeStoryEntry(base,CORE_STORY_PACK,'arrival','help');
-  const reset=fresh();
+  const reset=fresh();reset.revision=base.revision+1;
   const [saved,cleared]=await Promise.all([
     saveStoryDialogueWithLock(locks,storage,next,{expectedRaw}),
     saveStoryDialogueWithLock(locks,storage,reset,{expectedRaw,confirmedReset:true})
@@ -65,7 +65,7 @@ test('P24 confirmed reset wins first; queued dialogue completion cannot restore 
   assert.equal(writeStorySave(storage,base,{expectedRaw:null}),true);
   const expectedRaw=storage.getItem(STORY_SAVE_KEY);
   const next=completeStoryEntry(base,CORE_STORY_PACK,'arrival','help');
-  const reset=fresh();
+  const reset=fresh();reset.revision=base.revision+1;
   const [cleared,saved]=await Promise.all([
     saveStoryDialogueWithLock(locks,storage,reset,{expectedRaw,confirmedReset:true}),
     saveStoryDialogueWithLock(locks,storage,next,{expectedRaw})
@@ -73,6 +73,7 @@ test('P24 confirmed reset wins first; queued dialogue completion cannot restore 
   assert.equal(cleared.value,true);
   assert.equal(saved.value,false);
   assert.equal(storage.getItem(STORY_SAVE_KEY),JSON.stringify(reset));
+  assert.ok(reset.revision>base.revision,'reset advances revision to prevent ABA');
 });
 test('P24 first-time initialization is serialized and never overwrites a concurrent tab',async()=>{
   const storage=sharedStorage(),locks=exclusiveLocks();
@@ -96,11 +97,13 @@ test('P24 confirmed corrupt reset is isolated; malformed/rejecting locks never s
   assert.equal(storage.getItem(SAVE_KEY),'normal');
   assert.equal(storage.getItem(STORY_WORKSHOP_KEY),'workshop');
   const expectedRaw=storage.getItem(STORY_SAVE_KEY);
+  assert.equal((await saveStoryDialogueWithLock(locks,storage,fresh(),{expectedRaw,confirmedReset:true})).value,false,'same-revision reset cannot recreate an identical old snapshot');
   for(const bad of [{request:null},{request(){throw Error('blocked');}},{request(){return Promise.reject(Error('blocked'));}}]){
     assert.equal((await saveStoryDialogueWithLock(bad,storage,fresh(),{expectedRaw,confirmedReset:true})).ok,false);
     assert.equal(storage.getItem(STORY_SAVE_KEY),expectedRaw);
   }
-  assert.equal((await saveStoryDialogueWithLock(null,storage,fresh(),{expectedRaw,confirmedReset:true})).mode,'cas-fallback');
+  const nextReset=fresh();nextReset.revision=readStorySave(storage).progress.revision+1;
+  assert.equal((await saveStoryDialogueWithLock(null,storage,nextReset,{expectedRaw,confirmedReset:true})).mode,'cas-fallback');
 });
 test('P24 invalidated page aborts a queued write before touching localStorage',async()=>{
   const storage=sharedStorage(),locks=exclusiveLocks();
@@ -130,10 +133,12 @@ test('P24 dialogue UI gates choices and reset while pending and uses lock for al
   assert.ok(ui.includes('void save(next);'),'first-time initialization');
   assert.ok(ui.includes('if(await save(next))'),'completed dialogue');
   assert.ok(ui.includes('await save(next,true);'),'confirmed reset');
+  assert.ok(ui.includes('next.revision=current.progress.revision+1;'),'ABA-safe reset revision');
   assert.ok(ui.includes("window.confirm('确认重置此浏览器的剧情进度吗"));
   assert.ok(ui.includes('storageEpoch++;blocked=true;'));
   assert.ok(ui.includes("$('reset-story').disabled=saving||"));
   assert.ok(ui.includes('button.disabled=saving;'));
-  for(const forbidden of ['innerHTML','insertAdjacentHTML','fetch(','sendBeacon(','localStorage.setItem','SAVE_KEY'])
+  for(const forbidden of ['innerHTML','insertAdjacentHTML','fetch(','sendBeacon(','localStorage.setItem'])
     assert.equal(ui.includes(forbidden),false,forbidden);
+  assert.equal(/\\bSAVE_KEY\\b/.test(ui),false,'normal-mode save key must not appear');
 });

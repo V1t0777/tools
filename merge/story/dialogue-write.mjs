@@ -18,6 +18,10 @@ export async function saveStoryDialogueWithLock(locks,storage,next,{
     if(!isCurrent())return false;
     const current=readStorySave(storage);
     if(current.reason==='STORAGE_UNAVAILABLE'||current.raw!==expectedRaw)return false;
+    // Reject ABA on a valid save: a confirmed reset must advance revision,
+    // otherwise an older tab with the same raw snapshot could still commit.
+    if(confirmedReset&&!current.blocked&&current.raw!==null&&
+      next?.revision<=current.progress.revision)return false;
     if(!isCurrent())return false;
     return writeStorySave(storage,next,{expectedRaw,confirmedReset});
   });
