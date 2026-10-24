@@ -97,3 +97,25 @@ test('P2.30 full energy clock marker cannot move without refill',()=>{
   assert.equal(safe(exhausted,advanceTime(exhausted,now+ENERGY_REGEN_MS),
     now+ENERGY_REGEN_MS),true);
 });
+
+test('P2.31 future-dated energyAt cannot grant cross-tab energy early',()=>{
+  const local={...initial(),energy:MAX_ENERGY-4};
+  const future=advanceTime(local,now+2*ENERGY_REGEN_MS);
+  assert.equal(future.energy,local.energy+2);
+  assert.equal(safe(local,future,now+ENERGY_REGEN_MS),false);
+  assert.equal(safe(local,future,now+2*ENERGY_REGEN_MS),true);
+  // A baseline already dated in the future must not block an identical save.
+  const futureBaseline={...initial(),energyAt:now+2*ENERGY_REGEN_MS};
+  assert.equal(safe(futureBaseline,structuredClone(futureBaseline),now),true);
+});
+test('P2.31 future clock marker cannot piggyback on a due producer refill',()=>{
+  const base=initial();
+  const index=base.board.findIndex(item=>item?.kind==='producer');
+  const board=base.board.map(item=>item?{...item}:item);
+  board[index]={...board[index],charges:0,cooldownUntil:now+45_000};
+  const exhausted={...base,board};
+  const restored=advanceTime(exhausted,now+2*ENERGY_REGEN_MS);
+  assert.equal(restored.board[index].charges,PRODUCER_CHARGES);
+  assert.equal(safe(exhausted,restored,now+ENERGY_REGEN_MS),false);
+  assert.equal(safe(exhausted,restored,now+2*ENERGY_REGEN_MS),true);
+});
