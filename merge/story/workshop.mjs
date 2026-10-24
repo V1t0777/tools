@@ -9,6 +9,7 @@ import {resetStoryWorkshopWithLock} from './workshop-reset.mjs';
 import {shouldBlockStoryStorageEvent} from './storage-event-guard.mjs';
 import {shouldRefreshWorkshopForStoryEvent} from './storage-event-guard.mjs';
 import {storyGardenBuildAvailable,storyHarborBuildAvailable,storyStorefrontBuildAvailable} from './workshop-gate.mjs';
+import {storyBuildingWriteAllowed} from './building-commit-guard.mjs';
 const $=id=>document.getElementById(id);
 const storage=(()=>{try{return window.localStorage;}catch{return null;}})();
 const webLocks=(()=>{try{return window.navigator?.locks??null;}catch{return null;}})();
@@ -135,8 +136,12 @@ async function commit(result){
   if(!result.ok){$('board-notice').textContent=result.message;return;}
   saving=true;render();
   const expectedRaw=raw;
+  // A building spends coins only while its story prerequisite is still current.
+  // Recheck after acquiring the workshop lock, not just when the button was tapped.
+  const expectedStoryRaw=readStorySave(storage).raw;
   const attempt=await runStoryWriteWithLock(webLocks,STORY_WORKSHOP_KEY,
-    ()=>!blocked&&writeStoryWorkshop(storage,result.state,{expectedRaw}));
+    ()=>!blocked&&storyBuildingWriteAllowed(storage,state,result.state,expectedStoryRaw)&&
+      writeStoryWorkshop(storage,result.state,{expectedRaw}));
   saving=false;
   if(!attempt.ok||attempt.value!==true||blocked){
     blocked=true;reason='WRITE_CONFLICT';render();return;

@@ -82,7 +82,8 @@ test('P22 workshop UI disables actions while waiting, and retains exact-raw CAS'
   assert.ok(ui.includes('if(blocked||saving)return;'));
   assert.ok(ui.includes('saving=true;render();'));
   assert.ok(ui.includes('runStoryWriteWithLock(webLocks,STORY_WORKSHOP_KEY,'));
-  assert.ok(ui.includes('()=>!blocked&&writeStoryWorkshop(storage,result.state,{expectedRaw})'));
+  assert.ok(ui.includes('storyBuildingWriteAllowed(storage,state,result.state,expectedStoryRaw)'));
+  assert.ok(ui.includes('writeStoryWorkshop(storage,result.state,{expectedRaw})'));
   assert.ok(ui.includes('saving=false;'));
   assert.ok(ui.includes("if(!attempt.ok||attempt.value!==true||blocked)"));
   assert.ok(ui.includes("$('reset-workshop').disabled=saving||"));
