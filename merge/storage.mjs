@@ -20,7 +20,7 @@ export function loadLocal(storage, now = Date.now()) {
   if (raw === null) return newSession(now);
   try {
     if (typeof raw !== 'string' || raw.length > MAX_LOCAL_SAVE_BYTES)
-      return newSession(now, 'CORRUPT_SAVE');
+      return {...newSession(now, 'CORRUPT_SAVE'),raw};
     const parsed = JSON.parse(raw);
     if (validateSave(parsed)) return {state:parsed, recovered:true, migrated:false, raw};
     const v1=parsed?.schemaVersion===1 && validateLegacySave(parsed);
@@ -37,28 +37,36 @@ export function loadLocal(storage, now = Date.now()) {
         backedUp=storage.getItem(backupKey)===raw;
       }catch{/* Do not modify the only valid original. */}
       if(!backedUp)return {state:upgraded,recovered:true,migrated:true,
-        volatile:true,blocked:true,reason:'BACKUP_UNAVAILABLE'};
+        volatile:true,blocked:true,reason:'BACKUP_UNAVAILABLE',raw};
       if(saveLocal(storage,upgraded,{migrationRaw:raw}))
         return {state:upgraded,recovered:true,migrated:true,raw:JSON.stringify(upgraded)};
       return {state:upgraded,recovered:true,migrated:true,
-        volatile:true,blocked:true,reason:'WRITE_FAILED'};
+        volatile:true,blocked:true,reason:'WRITE_FAILED',raw};
     }
   } catch { /* Do not replace malformed or unrecognized stored bytes. */ }
-  return newSession(now, 'CORRUPT_SAVE');
+  return {...newSession(now, 'CORRUPT_SAVE'),raw};
 }
 
 /** Refuse corrupt saves, stale-tab rollback and unsafe legacy overwrite.
  * expectedRaw is the exact last-read/successfully-written value for this tab.
  * It detects sequential same-revision edits and intervening resets, but cannot
  * make localStorage's separate read/write operations atomic across tabs.
- * allowReset must be used ONLY after an explicit user-confirmed reset.
+ * allowReset requires BOTH explicit user confirmation and the exact last-read
+ * raw baseline; confirmation never authorizes overwriting another tab's save.
+ * This is a best-effort guard, NOT an atomic cross-tab transaction.
  */
 export function saveLocal(storage, state, {allowReset=false, migrationRaw=null, expectedRaw=undefined} = {}) {
   if (!validateSave(state)) return false;
   try {
     if (typeof storage?.getItem !== 'function' || typeof storage?.setItem !== 'function') return false;
     const current = storage.getItem(SAVE_KEY);
-    if (!allowReset && expectedRaw !== undefined && current !== expectedRaw) return false;
+    if (allowReset) {
+      // A reset must not bypass optimistic concurrency, even with user consent.
+      // Undefined means no trusted observed baseline; null means the key was absent.
+      if (expectedRaw === undefined ||
+          (expectedRaw !== null && typeof expectedRaw !== 'string') ||
+          current !== expectedRaw || migrationRaw !== null) return false;
+    } else if (expectedRaw !== undefined && current !== expectedRaw) return false;
     if (current !== null) {
       if (migrationRaw !== null) {
         if(current!==migrationRaw)return false;
