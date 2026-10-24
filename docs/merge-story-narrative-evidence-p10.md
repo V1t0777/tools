@@ -12,3 +12,6 @@
 `tests/merge-story-save-evidence.test.mjs` 新增原文保留、跨标签冲突、普通经营隔离、UI 离线契约及重置风险提示测试。仍须 iPhone Safari/微信 WebView 实测文件下载、文件可读性、低存储空间、私密模式和真实跨标签竞争。没有自动恢复功能；不能将 GitHub CI 视为真机或发布验收。
 
 **严格保持 Draft：** 不合并 main，不改正式导航与部署白名单，不发布网站/Edge，不运行线上 Supabase SQL 或迁移，不加入作弊功能。
+
+## P11 · 异常备份键域最小权限（未发布）
+`captureStoryWorkshopEvidence` 现在仅允许 `STORY_SAVE_KEY` 和 `STORY_WORKSHOP_KEY` 两个固定剧情键。即使调用方误传普通模式存档键或其他本地键，也会在读取存储前返回 `INVALID_KEY`；两种剧情损坏记录仍需主动同意、原文快照一致且不超限。新增 P11 回归验证拒绝路径不调用 `getItem`，并确认两种合法剧情键可继续导出。此变更不触碰正式部署、普通模式读写或生产数据；仍缺 iPhone Safari / 微信 WebView 的真实文件保存测试。
