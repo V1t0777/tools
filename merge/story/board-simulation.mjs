@@ -15,18 +15,22 @@ import {BUILDINGS,getLevel,getMaxOrderTier} from '../economy.mjs';
 
 const START_TIME=1_000_000;
 const BUILD_ORDER=Object.freeze(['garden','harbor','storefront']);
+const STRATEGIES=new Set(['greedy','novice']);
+const PRODUCER_CHAINS=Object.freeze(['tea','bakery','floral']);
+const NOVICE_MERGE_THRESHOLD=20;
 const numberId=id=>Number(id.slice(1));
 const usedSlots=state=>state.board.filter(Boolean).length;
 const validSeed=value=>Number.isSafeInteger(value)&&value>=0&&value<=0xffffffff;
 
 /** Return a bounded, deterministic report. Does not expose or persist a save. */
-export function simulateStoryBoard({seed=1,maxActions=20_000}={}){
-  if(!validSeed(seed)||!Number.isSafeInteger(maxActions)||
+export function simulateStoryBoard({seed=1,maxActions=20_000,strategy='greedy'}={}){
+  if(!STRATEGIES.has(strategy)||!validSeed(seed)||!Number.isSafeInteger(maxActions)||
     maxActions<1||maxActions>50_000)
     throw new RangeError('Invalid board simulation options');
 
   let now=START_TIME,state=createInitialState(now),randomState=seed>>>0;
   let orders=0,productions=0,merges=0,waits=0,phase=0,actions=0;
+  let offTargetProductions=0;
   let peakBoardUsed=usedSlots(state);
   let reason='action-cap';
   const milestones=[];
@@ -80,7 +84,7 @@ export function simulateStoryBoard({seed=1,maxActions=20_000}={}){
         other.chain===item.chain&&other.tier===item.tier);
       if(j>=0)pair=[i,j];
     }
-    if(pair){
+    if(pair&&(strategy==='greedy'||usedSlots(state)>=NOVICE_MERGE_THRESHOLD)){
       const result=moveOrMerge(state,...pair);
       if(!result.ok){reason='merge-rejected';break;}
       state=result.state;merges++;
@@ -90,8 +94,11 @@ export function simulateStoryBoard({seed=1,maxActions=20_000}={}){
     if(usedSlots(state)===state.board.length){reason='board-full';break;}
     const target=state.orders.slice()
       .sort((a,b)=>a.tier-b.tier||numberId(a.id)-numberId(b.id))[0];
+    const chain=strategy==='novice'
+      ? PRODUCER_CHAINS[productions%PRODUCER_CHAINS.length]
+      : target.chain;
     const slot=state.board.findIndex(item=>item?.kind==='producer'&&
-      item.chain===target.chain);
+      item.chain===chain);
     if(slot<0){reason='missing-producer';break;}
 
     if(state.energy===0){
@@ -107,15 +114,16 @@ export function simulateStoryBoard({seed=1,maxActions=20_000}={}){
     const result=produce(state,slot,now,rng);
     if(!result.ok){reason='production-rejected';break;}
     state=result.state;productions++;
+    if(chain!==target.chain)offTargetProductions++;
   }
 
   return Object.freeze({
-    seed,complete:reason==='complete',reason,actions,orders,productions,
-    merges,waits,elapsedMinutes:(now-START_TIME)/60_000,
+    seed,strategy,complete:reason==='complete',reason,actions,orders,productions,
+    offTargetProductions,merges,waits,elapsedMinutes:(now-START_TIME)/60_000,
     coins:state.coins,xp:state.xp,energy:state.energy,
     boardUsed:usedSlots(state),peakBoardUsed:Math.max(peakBoardUsed,usedSlots(state)),
     buildings:Object.freeze({...state.buildings}),
     milestones:Object.freeze(milestones),
-    limitations:'真实引擎与7×8棋盘、种子随机掉落及冷却；单一贪心策略，忽略玩家点击耗时、故事阅读、仓库、升级、补给、付费和存档冲突。模拟耗时绝非真实通关时间。'
+    limitations:'真实引擎与7×8棋盘、种子随机掉落及冷却；贪心或人为构造的新手压力策略，忽略玩家点击耗时、故事阅读、仓库、升级、补给、付费和存档冲突。模拟耗时绝非真实通关时间。'
   });
 }
