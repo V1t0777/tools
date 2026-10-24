@@ -11,6 +11,7 @@ import { deriveNormalMilestones } from './normal-milestones.mjs';
 import { prepareLocalSaveExport } from './save-export.mjs';
 import { commitNormalSnapshot } from './save-transaction.mjs';
 import { prepareNormalStartup } from './startup-persist.mjs';
+import { isSafeSameRevisionClockUpdate } from './storage-event-policy.mjs';
 
 const byId = id => document.getElementById(id);
 const board = byId('board');
@@ -448,6 +449,16 @@ window.addEventListener('storage', event => {
     byId('save-status').textContent =
       '检测到其他标签页的旧版进度，已暂停保存 · 请勿关闭页面';
     hint('跨标签进度冲突，请先核对并备份存档');
+    return;
+  }
+  if (fresh.state.revision === state.revision &&
+      !isSafeSameRevisionClockUpdate(state,fresh.state)) {
+    // Equal revision does not imply equal economy. Clock-only progress is
+    // allowed, but never silently adopt a divergent board/coins/orders.
+    saveIssue = 'CURRENT_SAVE_CHANGED';
+    byId('save-status').textContent =
+      '检测到同版本跨标签进度冲突，已暂停保存 · 请先备份核对';
+    hint('其他标签页存在不同的经营进度，请先备份并重新打开页面核对');
     return;
   }
   state = advanceTime(fresh.state);
