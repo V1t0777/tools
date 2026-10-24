@@ -4,7 +4,7 @@
  * for future manual recovery. Never reads the reserved story-mode namespace.
  */
 import { validateSave } from './engine.mjs';
-import { SAVE_KEY, MAX_LOCAL_SAVE_BYTES } from './storage.mjs';
+import { SAVE_KEY, ABNORMAL_RESET_BACKUP_KEY, MAX_LOCAL_SAVE_BYTES } from './storage.mjs';
 
 // Actual encoded file limit, not a JavaScript UTF-16 code-unit count.
 export const MAX_EXPORT_BYTES = 2_000_000;
@@ -55,4 +55,29 @@ export function prepareLocalSaveExport(storage) {
     mime:verified?'application/json;charset=utf-8':'text/plain;charset=utf-8',
     content:raw
   });
+}
+
+/**
+ * P2.36: manual, read-only export of the separate original saved before an
+ * abnormal confirmed reset. Never substitutes the current normal save, and
+ * never touches the story-mode namespace. Not an automatic restore.
+ */
+export function prepareAbnormalResetBackupExport(storage) {
+  // Reuse the exact raw-string bounds/UTF-16 handling of the primary exporter,
+  // but route its one permitted read to the dedicated abnormal backup key.
+  const view={
+    getItem(key) {
+      if(key!==SAVE_KEY||typeof storage?.getItem!=='function')
+        throw Error('STORAGE_UNAVAILABLE');
+      return storage.getItem(ABNORMAL_RESET_BACKUP_KEY);
+    }
+  };
+  const result=prepareLocalSaveExport(view);
+  if(!result.ok)return result;
+  // An abnormal-reset backup is historical evidence, not the active save.
+  // Do not label it as verified gameplay data even if its JSON validates.
+  return Object.freeze({...result,verified:false,backup:true,
+    filename:result.wrapped
+      ?'yunyu-abnormal-reset-utf16-escaped.json'
+      :'yunyu-abnormal-reset-original.txt'});
 }

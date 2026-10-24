@@ -2,6 +2,8 @@ import { createInitialState, upgradeLegacySave, upgradeV2Save, validateV2Save, v
 import { validateSave as validateLegacySave } from './legacy-engine.mjs';
 
 export const SAVE_KEY = 'toolbox.merge-isle.local.v1';
+// Reserved for the original bytes preserved before an abnormal confirmed reset.
+export const ABNORMAL_RESET_BACKUP_KEY = `${SAVE_KEY}.abnormal-reset-backup-v3`;
 export const LEGACY_BACKUP_KEY = `${SAVE_KEY}.backup-v1`;
 export const V2_BACKUP_KEY = `${SAVE_KEY}.backup-v2`;
 // Much larger than a legitimate 56-cell save; bound parsing and writes from untrusted storage.
