@@ -2,7 +2,7 @@ import {WIDTH,MAX_ENERGY,CHAINS,getLevel,moveOrMerge,produce,fulfillOrder,upgrad
 import {BUILDINGS} from '../economy.mjs';
 import {readStoryWorkshop,writeStoryWorkshop,STORY_WORKSHOP_KEY} from './workshop-storage.mjs';
 import {readStorySave} from './local-storage.mjs';
-import {storyGardenBuildAvailable,storyHarborBuildAvailable} from './workshop-gate.mjs';
+import {storyGardenBuildAvailable,storyHarborBuildAvailable,storyStorefrontBuildAvailable} from './workshop-gate.mjs';
 const $=id=>document.getElementById(id);
 const storage=(()=>{try{return window.localStorage;}catch{return null;}})();
 const loaded=readStoryWorkshop(storage);
@@ -71,6 +71,15 @@ function render(){
       ? '先完成《第一次独立修理》，确认学徒与岚叔的安全准备，再进行港湾修缮。'
       : '需要 '+harbor.minLevel+' 级和 '+harbor.coins+' 金币；当前 '+level+' 级、'+state.coins+' 金币。';
   $('build-harbor').disabled=blocked||harborBuilt||!harborStoryReady||level<harbor.minLevel||state.coins<harbor.coins;
+  const storefront=BUILDINGS.storefront,storefrontBuilt=state.buildings.storefront===1;
+  const storefrontStoryReady=!narrative.blocked&&storyStorefrontBuildAvailable(narrative.progress);
+  $('storefront-status').textContent=storefrontBuilt?'已修整':'未修整';
+  $('storefront-hint').textContent=storefrontBuilt
+    ? '百物铺门面已修整。返回剧情页参加《大家的开张庆典》。'
+    : !storefrontStoryReady
+      ? '先读完《海雾里的灯》，再为居民们准备开张庆典。'
+      : '修整门面需要 '+storefront.minLevel+' 级和 '+storefront.coins+' 金币；目前 '+level+' 级、'+state.coins+' 金币。';
+  $('build-storefront').disabled=blocked||storefrontBuilt||!storefrontStoryReady||level<storefront.minLevel||state.coins<storefront.coins;
   $('reset-workshop').disabled=reason==='STORAGE_UNAVAILABLE';
 }
 function commit(result){
@@ -105,6 +114,14 @@ $('build-harbor').addEventListener('click',()=>{
     $('board-notice').textContent='请先完成《第一次独立修理》，再修缮港湾街角。';return;
   }
   commit(upgradeBuilding(state,'harbor'));
+});
+$('build-storefront').addEventListener('click',()=>{
+  if(blocked)return;
+  const story=readStorySave(storage);
+  if(story.blocked||!storyStorefrontBuildAvailable(story.progress)){
+    $('board-notice').textContent='请先完成《海雾里的灯》，再为庆典修整百物铺门面。';return;
+  }
+  commit(upgradeBuilding(state,'storefront'));
 });
 $('reset-workshop').addEventListener('click',()=>{
   if(!window.confirm('确认重置剧情工作台？此处的金币、物品和订单进度将丢失，不影响普通经营或已读剧情。'))return;

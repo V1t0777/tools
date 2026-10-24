@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createInitialState,createInitialState as createNormal,moveOrMerge,fulfillOrder,upgradeBuilding,validateSave} from '../merge/engine.mjs';
 import {STORY_WORKSHOP_KEY,readStoryWorkshop,writeStoryWorkshop} from '../merge/story/workshop-storage.mjs';
-import {storyWorkshopRequirement,inspectStoryWorkshopRequirement,storyGardenBuildAvailable,storyHarborBuildAvailable} from '../merge/story/workshop-gate.mjs';
+import {storyWorkshopRequirement,inspectStoryWorkshopRequirement,storyGardenBuildAvailable,storyHarborBuildAvailable,storyStorefrontBuildAvailable} from '../merge/story/workshop-gate.mjs';
 import {createEmptyStoryProgress} from '../merge/mode-boundaries.mjs';
 import {CORE_STORY_PACK} from '../merge/story/core-pack.mjs';
 import {startCoreStory,completeStoryEntry} from '../merge/story/runtime.mjs';
@@ -158,4 +158,50 @@ test('chapter-three harbor construction follows apprentice story and preserves o
   assert.ok(ui.includes("commit(upgradeBuilding(state,'harbor'))"));
   assert.ok(ui.includes('!storyHarborBuildAvailable(story.progress)'));
   assert.ok(ui.includes('!harborStoryReady'));
+});
+
+
+test('chapter-four festival requires a genuinely upgraded story shopfront',()=>{
+ const storage=db();const state=createInitialState(1000000);
+ assert.equal(storyWorkshopRequirement('festival',state).required,true);
+ assert.equal(storyWorkshopRequirement('festival',state).met,false);
+ assert.equal(inspectStoryWorkshopRequirement('festival',storage).met,false);
+ const ready=structuredClone(state);
+ ready.xp=28;ready.coins=60;
+ assert.equal(validateSave(ready),true);
+ assert.equal(storyWorkshopRequirement('festival',ready).met,false);
+ const outcome=upgradeBuilding(ready,'storefront');
+ assert.equal(outcome.ok,true);
+ assert.equal(outcome.state.buildings.storefront,1);
+ assert.equal(outcome.state.coins,0);
+ assert.equal(storyWorkshopRequirement('festival',outcome.state).met,true);
+ assert.equal(storyWorkshopRequirement('harbor-light',outcome.state).met,false);
+ assert.equal(writeStoryWorkshop(storage,outcome.state,{expectedRaw:null}),true);
+ assert.equal(inspectStoryWorkshopRequirement('festival',storage).met,true);
+ storage.setItem(STORY_WORKSHOP_KEY,'invalid {');
+ assert.equal(inspectStoryWorkshopRequirement('festival',storage).met,false);
+ assert.equal(inspectStoryWorkshopRequirement('festival',storage).blocked,true);
+});
+
+test('festival storefront construction only follows the harbor-light dialogue',()=>{
+ let story=startCoreStory(createEmptyStoryProgress(),CORE_STORY_PACK);
+ assert.equal(storyStorefrontBuildAvailable(story),false);
+ const mains=CORE_STORY_PACK.entries.filter(e=>e.kind==='main');
+ for(const item of mains){
+   if(item.id==='harbor-light')break;
+   story=completeStoryEntry(story,CORE_STORY_PACK,item.id,item.choices[0]?.id??null);
+ }
+ assert.equal(storyStorefrontBuildAvailable(story),false);
+ const harbor=mains.find(item=>item.id==='harbor-light');
+ story=completeStoryEntry(story,CORE_STORY_PACK,harbor.id,harbor.choices[0]?.id??null);
+ assert.equal(storyStorefrontBuildAvailable(story),true);
+ assert.equal(story.packs.core.completed.side.length,0);
+ const corrupt=structuredClone(story);corrupt.revision=-1;
+ assert.equal(storyStorefrontBuildAvailable(corrupt),false);
+ const html=readFileSync(new URL('../merge/story-workshop.html',import.meta.url),'utf8');
+ const ui=readFileSync(new URL('../merge/story/workshop.mjs',import.meta.url),'utf8');
+ for(const id of ['storefront-status','storefront-hint','build-storefront'])assert.ok(html.includes('id="'+id+'"'));
+ assert.ok(ui.includes("commit(upgradeBuilding(state,'storefront'))"));
+ assert.ok(ui.includes('!storyStorefrontBuildAvailable(story.progress)'));
+ assert.ok(ui.includes('!storefrontStoryReady'));
 });

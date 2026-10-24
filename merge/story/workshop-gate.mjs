@@ -17,11 +17,17 @@ export function storyHarborBuildAvailable(storyProgress){
   return validateStoryProgress(storyProgress)&&
     storyProgress.packs.core?.completed.main.includes('apprentice')===true;
 }
+/** The festival should follow the harbor light scene, with the shopfront ready. */
+export function storyStorefrontBuildAvailable(storyProgress){
+  return validateStoryProgress(storyProgress)&&
+    storyProgress.packs.core?.completed.main.includes('harbor-light')===true;
+}
 
 const GOALS=Object.freeze({
   'first-order':Object.freeze({type:'orders',goal:1,description:'完成一笔街坊委托'}),
   'tea-table':Object.freeze({type:'building',building:'garden',goal:1,description:'修复后院花园'}),
-  'harbor-light':Object.freeze({type:'building',building:'harbor',goal:1,description:'修缮港湾街角'})
+  'harbor-light':Object.freeze({type:'building',building:'harbor',goal:1,description:'修缮港湾街角'}),
+  'festival':Object.freeze({type:'building',building:'storefront',goal:1,description:'修整百物铺门面'})
 });
 export function storyWorkshopRequirement(entryId,workshopState){
   const spec=Object.hasOwn(GOALS,entryId)?GOALS[entryId]:null;
