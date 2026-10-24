@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f4ede1">
+  <title>云屿百物铺 · 剧情工作台</title>
+  <link rel="stylesheet" href="./story/story.css">
+  <link rel="stylesheet" href="./story/workshop.css">
+  <script type="module" src="./story/workshop.mjs"></script>
+</head>
+<body>
+<div class="story-shell">
+  <header class="top">
+    <a class="back" href="./story.html">← 返回剧情</a>
+    <span class="eyebrow">STORY WORKSHOP · OFFLINE</span>
+  </header>
+  <main>
+    <section class="hero">
+      <p class="kicker">第一章 · 第一个委托</p>
+      <h1>百物工作台</h1>
+      <p class="lead">在这里合成材料，完成一笔真实订单，故事才会继续。</p>
+    </section>
+    <section class="notice-panel">
+      <p><strong>剧情专属经营进度</strong> · 与普通经营模式完全分开 · 无云端同步</p>
+      <p id="workshop-status" role="status" aria-live="polite">正在读取进度</p>
+    </section>
+    <section class="progress">
+      <div class="progress-heading"><h2>第一单的约定</h2><span id="order-count">0 / 1</span></div>
+      <p id="milestone" class="muted">完成一单街坊委托后，可返回剧情页阅读《第一杯热茶》。</p>
+      <a href="./story.html" class="back">返回剧情与人物对白 →</a>
+    </section>
+    <section class="stories workshop" aria-label="剧情合成棋盘">
+      <div class="resource-line"><span>⚡ <strong id="energy"></strong></span><span>◈ <strong id="coins"></strong></span><span>✦ <strong id="xp"></strong></span></div>
+      <h2>七列八行合成台</h2>
+      <p class="muted">点击 🧺 工坊生产材料；依次点击两个相同物品即可合成。物品可移动或交换。小屏幕可左右滑动棋盘。</p>
+      <div class="workshop-board-wrap" role="region" aria-label="可横向滚动的合成棋盘" tabindex="0">
+        <div id="workshop-board" class="workshop-board" role="group" aria-label="七列八行的剧情合成棋盘"></div>
+      </div>
+      <p id="board-notice" role="status" aria-live="polite">请选择一个物品，或点击工坊生产。</p>
+    </section>
+    <section class="stories workshop" aria-labelledby="warehouse-title">
+      <div class="progress-heading"><h2 id="warehouse-title">临时仓库 · 整理材料</h2><span id="warehouse-occupancy">0 / 4</span></div>
+      <p class="muted">当前棋盘占用：<strong id="board-occupancy">—</strong>。棋盘满时可收纳材料，避免生产受阻。</p>
+      <p id="warehouse-hint" class="muted" role="status" aria-live="polite">选择棋盘材料即可收纳，仓库物品可点按取回。</p>
+      <button type="button" id="store-selected" class="workshop-build" disabled>收纳选中材料</button>
+      <div id="workshop-warehouse" class="workshop-warehouse" role="group" aria-label="剧情工作台临时仓库"></div>
+      <p class="muted">仓库中的材料需要先取回棋盘，才能用于合成或交付委托；仓库容量与普通经营完全独立。</p>
+    </section>
+    <section class="stories">
+      <h2>街坊委托</h2>
+      <div id="workshop-orders" class="workshop-orders"></div>
+    </section>
+    <section class="stories" aria-labelledby="garden-title">
+      <div class="progress-heading"><h2 id="garden-title">第二章 · 后院花园</h2><span id="garden-status">未修复</span></div>
+      <p id="garden-hint" class="muted">花园修复需要等级与金币，完成后解锁《两个人的下午茶》。</p>
+      <button type="button" id="build-garden" class="workshop-build">修复后院花园</button>
+      <p class="muted">本次建设仅使用剧情工作台资源，不会改变普通模式的建筑。</p>
+    </section>
+    <section class="stories" aria-labelledby="harbor-title">
+      <div class="progress-heading"><h2 id="harbor-title">第三章 · 港湾街角</h2><span id="harbor-status">未修缮</span></div>
+      <p id="harbor-hint" class="muted">先完成学徒的安全修理课程，再筹备港湾街角修缮；完成后继续《海雾里的灯》。</p>
+      <button type="button" id="build-harbor" class="workshop-build">修缮港湾街角</button>
+      <p class="muted">这是剧情专属经营的港湾街角建设，不代表整个港口或航路已经恢复运营。</p>
+    </section>
+    <section class="stories" aria-labelledby="storefront-title">
+      <div class="progress-heading"><h2 id="storefront-title">第四章 · 开张庆典</h2><span id="storefront-status">未修整</span></div>
+      <p id="storefront-hint" class="muted">先读完《海雾里的灯》，再使用剧情工作台的金币修整百物铺门面，为庆典做准备。</p>
+      <button type="button" id="build-storefront" class="workshop-build">修整百物铺门面</button>
+      <p class="muted">庆典装饰使用剧情独立资源；不会改变普通模式的店面升级。</p>
+    </section>
+    <section class="stories" aria-labelledby="recovery-title">
+      <h2 id="recovery-title">异常存档保护 · 本地备份</h2>
+      <p class="muted">仅在检测到工作台存档损坏时允许导出其原始记录。导出的文本可能包含个人游玩信息，请自行妥善保管；此操作不自动修复、上传或删除任何进度。</p>
+      <button type="button" id="export-corrupt-workshop" class="workshop-build" disabled>导出异常原始记录（仅本机）</button>
+    </section>
+    <div class="foot-actions">
+      <button type="button" class="quiet" id="reset-workshop">重置剧情工作台（不清除剧情对白）</button>
+      <a href="./story.html">返回剧情 →</a>
+    </div>
+  </main>
+  <footer>剧情经营垂直切片 · 本地试玩 · 尚非发行版本</footer>
+</div>
+</body>
+</html>

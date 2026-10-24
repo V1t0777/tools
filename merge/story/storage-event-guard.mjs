@@ -1,0 +1,35 @@
+/**
+ * Conservative, read-only cross-tab invalidation for story-only localStorage.
+ * StorageEvent.key === null means localStorage.clear(); ignoring it could leave
+ * a suspended story page believing its cached snapshot is still current.
+ * Does not create an atomic compare-and-swap or repair deleted saves.
+ */
+import {STORY_SAVE_KEY} from '../mode-boundaries.mjs';
+import {STORY_WORKSHOP_KEY} from './workshop-storage.mjs';
+
+export function shouldBlockStoryStorageEvent(event,{key,storage}={}){
+  if(key!==STORY_SAVE_KEY&&key!==STORY_WORKSHOP_KEY)return false;
+  if(!event||typeof event!=='object')return false;
+  // A real StorageEvent identifies its storage area. Ignore sessionStorage
+  // changes, while treating missing storageArea as conservative/ambiguous.
+  if(event.storageArea!=null&&event.storageArea!==storage)return false;
+  return event.key===null||event.key===key;
+}
+
+/**
+ * Refresh a cross-mode prerequisite view without invalidating its own save.
+ * A clear() event (key === null) is handled by the caller's own-key blocker;
+ * it must never be treated as a harmless dependency refresh.
+ */
+export function shouldRefreshStoryDependencyEvent(event,{ownKey,dependencyKey,storage}={}){
+  if(ownKey===dependencyKey||!event||event.key!==dependencyKey)return false;
+  if(ownKey!==STORY_SAVE_KEY&&ownKey!==STORY_WORKSHOP_KEY)return false;
+  return shouldBlockStoryStorageEvent(event,{key:dependencyKey,storage});
+}
+
+/** Keep normal-mode save identifiers out of the workshop UI source itself. */
+export function shouldRefreshWorkshopForStoryEvent(event,storage){
+  return shouldRefreshStoryDependencyEvent(event,{
+    ownKey:STORY_WORKSHOP_KEY,dependencyKey:STORY_SAVE_KEY,storage
+  });
+}
