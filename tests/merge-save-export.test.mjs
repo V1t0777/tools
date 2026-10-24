@@ -115,3 +115,85 @@ test('P2.16 preview UI offers export without cloud transfer, import or overwrite
     assert.equal(action.includes(forbidden),false,`Unexpected export side effect: ${forbidden}`);
   }
 });
+
+test('P2.33 export limit uses actual UTF-8 bytes for CJK and emoji',()=>{
+  const exactly='中'.repeat(Math.floor(MAX_EXPORT_BYTES/3))+'ab';
+  assert.equal(new TextEncoder().encode(exactly).byteLength,MAX_EXPORT_BYTES);
+  const exact=mockStorage({[SAVE_KEY]:exactly});
+  const receipt=prepareLocalSaveExport(exact);
+  assert.equal(receipt.ok,true);
+  assert.equal(receipt.verified,false);
+  assert.equal(receipt.content,exactly);
+  assert.deepEqual(exact.writes,[]);
+  const tooLarge=mockStorage({[SAVE_KEY]:exactly+'中'});
+  assert.ok((exactly+'中').length<MAX_EXPORT_BYTES);
+  assert.deepEqual(prepareLocalSaveExport(tooLarge),
+    {ok:false,reason:'EXPORT_TOO_LARGE'});
+  assert.deepEqual(tooLarge.writes,[]);
+  const emoji='🌊'.repeat(Math.floor(MAX_EXPORT_BYTES/4)+1);
+  assert.ok(emoji.length<MAX_EXPORT_BYTES);
+  assert.deepEqual(prepareLocalSaveExport(mockStorage({[SAVE_KEY]:emoji})),
+    {ok:false,reason:'EXPORT_TOO_LARGE'});
+});
+
+test('P2.33 rejects missing UTF-8 encoder without claiming a safe download',()=>{
+  const encoder=globalThis.TextEncoder;
+  const raw='中文存档';
+  try {
+    globalThis.TextEncoder=undefined;
+    assert.deepEqual(prepareLocalSaveExport(mockStorage({[SAVE_KEY]:raw})),
+      {ok:false,reason:'EXPORT_ENCODING_UNAVAILABLE'});
+  } finally {globalThis.TextEncoder=encoder;}
+});
+
+test('P2.33 preview displays explicit encoding-unavailable guidance',()=>{
+  const main=source('../merge/main.mjs');
+  const action=main.slice(main.indexOf("byId('export-local-save').addEventListener"),
+    main.indexOf("byId('reset').addEventListener"));
+  assert.ok(action.includes("result.reason==='EXPORT_ENCODING_UNAVAILABLE'"));
+  assert.ok(action.includes('当前浏览器无法安全编码备份文件'));
+});
+
+test('P2.34 losslessly exports isolated UTF-16 surrogates in a marked JSON envelope',()=>{
+  const raw='{"damaged":"\uD800"}';
+  assert.equal(/[\uD800-\uDFFF]/u.test(raw),true);
+  const s=mockStorage({[SAVE_KEY]:raw});
+  const result=prepareLocalSaveExport(s);
+  assert.equal(result.ok,true);
+  assert.equal(result.verified,false);
+  assert.equal(result.wrapped,true);
+  assert.equal(result.filename,'yunyu-unverified-utf16-escaped.json');
+  assert.equal(result.mime,'application/json;charset=utf-8');
+  assert.deepEqual(JSON.parse(result.content),{format:'yunyu-normal-raw-utf16-v1',raw});
+  assert.ok(result.content.includes(String.fromCharCode(92)+'ud800'), 'envelope must escape the isolated code unit');
+  assert.deepEqual(s.reads,[SAVE_KEY]);
+  assert.deepEqual(s.writes,[]);
+  assert.equal(s.read(SAVE_KEY),raw);
+});
+
+test('P2.34 valid emoji pairs keep the ordinary raw text backup format',()=>{
+  const raw='🌊中文原始数据';
+  const result=prepareLocalSaveExport(mockStorage({[SAVE_KEY]:raw}));
+  assert.equal(result.ok,true);
+  assert.equal(result.verified,false);
+  assert.equal(result.wrapped,undefined);
+  assert.equal(result.content,raw);
+  assert.equal(result.filename,'yunyu-unverified-original.txt');
+});
+
+test('P2.34 UTF-16 envelope must itself fit the UTF-8 byte budget',()=>{
+  const raw='\uD800'.repeat(Math.ceil(MAX_EXPORT_BYTES/6));
+  assert.ok(raw.length<MAX_EXPORT_BYTES);
+  assert.ok(new TextEncoder().encode(raw).byteLength<MAX_EXPORT_BYTES);
+  const s=mockStorage({[SAVE_KEY]:raw});
+  assert.deepEqual(prepareLocalSaveExport(s),{ok:false,reason:'EXPORT_TOO_LARGE'});
+  assert.deepEqual(s.writes,[]);
+});
+
+test('P2.34 UI distinguishes encoded recovery envelope from ordinary raw download',()=>{
+  const main=source('../merge/main.mjs');
+  const action=main.slice(main.indexOf("byId('export-local-save').addEventListener"),
+    main.indexOf("byId('reset').addEventListener"));
+  assert.ok(action.includes("result.wrapped?'检测到异常字符"));
+  assert.ok(action.includes('不可直接导入'));
+});
