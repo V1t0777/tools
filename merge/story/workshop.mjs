@@ -5,6 +5,7 @@ import {readStorySave} from './local-storage.mjs';
 import {captureStoryWorkshopEvidence} from './save-evidence.mjs';
 import {checkStoryResumeSnapshot} from './resume-guard.mjs';
 import {runStoryWriteWithLock} from './write-lock.mjs';
+import {resetStoryWorkshopWithLock} from './workshop-reset.mjs';
 import {shouldBlockStoryStorageEvent} from './storage-event-guard.mjs';
 import {shouldRefreshWorkshopForStoryEvent} from './storage-event-guard.mjs';
 import {storyGardenBuildAvailable,storyHarborBuildAvailable,storyStorefrontBuildAvailable} from './workshop-gate.mjs';
@@ -14,6 +15,7 @@ const webLocks=(()=>{try{return window.navigator?.locks??null;}catch{return null
 const loaded=readStoryWorkshop(storage);
 let state=loaded.state,raw=loaded.raw,blocked=loaded.blocked,reason=loaded.reason,selected=-1;
 let saving=false;
+let storageEpoch=0; // increments when an external story-workshop snapshot invalidates this page
 function status(){
   $('workshop-status').textContent=blocked
     ? reason==='CORRUPT_SAVE'
@@ -206,22 +208,28 @@ $('export-corrupt-workshop').addEventListener('click',()=>{
     $('board-notice').textContent='设备未能触发文件导出。原浏览器存档未修改，请勿重置。';
   }
 });
-$('reset-workshop').addEventListener('click',()=>{
+$('reset-workshop').addEventListener('click',async()=>{
   if(saving)return;
   if(reason==='CORRUPT_SAVE'&&!window.confirm('异常原始记录会被重置覆盖。建议先导出并确认备份文件可用。仍要继续重置吗？'))return;
   if(!window.confirm('确认重置剧情工作台？此处的金币、物品和订单进度将丢失，不影响普通经营或已读剧情。'))return;
-  const current=readStoryWorkshop(storage);
-  if(current.reason==='STORAGE_UNAVAILABLE')return;
-  if(current.raw!==raw){blocked=true;reason='WRITE_CONFLICT';render();return;}
-  const fresh=readStoryWorkshop({getItem:()=>null,setItem:()=>{}});
-  if(writeStoryWorkshop(storage,fresh.state,{expectedRaw:raw,confirmedReset:true})){
-    state=fresh.state;raw=JSON.stringify(state);blocked=false;reason=null;selected=-1;render();
-  }else{blocked=true;reason='WRITE_CONFLICT';render();}
+  // Only enter the same Web Locks protocol as normal workshop writes AFTER confirmation.
+  // The lock callback re-reads the original snapshot and still requires exact-raw CAS.
+  const expectedRaw=raw,expectedEpoch=storageEpoch;
+  saving=true;render();
+  const attempt=await resetStoryWorkshopWithLock(webLocks,storage,{
+    expectedRaw,isCurrent:()=>storageEpoch===expectedEpoch
+  });
+  saving=false;
+  if(!attempt.ok||!attempt.value||storageEpoch!==expectedEpoch){
+    blocked=true;reason='WRITE_CONFLICT';render();return;
+  }
+  state=attempt.value;raw=JSON.stringify(state);
+  blocked=false;reason=null;selected=-1;render();
 });
 function recheckWorkshopOnResume(){
   if(!blocked){
     const check=checkStoryResumeSnapshot(storage,{key:STORY_WORKSHOP_KEY,expectedRaw:raw});
-    if(!check.ok){blocked=true;reason=check.reason;selected=-1;}
+    if(!check.ok){storageEpoch++;blocked=true;reason=check.reason;selected=-1;}
   }
   render();
 }
@@ -231,7 +239,7 @@ document.addEventListener('visibilitychange',()=>{
 });
 window.addEventListener('storage',event=>{
   if(shouldBlockStoryStorageEvent(event,{key:STORY_WORKSHOP_KEY,storage})){
-    blocked=true;reason='WRITE_CONFLICT';selected=-1;render();
+    storageEpoch++;blocked=true;reason='WRITE_CONFLICT';selected=-1;render();
   }else if(shouldRefreshWorkshopForStoryEvent(event,storage)){
     // Story chapter progress changes building eligibility without changing the board.
     render();
