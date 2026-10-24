@@ -165,7 +165,7 @@ test('P2.34 losslessly exports isolated UTF-16 surrogates in a marked JSON envel
   assert.equal(result.filename,'yunyu-unverified-utf16-escaped.json');
   assert.equal(result.mime,'application/json;charset=utf-8');
   assert.deepEqual(JSON.parse(result.content),{format:'yunyu-normal-raw-utf16-v1',raw});
-  assert.ok(result.content.includes('\\\\ud800'),'envelope must escape the isolated code unit');
+  assert.ok(result.content.includes(String.fromCharCode(92)+'ud800'), 'envelope must escape the isolated code unit');
   assert.deepEqual(s.reads,[SAVE_KEY]);
   assert.deepEqual(s.writes,[]);
   assert.equal(s.read(SAVE_KEY),raw);
