@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {runInNewContext} from 'node:vm';
 import {createInitialState,advanceTime,ENERGY_REGEN_MS,MAX_ENERGY,PRODUCER_CHARGES,validateSave} from '../merge/engine.mjs';
 import {isSafeSameRevisionClockUpdate as safe} from '../merge/storage-event-policy.mjs';
 const now=1_000_000;
@@ -60,7 +61,8 @@ test('current storage listener blocks same-revision economic divergence without 
   assert.ok(handler.includes('fresh.state.revision === state.revision'));
   assert.ok(handler.includes('!isSafeSameRevisionClockUpdate(state,fresh.state)'));
   assert.ok(handler.includes("saveIssue = 'CURRENT_SAVE_CHANGED'"));
-  assert.ok(handler.indexOf('isSafeSameRevisionClockUpdate')<handler.indexOf('state = advanceTime(fresh.state)'));
+  assert.ok(handler.indexOf('isSafeSameRevisionClockUpdate')<handler.indexOf('state = fresh.state;'));
+  assert.equal(handler.includes('advanceTime(fresh.state)'),false);
   assert.equal(/\bpersist\s*\(/.test(handler.replace(/\/\/[^\n]*/g,'')),false);
   assert.equal(handler.includes('setItem('),false);
 });
@@ -96,4 +98,64 @@ test('P2.30 full energy clock marker cannot move without refill',()=>{
   const exhausted={...full,board};
   assert.equal(safe(exhausted,advanceTime(exhausted,now+ENERGY_REGEN_MS),
     now+ENERGY_REGEN_MS),true);
+});
+
+test('P2.31 future-dated energyAt cannot grant cross-tab energy early',()=>{
+  const local={...initial(),energy:MAX_ENERGY-4};
+  const future=advanceTime(local,now+2*ENERGY_REGEN_MS);
+  assert.equal(future.energy,local.energy+2);
+  assert.equal(safe(local,future,now+ENERGY_REGEN_MS),false);
+  assert.equal(safe(local,future,now+2*ENERGY_REGEN_MS),true);
+  // A baseline already dated in the future must not block an identical save.
+  const futureBaseline={...initial(),energyAt:now+2*ENERGY_REGEN_MS};
+  assert.equal(safe(futureBaseline,structuredClone(futureBaseline),now),true);
+});
+test('P2.31 future clock marker cannot piggyback on a due producer refill',()=>{
+  const base=initial();
+  const index=base.board.findIndex(item=>item?.kind==='producer');
+  const board=base.board.map(item=>item?{...item}:item);
+  board[index]={...board[index],charges:0,cooldownUntil:now+45_000};
+  const exhausted={...base,board};
+  const restored=advanceTime(exhausted,now+2*ENERGY_REGEN_MS);
+  assert.equal(restored.board[index].charges,PRODUCER_CHARGES);
+  assert.equal(safe(exhausted,restored,now+ENERGY_REGEN_MS),false);
+  assert.equal(safe(exhausted,restored,now+2*ENERGY_REGEN_MS),true);
+});
+
+test('P2.32 storage listener adopts remote bytes without inventing unpersisted clock gains',()=>{
+  const main=readFileSync(new URL('../merge/main.mjs',import.meta.url),'utf8');
+  const start=main.indexOf("window.addEventListener('storage', event => {");
+  const end=main.indexOf('window.setInterval(() => {',start);
+  assert.ok(start>=0&&end>start);
+  const handler=main.slice(start,end);
+  const saveKey='toolbox.merge-isle.local.v1';
+  const old=createInitialState(now);
+  const local={...old,energy:MAX_ENERGY-2};
+  const remote=advanceTime(local,now+ENERGY_REGEN_MS);
+  assert.notEqual(remote,local);
+  assert.ok(remote.energy>local.energy);
+  for(const [label,from,to] of [
+    ['higher revision',local,{...local,revision:local.revision+1}],
+    ['equal revision clock',local,remote]
+  ]) {
+    const fresh={ok:true,state:to,raw:JSON.stringify(to)};
+    const status={textContent:''};
+    const ctx={
+      window:{addEventListener(type,fn){if(type==='storage')this.onStorage=fn;}},
+      SAVE_KEY:saveKey,store:{},peekLocalV3(){return fresh;},
+      isSafeSameRevisionClockUpdate(){return true;},
+      advanceTime(){throw Error('unverified time advance: '+label);},
+      state:from,persistedRaw:JSON.stringify(from),saveIssue:null,
+      selected:3,activeGuidance:{boardSlots:[]},
+      byId(id){assert.equal(id,'save-status');return status;},
+      render(){},hint(){}
+    };
+    runInNewContext(handler,ctx);
+    ctx.window.onStorage({key:saveKey});
+    assert.equal(JSON.stringify(ctx.state),fresh.raw,label);
+    assert.equal(ctx.persistedRaw,fresh.raw,label);
+    assert.equal(ctx.selected,-1);
+    assert.equal(ctx.activeGuidance,null);
+    assert.match(status.textContent,/已同步其他标签页进度/);
+  }
 });

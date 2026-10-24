@@ -461,7 +461,10 @@ window.addEventListener('storage', event => {
     hint('其他标签页存在不同的经营进度，请先备份并重新打开页面核对');
     return;
   }
-  state = advanceTime(fresh.state);
+  // Adopt only the exact verified remote snapshot. Advancing its clock here
+  // would show energy/cooldowns that this tab has not persisted. The regular
+  // timer performs regeneration through the verified save-before-publish path.
+  state = fresh.state;
   persistedRaw = fresh.raw;
   selected = -1; activeGuidance = null;
   // No persist() here: avoid cross-tab write-back loops. Any later gameplay

@@ -23,6 +23,10 @@ export function isSafeSameRevisionClockUpdate(local,remote,now=Date.now()) {
   if(!Array.isArray(local.board)||!Array.isArray(remote.board)||
       local.board.length!==remote.board.length)return false;
   if(!Number.isFinite(now)||now<0)return false;
+  // A remote tab cannot earn future clock ticks. If the local baseline was
+  // already future-dated (e.g. device clock changed), identical clock fields
+  // remain comparable, but any further forward jump must wait until due.
+  if(remote.energyAt!==local.energyAt&&remote.energyAt>now)return false;
   // Never grant more energy than the elapsed whole regeneration ticks.
   const elapsed=Math.floor((remote.energyAt-local.energyAt)/ENERGY_REGEN_MS);
   if(remote.energy>local.energy) {
