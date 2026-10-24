@@ -467,7 +467,10 @@ byId('how-to').addEventListener('click', () => dialog.showModal());
 byId('close-guide').addEventListener('click', () => dialog.close());
 // Local preview has no account/session hooks and intentionally sends no game data to the network.
 window.addEventListener('storage', event => {
-  if (event.key !== SAVE_KEY || !store) return;
+  // localStorage.clear() dispatches a storage event with key === null.
+  // Re-read the actual save for clear events: a cleared save must block
+  // gameplay immediately, but clearing unrelated keys must not.
+  if ((event.key !== SAVE_KEY && event.key !== null) || !store) return;
   // Storage events must be read-only. loadLocal can migrate legacy saves and
   // write backup keys; never run it while reacting to another tab's write.
   const fresh = peekLocalV3(store);

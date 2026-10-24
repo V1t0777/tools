@@ -159,3 +159,63 @@ test('P2.32 storage listener adopts remote bytes without inventing unpersisted c
     assert.match(status.textContent,/已同步其他标签页进度/);
   }
 });
+
+test('P2.38 localStorage.clear event immediately blocks a removed normal save',()=>{
+  const main=readFileSync(new URL('../merge/main.mjs',import.meta.url),'utf8');
+  const start=main.indexOf("window.addEventListener('storage', event => {");
+  const end=main.indexOf('window.setInterval(() => {',start);
+  assert.ok(start>=0&&end>start);
+  const handler=main.slice(start,end);
+  const saveKey='toolbox.merge-isle.local.v1';
+  const current=initial(),raw=JSON.stringify(current);
+  const status={textContent:''},messages=[];
+  let reads=0,rendered=0;
+  const ctx={
+    window:{addEventListener(type,fn){if(type==='storage')this.onStorage=fn;}},
+    SAVE_KEY:saveKey,store:{},state:current,persistedRaw:raw,
+    saveIssue:null,selected:1,activeGuidance:null,
+    peekLocalV3(){reads++;return {ok:false,reason:'SAVE_REMOVED'};},
+    byId(id){assert.equal(id,'save-status');return status;},
+    render(){rendered++;},hint(message){messages.push(message);}
+  };
+  runInNewContext(handler,ctx);
+  ctx.window.onStorage({key:'unrelated.setting'});
+  assert.equal(reads,0,'unrelated key must not cause save inspection');
+  ctx.window.onStorage({key:null});
+  assert.equal(reads,1,'clear must inspect actual normal save');
+  assert.equal(ctx.saveIssue,'SAVE_REMOVED');
+  assert.equal(ctx.persistedRaw,raw);
+  assert.equal(ctx.state,current);
+  assert.equal(rendered,0);
+  assert.match(status.textContent,/已暂停同步/);
+  assert.equal(messages.length,1);
+  assert.match(messages[0],/跨标签存档发生变化/);
+});
+
+test('P2.38 clear event that leaves normal save unchanged does not interrupt play',()=>{
+  const main=readFileSync(new URL('../merge/main.mjs',import.meta.url),'utf8');
+  const start=main.indexOf("window.addEventListener('storage', event => {");
+  const end=main.indexOf('window.setInterval(() => {',start);
+  assert.ok(start>=0&&end>start);
+  const handler=main.slice(start,end);
+  const saveKey='toolbox.merge-isle.local.v1';
+  const current=initial(),raw=JSON.stringify(current);
+  const status={textContent:'已保存'};
+  let reads=0,rendered=0,hints=0;
+  const ctx={
+    window:{addEventListener(type,fn){if(type==='storage')this.onStorage=fn;}},
+    SAVE_KEY:saveKey,store:{},state:current,persistedRaw:raw,
+    saveIssue:null,selected:1,activeGuidance:null,
+    peekLocalV3(){reads++;return {ok:true,state:current,raw};},
+    byId(id){assert.equal(id,'save-status');return status;},
+    render(){rendered++;},hint(){hints++;}
+  };
+  runInNewContext(handler,ctx);
+  ctx.window.onStorage({key:null});
+  assert.equal(reads,1);
+  assert.equal(ctx.saveIssue,null);
+  assert.equal(ctx.selected,1);
+  assert.equal(rendered,0);
+  assert.equal(hints,0);
+  assert.equal(status.textContent,'已保存');
+});
