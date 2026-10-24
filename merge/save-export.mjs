@@ -28,6 +28,21 @@ export function prepareLocalSaveExport(storage) {
   catch { return Object.freeze({ok:false,reason:'EXPORT_ENCODING_UNAVAILABLE'}); }
   if(utf8Bytes>MAX_EXPORT_BYTES)
     return Object.freeze({ok:false,reason:'EXPORT_TOO_LARGE'});
+  // TextEncoder/Blob silently replace isolated UTF-16 surrogates with U+FFFD.
+  // Preserve the original localStorage code units in a JSON string envelope.
+  // A paired surrogate (e.g. emoji) is valid Unicode and needs no wrapper.
+  if(/[\uD800-\uDFFF]/u.test(raw)) {
+    const content=JSON.stringify({format:'yunyu-normal-raw-utf16-v1',raw});
+    try {
+      if(new TextEncoder().encode(content).byteLength>MAX_EXPORT_BYTES)
+        return Object.freeze({ok:false,reason:'EXPORT_TOO_LARGE'});
+    } catch {return Object.freeze({ok:false,reason:'EXPORT_ENCODING_UNAVAILABLE'});}
+    return Object.freeze({
+      ok:true,verified:false,wrapped:true,
+      filename:'yunyu-unverified-utf16-escaped.json',
+      mime:'application/json;charset=utf-8',content
+    });
+  }
   let verified=false;
   if(raw.length<=MAX_LOCAL_SAVE_BYTES){
     try { verified=validateSave(JSON.parse(raw)); }

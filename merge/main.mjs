@@ -399,7 +399,8 @@ byId('export-local-save').addEventListener('click', () => {
     const downloadUrl=url;
     window.setTimeout(()=>URL.revokeObjectURL(downloadUrl),30_000);
     url=null;
-    hint(result.verified?'已请求下载当前浏览器的原始存档':'原始数据可能异常，已请求下载文本备份；请勿直接作为有效存档导入');
+    hint(result.wrapped?'检测到异常字符，已请求下载可还原原始字符的 JSON 封装备份；不可直接导入':
+      result.verified?'已请求下载当前浏览器的原始存档':'原始数据可能异常，已请求下载文本备份；请勿直接作为有效存档导入');
   }catch{
     if(url)URL.revokeObjectURL(url);
     hint('浏览器未能启动下载，请勿重置或清理存档');
