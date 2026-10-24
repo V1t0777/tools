@@ -241,9 +241,8 @@ test('reset cannot proceed when storage baseline was never read',()=>{
 test('reset UI keeps previous in-memory board when persistence fails',()=>{
   const main=readFileSync(new URL('../merge/main.mjs',import.meta.url),'utf8');
   const handler=main.slice(main.indexOf("byId('reset').addEventListener"),main.indexOf("const dialog = byId('guide')"));
-  assert.ok(handler.includes('const beforeReset=state;'));
-  assert.ok(handler.includes('const saved = persist({confirmedReset:true});'));
-  assert.ok(handler.includes('if (!saved) {'));
-  assert.ok(handler.includes('state=beforeReset;'));
+  assert.ok(handler.includes('const resetState=createInitialState();'));
+  assert.ok(handler.includes('if(!persist(resetState,{confirmedReset:true})) {'));
+  assert.ok(handler.indexOf('state=resetState;')>handler.indexOf('persist(resetState,{confirmedReset:true})'));
   assert.ok(handler.includes('重置已中止'));
 });
