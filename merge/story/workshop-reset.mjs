@@ -17,6 +17,13 @@ export async function resetStoryWorkshopWithLock(locks,storage,{expectedRaw,now=
     const current=readStoryWorkshop(storage,now);
     if(current.reason==='STORAGE_UNAVAILABLE'||current.raw!==expectedRaw)return null;
     const fresh=createInitialState(now);
+    // Preserve a monotonically increasing revision even after a reset.
+    // Reusing revision 0 could recreate an identical snapshot (ABA) when
+    // a deterministic clock is reused, allowing an old tab to replay it.
+    if(!current.blocked&&current.raw!==null){
+      if(current.state.revision===Number.MAX_SAFE_INTEGER)return null;
+      fresh.revision=current.state.revision+1;
+    }
     if(!isCurrent())return null;
     return writeStoryWorkshop(storage,fresh,{expectedRaw,confirmedReset:true})?fresh:null;
   });

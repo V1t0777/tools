@@ -34,6 +34,13 @@ export function writeStoryWorkshop(storage,state,{expectedRaw,confirmedReset=fal
       const prev=JSON.parse(current);
       if(!validateSave(prev)||state.revision<=prev.revision)return false;
     }
+    if(confirmedReset&&typeof current==='string'&&current.length<=MAX_LOCAL_SAVE_BYTES){
+      // Corrupt records can be explicitly reset, but a valid record must
+      // advance revision. Never recreate a previously observed snapshot.
+      let prev;
+      try{prev=JSON.parse(current);}catch{}
+      if(validateSave(prev)&&state.revision<=prev.revision)return false;
+    }
     const next=JSON.stringify(state);
     if(next.length>MAX_LOCAL_SAVE_BYTES)return false;
     // Serialization may take time while another tab writes. Narrow the race window;
