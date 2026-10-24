@@ -53,7 +53,7 @@ test('P18 both pages keep own-key conflict blocking, and refresh only on the oth
   const workshop=readFileSync(new URL('../merge/story/workshop.mjs',import.meta.url),'utf8');
   for(const ui of [story,workshop]){
     assert.ok(ui.includes('shouldBlockStoryStorageEvent(event,'));
-    assert.ok(ui.includes('}else if(shouldRefreshStoryDependencyEvent(event,'));
+    assert.ok(ui.includes('}else if(shouldRefreshStoryDependencyEvent(event,')||ui.includes('}else if(shouldRefreshWorkshopForStoryEvent(event,'));
     assert.ok(ui.includes("if($('story-dialog').open)$('story-dialog').close();")||ui.includes('selected=-1;render();'));
     assert.equal(ui.includes('localStorage.setItem'),false);
   }
