@@ -3,7 +3,8 @@ import {availableStoryEntries,completedStoryEntries,completeStoryEntry,startCore
 import {readStorySave,writeStorySave} from './local-storage.mjs';
 import {captureStoryWorkshopEvidence} from './save-evidence.mjs';
 import {checkStoryResumeSnapshot} from './resume-guard.mjs';
-import {shouldBlockStoryStorageEvent} from './storage-event-guard.mjs';
+import {shouldBlockStoryStorageEvent,shouldRefreshStoryDependencyEvent} from './storage-event-guard.mjs';
+import {STORY_WORKSHOP_KEY} from './workshop-storage.mjs';
 import {inspectStoryWorkshopRequirement} from './workshop-gate.mjs';
 import {createEmptyStoryProgress,STORY_SAVE_KEY} from '../mode-boundaries.mjs';
 
@@ -202,6 +203,12 @@ document.addEventListener('visibilitychange',()=>{
 window.addEventListener('storage',event=>{
   if(shouldBlockStoryStorageEvent(event,{key:STORY_SAVE_KEY,storage:store})){
     blocked=true;reason='WRITE_CONFLICT';selectedChoice=null;
+    if($('story-dialog').open)$('story-dialog').close();
+    render();
+  }else if(shouldRefreshStoryDependencyEvent(event,{ownKey:STORY_SAVE_KEY,dependencyKey:STORY_WORKSHOP_KEY,storage:store})){
+    // Workshop orders/buildings can unlock or relock a story entry in another tab.
+    // Reopen a dialogue to see the current requirement; story progress stays intact.
+    selectedChoice=null;
     if($('story-dialog').open)$('story-dialog').close();
     render();
   }

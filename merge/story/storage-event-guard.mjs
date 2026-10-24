@@ -15,3 +15,14 @@ export function shouldBlockStoryStorageEvent(event,{key,storage}={}){
   if(event.storageArea!=null&&event.storageArea!==storage)return false;
   return event.key===null||event.key===key;
 }
+
+/**
+ * Refresh a cross-mode prerequisite view without invalidating its own save.
+ * A clear() event (key === null) is handled by the caller's own-key blocker;
+ * it must never be treated as a harmless dependency refresh.
+ */
+export function shouldRefreshStoryDependencyEvent(event,{ownKey,dependencyKey,storage}={}){
+  if(ownKey===dependencyKey||!event||event.key!==dependencyKey)return false;
+  if(ownKey!==STORY_SAVE_KEY&&ownKey!==STORY_WORKSHOP_KEY)return false;
+  return shouldBlockStoryStorageEvent(event,{key:dependencyKey,storage});
+}

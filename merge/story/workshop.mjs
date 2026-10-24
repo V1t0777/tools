@@ -4,7 +4,8 @@ import {readStoryWorkshop,writeStoryWorkshop,STORY_WORKSHOP_KEY} from './worksho
 import {readStorySave} from './local-storage.mjs';
 import {captureStoryWorkshopEvidence} from './save-evidence.mjs';
 import {checkStoryResumeSnapshot} from './resume-guard.mjs';
-import {shouldBlockStoryStorageEvent} from './storage-event-guard.mjs';
+import {shouldBlockStoryStorageEvent,shouldRefreshStoryDependencyEvent} from './storage-event-guard.mjs';
+import {STORY_SAVE_KEY} from '../mode-boundaries.mjs';
 import {storyGardenBuildAvailable,storyHarborBuildAvailable,storyStorefrontBuildAvailable} from './workshop-gate.mjs';
 const $=id=>document.getElementById(id);
 const storage=(()=>{try{return window.localStorage;}catch{return null;}})();
@@ -221,6 +222,9 @@ document.addEventListener('visibilitychange',()=>{
 window.addEventListener('storage',event=>{
   if(shouldBlockStoryStorageEvent(event,{key:STORY_WORKSHOP_KEY,storage})){
     blocked=true;reason='WRITE_CONFLICT';selected=-1;render();
+  }else if(shouldRefreshStoryDependencyEvent(event,{ownKey:STORY_WORKSHOP_KEY,dependencyKey:STORY_SAVE_KEY,storage})){
+    // Story chapter progress changes building eligibility without changing the board.
+    render();
   }
 });
 render();
