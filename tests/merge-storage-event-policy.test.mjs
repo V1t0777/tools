@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {createInitialState,advanceTime,ENERGY_REGEN_MS,MAX_ENERGY,validateSave} from '../merge/engine.mjs';
+import {createInitialState,advanceTime,ENERGY_REGEN_MS,MAX_ENERGY,PRODUCER_CHARGES,validateSave} from '../merge/engine.mjs';
 import {isSafeSameRevisionClockUpdate as safe} from '../merge/storage-event-policy.mjs';
 const now=1_000_000;
 const initial=()=>createInitialState(now);
@@ -44,7 +44,7 @@ test('producer cooldown can only move from exhausted to replenished',()=>{
   board[index]={...board[index],charges:0,cooldownUntil:now+10};
   const exhausted={...local,board};
   const restored={...exhausted,board:board.map((item,i)=>i===index
-    ?{...item,charges:5,cooldownUntil:0}:item)};
+    ?{...item,charges:PRODUCER_CHARGES,cooldownUntil:0}:item)};
   assert.equal(safe(exhausted,restored),true);
   assert.equal(safe(restored,exhausted),false);
   const suspicious={...exhausted,board:board.map((item,i)=>i===index
@@ -63,4 +63,37 @@ test('current storage listener blocks same-revision economic divergence without 
   assert.ok(handler.indexOf('isSafeSameRevisionClockUpdate')<handler.indexOf('state = advanceTime(fresh.state)'));
   assert.equal(/\bpersist\s*\(/.test(handler.replace(/\/\/[^\n]*/g,'')),false);
   assert.equal(handler.includes('setItem('),false);
+});
+
+test('P2.30 energy gains require sufficient whole regeneration ticks',()=>{
+  const local={...initial(),energy:MAX_ENERGY-4};
+  assert.equal(safe(local,{...local,energy:local.energy+1}),false);
+  assert.equal(safe(local,{...local,energy:local.energy+2,energyAt:now+ENERGY_REGEN_MS}),false);
+  assert.equal(safe(local,{...local,energy:local.energy+1,energyAt:now+2*ENERGY_REGEN_MS}),false);
+  assert.equal(safe(local,advanceTime(local,now+2*ENERGY_REGEN_MS+500)),true);
+});
+test('P2.30 refill must be due and restore exactly all charges',()=>{
+  const local=initial();
+  const slot=local.board.findIndex(item=>item?.kind==='producer');
+  const board=local.board.map(item=>item?{...item}:item);
+  board[slot]={...board[slot],charges:0,cooldownUntil:now+45_000};
+  const exhausted={...local,board};
+  const restored={...exhausted,board:board.map((item,i)=>i===slot
+    ?{...item,charges:PRODUCER_CHARGES,cooldownUntil:0}:item)};
+  const partial={...restored,board:restored.board.map((item,i)=>i===slot
+    ?{...item,charges:PRODUCER_CHARGES-1}:item)};
+  assert.equal(safe(exhausted,restored,now+44_999),false);
+  assert.equal(safe(exhausted,restored,now+45_000),true);
+  assert.equal(safe(exhausted,partial,now+45_000),false);
+  assert.equal(safe(exhausted,exhausted,now),true);
+});
+test('P2.30 full energy clock marker cannot move without refill',()=>{
+  const full=initial();
+  assert.equal(safe(full,{...full,energyAt:now+ENERGY_REGEN_MS},now+ENERGY_REGEN_MS),false);
+  const slot=full.board.findIndex(item=>item?.kind==='producer');
+  const board=full.board.map(item=>item?{...item}:item);
+  board[slot]={...board[slot],charges:0,cooldownUntil:now+45_000};
+  const exhausted={...full,board};
+  assert.equal(safe(exhausted,advanceTime(exhausted,now+ENERGY_REGEN_MS),
+    now+ENERGY_REGEN_MS),true);
 });
