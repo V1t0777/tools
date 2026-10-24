@@ -146,6 +146,7 @@ test('P2.32 storage listener adopts remote bytes without inventing unpersisted c
       isSafeSameRevisionClockUpdate(){return true;},
       advanceTime(){throw Error('unverified time advance: '+label);},
       state:from,persistedRaw:JSON.stringify(from),saveIssue:null,
+      drag:null,ignoreNextClick:false,
       selected:3,activeGuidance:{boardSlots:[]},
       byId(id){assert.equal(id,'save-status');return status;},
       render(){},hint(){}
