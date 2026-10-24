@@ -362,3 +362,46 @@ test('P2.41 conflicting storage updates cancel active drag without publishing re
     assert.equal(rendered,0,scenario.name);
   }
 });
+
+test('P2.42 stale synthetic click is consumed without eating next genuine tap',()=>{
+  const main=readFileSync(new URL('../merge/main.mjs',import.meta.url),'utf8');
+  const start=main.indexOf("board.addEventListener('click', event => {");
+  const end=main.indexOf("board.addEventListener('pointermove', event => {",start);
+  assert.ok(start>=0&&end>start);
+  const handlers=main.slice(start,end);
+  const cell={dataset:{slot:'3'}};
+  const board={listeners:{},addEventListener(type,fn){this.listeners[type]=fn;},
+    contains(target){return target===cell;}};
+  let taps=0;
+  const ctx={board,state:{board:Array(56).fill(null)},ignoreNextClick:true,
+    drag:null,touchCell(slot){assert.equal(slot,3);taps++;}};
+  runInNewContext(handlers,ctx);
+  const click=(detail=1)=>board.listeners.click({
+    detail,target:{closest(){return cell;}}
+  });
+  // No new pointerdown: this is the canceled drag's late synthetic click.
+  click();
+  assert.equal(taps,0);
+  assert.equal(ctx.ignoreNextClick,false);
+  // Fresh primary pointerdown must release stale suppression even when it
+  // starts over an empty board slot that cannot itself start a drag.
+  ctx.ignoreNextClick=true;
+  board.listeners.pointerdown({button:0,target:{closest(){return cell;}}});
+  assert.equal(ctx.ignoreNextClick,false);
+  click();
+  assert.equal(taps,1,'the first real tap must not be lost');
+  // A secondary-button pointerdown must not release stale suppression.
+  ctx.ignoreNextClick=true;
+  board.listeners.pointerdown({button:2,target:{closest(){return cell;}}});
+  assert.equal(ctx.ignoreNextClick,true);
+  click();
+  assert.equal(taps,1);
+  // Keyboard click has detail 0 and must remain usable while blocked.
+  ctx.ignoreNextClick=true;
+  click(0);
+  assert.equal(taps,2);
+  assert.equal(ctx.ignoreNextClick,true,'keyboard activation does not consume pointer guard');
+  click();
+  assert.equal(taps,2,'the canceled pointer click is still consumed');
+  assert.equal(ctx.ignoreNextClick,false);
+});

@@ -326,13 +326,19 @@ byId('board-guide').addEventListener('click', () => {
 });
 
 board.addEventListener('click', event => {
-  if (ignoreNextClick) { ignoreNextClick = false; return; }
+  // Keyboard activation has detail === 0 and cannot be a canceled drag's
+  // synthetic pointer click. Never swallow it as a stale gesture.
+  if (ignoreNextClick && event.detail !== 0) { ignoreNextClick = false; return; }
   const cell = event.target.closest('[data-slot]');
   if (cell && board.contains(cell)) touchCell(Number(cell.dataset.slot));
 });
 board.addEventListener('pointerdown', event => {
+  if (event.button > 0) return;
+  // A genuine new pointerdown starts a new gesture. The canceled pointer's
+  // delayed synthetic click has no second pointerdown, so allow this tap.
+  ignoreNextClick = false;
   const cell = event.target.closest('[data-slot]');
-  if (!cell || event.button > 0) return;
+  if (!cell) return;
   const index = Number(cell.dataset.slot);
   const item = state.board[index];
   if (!item || item.kind !== 'material') return;
