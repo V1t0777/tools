@@ -1,6 +1,7 @@
 import {CORE_STORY_PACK} from './core-pack.mjs';
 import {availableStoryEntries,completedStoryEntries,completeStoryEntry,startCoreStory,dailyStoryIncident} from './runtime.mjs';
 import {readStorySave,writeStorySave} from './local-storage.mjs';
+import {inspectStoryWorkshopRequirement} from './workshop-gate.mjs';
 import {createEmptyStoryProgress,STORY_SAVE_KEY} from '../mode-boundaries.mjs';
 
 const $=id=>document.getElementById(id);
@@ -41,7 +42,8 @@ function card(entry,done=false){
   const head=document.createElement('div');head.className='story-head';
   const title=document.createElement('h3');title.textContent=entry.title;
   const state=document.createElement('span');state.className='status';
-  state.textContent=done?'已阅读':'可体验';
+  const requirement=inspectStoryWorkshopRequirement(entry.id,store);
+  state.textContent=done?'已阅读':requirement.required&&!requirement.met?'待完成委托':'可体验';
   head.append(title,state);
   const place=document.createElement('p');place.textContent=entry.chapter+' · '+entry.place;
   const button=document.createElement('button');button.type='button';
@@ -99,7 +101,14 @@ function open(entry){
     const picked=entry.choices.find(c=>c.id===previous);
     if(picked)$('dialog-reply').textContent='上次选择：'+picked.label+'。'+picked.reply;
   }
-  if(!done){
+  const requirement=inspectStoryWorkshopRequirement(entry.id,store);
+  if(!done&&requirement.required&&!requirement.met){
+    const notice=document.createElement('p');notice.className='muted';
+    notice.textContent=requirement.blocked?'剧情工作台进度不可用，请保留存档并检查工作台状态。':'先在剧情工作台完成一笔街坊委托，再返回继续此幕。';
+    const link=document.createElement('a');link.className='back';link.href='./story-workshop.html';link.textContent='前往剧情工作台 →';
+    $('dialog-choices').append(notice,link);
+  }
+  if(!done&&(!requirement.required||requirement.met)){
     for(const choice of entry.choices){
       const button=document.createElement('button');button.type='button';
       button.textContent=choice.label;
@@ -108,14 +117,14 @@ function open(entry){
         selectedChoice=choice.id;
         $('dialog-choices').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));
         $('dialog-reply').textContent=choice.reply;
-        $('complete-story').disabled=blocked;
+        $('complete-story').disabled=blocked||!inspectStoryWorkshopRequirement(entry.id,store).met;
       });
       $('dialog-choices').append(button);
     }
   }
   const finish=$('complete-story');
   finish.textContent=done?'已阅读 · 关闭':entry.choices.length?'确认选择并继续':'完成阅读并继续';
-  finish.disabled=!done&&(blocked||entry.choices.length>0);
+  finish.disabled=!done&&(blocked||!requirement.met||entry.choices.length>0);
   $('story-dialog').showModal();
 }
 $('close-dialog').addEventListener('click',()=>$('story-dialog').close());
@@ -123,6 +132,9 @@ $('complete-story').addEventListener('click',()=>{
   if(!selected)return;
   if(completed(selected)){$('story-dialog').close();return;}
   try{
+    if(!inspectStoryWorkshopRequirement(selected.id,store).met){
+      $('dialog-reply').textContent='尚未完成剧情工作台的委托，无法推进这一幕。';return;
+    }
     const next=completeStoryEntry(progress,CORE_STORY_PACK,selected.id,selectedChoice);
     if(save(next)){
       $('story-dialog').close();render();
@@ -144,6 +156,7 @@ $('reset-story').addEventListener('click',()=>{
   const next=startCoreStory(createEmptyStoryProgress(),CORE_STORY_PACK);
   if(save(next,true))render();
 });
+window.addEventListener('pageshow',()=>{if(!$('story-dialog').open)render();});
 window.addEventListener('storage',event=>{
   if(event.key===STORY_SAVE_KEY){
     blocked=true;reason='WRITE_CONFLICT';render();

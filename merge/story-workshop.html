@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f4ede1">
+  <title>云屿百物铺 · 剧情工作台</title>
+  <link rel="stylesheet" href="./story/story.css">
+  <link rel="stylesheet" href="./story/workshop.css">
+  <script type="module" src="./story/workshop.mjs"></script>
+</head>
+<body>
+<div class="story-shell">
+  <header class="top">
+    <a class="back" href="./story.html">← 返回剧情</a>
+    <span class="eyebrow">STORY WORKSHOP · OFFLINE</span>
+  </header>
+  <main>
+    <section class="hero">
+      <p class="kicker">第一章 · 第一个委托</p>
+      <h1>百物工作台</h1>
+      <p class="lead">在这里合成材料，完成一笔真实订单，故事才会继续。</p>
+    </section>
+    <section class="notice-panel">
+      <p><strong>剧情专属经营进度</strong> · 与普通经营模式完全分开 · 无云端同步</p>
+      <p id="workshop-status" role="status" aria-live="polite">正在读取进度</p>
+    </section>
+    <section class="progress">
+      <div class="progress-heading"><h2>第一单的约定</h2><span id="order-count">0 / 1</span></div>
+      <p id="milestone" class="muted">完成一单街坊委托后，可返回剧情页阅读《第一杯热茶》。</p>
+      <a href="./story.html" class="back">返回剧情与人物对白 →</a>
+    </section>
+    <section class="stories workshop" aria-label="剧情合成棋盘">
+      <div class="resource-line"><span>⚡ <strong id="energy"></strong></span><span>◈ <strong id="coins"></strong></span><span>✦ <strong id="xp"></strong></span></div>
+      <h2>七列八行合成台</h2>
+      <p class="muted">点击 🧺 工坊生产材料；依次点击两个相同物品即可合成。物品可移动或交换。</p>
+      <div id="workshop-board" class="workshop-board" role="group" aria-label="七列八行的剧情合成棋盘"></div>
+      <p id="board-notice" role="status" aria-live="polite">请选择一个物品，或点击工坊生产。</p>
+    </section>
+    <section class="stories">
+      <h2>街坊委托</h2>
+      <div id="workshop-orders" class="workshop-orders"></div>
+    </section>
+    <div class="foot-actions">
+      <button type="button" class="quiet" id="reset-workshop">重置剧情工作台（不清除剧情对白）</button>
+      <a href="./story.html">返回剧情 →</a>
+    </div>
+  </main>
+  <footer>剧情经营垂直切片 · 本地试玩 · 尚非发行版本</footer>
+</div>
+</body>
+</html>
