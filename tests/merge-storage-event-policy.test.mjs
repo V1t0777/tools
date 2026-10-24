@@ -175,6 +175,7 @@ test('P2.38 localStorage.clear event immediately blocks a removed normal save',(
     window:{addEventListener(type,fn){if(type==='storage')this.onStorage=fn;}},
     SAVE_KEY:saveKey,store:{},state:current,persistedRaw:raw,
     saveIssue:null,selected:1,activeGuidance:null,
+    drag:null,ignoreNextClick:false,
     peekLocalV3(){reads++;return {ok:false,reason:'SAVE_REMOVED'};},
     byId(id){assert.equal(id,'save-status');return status;},
     render(){rendered++;},hint(message){messages.push(message);}
@@ -207,6 +208,7 @@ test('P2.38 clear event that leaves normal save unchanged does not interrupt pla
     window:{addEventListener(type,fn){if(type==='storage')this.onStorage=fn;}},
     SAVE_KEY:saveKey,store:{},state:current,persistedRaw:raw,
     saveIssue:null,selected:1,activeGuidance:null,
+    drag:null,ignoreNextClick:false,
     peekLocalV3(){reads++;return {ok:true,state:current,raw};},
     byId(id){assert.equal(id,'save-status');return status;},
     render(){rendered++;},hint(){hints++;}
@@ -234,6 +236,7 @@ test('P2.39 ignores same-key and clear events from other storage areas',()=>{
     window:{addEventListener(type,fn){if(type==='storage')this.onStorage=fn;}},
     SAVE_KEY:'toolbox.merge-isle.local.v1',store:localArea,
     state:current,persistedRaw:raw,saveIssue:null,selected:1,activeGuidance:null,
+    drag:null,ignoreNextClick:false,
     peekLocalV3(){reads++;return {ok:false,reason:'SAVE_REMOVED'};},
     byId(id){assert.equal(id,'save-status');return status;},
     hint(){hints++;},render(){renders++;}
@@ -309,4 +312,53 @@ test('P2.40 unchanged or unrelated storage events do not cancel a live drag',()=
   assert.equal(ctx.drag,drag);
   assert.equal(ctx.ignoreNextClick,false);
   assert.equal(removed,0);
+});
+
+test('P2.41 conflicting storage updates cancel active drag without publishing remote state',()=>{
+  const main=readFileSync(new URL('../merge/main.mjs',import.meta.url),'utf8');
+  const start=main.indexOf("window.addEventListener('storage', event => {");
+  const end=main.indexOf('window.setInterval(() => {',start);
+  assert.ok(start>=0&&end>start);
+  const handler=main.slice(start,end);
+  const base=initial(),localRaw=JSON.stringify(base);
+  const changed={...base,revision:base.revision+1};
+  const cases=[
+    {name:'removed or corrupt save',local:base,
+      fresh:{ok:false,reason:'SAVE_REMOVED'},issue:null,reason:'SAVE_REMOVED'},
+    {name:'already blocked page',local:base,
+      fresh:{ok:true,state:changed,raw:JSON.stringify(changed)},
+      issue:'SAVE_OUTCOME_UNCERTAIN',reason:'SAVE_OUTCOME_UNCERTAIN'},
+    {name:'remote older revision',local:changed,
+      fresh:{ok:true,state:base,raw:localRaw},issue:null,reason:'CURRENT_SAVE_CHANGED'},
+    {name:'equal revision economic divergence',local:base,
+      fresh:{ok:true,state:{...base,coins:base.coins+1},
+        raw:JSON.stringify({...base,coins:base.coins+1})},
+      issue:null,reason:'CURRENT_SAVE_CHANGED'}
+  ];
+  for(const scenario of cases){
+    let removed=0,rendered=0;
+    const original=JSON.stringify(scenario.local);
+    const storage={getItem(){throw Error('no direct reads');},
+      setItem(){throw Error('storage event must never write');}};
+    const ctx={
+      window:{addEventListener(type,fn){if(type==='storage')this.onStorage=fn;}},
+      SAVE_KEY:'toolbox.merge-isle.local.v1',store:storage,
+      state:scenario.local,persistedRaw:original,saveIssue:scenario.issue,
+      drag:{id:4,origin:0,moved:true,ghost:{remove(){removed++;}}},
+      ignoreNextClick:false,selected:0,activeGuidance:null,
+      peekLocalV3(){return scenario.fresh;},
+      isSafeSameRevisionClockUpdate(){return false;},
+      byId(id){assert.equal(id,'save-status');return {textContent:''};},
+      render(){rendered++;},hint(){}
+    };
+    runInNewContext(handler,ctx);
+    ctx.window.onStorage({storageArea:storage,key:ctx.SAVE_KEY});
+    assert.equal(ctx.saveIssue,scenario.reason,scenario.name);
+    assert.equal(ctx.state,scenario.local,scenario.name);
+    assert.equal(ctx.persistedRaw,original,scenario.name);
+    assert.equal(ctx.drag,null,scenario.name);
+    assert.equal(ctx.ignoreNextClick,true,scenario.name);
+    assert.equal(removed,1,scenario.name);
+    assert.equal(rendered,0,scenario.name);
+  }
 });

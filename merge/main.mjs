@@ -476,8 +476,19 @@ window.addEventListener('storage', event => {
       (event.key !== SAVE_KEY && event.key !== null)) return;
   // Storage events must be read-only. loadLocal can migrate legacy saves and
   // write backup keys; never run it while reacting to another tab's write.
+  // A conflict can arrive mid-gesture. Discard the stale pointer before
+  // leaving the save in a blocked state; never act on an uncertain board.
+  const cancelStaleGesture = () => {
+    if (!drag) return;
+    drag.ghost?.remove();
+    drag = null;
+    // The browser may dispatch a late synthetic click after pointer capture
+    // is lost. Consume it rather than selecting or merging an old slot.
+    ignoreNextClick = true;
+  };
   const fresh = peekLocalV3(store);
   if (!fresh.ok) {
+    cancelStaleGesture();
     saveIssue = fresh.reason;
     byId('save-status').textContent =
       '其他标签页的存档异常或已移除，已暂停同步 · 请勿关闭页面';
@@ -486,10 +497,12 @@ window.addEventListener('storage', event => {
   }
   if (fresh.raw === persistedRaw) return;
   if (saveIssue) {
+    cancelStaleGesture();
     hint('其他标签页更新了存档，当前页面存在未保存进度');
     return;
   }
   if (fresh.state.revision < state.revision) {
+    cancelStaleGesture();
     // Never replace a newer in-memory board with older remote progress.
     // Keep the existing expectedRaw so subsequent writes fail closed.
     saveIssue = 'CURRENT_SAVE_CHANGED';
@@ -500,6 +513,7 @@ window.addEventListener('storage', event => {
   }
   if (fresh.state.revision === state.revision &&
       !isSafeSameRevisionClockUpdate(state,fresh.state)) {
+    cancelStaleGesture();
     // Equal revision does not imply equal economy. Clock-only progress is
     // allowed, but never silently adopt a divergent board/coins/orders.
     saveIssue = 'CURRENT_SAVE_CHANGED';
@@ -511,13 +525,7 @@ window.addEventListener('storage', event => {
   // An in-progress pointer gesture refers to the OLD board. Cancel it before
   // rendering the remote snapshot, including its ghost, so a late pointerup
   // or synthetic click cannot move an unrelated item on the new board.
-  if (drag) {
-    drag.ghost?.remove();
-    drag = null;
-    // Keep this until the next board click: replacing captured DOM nodes may
-    // prevent pointerup, so a timer alone cannot reliably suppress that click.
-    ignoreNextClick = true;
-  }
+  cancelStaleGesture();
   // Adopt only the exact verified remote snapshot. Advancing its clock here
   // would show energy/cooldowns that this tab has not persisted. The regular
   // timer performs regeneration through the verified save-before-publish path.
