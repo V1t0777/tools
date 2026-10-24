@@ -1,6 +1,7 @@
 import {CORE_STORY_PACK} from './core-pack.mjs';
 import {availableStoryEntries,completedStoryEntries,completeStoryEntry,startCoreStory,dailyStoryIncident} from './runtime.mjs';
-import {readStorySave,writeStorySave} from './local-storage.mjs';
+import {readStorySave} from './local-storage.mjs';
+import {saveStoryDialogueWithLock} from './dialogue-write.mjs';
 import {captureStoryWorkshopEvidence} from './save-evidence.mjs';
 import {checkStoryResumeSnapshot} from './resume-guard.mjs';
 import {shouldBlockStoryStorageEvent} from './storage-event-guard.mjs';
@@ -11,8 +12,10 @@ import {createEmptyStoryProgress,STORY_SAVE_KEY} from '../mode-boundaries.mjs';
 
 const $=id=>document.getElementById(id);
 const store=(()=>{try{return window.localStorage;}catch{return null;}})();
+const webLocks=(()=>{try{return window.navigator?.locks??null;}catch{return null;}})();
 const loaded=readStorySave(store);
 let progress=loaded.progress,raw=loaded.raw,blocked=loaded.blocked,reason=loaded.reason;
+let saving=false,storageEpoch=0;
 let kind='main',selected=null,selectedChoice=null;
 const entries=CORE_STORY_PACK.entries;
 const main=entries.filter(x=>x.kind==='main');
@@ -22,17 +25,27 @@ function localDay(){
   const pad=n=>String(n).padStart(2,'0');
   return date.getFullYear()+'-'+pad(date.getMonth()+1)+'-'+pad(date.getDate());
 }
-function save(next,reset=false){
-  // A stale dialog cannot save after a cross-tab invalidation; explicit reset keeps its CAS flow.
+async function save(next,reset=false){
+  // One pending story write per tab. The same lock covers initialization,
+  // completion and explicitly confirmed reset; exact-raw CAS stays mandatory.
   if(blocked&&!reset)return false;
-  if(!writeStorySave(store,next,{expectedRaw:raw,confirmedReset:reset})){
+  if(saving)return false;
+  const expectedRaw=raw,expectedEpoch=storageEpoch;
+  saving=true;render();
+  const attempt=await saveStoryDialogueWithLock(webLocks,store,next,{
+    expectedRaw,confirmedReset:reset,
+    isCurrent:()=>storageEpoch===expectedEpoch&&(!blocked||reset)
+  });
+  saving=false;
+  if(!attempt.ok||attempt.value!==true||storageEpoch!==expectedEpoch||(!reset&&blocked)){
     blocked=true;reason='WRITE_CONFLICT';render();return false;
   }
-  progress=next;raw=JSON.stringify(next);blocked=false;reason=null;return true;
+  progress=next;raw=JSON.stringify(next);blocked=false;reason=null;
+  render();return true;
 }
 if(!blocked&&!progress.packs.core){
   const next=startCoreStory(progress,CORE_STORY_PACK);
-  save(next);
+  void save(next);
 }
 function status(){
   $('save-state').textContent=blocked
@@ -55,6 +68,7 @@ function card(entry,done=false){
   const place=document.createElement('p');place.textContent=entry.chapter+' · '+entry.place;
   const button=document.createElement('button');button.type='button';
   button.textContent=done?'回看剧情':'阅读故事';
+  button.disabled=saving;
   button.addEventListener('click',()=>open(entry));
   wrapper.append(head,place,button);
   return wrapper;
@@ -86,8 +100,8 @@ function render(){
     empty.textContent=kind==='side'?'暂时没有新支线。继续主线后，居民会带来新的故事。':'故事已全部读完，或者还未满足事件前置条件。';
     list.append(empty);
   }
-  $('reset-story').disabled=reason==='STORAGE_UNAVAILABLE';
-  $('export-corrupt-story').disabled=reason!=='CORRUPT_SAVE'||typeof raw!=='string';
+  $('reset-story').disabled=saving||reason==='STORAGE_UNAVAILABLE';
+  $('export-corrupt-story').disabled=saving||reason!=='CORRUPT_SAVE'||typeof raw!=='string';
 }
 function lineElement(line){
   const row=document.createElement('div');row.className='dialog-line';
@@ -96,6 +110,7 @@ function lineElement(line){
   row.append(name,text);return row;
 }
 function open(entry){
+  if(saving)return;
   selected=entry;selectedChoice=null;
   const done=completed(entry);
   $('dialog-chapter').textContent=entry.chapter;
@@ -122,6 +137,7 @@ function open(entry){
       button.textContent=choice.label;
       button.setAttribute('aria-pressed','false');
       button.addEventListener('click',()=>{
+        if(saving||blocked)return;
         selectedChoice=choice.id;
         $('dialog-choices').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));
         $('dialog-reply').textContent=choice.reply;
@@ -132,20 +148,21 @@ function open(entry){
   }
   const finish=$('complete-story');
   finish.textContent=done?'已阅读 · 关闭':entry.choices.length?'确认选择并继续':'完成阅读并继续';
-  finish.disabled=!done&&(blocked||!requirement.met||entry.choices.length>0);
+  finish.disabled=saving||(!done&&(blocked||!requirement.met||entry.choices.length>0));
   $('story-dialog').showModal();
 }
 $('close-dialog').addEventListener('click',()=>$('story-dialog').close());
-$('complete-story').addEventListener('click',()=>{
-  if(!selected)return;
+$('complete-story').addEventListener('click',async()=>{
+  if(saving||!selected)return;
   if(completed(selected)){$('story-dialog').close();return;}
   try{
     if(!inspectStoryWorkshopRequirement(selected.id,store).met){
       $('dialog-reply').textContent='尚未完成剧情工作台的委托，无法推进这一幕。';return;
     }
     const next=completeStoryEntry(progress,CORE_STORY_PACK,selected.id,selectedChoice);
-    if(save(next)){
-      $('story-dialog').close();render();
+    $('complete-story').disabled=true;
+    if(await save(next)){
+      if($('story-dialog').open)$('story-dialog').close();
     }
   }catch{
     $('dialog-reply').textContent='当前剧情暂不可完成，请确认前置故事是否已解锁。';
@@ -155,7 +172,7 @@ document.querySelectorAll('.tabs [data-kind]').forEach(btn=>btn.addEventListener
   kind=btn.dataset.kind;render();
 }));
 $('export-corrupt-story').addEventListener('click',()=>{
-  if(reason!=='CORRUPT_SAVE'||typeof raw!=='string')return;
+  if(saving||reason!=='CORRUPT_SAVE'||typeof raw!=='string')return;
   if(!window.confirm('将异常剧情对白存档保存为本地文本文件？文件可能包含个人游玩信息，不会上传或修改浏览器存档。'))return;
   const evidence=captureStoryWorkshopEvidence(store,{key:STORY_SAVE_KEY,expectedRaw:raw,confirmedByUser:true});
   if(!evidence.ok){
@@ -178,7 +195,8 @@ $('export-corrupt-story').addEventListener('click',()=>{
     $('save-state').textContent='设备未能触发文件导出；原浏览器存档未修改，请勿重置。';
   }
 });
-$('reset-story').addEventListener('click',()=>{
+$('reset-story').addEventListener('click',async()=>{
+  if(saving)return;
   if(reason==='CORRUPT_SAVE'&&!window.confirm('异常剧情对白存档会被重置覆盖。建议先导出并确认备份文件可用。仍要继续重置吗？'))return;
   if(!window.confirm('确认重置此浏览器的剧情进度吗？此操作不影响普通经营存档，但剧情选择与已读记录不可恢复。'))return;
   const current=readStorySave(store);
@@ -187,12 +205,12 @@ $('reset-story').addEventListener('click',()=>{
     blocked=true;reason='WRITE_CONFLICT';render();return;
   }
   const next=startCoreStory(createEmptyStoryProgress(),CORE_STORY_PACK);
-  if(save(next,true))render();
+  await save(next,true);
 });
 function recheckStoryOnResume(){
   if(!blocked){
     const check=checkStoryResumeSnapshot(store,{key:STORY_SAVE_KEY,expectedRaw:raw});
-    if(!check.ok){blocked=true;reason=check.reason;}
+    if(!check.ok){blocked=true;reason=check.reason;storageEpoch++;}
   }
   if($('story-dialog').open)$('story-dialog').close();
   render();
@@ -203,7 +221,7 @@ document.addEventListener('visibilitychange',()=>{
 });
 window.addEventListener('storage',event=>{
   if(shouldBlockStoryStorageEvent(event,{key:STORY_SAVE_KEY,storage:store})){
-    blocked=true;reason='WRITE_CONFLICT';selectedChoice=null;
+    storageEpoch++;blocked=true;reason='WRITE_CONFLICT';selectedChoice=null;
     if($('story-dialog').open)$('story-dialog').close();
     render();
   }else if(shouldRefreshStoryDependencyEvent(event,{ownKey:STORY_SAVE_KEY,dependencyKey:STORY_WORKSHOP_KEY,storage:store})){
