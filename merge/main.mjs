@@ -10,6 +10,7 @@ import { getSupplyControlSnapshot } from './supply-controls.mjs';
 import { deriveNormalMilestones } from './normal-milestones.mjs';
 import { prepareLocalSaveExport } from './save-export.mjs';
 import { commitNormalSnapshot } from './save-transaction.mjs';
+import { prepareAbnormalResetBackup } from './reset-backup.mjs';
 import { prepareNormalStartup } from './startup-persist.mjs';
 import { isSafeSameRevisionClockUpdate } from './storage-event-policy.mjs';
 
@@ -409,9 +410,18 @@ byId('export-local-save').addEventListener('click', () => {
 
 byId('reset').addEventListener('click', () => {
   const warning = saveIssue
-    ? '当前存档无法安全保存。重置会永久覆盖原始存档数据（可能仍可人工修复），确定继续吗？'
+    ? '当前存档状态异常。重置前将尝试在此浏览器保留原始备份，但仍建议先下载原始文件；确定继续吗？'
     : '确定重置本地试玩进度吗？当前棋盘、金币和订单会被清空，且无法恢复。';
   if (!window.confirm(warning)) return;
+  // A damaged or uncertain original must have a verified separate local
+  // backup before any confirmed reset is allowed to overwrite its key.
+  if(saveIssue) {
+    const backup=prepareAbnormalResetBackup(store,{expectedRaw:persistedRaw});
+    if(!backup.ok) {
+      hint('无法核实异常存档备份，重置已中止；请先导出原始存档并核对');
+      return;
+    }
+  }
   const resetState=createInitialState();
   if(!persist(resetState,{confirmedReset:true})) {
     render();
