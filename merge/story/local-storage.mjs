@@ -29,6 +29,9 @@ export function writeStorySave(storage,progress,{expectedRaw,confirmedReset=fals
     }
     const serialized=JSON.stringify(progress);
     if(serialized.length>MAX_STORY_SAVE_BYTES)return false;
+    // Serialization may take time while another tab writes. Narrow the race window;
+    // this is still NOT an atomic cross-tab compare-and-swap.
+    if(storage.getItem(STORY_SAVE_KEY)!==expectedRaw)return false;
     storage.setItem(STORY_SAVE_KEY,serialized);
     return storage.getItem(STORY_SAVE_KEY)===serialized;
   }catch{return false;}

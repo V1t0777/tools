@@ -36,6 +36,9 @@ export function writeStoryWorkshop(storage,state,{expectedRaw,confirmedReset=fal
     }
     const next=JSON.stringify(state);
     if(next.length>MAX_LOCAL_SAVE_BYTES)return false;
+    // Serialization may take time while another tab writes. Narrow the race window;
+    // this is still NOT an atomic cross-tab compare-and-swap.
+    if(storage.getItem(STORY_WORKSHOP_KEY)!==expectedRaw)return false;
     storage.setItem(STORY_WORKSHOP_KEY,next);
     return storage.getItem(STORY_WORKSHOP_KEY)===next;
   }catch{return false;}
