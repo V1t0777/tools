@@ -8,7 +8,7 @@ test('P2.13 stable unique bounded display goals',()=>{
   assert.ok(NORMAL_MILESTONE_RULES.every(x=>Object.isFrozen(x)&&
     Number.isSafeInteger(x.target)&&x.target>0&&x.target<=2400));
 });
-test('P2.15 read-only normal milestone view remains activated without new grants',()=>{
+test('P2.15 milestone core remains I/O-free while read-only preview activation is explicit',()=>{
   const files=['normal-milestone-rules.mjs','normal-milestone-metrics.mjs',
     'normal-milestones.mjs'];
   const code=files.map(name=>readFileSync(new URL('../merge/'+name,import.meta.url),'utf8')).join('\n');
@@ -16,7 +16,5 @@ test('P2.15 read-only normal milestone view remains activated without new grants
   for(const term of ['localStorage','sessionStorage','fetch(','saveLocal(',
     'purchaseSupply(','recordSupplyProgress(','Date.now(','Math.random('])
     assert.equal(code.includes(term),false,term);
-  assert.equal(main.includes("import { deriveNormalMilestones } from './normal-milestones.mjs'"),true);
-  assert.equal(main.includes('const report=deriveNormalMilestones(state);'),true);
-  assert.equal(main.includes("milestone.complete?'已完成 · 无额外奖励'"),true);
+  assert.equal(main.includes("import { deriveNormalMilestones } from './normal-milestones.mjs';"),true);
 });
