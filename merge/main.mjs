@@ -470,7 +470,10 @@ window.addEventListener('storage', event => {
   // localStorage.clear() dispatches a storage event with key === null.
   // Re-read the actual save for clear events: a cleared save must block
   // gameplay immediately, but clearing unrelated keys must not.
-  if ((event.key !== SAVE_KEY && event.key !== null) || !store) return;
+  // Same-key sessionStorage events from same-origin frames are unrelated.
+  // Only reconcile the actual normal-mode localStorage area.
+  if (!store || event.storageArea !== store ||
+      (event.key !== SAVE_KEY && event.key !== null)) return;
   // Storage events must be read-only. loadLocal can migrate legacy saves and
   // write backup keys; never run it while reacting to another tab's write.
   const fresh = peekLocalV3(store);

@@ -151,7 +151,7 @@ test('P2.32 storage listener adopts remote bytes without inventing unpersisted c
       render(){},hint(){}
     };
     runInNewContext(handler,ctx);
-    ctx.window.onStorage({key:saveKey});
+    ctx.window.onStorage({storageArea:ctx.store,key:saveKey});
     assert.equal(JSON.stringify(ctx.state),fresh.raw,label);
     assert.equal(ctx.persistedRaw,fresh.raw,label);
     assert.equal(ctx.selected,-1);
@@ -179,9 +179,9 @@ test('P2.38 localStorage.clear event immediately blocks a removed normal save',(
     render(){rendered++;},hint(message){messages.push(message);}
   };
   runInNewContext(handler,ctx);
-  ctx.window.onStorage({key:'unrelated.setting'});
+  ctx.window.onStorage({storageArea:ctx.store,key:'unrelated.setting'});
   assert.equal(reads,0,'unrelated key must not cause save inspection');
-  ctx.window.onStorage({key:null});
+  ctx.window.onStorage({storageArea:ctx.store,key:null});
   assert.equal(reads,1,'clear must inspect actual normal save');
   assert.equal(ctx.saveIssue,'SAVE_REMOVED');
   assert.equal(ctx.persistedRaw,raw);
@@ -211,11 +211,45 @@ test('P2.38 clear event that leaves normal save unchanged does not interrupt pla
     render(){rendered++;},hint(){hints++;}
   };
   runInNewContext(handler,ctx);
-  ctx.window.onStorage({key:null});
+  ctx.window.onStorage({storageArea:ctx.store,key:null});
   assert.equal(reads,1);
   assert.equal(ctx.saveIssue,null);
   assert.equal(ctx.selected,1);
   assert.equal(rendered,0);
   assert.equal(hints,0);
   assert.equal(status.textContent,'已保存');
+});
+
+test('P2.39 ignores same-key and clear events from other storage areas',()=>{
+  const main=readFileSync(new URL('../merge/main.mjs',import.meta.url),'utf8');
+  const start=main.indexOf("window.addEventListener('storage', event => {");
+  const end=main.indexOf('window.setInterval(() => {',start);
+  assert.ok(start>=0&&end>start);
+  const handler=main.slice(start,end);
+  const current=initial(),raw=JSON.stringify(current);
+  const status={textContent:'已保存'},localArea={},sessionArea={};
+  let reads=0,hints=0,renders=0;
+  const ctx={
+    window:{addEventListener(type,fn){if(type==='storage')this.onStorage=fn;}},
+    SAVE_KEY:'toolbox.merge-isle.local.v1',store:localArea,
+    state:current,persistedRaw:raw,saveIssue:null,selected:1,activeGuidance:null,
+    peekLocalV3(){reads++;return {ok:false,reason:'SAVE_REMOVED'};},
+    byId(id){assert.equal(id,'save-status');return status;},
+    hint(){hints++;},render(){renders++;}
+  };
+  runInNewContext(handler,ctx);
+  ctx.window.onStorage({storageArea:sessionArea,key:ctx.SAVE_KEY});
+  ctx.window.onStorage({storageArea:sessionArea,key:null});
+  ctx.window.onStorage({storageArea:undefined,key:ctx.SAVE_KEY});
+  assert.equal(reads,0,'foreign or unknown storage area must not inspect save');
+  assert.equal(ctx.saveIssue,null);
+  assert.equal(ctx.state,current);
+  assert.equal(ctx.persistedRaw,raw);
+  assert.equal(ctx.selected,1);
+  assert.equal(status.textContent,'已保存');
+  assert.equal(hints,0);
+  assert.equal(renders,0);
+  ctx.window.onStorage({storageArea:localArea,key:ctx.SAVE_KEY});
+  assert.equal(reads,1,'actual localStorage save event still handled');
+  assert.equal(ctx.saveIssue,'SAVE_REMOVED');
 });
