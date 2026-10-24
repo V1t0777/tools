@@ -17,7 +17,7 @@ const START_TIME=1_000_000;
 const BUILD_ORDER=Object.freeze(['garden','harbor','storefront']);
 const STRATEGIES=new Set(['greedy','novice']);
 const PRODUCER_CHAINS=Object.freeze(['tea','bakery','floral']);
-const NOVICE_MERGE_THRESHOLD=20;
+const NOVICE_MERGE_THRESHOLD=44;
 const numberId=id=>Number(id.slice(1));
 const usedSlots=state=>state.board.filter(Boolean).length;
 const validSeed=value=>Number.isSafeInteger(value)&&value>=0&&value<=0xffffffff;
