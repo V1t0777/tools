@@ -4,6 +4,7 @@ import {readStorySave} from './local-storage.mjs';
 import {incidentWorkshopEcho} from './incident-context.mjs';
 import {incidentChoiceEcho} from './incident-choice-context.mjs';
 import {mainlineChoiceEcho} from './mainline-choice-context.mjs';
+import {readStoryHash} from './story-return-route.mjs';
 import {saveStoryDialogueWithLock} from './dialogue-write.mjs';
 import {captureStoryWorkshopEvidence} from './save-evidence.mjs';
 import {checkStoryResumeSnapshot} from './resume-guard.mjs';
@@ -20,7 +21,7 @@ const webLocks=(()=>{try{return window.navigator?.locks??null;}catch{return null
 const loaded=readStorySave(store);
 let progress=loaded.progress,raw=loaded.raw,blocked=loaded.blocked,reason=loaded.reason;
 let saving=false,storageEpoch=0;
-let kind=window.location.hash==='#side'?'side':window.location.hash==='#incident'?'incident':'main';
+let kind=readStoryHash(window.location.hash).kind;
 let selected=null,selectedChoice=null;
 const entries=CORE_STORY_PACK.entries;
 const main=entries.filter(x=>x.kind==='main');
@@ -64,6 +65,8 @@ function status(){
 function completed(entry){return !!progress.packs.core?.completed[entry.kind].includes(entry.id);}
 function card(entry,done=false){
   const wrapper=document.createElement('article');wrapper.className='story-card';
+  wrapper.id='story-'+entry.id;
+  wrapper.tabIndex=-1;
   const head=document.createElement('div');head.className='story-head';
   const title=document.createElement('h3');title.textContent=entry.title;
   const state=document.createElement('span');state.className='status';
@@ -288,4 +291,19 @@ window.addEventListener('storage',event=>{
     render();
   }
 });
-render();
+function syncStoryHash(){
+  const route=readStoryHash(window.location.hash);
+  kind=route.kind;
+  render();
+  if(!route.entryId)return;
+  // A route is a focus hint, never a command to open or complete a locked scene.
+  window.requestAnimationFrame(()=>{
+    if(kind!==route.kind||readStoryHash(window.location.hash).entryId!==route.entryId)return;
+    const target=document.getElementById('story-'+route.entryId);
+    if(!target)return; // Locked or otherwise unavailable; prerequisites stay intact.
+    target.focus({preventScroll:true});
+    target.scrollIntoView({block:'nearest'});
+  });
+}
+window.addEventListener('hashchange',syncStoryHash);
+syncStoryHash();

@@ -26,3 +26,6 @@ dialog{border:1px solid var(--line);border-radius:22px;max-width:min(560px,calc(
 .story-card .goal-link{display:flex;align-items:center;justify-content:center;min-height:44px;margin:0 0 8px;text-align:center;overflow-wrap:anywhere}
 .story-goal-target{scroll-margin-top:16px}
 .story-goal-target:target{outline:3px solid var(--accent);outline-offset:3px}
+
+/* P44: returning to a scene focuses the real card without auto-opening dialogue. */
+.story-card:target,.story-card:focus{outline:3px solid var(--accent);outline-offset:3px;scroll-margin-top:16px}

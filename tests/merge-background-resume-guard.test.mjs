@@ -11,7 +11,7 @@ const slice=(start,end)=>{
   assert.ok(left>=0&&right>left,`missing real page handler: ${start}`);
   return main.slice(left,right);
 };
-const visibilityCode=slice("document.addEventListener('visibilitychange', () => {",
+const visibilityCode=slice("function revalidateResumedSave() {",
   "byId('store-selected').addEventListener");
 const timerCode=slice("window.setInterval(() => {","byId('save-status').textContent = saveIssue");
 
@@ -20,6 +20,7 @@ function visibilityHarness(raw,actual=raw) {
   let renders=0,reads=0;
   const store={getItem(key){assert.equal(key,SAVE_KEY);reads++;return actual;}};
   const ctx={document:{hidden:false,addEventListener(name,listener){listeners[name]=listener;}},
+    window:{addEventListener(name,listener){listeners[name]=listener;}},
     drag:null,ignoreNextClick:false,selected:2,activeGuidance:{boardSlots:[2]},
     saveIssue:null,persistedRaw:raw,store,peekLocalV3,
     byId(id){assert.equal(id,'save-status');return status;},
@@ -27,7 +28,8 @@ function visibilityHarness(raw,actual=raw) {
     completeDrag(){throw Error('no active drag should be completed');}};
   runInNewContext(visibilityCode,ctx);
   assert.equal(typeof listeners.visibilitychange,'function');
-  return {ctx,fire:()=>listeners.visibilitychange(),status,hints,get renders(){return renders;},
+  return {ctx,fire:()=>listeners.visibilitychange(),firePageShow:persisted=>listeners.pageshow({persisted}),
+    status,hints,get renders(){return renders;},
     get reads(){return reads;}};
 }
 
@@ -111,4 +113,57 @@ test('P2.58 background hide still cancels a stale drag without reading storage',
   assert.equal(cancelled,1);
   assert.equal(h.ctx.ignoreNextClick,true);
   assert.equal(h.reads,0);
+});
+
+test('P2.59 ordinary initial pageshow does not perform redundant storage reads',()=>{
+  const raw=JSON.stringify(createInitialState(1000)),h=visibilityHarness(raw);
+  h.firePageShow(false);
+  assert.equal(h.reads,0);
+  assert.equal(h.ctx.saveIssue,null);
+});
+
+test('P2.59 BFCache restore with unchanged raw bytes keeps current selection',()=>{
+  const raw=JSON.stringify(createInitialState(1000)),h=visibilityHarness(raw);
+  h.firePageShow(true);
+  assert.equal(h.reads,1);
+  assert.equal(h.ctx.saveIssue,null);
+  assert.equal(h.ctx.selected,2);
+  assert.equal(h.renders,0);
+});
+
+test('P2.59 BFCache restore blocks changed save and cancels stale pointer',()=>{
+  const state=createInitialState(1000),raw=JSON.stringify(state);
+  const h=visibilityHarness(raw,JSON.stringify({...state,revision:state.revision+1}));
+  let removed=0;
+  h.ctx.drag={id:4,ghost:{remove(){removed++;}}};
+  h.firePageShow(true);
+  assert.equal(h.ctx.saveIssue,'CURRENT_SAVE_CHANGED');
+  assert.equal(h.ctx.persistedRaw,raw);
+  assert.equal(h.ctx.drag,null);
+  assert.equal(h.ctx.ignoreNextClick,true);
+  assert.equal(removed,1);
+  assert.equal(h.renders,1);
+  assert.match(h.status.textContent,/暂停写入/);
+});
+
+test('P2.59 BFCache restored while hidden waits for visible revalidation',()=>{
+  const state=createInitialState(1000),raw=JSON.stringify(state);
+  const h=visibilityHarness(raw,JSON.stringify({...state,revision:state.revision+1}));
+  h.ctx.document.hidden=true;
+  h.firePageShow(true);
+  assert.equal(h.reads,0);
+  assert.equal(h.ctx.saveIssue,null);
+  h.ctx.document.hidden=false;
+  h.fire();
+  assert.equal(h.reads,1);
+  assert.equal(h.ctx.saveIssue,'CURRENT_SAVE_CHANGED');
+});
+
+test('P2.59 BFCache restoration preserves existing blocked state without writes',()=>{
+  const raw=JSON.stringify(createInitialState(1000)),h=visibilityHarness(raw);
+  h.ctx.saveIssue='CORRUPT_SAVE';
+  h.firePageShow(true);
+  assert.equal(h.ctx.saveIssue,'CORRUPT_SAVE');
+  assert.equal(h.reads,0);
+  assert.equal(h.renders,0);
 });

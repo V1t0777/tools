@@ -1,96 +1,120 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {NORMAL_SAVE_LOCK_NAME,withNormalSaveLock} from '../merge/normal-save-lock.mjs';
+import {createInitialState} from '../merge/engine.mjs';
+import {SAVE_KEY} from '../merge/storage.mjs';
+import {STORY_SAVE_KEY} from '../merge/mode-boundaries.mjs';
+import {NORMAL_SAVE_LOCK_NAME,commitNormalSnapshotLocked} from '../merge/normal-save-lock.mjs';
 
-function lockManager() {
-  let held = false;
-  const calls = [];
+const state=revision=>({...createInitialState(1_000_000),revision});
+const raw=revision=>JSON.stringify(state(revision));
+function storage(initial=null,story='story-bytes') {
+  const data=new Map([[STORY_SAVE_KEY,story]]);
+  if(initial!==null)data.set(SAVE_KEY,initial);
+  const writes=[];
+  return {data,writes,getItem:key=>data.get(key)??null,
+    setItem:(key,value)=>{writes.push([key,value]);data.set(key,value);}};
+}
+function serialLocks() {
+  let tail=Promise.resolve();
+  const calls=[];
   return {calls,request(name,options,callback) {
-    calls.push({name,options});
-    if (held) return Promise.resolve(callback(null));
-    held = true;
-    return Promise.resolve().then(() => callback({name,mode:'exclusive'}))
-      .finally(() => {held = false;});
+    calls.push({name,mode:options.mode});
+    const pending=tail.then(()=>callback({name,mode:options.mode}));
+    tail=pending.then(()=>{},()=>{});
+    return pending;
   }};
 }
 
-test('normal write uses a stable exclusive non-waiting Web Lock',async()=>{
-  const locks=lockManager();
-  const receipt=Object.freeze({ok:true,raw:'verified'});
-  assert.equal(await withNormalSaveLock(locks,()=>receipt),receipt);
-  assert.deepEqual(locks.calls,[{name:NORMAL_SAVE_LOCK_NAME,
-    options:{mode:'exclusive',ifAvailable:true}}]);
+test('P2.60a lock serializes two stale tabs: exactly one save succeeds',async()=>{
+  const previous=raw(1),db=storage(previous),locks=serialLocks();
+  const [first,second]=await Promise.all([
+    commitNormalSnapshotLocked(db,state(2),{expectedRaw:previous,locks}),
+    commitNormalSnapshotLocked(db,state(3),{expectedRaw:previous,locks})
+  ]);
+  assert.equal(first.ok,true);
+  assert.equal(first.verifiedReadback,true);
+  assert.deepEqual(second,{ok:false,reason:'CURRENT_SAVE_CHANGED'});
+  assert.equal(db.getItem(SAVE_KEY),raw(2));
+  assert.deepEqual(db.writes.map(([key])=>key),[SAVE_KEY]);
+  assert.deepEqual(locks.calls,[
+    {name:NORMAL_SAVE_LOCK_NAME,mode:'exclusive'},
+    {name:NORMAL_SAVE_LOCK_NAME,mode:'exclusive'}]);
+  assert.equal(db.getItem(STORY_SAVE_KEY),'story-bytes');
 });
 
-test('simultaneous tabs cannot run the second write while the first holds the lock',async()=>{
-  const locks=lockManager();
-  let release;
-  const gate=new Promise(resolve=>{release=resolve;});
-  let firstStarted;
-  const started=new Promise(resolve=>{firstStarted=resolve;});
-  const writes=[];
-  const first=withNormalSaveLock(locks,async()=>{
-    firstStarted();
-    await gate;
-    writes.push('first');
-    return {ok:true};
-  });
-  await started;
-  const second=await withNormalSaveLock(locks,()=>{
-    writes.push('second');
-    return {ok:true};
-  });
-  assert.deepEqual(second,{ok:false,reason:'SAVE_LOCK_BUSY'});
-  assert.deepEqual(writes,[]);
-  release();
-  assert.equal((await first).ok,true);
-  assert.deepEqual(writes,['first']);
-  assert.equal((await withNormalSaveLock(locks,()=>{
-    writes.push('third');return {ok:true};
-  })).ok,true);
-  assert.deepEqual(writes,['first','third']);
+test('P2.60a no Web Locks support refuses writes, no fake storage lock',async()=>{
+  const db=storage(raw(1));
+  const result=await commitNormalSnapshotLocked(db,state(2),{
+    expectedRaw:raw(1),locks:null});
+  assert.deepEqual(result,{ok:false,reason:'MULTITAB_LOCK_UNAVAILABLE'});
+  assert.equal(db.getItem(SAVE_KEY),raw(1));
+  assert.deepEqual(db.writes,[]);
 });
 
-test('missing Web Locks and invalid callback never write',async()=>{
-  let writes=0;
-  assert.deepEqual(await withNormalSaveLock(null,()=>{writes++;return {ok:true};}),
-    {ok:false,reason:'WEB_LOCKS_UNAVAILABLE'});
-  assert.deepEqual(await withNormalSaveLock({},()=>{writes++;return {ok:true};}),
-    {ok:false,reason:'WEB_LOCKS_UNAVAILABLE'});
-  assert.deepEqual(await withNormalSaveLock(lockManager(),null),
-    {ok:false,reason:'INVALID_TRANSACTION'});
-  assert.equal(writes,0);
+test('P2.60a missing baseline refuses before requesting a lock',async()=>{
+  const db=storage(raw(1)),locks=serialLocks();
+  assert.deepEqual(await commitNormalSnapshotLocked(db,state(2),{locks}),
+    {ok:false,reason:'NO_TRUSTED_BASELINE'});
+  assert.deepEqual(locks.calls,[]);
+  assert.deepEqual(db.writes,[]);
 });
 
-test('wrong lock name or shared mode cannot authorize a write',async()=>{
-  for(const bad of [{name:'wrong',mode:'exclusive'},
-    {name:NORMAL_SAVE_LOCK_NAME,mode:'shared'}]) {
-    let writes=0;
-    const locks={request:(_name,_options,callback)=>callback(bad)};
-    assert.deepEqual(await withNormalSaveLock(locks,()=>{
-      writes++;return {ok:true};
-    }),{ok:false,reason:'INVALID_SAVE_LOCK'});
-    assert.equal(writes,0);
+test('P2.60a denied or malformed grant never writes',async()=>{
+  for(const grant of [null,{name:NORMAL_SAVE_LOCK_NAME,mode:'shared'},
+    {name:'wrong',mode:'exclusive'}]) {
+    const db=storage(raw(1));
+    const locks={request:(_name,_options,callback)=>callback(grant)};
+    assert.deepEqual(await commitNormalSnapshotLocked(db,state(2),{
+      expectedRaw:raw(1),locks}),{ok:false,reason:'LOCK_NOT_GRANTED'});
+    assert.deepEqual(db.writes,[]);
   }
 });
 
-test('lock request errors, fake completion, and invalid receipts fail closed',async()=>{
-  const broken={request(){throw Error('denied');}};
-  assert.deepEqual(await withNormalSaveLock(broken,()=>({ok:true})),
-    {ok:false,reason:'SAVE_LOCK_REQUEST_FAILED'});
-  assert.deepEqual(await withNormalSaveLock({request:()=>({ok:true})},()=>({ok:true})),
-    {ok:false,reason:'SAVE_LOCK_OUTCOME_UNCERTAIN'});
-  assert.deepEqual(await withNormalSaveLock(lockManager(),()=>undefined),
-    {ok:false,reason:'INVALID_TRANSACTION_RECEIPT'});
-  assert.deepEqual(await withNormalSaveLock(lockManager(),()=>{throw Error('fail');}),
-    {ok:false,reason:'SAVE_TRANSACTION_FAILED'});
+test('P2.60a lock rejection and absent callback receipt fail closed',async()=>{
+  for(const request of [()=>{throw Error('denied');},
+    ()=>Promise.reject(Error('denied')),()=>undefined]) {
+    const db=storage(raw(1));
+    assert.deepEqual(await commitNormalSnapshotLocked(db,state(2),{
+      expectedRaw:raw(1),locks:{request}}),
+    {ok:false,reason:'LOCK_REQUEST_FAILED'});
+    assert.deepEqual(db.writes,[]);
+  }
 });
 
-test('transaction rejection releases lock for a subsequent safe attempt',async()=>{
-  const locks=lockManager();
-  assert.deepEqual(await withNormalSaveLock(locks,async()=>{throw Error('quota');}),
-    {ok:false,reason:'SAVE_TRANSACTION_FAILED'});
-  assert.deepEqual(await withNormalSaveLock(locks,()=>({ok:false,reason:'STALE_BASELINE'})),
-    {ok:false,reason:'STALE_BASELINE'});
-  assert.equal((await withNormalSaveLock(locks,()=>({ok:true}))).ok,true);
+test('P2.60a storage read failure under lock preserves raw data',async()=>{
+  const db=storage(raw(1)),locks=serialLocks();
+  const broken={getItem(){throw Error('blocked');},setItem:db.setItem};
+  assert.deepEqual(await commitNormalSnapshotLocked(broken,state(2),{
+    expectedRaw:raw(1),locks}),{ok:false,reason:'STORAGE_UNAVAILABLE'});
+  assert.deepEqual(db.writes,[]);
+});
+
+test('P2.60a confirmed reset still requires exact locked baseline',async()=>{
+  const db=storage(raw(8)),locks=serialLocks();
+  assert.deepEqual(await commitNormalSnapshotLocked(db,state(0),{
+    expectedRaw:raw(7),confirmedReset:true,locks}),
+  {ok:false,reason:'CURRENT_SAVE_CHANGED'});
+  assert.equal(db.getItem(SAVE_KEY),raw(8));
+  const accepted=await commitNormalSnapshotLocked(db,state(0),{
+    expectedRaw:raw(8),confirmedReset:true,locks});
+  assert.equal(accepted.ok,true);
+  assert.equal(db.getItem(SAVE_KEY),raw(0));
+  assert.equal(db.getItem(STORY_SAVE_KEY),'story-bytes');
+});
+
+test('P2.60a locked initialization from absent key verifies exact bytes',async()=>{
+  const db=storage(null),locks=serialLocks();
+  const receipt=await commitNormalSnapshotLocked(db,state(0),{
+    expectedRaw:null,locks});
+  assert.equal(receipt.ok,true);
+  assert.equal(db.getItem(SAVE_KEY),raw(0));
+});
+
+test('P2.60a readback failure is not mislabeled a successful locked write',async()=>{
+  const db=storage(raw(1)),locks=serialLocks();
+  const broken={getItem:db.getItem,setItem(){}};
+  const receipt=await commitNormalSnapshotLocked(broken,state(2),{
+    expectedRaw:raw(1),locks});
+  assert.deepEqual(receipt,{ok:false,reason:'SAVE_VERIFY_FAILED'});
+  assert.equal(db.getItem(SAVE_KEY),raw(1));
 });

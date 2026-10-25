@@ -52,8 +52,8 @@ test('P43 story cards and modal both navigate to the same goal-specific target',
 test('P43 warehouse return restores the side-story tab without changing progress',()=>{
   const html=read('../merge/story-workshop.html');
   const ui=read('../merge/story/ui.mjs');
-  assert.ok(html.includes('href="./story.html#side"'));
-  assert.ok(ui.includes("window.location.hash==='#side'?'side'"));
+  assert.ok(html.includes('href="./story.html#story-toolbox"'));
+  assert.ok(ui.includes("readStoryHash(window.location.hash).kind"));
   assert.ok(ui.includes("kind==='incident'"));
   assert.equal(ui.includes('window.localStorage.setItem('),false);
   assert.equal(ui.includes('history.pushState('),false);
