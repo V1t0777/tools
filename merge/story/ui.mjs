@@ -30,6 +30,9 @@ let saving=false,storageEpoch=0;
 let pinQueued=false;
 let kind=readStoryHash(window.location.hash).kind;
 let selected=null,selectedChoice=null,selectedIncidentDay=null;
+// A resumed dialogue must not reuse workshop-dependent text or choices after
+// a peer changed the separate story-workshop save while this page was asleep.
+let selectedWorkshopRaw=null,selectedWorkshopReadable=false;
 let shownDay=localDay();
 const entries=CORE_STORY_PACK.entries;
 const main=entries.filter(x=>x.kind==='main');
@@ -201,6 +204,9 @@ function open(entry){
     refreshIncidentDay();render();return;
   }
   selected=entry;selectedChoice=null;
+  const workshopAtOpen=readStoryWorkshop(store);
+  selectedWorkshopRaw=workshopAtOpen.raw;
+  selectedWorkshopReadable=!workshopAtOpen.blocked;
   selectedIncidentDay=entry.kind==='incident'?openedDay:null;
   const done=completed(entry);
   $('dialog-chapter').textContent=entry.chapter;
@@ -368,6 +374,16 @@ function recheckStoryOnResume(){
     }
     snapshotOk=check.ok;
     if(!check.ok){blocked=true;reason=check.reason;storageEpoch++;}
+  }
+  // A backgrounded tab can miss the workshop StorageEvent as well. A main
+  // or side dialogue may contain workshop-dependent text or choices, so
+  // preserve it only if that independent raw snapshot is still identical.
+  // A changed workshop closes the stale dialogue without blocking the
+  // otherwise intact story save; the next open re-evaluates prerequisites.
+  if(snapshotOk&&$('story-dialog').open&&selected&&
+    (selected.kind==='main'||selected.kind==='side')){
+    snapshotOk=selectedWorkshopReadable&&
+      checkStoryResumeSnapshot(store,{key:STORY_WORKSHOP_KEY,expectedRaw:selectedWorkshopRaw}).ok;
   }
   // pageshow and visibilitychange may fire back-to-back. Keep an unlocked
   // main/side dialogue and its choice only after an exact snapshot check.
