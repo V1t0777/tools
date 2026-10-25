@@ -7,9 +7,14 @@
 const reject=reason=>Object.freeze({ok:false,reason});
 
 export function createNormalUiFlight() {
-  let busy=false,epoch=0;
+  let busy=false,epoch=0,blocked=false;
   return Object.freeze({
     get busy(){return busy;},
+    get blocked(){return blocked;},
+    /** Permanent fail-closed stop after a storage conflict or uncertain save.
+     * A new gate must be created only after the page reopens/revalidates.
+     */
+    block(){if(!blocked){blocked=true;epoch++;}},
     /** Invalidate a pending result after cross-tab conflict, page hide/reset. */
     invalidate(){epoch++;},
     /**
@@ -19,6 +24,7 @@ export function createNormalUiFlight() {
      * the page must re-read/reopen rather than assume it was rolled back.
      */
     async run(transaction,publish) {
+      if(blocked)return reject('UI_SAVE_BLOCKED');
       if(busy)return reject('UI_TRANSACTION_BUSY');
       if(typeof transaction!=='function'||typeof publish!=='function')
         return reject('INVALID_UI_TRANSACTION');
@@ -28,6 +34,7 @@ export function createNormalUiFlight() {
         let receipt;
         try {receipt=await transaction();}
         catch {return reject('UI_TRANSACTION_FAILED');}
+        if(blocked)return reject('UI_SAVE_BLOCKED');
         if(startedAt!==epoch)return reject('UI_TRANSACTION_INVALIDATED');
         if(!receipt||receipt.ok!==true)return receipt?.ok===false&&typeof receipt.reason==='string'
           ?reject(receipt.reason):reject('UI_TRANSACTION_REJECTED');
