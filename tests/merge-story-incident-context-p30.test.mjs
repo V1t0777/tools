@@ -30,6 +30,19 @@ test('P30 six core daily incidents preserve narrative-only selection and do not 
   const first=dailyStoryIncident(story,CORE_STORY_PACK,day);
   assert.equal(dailyStoryIncident(story,CORE_STORY_PACK,day)?.id,first?.id);
 });
+test('P34 core workshop echoes reject same-ID DLC events without mutating economy',()=>{
+  const state=createInitialState(1000000);
+  const original=JSON.stringify(state);
+  for(const core of CORE_STORY_PACK.entries.filter(e=>e.kind==='incident')){
+    assert.ok(incidentWorkshopEcho(core,state),core.id);
+    const collidingDlc={...core,chapter:'DLC 独立事件'};
+    assert.equal(incidentWorkshopEcho(collidingDlc,state),null,
+      'a foreign pack reusing '+core.id+' must not inherit core economic dialogue');
+    assert.equal(incidentWorkshopEcho({id:core.id,kind:'incident'},state),null);
+  }
+  assert.equal(JSON.stringify(state),original);
+});
+
 test('P30 actual workshop fulfillment changes event dialogue without changing resources or save',()=>{
   const initial=createInitialState(1000000);
   const order=initial.orders[0];

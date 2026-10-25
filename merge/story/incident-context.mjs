@@ -5,6 +5,7 @@
  * remain untouched until their own reviewed content adapter is provided.
  */
 import {validateSave} from '../engine.mjs';
+import {CORE_STORY_PACK} from './core-pack.mjs';
 
 const hasOwn=(obj,key)=>Object.prototype.hasOwnProperty.call(obj,key);
 const ECHOES=Object.freeze({
@@ -35,7 +36,8 @@ const ECHOES=Object.freeze({
 });
 
 export function incidentWorkshopEcho(entry,workshopState){
-  if(!entry||entry.kind!=='incident'||typeof entry.id!=='string'||!hasOwn(ECHOES,entry.id))
+  if(!entry||entry.kind!=='incident'||typeof entry.id!=='string'||
+    !hasOwn(ECHOES,entry.id)||!CORE_STORY_PACK.entries.includes(entry))
     return null;
   if(!validateSave(workshopState))return null;
   const built=workshopState.buildings;
