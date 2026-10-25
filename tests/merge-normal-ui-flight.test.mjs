@@ -175,3 +175,77 @@ test('P2.52 throwing transaction permanently blocks uncertain write outcome',asy
   assert.equal(gate.busy,false);
   assert.equal(gate.blocked,true);
 });
+
+test('P2.53 invalidated in-flight successful write permanently blocks future actions',async()=>{
+  const gate=createNormalUiFlight(),wait=deferred();
+  let published=0,executed=0;
+  const pending=gate.run(()=>{executed++;return wait.promise;},()=>published++);
+  gate.invalidate();
+  wait.resolve(verified({revision:2}));
+  assert.deepEqual(await pending,{ok:false,reason:'UI_TRANSACTION_INVALIDATED'});
+  assert.equal(gate.busy,false);
+  assert.equal(gate.blocked,true);
+  assert.equal(published,0);
+  assert.deepEqual(await gate.run(()=>{executed++;return verified();},()=>published++),
+    {ok:false,reason:'UI_SAVE_BLOCKED'});
+  assert.equal(executed,1);
+});
+
+test('P2.53 invalidation during a pending safe rejection also requires revalidation',async()=>{
+  const gate=createNormalUiFlight(),wait=deferred();
+  let published=0;
+  const pending=gate.run(()=>wait.promise,()=>published++);
+  gate.invalidate();
+  wait.resolve({ok:false,reason:'SAVE_LOCK_BUSY'});
+  assert.deepEqual(await pending,{ok:false,reason:'UI_TRANSACTION_INVALIDATED'});
+  assert.equal(gate.blocked,true);
+  assert.equal(published,0);
+});
+
+test('P2.53 idle invalidation remains transient; active invalidation never reopens',async()=>{
+  const idle=createNormalUiFlight();
+  idle.invalidate();
+  assert.equal(idle.blocked,false);
+  assert.equal((await idle.run(()=>verified(),()=>{})).ok,true);
+  const gate=createNormalUiFlight(),wait=deferred();
+  const pending=gate.run(()=>wait.promise,()=>{});
+  gate.invalidate();wait.resolve(verified());
+  await pending;
+  gate.invalidate();
+  assert.equal(gate.blocked,true);
+  assert.deepEqual(await gate.run(()=>verified(),()=>{}),
+    {ok:false,reason:'UI_SAVE_BLOCKED'});
+});
+
+test('P2.54 asynchronous publication cannot report success or reopen UI gate',async()=>{
+  const gate=createNormalUiFlight();
+  let called=0;
+  const result=await gate.run(()=>verified(),async()=>{called++;await Promise.resolve();});
+  assert.deepEqual(result,{ok:false,reason:'UI_ASYNC_PUBLISH_NOT_ALLOWED'});
+  assert.equal(called,1);
+  assert.equal(gate.busy,false);
+  assert.equal(gate.blocked,true);
+  assert.deepEqual(await gate.run(()=>verified(),()=>{}),
+    {ok:false,reason:'UI_SAVE_BLOCKED'});
+});
+
+test('P2.54 rejecting async publish is observed without unhandled rejection',async()=>{
+  const gate=createNormalUiFlight();
+  const result=await gate.run(()=>verified(),async()=>{
+    await Promise.resolve();
+    throw Error('late rendering failure');
+  });
+  assert.deepEqual(result,{ok:false,reason:'UI_ASYNC_PUBLISH_NOT_ALLOWED'});
+  assert.equal(gate.blocked,true);
+  await new Promise(resolve=>setImmediate(resolve));
+});
+
+test('P2.54 synchronous publication remains compatible',async()=>{
+  const gate=createNormalUiFlight(),seen=[];
+  const result=await gate.run(()=>verified(),(state,raw)=>{
+    seen.push([state.revision,raw]);
+  });
+  assert.deepEqual(result,{ok:true,status:'UI_PUBLISHED'});
+  assert.deepEqual(seen,[[1,'exact-save']]);
+  assert.equal(gate.blocked,false);
+});

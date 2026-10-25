@@ -4,6 +4,7 @@
  * locked startup/action/clock/reset transactions and provide a publish hook.
  * Not yet connected to main.mjs: all normal writers must switch together.
  * P2.52: uncertain transaction outcomes permanently block subsequent UI work.
+ * P2.53: invalidated in-flight outcomes also require a fresh page/revalidation.
  */
 const reject=reason=>Object.freeze({ok:false,reason});
 // P2.52: only failures known to occur before any write may be retried.
@@ -44,7 +45,14 @@ export function createNormalUiFlight() {
         try {receipt=await transaction();}
         catch {blockUncertain();return reject('UI_TRANSACTION_FAILED');}
         if(blocked)return reject('UI_SAVE_BLOCKED');
-        if(startedAt!==epoch)return reject('UI_TRANSACTION_INVALIDATED');
+        // P2.53: invalidation can happen AFTER a write but BEFORE publication.
+        // Even a subsequently returned pre-write rejection cannot prove the
+        // page's old baseline is safe after a cross-tab or lifecycle change.
+        // A fresh page/revalidation is required; never silently resume.
+        if(startedAt!==epoch) {
+          blockUncertain();
+          return reject('UI_TRANSACTION_INVALIDATED');
+        }
         if(!receipt||receipt.ok!==true) {
           const reason=receipt?.ok===false&&typeof receipt.reason==='string'
             ?receipt.reason:'UI_TRANSACTION_REJECTED';
@@ -58,8 +66,18 @@ export function createNormalUiFlight() {
           blockUncertain();
           return reject('UI_RECEIPT_NOT_VERIFIED');
         }
-        try {publish(receipt.state,receipt.raw,receipt);}
-        catch {blockUncertain();return reject('UI_PUBLISH_FAILED');}
+        try {
+          const publication=publish(receipt.state,receipt.raw,receipt);
+          // UI publication must be synchronous. An async callback can reject
+          // after this flight has returned, leaving a falsely successful UI.
+          // It may already have side effects, so permanently block further
+          // actions and observe its rejection to avoid an unhandled promise.
+          if(publication && typeof publication.then==='function') {
+            void Promise.resolve(publication).catch(()=>{});
+            blockUncertain();
+            return reject('UI_ASYNC_PUBLISH_NOT_ALLOWED');
+          }
+        } catch {blockUncertain();return reject('UI_PUBLISH_FAILED');}
         return Object.freeze({ok:true,status:'UI_PUBLISHED'});
       } finally {busy=false;}
     }
