@@ -110,3 +110,52 @@ test('real unchanged clock receipt passes UI gate only with lock-verified baseli
   assert.equal(store.writes,0);
   assert.equal(gate.blocked,false);
 });
+
+test('P2.61g unchanged clock rejects a save replaced before its final readback',async()=>{
+  const state=initial(),raw=JSON.stringify(state);
+  const replaced=JSON.stringify({...state,revision:state.revision+1});
+  let reads=0,writes=0;
+  const store={getItem(key){
+    assert.equal(key,SAVE_KEY);
+    return ++reads===1?raw:replaced;
+  },setItem(){writes++;}};
+  const result=await commitNormalClockWithLock(exclusiveLock(),store,
+    {expectedRaw:raw,now:at});
+  assert.deepEqual(result,{ok:false,reason:'STALE_BASELINE'});
+  assert.equal(reads,2);
+  assert.equal(writes,0);
+  assert.equal('state' in result,false);
+});
+
+test('P2.61g unchanged clock fails closed when final readback throws',async()=>{
+  const raw=JSON.stringify(initial());
+  let reads=0,writes=0;
+  const store={getItem(key){
+    assert.equal(key,SAVE_KEY);
+    if(++reads===1)return raw;
+    throw Error('storage read failed');
+  },setItem(){writes++;}};
+  const result=await commitNormalClockWithLock(exclusiveLock(),store,
+    {expectedRaw:raw,now:at});
+  assert.deepEqual(result,{ok:false,reason:'STORAGE_UNAVAILABLE'});
+  assert.equal(reads,2);
+  assert.equal(writes,0);
+  assert.equal('state' in result,false);
+});
+
+test('P2.61g stale no-op clock receipt blocks UI publication and subsequent writes',async()=>{
+  const state=initial(),raw=JSON.stringify(state);
+  const replaced=JSON.stringify({...state,revision:state.revision+1});
+  let reads=0,published=0;
+  const store={getItem(){return ++reads===1?raw:replaced;},
+    setItem(){throw Error('no-op must never write');}};
+  const gate=createNormalUiFlight();
+  const outcome=await gate.run(
+    ()=>commitNormalClockWithLock(exclusiveLock(),store,{expectedRaw:raw,now:at}),
+    ()=>published++);
+  assert.deepEqual(outcome,{ok:false,reason:'STALE_BASELINE'});
+  assert.equal(published,0);
+  assert.equal(gate.blocked,true);
+  assert.deepEqual(await gate.run(()=>({ok:true}),()=>published++),
+    {ok:false,reason:'UI_SAVE_BLOCKED'});
+});

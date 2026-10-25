@@ -5,7 +5,7 @@
  */
 import {withNormalSaveLock} from './normal-save-lock.mjs';
 import {advanceTime} from './engine.mjs';
-import {peekLocalV3} from './storage.mjs';
+import {peekLocalV3,SAVE_KEY} from './storage.mjs';
 import {commitNormalSnapshot} from './save-transaction.mjs';
 
 const reject=reason=>Object.freeze({ok:false,reason});
@@ -48,9 +48,18 @@ export async function commitNormalClockWithLock(locks,storage,{expectedRaw,now=D
     if(!current.ok)return reject(current.reason);
     if(current.raw!==expectedRaw)return reject('STALE_BASELINE');
     const next=advanceTime(current.state,now);
-    if(next===current.state)
+    if(next===current.state) {
+      // A no-op still publishes a trusted baseline to the async UI. An
+      // uncoordinated older tab may have replaced the save after our first
+      // read, so never call that baseline verified without a final readback.
+      // This is not a substitute for every writer using the same Web Lock.
+      let observed;
+      try {observed=storage.getItem(SAVE_KEY);}
+      catch {return reject('STORAGE_UNAVAILABLE');}
+      if(observed!==current.raw)return reject('STALE_BASELINE');
       return Object.freeze({ok:true,status:'CLOCK_UNCHANGED',changed:false,
         raw:current.raw,state:current.state,verifiedBaseline:true});
+    }
     const receipt=commitNormalSnapshot(storage,next,{expectedRaw:current.raw});
     if(!receipt.ok)return receipt;
     return Object.freeze({...receipt,changed:true,state:next});
