@@ -380,26 +380,29 @@ board.addEventListener('pointercancel', event => completeDrag(event, true));
 // Mobile browsers can suspend a page mid-drag without delivering pointerup.
 // Drop the stale gesture when the page is hidden; never move a board item or
 // write a save based on a pointer that began before backgrounding.
+// Both visibility restoration and BFCache pageshow must validate the actual
+// saved bytes before the resumed tab can advance its clock or accept actions.
+function revalidateResumedSave() {
+  if (saveIssue) return;
+  const fresh=peekLocalV3(store);
+  if (!fresh.ok || fresh.raw !== persistedRaw) {
+    if (drag) {
+      drag.ghost?.remove();
+      drag = null;
+      ignoreNextClick = true;
+    }
+    saveIssue=fresh.ok?'CURRENT_SAVE_CHANGED':fresh.reason;
+    selected=-1;
+    activeGuidance=null;
+    byId('save-status').textContent =
+      '返回页面后检测到存档变化，已暂停写入 · 请备份并重新打开页面核对';
+    hint('后台期间存档可能已变化，当前页面已暂停操作以保护进度');
+    render();
+  }
+}
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) {
-    // P2.58: a suspended mobile tab may miss or delay storage events.
-    // Revalidate before its next timer tick or player action can save.
-    if (saveIssue) return;
-    const fresh=peekLocalV3(store);
-    if (!fresh.ok || fresh.raw !== persistedRaw) {
-      if (drag) {
-        drag.ghost?.remove();
-        drag = null;
-        ignoreNextClick = true;
-      }
-      saveIssue=fresh.ok?'CURRENT_SAVE_CHANGED':fresh.reason;
-      selected=-1;
-      activeGuidance=null;
-      byId('save-status').textContent =
-        '返回页面后检测到存档变化，已暂停写入 · 请备份并重新打开页面核对';
-      hint('后台期间存档可能已变化，当前页面已暂停操作以保护进度');
-      render();
-    }
+    revalidateResumedSave();
     return;
   }
   if (!drag) return;
@@ -407,6 +410,11 @@ document.addEventListener('visibilitychange', () => {
   // A delayed pointer click must not select a stale board slot. P2.42 clears
   // this guard on the next genuine primary pointerdown.
   ignoreNextClick = true;
+});
+// BFCache can restore a document without a fresh visibilitychange event.
+// Only a genuine history-cache restoration needs this additional read.
+window.addEventListener('pageshow', event => {
+  if (event.persisted && !document.hidden) revalidateResumedSave();
 });
 
 byId('store-selected').addEventListener('click',()=>{
