@@ -78,6 +78,15 @@ export function createNormalUiFlight() {
             return reject('UI_ASYNC_PUBLISH_NOT_ALLOWED');
           }
         } catch {blockUncertain();return reject('UI_PUBLISH_FAILED');}
+        // P2.55: a synchronous publish hook can itself invalidate or block
+        // this flight (for example, when an integration detects a conflict).
+        // It may already have changed the DOM, so never report success or
+        // allow further writes until the page is revalidated.
+        if(blocked)return reject('UI_SAVE_BLOCKED');
+        if(startedAt!==epoch) {
+          blockUncertain();
+          return reject('UI_TRANSACTION_INVALIDATED');
+        }
         return Object.freeze({ok:true,status:'UI_PUBLISHED'});
       } finally {busy=false;}
     }
