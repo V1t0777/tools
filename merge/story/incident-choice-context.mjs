@@ -23,6 +23,10 @@ const ECHOES=Object.freeze({
     teach:Object.freeze({speaker:'学徒',text:'学徒照着岚叔示范的步骤检查岸上的引导标记，遇到湿滑木板就停下来请岚叔复核。'}),
     trust:Object.freeze({speaker:'学徒',text:'学徒主动封好湿滑的栈桥入口，等岚叔检查完毕再继续修理；今天谁也不冒险出海。'})
   })}),
+  'old-crate':Object.freeze({node:'old-crate',kind:'incident',lines:Object.freeze({
+    register:Object.freeze({speaker:'阿澄',text:'阿澄把木箱发现的位置、潮汐时刻和外观记进港湾登记簿。她提醒大家：在确认失主之前，木箱仍应妥善封存。'}),
+    ask:Object.freeze({speaker:'岚叔',text:'岚叔请街坊辨认木箱上的旧榫接，却没有让任何人擅自打开。他说，问清来历比猜出答案更重要。'})
+  })}),
   visitor:Object.freeze({node:'postcard',kind:'side',lines:Object.freeze({
     send:Object.freeze({speaker:'晚禾',text:'旅人说起邻岛，晚禾想起那张写好收件人的明信片。她仍打算亲自投递，不让别人替她决定。'}),
     hold:Object.freeze({speaker:'晚禾',text:'旅人说起邻岛，晚禾把尚未寄出的明信片收好。没有人催她，现在不寄也是她自己的决定。'})

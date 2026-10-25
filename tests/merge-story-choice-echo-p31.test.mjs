@@ -126,3 +126,28 @@ test('P31 UI adds choice echo independently of workshop availability and renders
   assert.ok(ui.includes('text.textContent=line.text;'));
   assert.equal(ui.includes('innerHTML'),false);
 });
+
+test('P37 old-crate choice echoes only after its first committed incident, without solving the mystery',()=>{
+  const before=through('harbor-light');
+  assert.equal(incidentChoiceEcho(incident('old-crate'),before),null);
+  const variants=[];
+  for(const [choice,fragment] of [['register','港湾登记簿'],['ask','旧榫接']]){
+    const committed=completeStoryEntry(before,CORE_STORY_PACK,'old-crate',choice);
+    const snapshot=JSON.stringify(committed);
+    const echo=incidentChoiceEcho(incident('old-crate'),committed);
+    assert.match(echo.text,new RegExp(fragment));
+    assert.match(echo.text,/没有让任何人擅自打开|封存/);
+    assert.doesNotMatch(echo.text,/找到失主|已经打开|确定来自邻岛/);
+    assert.equal(JSON.stringify(committed),snapshot,'echo is read-only');
+    assert.equal(completeStoryEntry(committed,CORE_STORY_PACK,'old-crate',
+      choice==='register'?'ask':'register'),committed,'repeat viewing cannot rewrite the original choice');
+    assert.equal(incidentChoiceEcho({...incident('old-crate')},committed),null,'DLC ID collision is isolated');
+    variants.push(echo.text);
+  }
+  assert.notEqual(...variants);
+  const forged=structuredClone(before);
+  forged.packs.core.choices['old-crate']='register';
+  assert.equal(validateStoryProgress(forged),true);
+  assert.equal(incidentChoiceEcho(incident('old-crate'),forged),null,
+    'a stored choice without a completed incident is not a consequence');
+});
