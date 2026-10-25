@@ -6,6 +6,7 @@ import {incidentChoiceEcho} from './incident-choice-context.mjs';
 import {mainlineChoiceEcho} from './mainline-choice-context.mjs';
 import {storyWorkshopChapterEcho} from './mainline-workshop-context.mjs';
 import {readStoryHash} from './story-return-route.mjs';
+import {canCommitDailyIncident} from './daily-incident-guard.mjs';
 import {saveStoryDialogueWithLock} from './dialogue-write.mjs';
 import {captureStoryWorkshopEvidence} from './save-evidence.mjs';
 import {checkStoryResumeSnapshot} from './resume-guard.mjs';
@@ -23,7 +24,8 @@ const loaded=readStorySave(store);
 let progress=loaded.progress,raw=loaded.raw,blocked=loaded.blocked,reason=loaded.reason;
 let saving=false,storageEpoch=0;
 let kind=readStoryHash(window.location.hash).kind;
-let selected=null,selectedChoice=null;
+let selected=null,selectedChoice=null,selectedIncidentDay=null;
+let shownDay=localDay();
 const entries=CORE_STORY_PACK.entries;
 const main=entries.filter(x=>x.kind==='main');
 const choicesById=Object.fromEntries(entries.map(e=>[e.id,e]));
@@ -136,7 +138,13 @@ function lineElement(line){
 }
 function open(entry){
   if(saving)return;
+  const openedDay=localDay();
+  // A card rendered before local midnight must never open yesterday's event.
+  if(entry.kind==='incident'&&!canCommitDailyIncident(entry,openedDay,openedDay,progress,CORE_STORY_PACK)){
+    refreshIncidentDay();render();return;
+  }
   selected=entry;selectedChoice=null;
+  selectedIncidentDay=entry.kind==='incident'?openedDay:null;
   const done=completed(entry);
   $('dialog-chapter').textContent=entry.chapter;
   $('dialog-title').textContent=entry.title;
@@ -208,6 +216,12 @@ function open(entry){
 $('close-dialog').addEventListener('click',()=>$('story-dialog').close());
 $('complete-story').addEventListener('click',async()=>{
   if(saving||!selected)return;
+  // A stale incident must not be completed from an overnight-open dialogue.
+  if(!canCommitDailyIncident(selected,selectedIncidentDay,localDay(),progress,CORE_STORY_PACK)){
+    selected=null;selectedChoice=null;selectedIncidentDay=null;
+    if($('story-dialog').open)$('story-dialog').close();
+    refreshIncidentDay();render();return;
+  }
   if(completed(selected)){$('story-dialog').close();return;}
   try{
     // Capture the exact workshop snapshot before queueing the dialogue write.
@@ -216,7 +230,8 @@ $('complete-story').addEventListener('click',async()=>{
     const requiresWorkshop=storyWorkshopRequirement(entryId,null).required;
     const workshopSnapshot=requiresWorkshop?readStoryWorkshop(store):null;
     const expectedWorkshopRaw=workshopSnapshot?.raw;
-    const commitGuard=()=>storyDialogueCommitAllowed(store,entryId,expectedWorkshopRaw);
+    const commitGuard=()=>storyDialogueCommitAllowed(store,entryId,expectedWorkshopRaw)&&
+      canCommitDailyIncident(selected,selectedIncidentDay,localDay(),progress,CORE_STORY_PACK);
     if(!commitGuard()){
       $('dialog-reply').textContent='经营目标尚未完成，或工作台存档已变化，请核对后重试。';return;
     }
@@ -277,6 +292,8 @@ $('reset-story').addEventListener('click',async()=>{
   await save(next,true);
 });
 function recheckStoryOnResume(){
+  shownDay=localDay();
+  selectedIncidentDay=null;
   if(!blocked){
     const check=checkStoryResumeSnapshot(store,{key:STORY_SAVE_KEY,expectedRaw:raw});
     if(!check.ok){blocked=true;reason=check.reason;storageEpoch++;}
@@ -284,6 +301,21 @@ function recheckStoryOnResume(){
   if($('story-dialog').open)$('story-dialog').close();
   render();
 }
+// Background timers are throttled on iPhone: pageshow/visibilitychange above
+// provide a catch-up path. This timer only updates the read-only event view.
+function refreshIncidentDay(){
+  const today=localDay();
+  if(today===shownDay)return;
+  shownDay=today;
+  if(selected?.kind==='incident'){
+    selected=null;selectedChoice=null;selectedIncidentDay=null;
+    if($('story-dialog').open)$('story-dialog').close();
+  }
+  if(kind==='incident')render();
+}
+window.setInterval(()=>{
+  if(document.visibilityState==='visible')refreshIncidentDay();
+},30_000);
 window.addEventListener('pageshow',recheckStoryOnResume);
 document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState==='visible')recheckStoryOnResume();
