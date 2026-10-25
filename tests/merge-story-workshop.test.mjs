@@ -51,7 +51,7 @@ test('story workshop UI uses own state writer and a genuine engine, not normal s
  const ui=readFileSync(new URL('../merge/story/workshop.mjs',import.meta.url),'utf8');
  const story=readFileSync(new URL('../merge/story/ui.mjs',import.meta.url),'utf8');
  for(const id of ['workshop-board','workshop-orders','reset-workshop','workshop-status'])assert.ok(html.includes('id="'+id+'"'));
- assert.ok(story.includes('inspectStoryWorkshopRequirement(selected.id,store)'));
+ assert.ok(story.includes('storyDialogueCommitAllowed(store,entryId,expectedWorkshopRaw)'),'workshop prerequisite is rechecked inside the dialogue write lock');
  assert.ok(ui.includes('fulfillOrder(state,order.id)'));
  assert.ok(ui.includes('readStoryWorkshop(storage)'));
  for(const dangerous of ['innerHTML','insertAdjacentHTML','fetch(','sendBeacon(','localStorage.setItem','SAVE_KEY'])
