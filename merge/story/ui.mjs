@@ -10,7 +10,7 @@ import {checkStoryResumeSnapshot} from './resume-guard.mjs';
 import {shouldBlockStoryStorageEvent} from './storage-event-guard.mjs';
 import {shouldRefreshStoryDependencyEvent} from './storage-event-guard.mjs';
 import {STORY_WORKSHOP_KEY,readStoryWorkshop} from './workshop-storage.mjs';
-import {inspectStoryWorkshopRequirement,storyWorkshopRequirement} from './workshop-gate.mjs';
+import {inspectStoryWorkshopRequirement,storyWorkshopRequirement,storyWorkshopGoalHref} from './workshop-gate.mjs';
 import {storyDialogueCommitAllowed} from './dialogue-commit-guard.mjs';
 import {createEmptyStoryProgress,STORY_SAVE_KEY} from '../mode-boundaries.mjs';
 
@@ -20,7 +20,8 @@ const webLocks=(()=>{try{return window.navigator?.locks??null;}catch{return null
 const loaded=readStorySave(store);
 let progress=loaded.progress,raw=loaded.raw,blocked=loaded.blocked,reason=loaded.reason;
 let saving=false,storageEpoch=0;
-let kind='main',selected=null,selectedChoice=null;
+let kind=window.location.hash==='#side'?'side':window.location.hash==='#incident'?'incident':'main';
+let selected=null,selectedChoice=null;
 const entries=CORE_STORY_PACK.entries;
 const main=entries.filter(x=>x.kind==='main');
 const choicesById=Object.fromEntries(entries.map(e=>[e.id,e]));
@@ -84,6 +85,11 @@ function card(entry,done=false){
       ? '工作台进度不可读取，请先核对存档。'
       : requirement.description+' · '+Math.min(requirement.current,requirement.goal)+' / '+requirement.goal;
     wrapper.append(goal);
+    const go=document.createElement('a');
+    go.className='back goal-link';
+    go.href=storyWorkshopGoalHref(entry.id);
+    go.textContent=requirement.blocked?'前往核对工作台存档 →':'前往完成经营目标 →';
+    wrapper.append(go);
   }
   wrapper.append(button);
   return wrapper;
@@ -163,7 +169,7 @@ function open(entry){
     notice.textContent=requirement.blocked
       ? '剧情工作台进度不可用，请保留存档并检查工作台状态。'
       : '请先在剧情工作台'+requirement.description+'（'+Math.min(requirement.current,requirement.goal)+' / '+requirement.goal+'），再返回继续此幕。';
-    const link=document.createElement('a');link.className='back';link.href='./story-workshop.html';link.textContent='前往剧情工作台 →';
+    const link=document.createElement('a');link.className='back';link.href=storyWorkshopGoalHref(entry.id);link.textContent='前往对应经营目标 →';
     $('dialog-choices').append(notice,link);
   }
   if(!done&&(!requirement.required||requirement.met)){

@@ -24,12 +24,17 @@ export function storyStorefrontBuildAvailable(storyProgress){
 }
 
 const GOALS=Object.freeze({
-  'first-order':Object.freeze({type:'orders',goal:1,description:'完成一笔街坊委托'}),
-  'toolbox':Object.freeze({type:'warehouse',goal:1,description:'将一件材料收纳进剧情仓库'}),
-  'tea-table':Object.freeze({type:'building',building:'garden',goal:1,description:'修复后院花园'}),
-  'harbor-light':Object.freeze({type:'building',building:'harbor',goal:1,description:'修缮港湾街角'}),
-  'festival':Object.freeze({type:'building',building:'storefront',goal:1,description:'修整百物铺门面'})
+  'first-order':Object.freeze({target:'orders-goal',type:'orders',goal:1,description:'完成一笔街坊委托'}),
+  'toolbox':Object.freeze({target:'warehouse-goal',type:'warehouse',goal:1,description:'将一件材料收纳进剧情仓库'}),
+  'tea-table':Object.freeze({target:'garden-goal',type:'building',building:'garden',goal:1,description:'修复后院花园'}),
+  'harbor-light':Object.freeze({target:'harbor-goal',type:'building',building:'harbor',goal:1,description:'修缮港湾街角'}),
+  'festival':Object.freeze({target:'storefront-goal',type:'building',building:'storefront',goal:1,description:'修整百物铺门面'})
 });
+/** Route a locked narrative goal to its real, static workshop section. */
+export function storyWorkshopGoalHref(entryId){
+  const spec=Object.hasOwn(GOALS,entryId)?GOALS[entryId]:null;
+  return './story-workshop.html'+(spec?'#'+spec.target:'');
+}
 export function storyWorkshopRequirement(entryId,workshopState){
   const spec=Object.hasOwn(GOALS,entryId)?GOALS[entryId]:null;
   if(!spec)return Object.freeze({required:false,met:true,goal:0,current:0,description:''});

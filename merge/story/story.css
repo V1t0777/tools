@@ -21,3 +21,8 @@ dialog{border:1px solid var(--line);border-radius:22px;max-width:min(560px,calc(
 @media(max-width:360px){.story-shell{padding-left:10px;padding-right:10px}.notice-panel,.progress,.stories{padding:12px}.eyebrow{font-size:8px}.story-head h3{font-size:14px}.scene-label{font-size:10px}}
 @media(prefers-color-scheme:dark){:root{color-scheme:dark;--ink:#e5eee5;--muted:#b9c9bd;--paper:#172b29;--card:#233833;--line:#47635a;--accent:#90b8a3}.scenery{filter:brightness(.72)}.notice-panel,.progress,.stories{box-shadow:none}.story-card,.dialog-line{background:#2c433b}.tabs button,.dialog-choices button{background:#345249;color:var(--ink)}.tabs button[aria-pressed=true],.story-card button,.complete{background:#527d6d;color:white}.dialog-choices button[aria-pressed=true]{background:#426659}.track{background:#405850}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* P43: native, no-script goal anchors remain visible and finger-sized on iPhone. */
+.story-card .goal-link{display:flex;align-items:center;justify-content:center;min-height:44px;margin:0 0 8px;text-align:center;overflow-wrap:anywhere}
+.story-goal-target{scroll-margin-top:16px}
+.story-goal-target:target{outline:3px solid var(--accent);outline-offset:3px}
