@@ -66,8 +66,18 @@ export function createNormalUiFlight() {
           blockUncertain();
           return reject('UI_RECEIPT_NOT_VERIFIED');
         }
-        try {publish(receipt.state,receipt.raw,receipt);}
-        catch {blockUncertain();return reject('UI_PUBLISH_FAILED');}
+        try {
+          const publication=publish(receipt.state,receipt.raw,receipt);
+          // UI publication must be synchronous. An async callback can reject
+          // after this flight has returned, leaving a falsely successful UI.
+          // It may already have side effects, so permanently block further
+          // actions and observe its rejection to avoid an unhandled promise.
+          if(publication && typeof publication.then==='function') {
+            void Promise.resolve(publication).catch(()=>{});
+            blockUncertain();
+            return reject('UI_ASYNC_PUBLISH_NOT_ALLOWED');
+          }
+        } catch {blockUncertain();return reject('UI_PUBLISH_FAILED');}
         return Object.freeze({ok:true,status:'UI_PUBLISHED'});
       } finally {busy=false;}
     }
