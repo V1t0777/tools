@@ -417,7 +417,13 @@ test('P2.43 hiding the page cancels a live drag without a gameplay write',()=>{
     addEventListener(type,fn){this.listeners[type]=fn;}};
   let removed=0,mutations=0;
   const drag={id:41,origin:2,moved:true,ghost:{remove(){removed++;}}};
+  // Visible-page resume now validates its last confirmed raw save. Supply the
+  // real page's baseline/read-only storage context, not an incomplete VM shim.
+  const originalRaw=JSON.stringify(initial());
   const ctx={board,document,drag,ignoreNextClick:false,
+    saveIssue:null,persistedRaw:originalRaw,
+    store:{getItem(){return originalRaw;}},
+    peekLocalV3(){return {ok:true,raw:originalRaw};},
     moveOrMerge(){mutations++;throw Error('stale drag must not merge');},
     commit(){mutations++;throw Error('stale drag must not commit');},
     render(){mutations++;throw Error('stale drag must not render');},

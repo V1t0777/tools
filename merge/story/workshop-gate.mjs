@@ -25,6 +25,7 @@ export function storyStorefrontBuildAvailable(storyProgress){
 
 const GOALS=Object.freeze({
   'first-order':Object.freeze({type:'orders',goal:1,description:'完成一笔街坊委托'}),
+  'toolbox':Object.freeze({type:'warehouse',goal:1,description:'将一件材料收纳进剧情仓库'}),
   'tea-table':Object.freeze({type:'building',building:'garden',goal:1,description:'修复后院花园'}),
   'harbor-light':Object.freeze({type:'building',building:'harbor',goal:1,description:'修缮港湾街角'}),
   'festival':Object.freeze({type:'building',building:'storefront',goal:1,description:'修整百物铺门面'})
@@ -35,7 +36,9 @@ export function storyWorkshopRequirement(entryId,workshopState){
   const valid=validateSave(workshopState);
   const count=!valid?0:spec.type==='orders'
     ? workshopState.progress.orders
-    : workshopState.buildings[spec.building];
+    : spec.type==='warehouse'
+      ? workshopState.warehouse.slots.slice(0,workshopState.warehouse.capacity).filter(Boolean).length
+      : workshopState.buildings[spec.building];
   return Object.freeze({required:true,met:valid&&count>=spec.goal,
     goal:spec.goal,current:count,description:spec.description});
 }

@@ -67,14 +67,25 @@ function card(entry,done=false){
   const title=document.createElement('h3');title.textContent=entry.title;
   const state=document.createElement('span');state.className='status';
   const requirement=inspectStoryWorkshopRequirement(entry.id,store);
-  state.textContent=done?'已阅读':requirement.required&&!requirement.met?'待完成经营目标':'可体验';
+  state.textContent=done?'已阅读':blocked?'存档需核对'
+    :requirement.required&&requirement.blocked?'工作台需核对'
+      :requirement.required&&!requirement.met?'待完成经营目标'
+        :requirement.required?'经营已达标':'可体验';
   head.append(title,state);
   const place=document.createElement('p');place.textContent=entry.chapter+' · '+entry.place;
   const button=document.createElement('button');button.type='button';
   button.textContent=done?'回看剧情':'阅读故事';
   button.disabled=saving;
   button.addEventListener('click',()=>open(entry));
-  wrapper.append(head,place,button);
+  wrapper.append(head,place);
+  if(!done&&requirement.required){
+    const goal=document.createElement('p');goal.className='goal-progress';
+    goal.textContent=requirement.blocked
+      ? '工作台进度不可读取，请先核对存档。'
+      : requirement.description+' · '+Math.min(requirement.current,requirement.goal)+' / '+requirement.goal;
+    wrapper.append(goal);
+  }
+  wrapper.append(button);
   return wrapper;
 }
 function render(){
@@ -149,7 +160,9 @@ function open(entry){
   const requirement=inspectStoryWorkshopRequirement(entry.id,store);
   if(!done&&requirement.required&&!requirement.met){
     const notice=document.createElement('p');notice.className='muted';
-    notice.textContent=requirement.blocked?'剧情工作台进度不可用，请保留存档并检查工作台状态。':'请先在剧情工作台'+requirement.description+'，再返回继续此幕。';
+    notice.textContent=requirement.blocked
+      ? '剧情工作台进度不可用，请保留存档并检查工作台状态。'
+      : '请先在剧情工作台'+requirement.description+'（'+Math.min(requirement.current,requirement.goal)+' / '+requirement.goal+'），再返回继续此幕。';
     const link=document.createElement('a');link.className='back';link.href='./story-workshop.html';link.textContent='前往剧情工作台 →';
     $('dialog-choices').append(notice,link);
   }
