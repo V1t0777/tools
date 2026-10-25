@@ -89,3 +89,44 @@ test('P2.50 invalid arguments cannot start or occupy a flight',async()=>{
     {ok:false,reason:'INVALID_UI_TRANSACTION'});
   assert.equal(gate.busy,false);
 });
+
+test('P2.51 permanent block rejects new operations without executing transaction',async()=>{
+  const gate=createNormalUiFlight();
+  let called=0,published=0;
+  assert.equal(gate.blocked,false);
+  gate.block();
+  assert.equal(gate.blocked,true);
+  assert.deepEqual(await gate.run(()=>{called++;return verified();},()=>published++),
+    {ok:false,reason:'UI_SAVE_BLOCKED'});
+  assert.equal(called,0);
+  assert.equal(published,0);
+  assert.equal(gate.busy,false);
+});
+
+test('P2.51 block during in-flight write prevents stale result publication',async()=>{
+  const gate=createNormalUiFlight(),wait=deferred();
+  let published=0,called=0;
+  const pending=gate.run(()=>{called++;return wait.promise;},()=>published++);
+  assert.equal(gate.busy,true);
+  gate.block();
+  assert.equal(gate.blocked,true);
+  assert.deepEqual(await gate.run(()=>{called++;return verified();},()=>published++),
+    {ok:false,reason:'UI_SAVE_BLOCKED'});
+  wait.resolve(verified());
+  assert.deepEqual(await pending,{ok:false,reason:'UI_SAVE_BLOCKED'});
+  assert.equal(gate.busy,false);
+  assert.equal(published,0);
+  assert.equal(called,1);
+});
+
+test('P2.51 repeated block and transient invalidate cannot reopen blocked gate',async()=>{
+  const gate=createNormalUiFlight();
+  gate.block();gate.block();gate.invalidate();
+  assert.equal(gate.blocked,true);
+  assert.deepEqual(await gate.run(()=>verified(),()=>{}),
+    {ok:false,reason:'UI_SAVE_BLOCKED'});
+  const fresh=createNormalUiFlight();
+  assert.equal(fresh.blocked,false);
+  fresh.invalidate();
+  assert.equal((await fresh.run(()=>verified(),()=>{})).ok,true);
+});
