@@ -7,6 +7,7 @@ import {mainlineChoiceEcho} from './mainline-choice-context.mjs';
 import {storyWorkshopChapterEcho} from './mainline-workshop-context.mjs';
 import {readStoryHash} from './story-return-route.mjs';
 import {canCommitDailyIncident} from './daily-incident-guard.mjs';
+import {isMatchingConcurrentDailyPin} from './daily-pin-reconcile.mjs';
 import {saveStoryDialogueWithLock} from './dialogue-write.mjs';
 import {captureStoryWorkshopEvidence} from './save-evidence.mjs';
 import {checkStoryResumeSnapshot} from './resume-guard.mjs';
@@ -55,6 +56,18 @@ async function save(next,reset=false,commitGuard=()=>true,pinDay=null){
     storageEpoch===expectedEpoch&&!blocked){
     const current=readStorySave(store);
     if(!current.blocked&&current.raw===expectedRaw){render();return false;}
+  }
+  // Another tab may have committed the identical deterministic pin while
+  // this tab waited for the story lock. Adopt ONLY byte-exact same-day output.
+  // All unrelated changes, malformed saves and lock failures still block.
+  if(pinDay!==null&&localDay()===pinDay&&attempt.ok&&attempt.value===false&&
+    (!blocked||reason==='WRITE_CONFLICT')){
+    const current=readStorySave(store);
+    if(!current.blocked&&
+      isMatchingConcurrentDailyPin({expectedRaw,observedRaw:current.raw,proposed:next,day:pinDay,pack:CORE_STORY_PACK})){
+      progress=current.progress;raw=current.raw;blocked=false;reason=null;
+      render();return true;
+    }
   }
   if(!attempt.ok||attempt.value!==true||storageEpoch!==expectedEpoch||(!reset&&blocked)){
     blocked=true;reason='WRITE_CONFLICT';render();return false;

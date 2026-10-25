@@ -61,6 +61,9 @@ function maybeProduce(slot) {
   commit(produce(state, slot));
 }
 function touchCell(slot) {
+  // A stale page may still receive keyboard/click input after another tab
+  // replaces or removes its save. Do not even select an old board item.
+  if (saveIssue) { hint('存档状态未确认，棋盘操作已暂停；请备份并重新打开页面核对'); return; }
   const item = state.board[slot];
   if (selected === -1) {
     if (!item) return;
@@ -320,6 +323,7 @@ function render() {
 }
 
 byId('board-guide').addEventListener('click', () => {
+  if (saveIssue) { hint('存档状态未确认，整理提示已暂停；请先备份核对'); return; }
   if (activeGuidance) { activeGuidance = null; render(); return; }
   try { activeGuidance = getBoardGuidance(state); selected = -1; render(); }
   catch { hint('存档状态异常，请保留原始数据，不要重置'); }
@@ -333,6 +337,8 @@ board.addEventListener('click', event => {
   if (cell && board.contains(cell)) touchCell(Number(cell.dataset.slot));
 });
 board.addEventListener('pointerdown', event => {
+  // Never start a drag against a board whose saved baseline is untrusted.
+  if (saveIssue) return;
   if (event.button > 0) return;
   // A genuine new pointerdown starts a new gesture. The canceled pointer's
   // delayed synthetic click has no second pointerdown, so allow this tap.
@@ -416,6 +422,11 @@ document.addEventListener('visibilitychange', () => {
 // Only a genuine history-cache restoration needs this additional read.
 window.addEventListener('pageshow', event => {
   if (event.persisted && !document.hidden) revalidateResumedSave();
+});
+// Some mobile WebViews restore a focused page without visibilitychange or
+// a BFCache pageshow. Recheck only the raw save, never write on focus.
+window.addEventListener('focus', () => {
+  if (!document.hidden) revalidateResumedSave();
 });
 
 byId('store-selected').addEventListener('click',()=>{
