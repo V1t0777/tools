@@ -417,10 +417,12 @@ test('P2.43 hiding the page cancels a live drag without a gameplay write',()=>{
     addEventListener(type,fn){this.listeners[type]=fn;}};
   let removed=0,mutations=0;
   const drag={id:41,origin:2,moved:true,ghost:{remove(){removed++;}}};
+  // BFCache pageshow is registered by the same extracted handler; stub its
+  // event target so this legacy fixture can focus on visibility and drag.
   // Visible-page resume now validates its last confirmed raw save. Supply the
   // real page's baseline/read-only storage context, not an incomplete VM shim.
   const originalRaw=JSON.stringify(initial());
-  const ctx={board,document,drag,ignoreNextClick:false,
+  const ctx={board,document,window:{addEventListener(){}},drag,ignoreNextClick:false,
     saveIssue:null,persistedRaw:originalRaw,
     store:{getItem(){return originalRaw;}},
     peekLocalV3(){return {ok:true,raw:originalRaw};},
@@ -451,7 +453,7 @@ test('P2.43 visibility handling leaves unrelated idle state unchanged',()=>{
   const end=main.indexOf("byId('store-selected').addEventListener",start);
   assert.ok(start>=0&&end>start);
   const document={hidden:true,addEventListener(type,fn){this.listener=fn;}};
-  const ctx={document,drag:null,ignoreNextClick:false,
+  const ctx={document,window:{addEventListener(){}},drag:null,ignoreNextClick:false,
     completeDrag(){throw Error('no drag to cancel');}};
   runInNewContext(main.slice(start,end),ctx);
   document.listener();
