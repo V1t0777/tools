@@ -8,6 +8,7 @@ import {storyWorkshopChapterEcho} from './mainline-workshop-context.mjs';
 import {readStoryHash} from './story-return-route.mjs';
 import {canCommitDailyIncident} from './daily-incident-guard.mjs';
 import {isMatchingConcurrentDailyPin} from './daily-pin-reconcile.mjs';
+import {adoptConcurrentDailyPinStorageEvent} from './daily-pin-reconcile.mjs';
 import {saveStoryDialogueWithLock} from './dialogue-write.mjs';
 import {captureStoryWorkshopEvidence} from './save-evidence.mjs';
 import {checkStoryResumeSnapshot} from './resume-guard.mjs';
@@ -378,6 +379,18 @@ document.addEventListener('visibilitychange',()=>{
 });
 window.addEventListener('storage',event=>{
   if(shouldBlockStoryStorageEvent(event,{key:STORY_SAVE_KEY,storage:store})){
+    // Passive tabs may safely accept only the identical deterministic pin,
+    // not an arbitrary chapter, reset or DLC change. An in-flight writer uses
+    // the separate P49 lock-result reconciliation after its callback returns.
+    const adopted=!saving&&!blocked?adoptConcurrentDailyPinStorageEvent(event,{
+      storage:store,expectedRaw:raw,day:localDay(),pack:CORE_STORY_PACK
+    }):null;
+    if(adopted){
+      storageEpoch++;progress=adopted.progress;raw=adopted.raw;
+      selected=null;selectedChoice=null;selectedIncidentDay=null;
+      if($('story-dialog').open)$('story-dialog').close();
+      render();return;
+    }
     storageEpoch++;blocked=true;reason='WRITE_CONFLICT';selectedChoice=null;
     if($('story-dialog').open)$('story-dialog').close();
     render();
