@@ -82,3 +82,15 @@ export function adoptConcurrentDailyPinOnResume(storage,{expectedRaw,day,pack}={
     return {progress:observed.progress,raw:observed.raw};
   }catch{return null;}
 }
+
+/** P53: preserve a resumed main/side dialogue only after an exact narrative
+ * snapshot check (or the byte-identical P52 pin reconciliation). Duplicate
+ * pageshow/visibilitychange notifications must not discard a safe choice.
+ * Invalid/unknown flags fail closed; no storage reads or writes here.
+ */
+export function canKeepResumedStoryDialogue({
+  snapshotOk,blocked,saving,dialogOpen,entry,progress,pack
+}={}){
+  return snapshotOk===true&&blocked===false&&saving===false&&
+    dialogOpen===true&&canKeepDialogueAfterDailyPin(entry,progress,pack);
+}
