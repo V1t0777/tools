@@ -10,7 +10,7 @@ import {canCommitDailyIncident} from './daily-incident-guard.mjs';
 import {isMatchingConcurrentDailyPin} from './daily-pin-reconcile.mjs';
 import {adoptConcurrentDailyPinStorageEvent} from './daily-pin-reconcile.mjs';
 import {canKeepDialogueAfterDailyPin} from './daily-pin-reconcile.mjs';
-import {adoptConcurrentDailyPinOnResume} from './daily-pin-reconcile.mjs';
+import {adoptConcurrentDailyPinOnResume,canKeepResumedStoryDialogue} from './daily-pin-reconcile.mjs';
 import {saveStoryDialogueWithLock} from './dialogue-write.mjs';
 import {captureStoryWorkshopEvidence} from './save-evidence.mjs';
 import {checkStoryResumeSnapshot} from './resume-guard.mjs';
@@ -351,6 +351,7 @@ $('reset-story').addEventListener('click',async()=>{
 function recheckStoryOnResume(){
   shownDay=localDay();
   selectedIncidentDay=null;
+  let snapshotOk=false;
   if(!blocked){
     let check=checkStoryResumeSnapshot(store,{key:STORY_SAVE_KEY,expectedRaw:raw});
     // A suspended tab may miss the peer's StorageEvent. The only safe
@@ -365,9 +366,21 @@ function recheckStoryOnResume(){
         check={ok:true,reason:null};
       }
     }
+    snapshotOk=check.ok;
     if(!check.ok){blocked=true;reason=check.reason;storageEpoch++;}
   }
-  if($('story-dialog').open)$('story-dialog').close();
+  // pageshow and visibilitychange may fire back-to-back. Keep an unlocked
+  // main/side dialogue and its choice only after an exact snapshot check.
+  // Daily incidents, stale saves and pending writes must close. Workshop
+  // prerequisites are rechecked under the story lock before completion.
+  const keepDialog=canKeepResumedStoryDialogue({
+    snapshotOk,blocked,saving,dialogOpen:$('story-dialog').open,
+    entry:selected,progress,pack:CORE_STORY_PACK
+  });
+  if(!keepDialog){
+    selected=null;selectedChoice=null;selectedIncidentDay=null;
+    if($('story-dialog').open)$('story-dialog').close();
+  }
   render();
 }
 // Background timers are throttled on iPhone: pageshow/visibilitychange above
