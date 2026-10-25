@@ -125,13 +125,13 @@ test('P24 dialogue UI gates choices and reset while pending and uses lock for al
   const ui=readFileSync(new URL('../merge/story/ui.mjs',import.meta.url),'utf8');
   assert.ok(ui.includes("import {saveStoryDialogueWithLock} from './dialogue-write.mjs';"));
   assert.ok(ui.includes('let saving=false,storageEpoch=0;'));
-  assert.ok(ui.includes('async function save(next,reset=false){'));
+  assert.ok(ui.includes('async function save(next,reset=false,commitGuard=()=>true){'));
   assert.ok(ui.includes('if(saving)return false;'));
   assert.ok(ui.includes('saveStoryDialogueWithLock(webLocks,store,next,{'));
-  assert.ok(ui.includes('expectedRaw,confirmedReset:reset,'));
+  assert.ok(ui.includes('expectedRaw,confirmedReset:reset,commitGuard'));
   assert.ok(ui.includes('isCurrent:()=>storageEpoch===expectedEpoch&&(!blocked||reset)'));
   assert.ok(ui.includes('void save(next);'),'first-time initialization');
-  assert.ok(ui.includes('if(await save(next))'),'completed dialogue');
+  assert.ok(ui.includes('if(await save(next,false,commitGuard))'),'completed dialogue with cross-save guard');
   assert.ok(ui.includes('await save(next,true);'),'confirmed reset');
   assert.ok(ui.includes('next.revision=current.progress.revision+1;'),'ABA-safe reset revision');
   assert.ok(ui.includes("window.confirm('确认重置此浏览器的剧情进度吗"));

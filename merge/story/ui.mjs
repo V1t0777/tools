@@ -6,8 +6,9 @@ import {captureStoryWorkshopEvidence} from './save-evidence.mjs';
 import {checkStoryResumeSnapshot} from './resume-guard.mjs';
 import {shouldBlockStoryStorageEvent} from './storage-event-guard.mjs';
 import {shouldRefreshStoryDependencyEvent} from './storage-event-guard.mjs';
-import {STORY_WORKSHOP_KEY} from './workshop-storage.mjs';
-import {inspectStoryWorkshopRequirement} from './workshop-gate.mjs';
+import {STORY_WORKSHOP_KEY,readStoryWorkshop} from './workshop-storage.mjs';
+import {inspectStoryWorkshopRequirement,storyWorkshopRequirement} from './workshop-gate.mjs';
+import {storyDialogueCommitAllowed} from './dialogue-commit-guard.mjs';
 import {createEmptyStoryProgress,STORY_SAVE_KEY} from '../mode-boundaries.mjs';
 
 const $=id=>document.getElementById(id);
@@ -25,7 +26,7 @@ function localDay(){
   const pad=n=>String(n).padStart(2,'0');
   return date.getFullYear()+'-'+pad(date.getMonth()+1)+'-'+pad(date.getDate());
 }
-async function save(next,reset=false){
+async function save(next,reset=false,commitGuard=()=>true){
   // One pending story write per tab. The same lock covers initialization,
   // completion and explicitly confirmed reset; exact-raw CAS stays mandatory.
   if(blocked&&!reset)return false;
@@ -33,7 +34,7 @@ async function save(next,reset=false){
   const expectedRaw=raw,expectedEpoch=storageEpoch;
   saving=true;render();
   const attempt=await saveStoryDialogueWithLock(webLocks,store,next,{
-    expectedRaw,confirmedReset:reset,
+    expectedRaw,confirmedReset:reset,commitGuard,
     isCurrent:()=>storageEpoch===expectedEpoch&&(!blocked||reset)
   });
   saving=false;
@@ -156,12 +157,19 @@ $('complete-story').addEventListener('click',async()=>{
   if(saving||!selected)return;
   if(completed(selected)){$('story-dialog').close();return;}
   try{
-    if(!inspectStoryWorkshopRequirement(selected.id,store).met){
-      $('dialog-reply').textContent='尚未完成剧情工作台的委托，无法推进这一幕。';return;
+    // Capture the exact workshop snapshot before queueing the dialogue write.
+    // Recheck inside the story Web Lock: the other tab may reset its workshop.
+    const entryId=selected.id;
+    const requiresWorkshop=storyWorkshopRequirement(entryId,null).required;
+    const workshopSnapshot=requiresWorkshop?readStoryWorkshop(store):null;
+    const expectedWorkshopRaw=workshopSnapshot?.raw;
+    const commitGuard=()=>storyDialogueCommitAllowed(store,entryId,expectedWorkshopRaw);
+    if(!commitGuard()){
+      $('dialog-reply').textContent='经营目标尚未完成，或工作台存档已变化，请核对后重试。';return;
     }
-    const next=completeStoryEntry(progress,CORE_STORY_PACK,selected.id,selectedChoice);
+    const next=completeStoryEntry(progress,CORE_STORY_PACK,entryId,selectedChoice);
     $('complete-story').disabled=true;
-    if(await save(next)){
+    if(await save(next,false,commitGuard)){
       if($('story-dialog').open)$('story-dialog').close();
     }
   }catch{
