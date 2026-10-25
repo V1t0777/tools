@@ -4,6 +4,7 @@
  * including startup migration, reset and timer, must migrate together.
  */
 import {withNormalSaveLock} from './normal-save-lock.mjs';
+import {advanceTime} from './engine.mjs';
 import {peekLocalV3} from './storage.mjs';
 import {commitNormalSnapshot} from './save-transaction.mjs';
 
@@ -31,5 +32,27 @@ export async function commitNormalActionWithLock(locks,storage,{expectedRaw,acti
     if(!receipt.ok)return receipt;
     return Object.freeze({...receipt,state:result.state,
       message:typeof result.message==='string'?result.message:''});
+  });
+}
+
+/**
+ * P2.47: a future ordinary-mode energy/cooldown tick runs under the SAME
+ * exclusive lock as gameplay. A no-op tick never rewrites the save.
+ * Deliberately not wired into the synchronous page until ALL writers migrate.
+ */
+export async function commitNormalClockWithLock(locks,storage,{expectedRaw,now=Date.now()}={}) {
+  if(typeof expectedRaw!=='string')return reject('NO_TRUSTED_BASELINE');
+  if(!Number.isFinite(now)||now<0)return reject('INVALID_CLOCK');
+  return withNormalSaveLock(locks,()=>{
+    const current=peekLocalV3(storage);
+    if(!current.ok)return reject(current.reason);
+    if(current.raw!==expectedRaw)return reject('STALE_BASELINE');
+    const next=advanceTime(current.state,now);
+    if(next===current.state)
+      return Object.freeze({ok:true,status:'CLOCK_UNCHANGED',changed:false,
+        raw:current.raw,state:current.state});
+    const receipt=commitNormalSnapshot(storage,next,{expectedRaw:current.raw});
+    if(!receipt.ok)return receipt;
+    return Object.freeze({...receipt,changed:true,state:next});
   });
 }
