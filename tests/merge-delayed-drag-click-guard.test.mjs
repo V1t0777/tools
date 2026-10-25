@@ -29,7 +29,7 @@ function harness() {
     board,document:{elementFromPoint(){return {closest(){return cell;}};}},
     state:{board:[{kind:'material'},{kind:'material'}]},
     drag:{id:7,origin:0,moved:true,ghost:{remove(){events.ghostRemovals++;}}},
-    ignoreNextClick:false,
+    ignoreNextClick:false,saveIssue:null,
     touchCell(slot){touched.push(slot);},
     moveOrMerge(){events.moves++;return {ok:true};},
     commit(){events.commits++;},

@@ -23,19 +23,20 @@ test('P2.61c blocked normal save cannot select or produce an old board item',()=
     assert.equal(messages.length,2);
     assert.match(messages[0],/暂停/);
   }
+  let renders=0;
   const ctx={saveIssue:null,state:{board:[{kind:'material'}]},selected:-1,
-    hint(){throw Error('healthy select should not warn');},render(){this.renders++;},renders:0};
+    hint(){throw Error('healthy select should not warn');},render(){renders++;}};
   runInNewContext(code,ctx);
   ctx.touchCell(0);
   assert.equal(ctx.selected,0);
-  assert.equal(ctx.renders,1);
+  assert.equal(renders,1);
 });
 test('P2.61c blocked save cannot start stale pointer capture or drag',()=>{
   const code=section("board.addEventListener('pointerdown', event => {",
     "board.addEventListener('pointermove', event => {");
   for(const issue of ['CURRENT_SAVE_CHANGED',null]){
     let captured=0;
-    const cell={setPointerCapture(){captured++;}};
+    const cell={dataset:{slot:'0'},setPointerCapture(){captured++;}};
     const board={listener:null,addEventListener(name,fn){
       assert.equal(name,'pointerdown');this.listener=fn;}};
     const ctx={board,saveIssue:issue,ignoreNextClick:true,drag:null,
