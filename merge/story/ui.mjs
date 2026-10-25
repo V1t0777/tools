@@ -3,6 +3,7 @@ import {availableStoryEntries,completedStoryEntries,completeStoryEntry,startCore
 import {readStorySave} from './local-storage.mjs';
 import {incidentWorkshopEcho} from './incident-context.mjs';
 import {incidentChoiceEcho} from './incident-choice-context.mjs';
+import {mainlineChoiceEcho} from './mainline-choice-context.mjs';
 import {saveStoryDialogueWithLock} from './dialogue-write.mjs';
 import {captureStoryWorkshopEvidence} from './save-evidence.mjs';
 import {checkStoryResumeSnapshot} from './resume-guard.mjs';
@@ -122,6 +123,10 @@ function open(entry){
   // Daily incidents can acknowledge actual story-only orders and buildings.
   // This is read-only flavor text; corrupt/missing workshop data is never invented.
   const lines=entry.lines.slice();
+  if(entry.kind==='main'){
+    const mainlineEcho=mainlineChoiceEcho(entry,progress);
+    if(mainlineEcho)lines.push(mainlineEcho);
+  }
   if(entry.kind==='incident'){
     // Choice consequences are read from the validated narrative save even when
     // the independent workshop save is absent or blocked.
