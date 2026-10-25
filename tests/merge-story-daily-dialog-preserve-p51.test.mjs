@@ -21,7 +21,8 @@ test('P51 a peer daily pin does not discard an open unlocked mainline choice',()
   const before=through('signboard');
   const after=pinDailyStoryIncident(before,pack,day);
   const raw=JSON.stringify(before),nextRaw=JSON.stringify(after);
-  const storage={getItem:key=>key===STORY_SAVE_KEY?nextRaw:null};
+  const storage={getItem:key=>key===STORY_SAVE_KEY?nextRaw:null,
+    setItem(){throw Error('passive adoption must never write');}};
   const event={key:STORY_SAVE_KEY,storageArea:storage,oldValue:raw,newValue:nextRaw};
   const adopted=adoptConcurrentDailyPinStorageEvent(event,{storage,expectedRaw:raw,day,pack});
   assert.ok(adopted);
