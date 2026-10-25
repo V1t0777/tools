@@ -69,12 +69,21 @@ export function startCoreStory(progress,pack){
   context(progress,pack);
   return registerStoryPack(progress,pack.id);
 }
+/** Reject impossible Gregorian dates before hashing (UTC/local timezone independent). */
+function validLocalCalendarDay(dayKey){
+  if(typeof dayKey!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(dayKey))return false;
+  const year=Number(dayKey.slice(0,4)),month=Number(dayKey.slice(5,7)),day=Number(dayKey.slice(8,10));
+  if(year<1||month<1||month>12)return false;
+  const leap=year%4===0&&(year%100!==0||year%400===0);
+  const days=[31,leap?29:28,31,30,31,30,31,31,30,31,30,31];
+  return day>=1&&day<=days[month-1];
+}
 /** Deterministic local-day event without server, resources or reroll-on-refresh.
  * This returns one eligible event; a repeatable incident can be reread the next day.
  */
 export function dailyStoryIncident(progress,pack,dayKey){
-  if(typeof dayKey!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(dayKey))
-    throw new TypeError('Expected local calendar day');
+  if(!validLocalCalendarDay(dayKey))
+    throw new TypeError('Expected real local calendar day');
   const candidates=availableStoryEntries(progress,pack,'incident');
   if(!candidates.length)return null;
   let hash=2166136261;

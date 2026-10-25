@@ -1,6 +1,7 @@
 import {CORE_STORY_PACK} from './core-pack.mjs';
 import {availableStoryEntries,completedStoryEntries,completeStoryEntry,startCoreStory,dailyStoryIncident} from './runtime.mjs';
 import {readStorySave} from './local-storage.mjs';
+import {incidentWorkshopEcho} from './incident-context.mjs';
 import {saveStoryDialogueWithLock} from './dialogue-write.mjs';
 import {captureStoryWorkshopEvidence} from './save-evidence.mjs';
 import {checkStoryResumeSnapshot} from './resume-guard.mjs';
@@ -117,7 +118,17 @@ function open(entry){
   $('dialog-chapter').textContent=entry.chapter;
   $('dialog-title').textContent=entry.title;
   $('dialog-place').textContent=entry.place;
-  $('dialog-lines').replaceChildren(...entry.lines.map(lineElement));
+  // Daily incidents can acknowledge actual story-only orders and buildings.
+  // This is read-only flavor text; corrupt/missing workshop data is never invented.
+  const lines=entry.lines.slice();
+  if(entry.kind==='incident'){
+    const workshop=readStoryWorkshop(store);
+    if(!workshop.blocked&&workshop.raw!==null){
+      const echo=incidentWorkshopEcho(entry,workshop.state);
+      if(echo)lines.push(echo);
+    }
+  }
+  $('dialog-lines').replaceChildren(...lines.map(lineElement));
   $('dialog-choices').replaceChildren();
   $('dialog-reply').textContent='';
   const previous=progress.packs.core?.choices[entry.id]??null;
