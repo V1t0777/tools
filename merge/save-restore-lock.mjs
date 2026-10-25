@@ -22,25 +22,36 @@ export async function coordinateNormalSaveRestore(fileText,storage,lockManager,
   {expectedRaw,confirmed=false,allowDowngrade=false}={}) {
   if(confirmed!==true)return rejected('CONFIRMATION_REQUIRED');
   if(typeof lockManager?.request!=='function')return rejected('LOCKS_UNAVAILABLE');
-  let entered=false,attempted=false;
+  let entered=false,attempted=false,callbackRepeated=false,requestSettled=false;
+  let expectedResult;
   try {
     const result=await lockManager.request(RESTORE_LOCK_NAME,
       {mode:'exclusive',ifAvailable:true},lock=>{
-        if(entered)return rejected('LOCK_CALLBACK_REPEATED');
+        // A malformed provider must never replay a restore callback, including
+        // one delivered after its request has already settled.
+        if(entered || requestSettled){
+          callbackRepeated=true;
+          return rejected('LOCK_CALLBACK_REPEATED');
+        }
         entered=true;
-        if(lock===null)return rejected('LOCK_BUSY');
+        if(lock===null)return (expectedResult=rejected('LOCK_BUSY'));
         if(lock?.name!==RESTORE_LOCK_NAME||lock.mode!=='exclusive')
-          return rejected('LOCK_INVALID');
+          return (expectedResult=rejected('LOCK_INVALID'));
         attempted=true;
         // The restore checks expectedRaw, reserves a backup and verifies
         // the write while the participating Web Lock is held.
-        return commitNormalSaveRestore(fileText,storage,
-          {expectedRaw,confirmed,allowDowngrade});
+        return (expectedResult=commitNormalSaveRestore(fileText,storage,
+          {expectedRaw,confirmed,allowDowngrade}));
       });
-    if(!entered || !result || typeof result.ok!=='boolean')
+    requestSettled=true;
+    // The browser's Web Locks request resolves to the exact callback result.
+    // A duplicate callback or forged return makes any completed write uncertain.
+    if(!entered || callbackRepeated || result!==expectedResult ||
+        !result || typeof result.ok!=='boolean')
       return rejected(attempted?'RESTORE_OUTCOME_UNCERTAIN':'LOCK_RESULT_INVALID');
     return result;
   } catch {
+    requestSettled=true;
     // A rejected request AFTER commit may have written the save.
     // Never retry blindly or claim that no write occurred.
     return rejected(attempted?'RESTORE_OUTCOME_UNCERTAIN':'LOCK_FAILED');

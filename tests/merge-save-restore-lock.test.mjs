@@ -128,3 +128,44 @@ test('locking adapter stays unconnected to player UI and has no unlocked fallbac
   assert.equal(main.includes("from './save-restore-lock.mjs'"),false);
   assert.equal(html.includes('id="import-local-save"'),false);
 });
+
+test('P2.61e repeated restore callback writes only once and reports uncertain outcome',async()=>{
+  const old=raw(1),next=raw(2),db=storage(old);
+  const manager={async request(name,_options,callback){
+    const lock={name,mode:'exclusive'};
+    const first=callback(lock);
+    assert.deepEqual(callback(lock),{ok:false,reason:'LOCK_CALLBACK_REPEATED'});
+    return first; // A broken provider hides its duplicate callback.
+  }};
+  assert.deepEqual(await restore(next,db,manager,{expectedRaw:old,confirmed:true}),
+    {ok:false,reason:'RESTORE_OUTCOME_UNCERTAIN'});
+  assert.equal(db.read(SAVE_KEY),next);
+  assert.deepEqual(db.writes.map(([key])=>key),[RESTORE_BACKUP_KEY,SAVE_KEY]);
+});
+
+test('P2.61e late callback after request completion cannot restore or create backup',async()=>{
+  const old=raw(1),db=storage(old);
+  let late;
+  const manager={request(_name,_options,callback){
+    late=callback;
+    return Promise.resolve({ok:true,status:'RESTORE_VERIFIED'});
+  }};
+  assert.deepEqual(await restore(raw(2),db,manager,{expectedRaw:old,confirmed:true}),
+    {ok:false,reason:'LOCK_RESULT_INVALID'});
+  assert.deepEqual(late({name:RESTORE_LOCK_NAME,mode:'exclusive'}),
+    {ok:false,reason:'LOCK_CALLBACK_REPEATED'});
+  assert.equal(db.read(SAVE_KEY),old);
+  assert.deepEqual(db.writes,[]);
+});
+
+test('P2.61e forged lock return cannot claim successful restore',async()=>{
+  const old=raw(1),next=raw(2),db=storage(old);
+  const manager={request(name,_options,callback){
+    callback({name,mode:'exclusive'});
+    return {ok:true,status:'RESTORE_VERIFIED'}; // Not the callback receipt.
+  }};
+  assert.deepEqual(await restore(next,db,manager,{expectedRaw:old,confirmed:true}),
+    {ok:false,reason:'RESTORE_OUTCOME_UNCERTAIN'});
+  assert.equal(db.read(SAVE_KEY),next);
+  assert.deepEqual(db.writes.map(([key])=>key),[RESTORE_BACKUP_KEY,SAVE_KEY]);
+});

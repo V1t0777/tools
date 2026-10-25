@@ -9,6 +9,7 @@ import {readStoryHash} from './story-return-route.mjs';
 import {canCommitDailyIncident} from './daily-incident-guard.mjs';
 import {isMatchingConcurrentDailyPin} from './daily-pin-reconcile.mjs';
 import {adoptConcurrentDailyPinStorageEvent} from './daily-pin-reconcile.mjs';
+import {canKeepDialogueAfterDailyPin} from './daily-pin-reconcile.mjs';
 import {saveStoryDialogueWithLock} from './dialogue-write.mjs';
 import {captureStoryWorkshopEvidence} from './save-evidence.mjs';
 import {checkStoryResumeSnapshot} from './resume-guard.mjs';
@@ -386,9 +387,16 @@ window.addEventListener('storage',event=>{
       storage:store,expectedRaw:raw,day:localDay(),pack:CORE_STORY_PACK
     }):null;
     if(adopted){
+      // An identical daily pin does not alter main/side choices. Keep an
+      // actively read chapter (and its selected option) instead of closing
+      // the dialogue just because another tab pinned today's event.
+      const keepDialog=$('story-dialog').open&&
+        canKeepDialogueAfterDailyPin(selected,adopted.progress,CORE_STORY_PACK);
       storageEpoch++;progress=adopted.progress;raw=adopted.raw;
-      selected=null;selectedChoice=null;selectedIncidentDay=null;
-      if($('story-dialog').open)$('story-dialog').close();
+      if(!keepDialog){
+        selected=null;selectedChoice=null;selectedIncidentDay=null;
+        if($('story-dialog').open)$('story-dialog').close();
+      }
       render();return;
     }
     storageEpoch++;blocked=true;reason='WRITE_CONFLICT';selectedChoice=null;

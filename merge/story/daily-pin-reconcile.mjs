@@ -45,3 +45,21 @@ export function adoptConcurrentDailyPinStorageEvent(event,{storage,expectedRaw,d
     return {progress:observed.progress,raw:observed.raw};
   }catch{return null;}
 }
+
+/** P51: a byte-identical daily pin changes no chapter completion/choices.
+ * Keep an already open main/side dialogue only if its *actual core-pack
+ * object* remains unlocked or completed. Never keep a daily event, forged
+ * DLC lookalike, or dialogue with malformed/unknown progress.
+ */
+import {availableStoryEntries,completedStoryEntries} from './runtime.mjs';
+
+export function canKeepDialogueAfterDailyPin(entry,progress,pack){
+  if(!entry||!pack||!Array.isArray(pack.entries)||
+    !pack.entries.includes(entry)||
+    (entry.kind!=='main'&&entry.kind!=='side')||
+    !validateStoryProgress(progress))return false;
+  try{
+    return availableStoryEntries(progress,pack,entry.kind).includes(entry)||
+      completedStoryEntries(progress,pack,entry.kind).includes(entry);
+  }catch{return false;}
+}
