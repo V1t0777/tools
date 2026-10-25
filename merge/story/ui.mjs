@@ -35,7 +35,7 @@ function localDay(){
   const pad=n=>String(n).padStart(2,'0');
   return date.getFullYear()+'-'+pad(date.getMonth()+1)+'-'+pad(date.getDate());
 }
-async function save(next,reset=false,commitGuard=()=>true){
+async function save(next,reset=false,commitGuard=()=>true,pinDay=null){
   // One pending story write per tab. The same lock covers initialization,
   // completion and explicitly confirmed reset; exact-raw CAS stays mandatory.
   if(blocked&&!reset)return false;
@@ -47,6 +47,15 @@ async function save(next,reset=false,commitGuard=()=>true){
     isCurrent:()=>storageEpoch===expectedEpoch&&(!blocked||reset)
   });
   saving=false;
+  // A midnight rollover can cancel an auto-pin while waiting for the lock.
+  // If the lock callback refused the expired day *without writing*, and the
+  // exact raw baseline is still intact, this is a harmless cancellation,
+  // not a cross-tab conflict. All other failures remain fail-closed.
+  if(pinDay!==null&&localDay()!==pinDay&&attempt.ok&&attempt.value===false&&
+    storageEpoch===expectedEpoch&&!blocked){
+    const current=readStorySave(store);
+    if(!current.blocked&&current.raw===expectedRaw){render();return false;}
+  }
   if(!attempt.ok||attempt.value!==true||storageEpoch!==expectedEpoch||(!reset&&blocked)){
     blocked=true;reason='WRITE_CONFLICT';render();return false;
   }
@@ -148,12 +157,17 @@ function render(){
         if(!blocked&&!saving&&localDay()===day&&
           !pinnedDailyStoryIncident(progress,CORE_STORY_PACK,day)){
           const next=pinDailyStoryIncident(progress,CORE_STORY_PACK,day);
-          if(next!==progress)await save(next,false,()=>localDay()===day);
+          if(next!==progress)await save(next,false,()=>localDay()===day,day);
         }
       }catch{
         // Never show or commit an unpinned replacement on a failed claim.
         blocked=true;reason='WRITE_CONFLICT';render();
-      }finally{pinQueued=false;}
+      }finally{
+        pinQueued=false;
+        // The save() render happened while pinQueued was true. On rollover,
+        // render once more to claim today's event even on the mainline tab.
+        if(!blocked&&!saving&&localDay()!==day)render();
+      }
     });
   }
 }
@@ -338,7 +352,9 @@ function refreshIncidentDay(){
     selected=null;selectedChoice=null;selectedIncidentDay=null;
     if($('story-dialog').open)$('story-dialog').close();
   }
-  if(kind==='incident')render();
+  // Refresh even on main/side tabs: a newly started day must be pinned
+  // before subsequent chapter completion changes the candidate pool.
+  render();
 }
 window.setInterval(()=>{
   if(document.visibilityState==='visible')refreshIncidentDay();

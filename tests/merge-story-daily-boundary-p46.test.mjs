@@ -57,7 +57,8 @@ test('P46 UI refreshes after midnight and rechecks incident at click and under W
   assert.ok(ui.includes('const commitGuard=()=>storyDialogueCommitAllowed(store,entryId,expectedWorkshopRaw)&&'));
   assert.ok(ui.includes('function refreshIncidentDay(){'));
   assert.ok(ui.includes("if(selected?.kind==='incident')"));
-  assert.ok(ui.includes("if(kind==='incident')render();"));
+  assert.ok(ui.includes('  render();\n}'));
+  assert.equal(ui.includes("if(kind==='incident')render();"),false);
   assert.ok(ui.includes("if(document.visibilityState==='visible')refreshIncidentDay();"));
   assert.ok(ui.includes("window.addEventListener('pageshow',recheckStoryOnResume);"));
   assert.ok(ui.includes("document.addEventListener('visibilitychange',()=>{"));

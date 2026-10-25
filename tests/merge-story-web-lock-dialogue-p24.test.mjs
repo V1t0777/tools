@@ -125,7 +125,7 @@ test('P24 dialogue UI gates choices and reset while pending and uses lock for al
   const ui=readFileSync(new URL('../merge/story/ui.mjs',import.meta.url),'utf8');
   assert.ok(ui.includes("import {saveStoryDialogueWithLock} from './dialogue-write.mjs';"));
   assert.ok(ui.includes('let saving=false,storageEpoch=0;'));
-  assert.ok(ui.includes('async function save(next,reset=false,commitGuard=()=>true){'));
+  assert.ok(ui.includes('async function save(next,reset=false,commitGuard=()=>true,pinDay=null){'));
   assert.ok(ui.includes('if(saving)return false;'));
   assert.ok(ui.includes('saveStoryDialogueWithLock(webLocks,store,next,{'));
   assert.ok(ui.includes('expectedRaw,confirmedReset:reset,commitGuard'));
