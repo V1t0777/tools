@@ -73,7 +73,7 @@ test('P2.50 unchanged clock and verified startup receipts are publishable',async
   const gate=createNormalUiFlight();
   let published=0;
   assert.equal((await gate.run(()=>({ok:true,state:{},raw:'old',
-    changed:false,status:'CLOCK_UNCHANGED'}),()=>published++)).ok,true);
+    changed:false,status:'CLOCK_UNCHANGED',verifiedBaseline:true}),()=>published++)).ok,true);
   assert.equal((await gate.run(()=>({ok:true,state:{},raw:'new',
     verifiedBaseline:true}),()=>published++)).ok,true);
   assert.equal(published,2);
@@ -291,4 +291,16 @@ test('P2.55 nested action during synchronous publish remains busy, outer result 
   assert.equal(called,0);
   assert.equal(gate.blocked,false);
   assert.equal(gate.busy,false);
+});
+
+test('P2.56 unverified CLOCK_UNCHANGED receipt cannot bypass publication proof',async()=>{
+  const gate=createNormalUiFlight();
+  let published=0;
+  const result=await gate.run(()=>({ok:true,state:{revision:1},raw:'old',
+    changed:false,status:'CLOCK_UNCHANGED'}),()=>published++);
+  assert.deepEqual(result,{ok:false,reason:'UI_RECEIPT_NOT_VERIFIED'});
+  assert.equal(published,0);
+  assert.equal(gate.blocked,true);
+  assert.deepEqual(await gate.run(()=>verified(),()=>published++),
+    {ok:false,reason:'UI_SAVE_BLOCKED'});
 });

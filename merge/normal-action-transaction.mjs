@@ -50,7 +50,7 @@ export async function commitNormalClockWithLock(locks,storage,{expectedRaw,now=D
     const next=advanceTime(current.state,now);
     if(next===current.state)
       return Object.freeze({ok:true,status:'CLOCK_UNCHANGED',changed:false,
-        raw:current.raw,state:current.state});
+        raw:current.raw,state:current.state,verifiedBaseline:true});
     const receipt=commitNormalSnapshot(storage,next,{expectedRaw:current.raw});
     if(!receipt.ok)return receipt;
     return Object.freeze({...receipt,changed:true,state:next});
