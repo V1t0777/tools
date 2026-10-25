@@ -4,6 +4,7 @@
  * locked startup/action/clock/reset transactions and provide a publish hook.
  * Not yet connected to main.mjs: all normal writers must switch together.
  * P2.52: uncertain transaction outcomes permanently block subsequent UI work.
+ * P2.53: invalidated in-flight outcomes also require a fresh page/revalidation.
  */
 const reject=reason=>Object.freeze({ok:false,reason});
 // P2.52: only failures known to occur before any write may be retried.
@@ -44,7 +45,14 @@ export function createNormalUiFlight() {
         try {receipt=await transaction();}
         catch {blockUncertain();return reject('UI_TRANSACTION_FAILED');}
         if(blocked)return reject('UI_SAVE_BLOCKED');
-        if(startedAt!==epoch)return reject('UI_TRANSACTION_INVALIDATED');
+        // P2.53: invalidation can happen AFTER a write but BEFORE publication.
+        // Even a subsequently returned pre-write rejection cannot prove the
+        // page's old baseline is safe after a cross-tab or lifecycle change.
+        // A fresh page/revalidation is required; never silently resume.
+        if(startedAt!==epoch) {
+          blockUncertain();
+          return reject('UI_TRANSACTION_INVALIDATED');
+        }
         if(!receipt||receipt.ok!==true) {
           const reason=receipt?.ok===false&&typeof receipt.reason==='string'
             ?receipt.reason:'UI_TRANSACTION_REJECTED';
