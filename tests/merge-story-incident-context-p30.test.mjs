@@ -91,6 +91,6 @@ test('P30 mobile story page only adds read-only event lines for valid persisted 
   for(const unsafe of ['innerHTML','insertAdjacentHTML','sendBeacon(','fetch('])
     assert.equal(ui.includes(unsafe),false,unsafe);
   // STORY_SAVE_KEY is allowed, but a standalone ordinary-mode SAVE_KEY is not.
-  assert.doesNotMatch(ui,/\\bSAVE_KEY\\b/);
+  assert.equal(/(^|[^A-Za-z0-9_])SAVE_KEY(?![A-Za-z0-9_])/.test(ui),false);
   assert.notEqual(SAVE_KEY,'toolbox.merge-isle.story.local.v1');
 });
