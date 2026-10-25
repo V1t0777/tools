@@ -3,18 +3,27 @@
  * It never writes storage or publishes state by itself; callers must use the
  * locked startup/action/clock/reset transactions and provide a publish hook.
  * Not yet connected to main.mjs: all normal writers must switch together.
+ * P2.52: uncertain transaction outcomes permanently block subsequent UI work.
  */
 const reject=reason=>Object.freeze({ok:false,reason});
+// P2.52: only failures known to occur before any write may be retried.
+// Unknown errors, stale baselines and uncertain receipts must close the gate.
+const SAFE_NO_WRITE_REJECTIONS=new Set([
+  'ACTION_REJECTED','SAVE_LOCK_BUSY','WEB_LOCKS_UNAVAILABLE',
+  'RESET_NOT_CONFIRMED','INVALID_CLOCK','INVALID_ACTION',
+  'ASYNC_ACTION_NOT_ALLOWED','INVALID_BACKUP_POLICY','INVALID_RESET_FLAG'
+]);
 
 export function createNormalUiFlight() {
   let busy=false,epoch=0,blocked=false;
+  const blockUncertain=()=>{if(!blocked){blocked=true;epoch++;}};
   return Object.freeze({
     get busy(){return busy;},
     get blocked(){return blocked;},
     /** Permanent fail-closed stop after a storage conflict or uncertain save.
      * A new gate must be created only after the page reopens/revalidates.
      */
-    block(){if(!blocked){blocked=true;epoch++;}},
+    block(){blockUncertain();},
     /** Invalidate a pending result after cross-tab conflict, page hide/reset. */
     invalidate(){epoch++;},
     /**
@@ -33,18 +42,24 @@ export function createNormalUiFlight() {
       try {
         let receipt;
         try {receipt=await transaction();}
-        catch {return reject('UI_TRANSACTION_FAILED');}
+        catch {blockUncertain();return reject('UI_TRANSACTION_FAILED');}
         if(blocked)return reject('UI_SAVE_BLOCKED');
         if(startedAt!==epoch)return reject('UI_TRANSACTION_INVALIDATED');
-        if(!receipt||receipt.ok!==true)return receipt?.ok===false&&typeof receipt.reason==='string'
-          ?reject(receipt.reason):reject('UI_TRANSACTION_REJECTED');
+        if(!receipt||receipt.ok!==true) {
+          const reason=receipt?.ok===false&&typeof receipt.reason==='string'
+            ?receipt.reason:'UI_TRANSACTION_REJECTED';
+          if(!SAFE_NO_WRITE_REJECTIONS.has(reason))blockUncertain();
+          return reject(reason);
+        }
         if(typeof receipt.raw!=='string'||!receipt.state||
             (receipt.verifiedReadback!==true&&
              receipt.verifiedBaseline!==true&&
-             !(receipt.changed===false&&receipt.status==='CLOCK_UNCHANGED')))
+             !(receipt.changed===false&&receipt.status==='CLOCK_UNCHANGED'))) {
+          blockUncertain();
           return reject('UI_RECEIPT_NOT_VERIFIED');
+        }
         try {publish(receipt.state,receipt.raw,receipt);}
-        catch {return reject('UI_PUBLISH_FAILED');}
+        catch {blockUncertain();return reject('UI_PUBLISH_FAILED');}
         return Object.freeze({ok:true,status:'UI_PUBLISHED'});
       } finally {busy=false;}
     }

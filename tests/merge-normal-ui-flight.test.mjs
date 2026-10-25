@@ -41,24 +41,30 @@ test('P2.50 storage conflict invalidates pending save receipt without publishing
   assert.equal(gate.busy,false);
 });
 
-test('P2.50 rejected or throwing transactions cannot publish state',async()=>{
-  const gate=createNormalUiFlight();
+test('P2.52 stale baseline and throwing transactions each fail closed',async()=>{
+  const staleGate=createNormalUiFlight(),errorGate=createNormalUiFlight();
   let published=0;
-  assert.deepEqual(await gate.run(()=>({ok:false,reason:'STALE_BASELINE'}),
+  assert.deepEqual(await staleGate.run(()=>({ok:false,reason:'STALE_BASELINE'}),
     ()=>published++),{ok:false,reason:'STALE_BASELINE'});
-  assert.deepEqual(await gate.run(()=>{throw Error('storage');},
+  assert.equal(staleGate.blocked,true);
+  assert.deepEqual(await errorGate.run(()=>{throw Error('storage');},
     ()=>published++),{ok:false,reason:'UI_TRANSACTION_FAILED'});
+  assert.equal(errorGate.blocked,true);
   assert.equal(published,0);
-  assert.equal(gate.busy,false);
+  assert.equal(staleGate.busy,false);
+  assert.equal(errorGate.busy,false);
 });
 
-test('P2.50 unverified, malformed and absent receipts cannot publish',async()=>{
-  const gate=createNormalUiFlight();
+test('P2.52 unverified, malformed and absent receipts block further writes',async()=>{
   let published=0;
   for(const result of [null,{ok:true},{ok:true,state:{revision:1},raw:'bytes'},
     {ok:true,state:{revision:1},raw:123,verifiedReadback:true}]) {
+    const gate=createNormalUiFlight();
     const response=await gate.run(()=>result,()=>published++);
     assert.equal(response.ok,false);
+    assert.equal(gate.blocked,true);
+    assert.deepEqual(await gate.run(()=>verified(),()=>published++),
+      {ok:false,reason:'UI_SAVE_BLOCKED'});
   }
   assert.equal(published,0);
 });
@@ -73,12 +79,14 @@ test('P2.50 unchanged clock and verified startup receipts are publishable',async
   assert.equal(published,2);
 });
 
-test('P2.50 publish exceptions release busy gate for recovery',async()=>{
+test('P2.52 publish exception blocks new work after a possibly saved state',async()=>{
   const gate=createNormalUiFlight();
   assert.deepEqual(await gate.run(()=>verified(),()=>{throw Error('render');}),
     {ok:false,reason:'UI_PUBLISH_FAILED'});
   assert.equal(gate.busy,false);
-  assert.equal((await gate.run(()=>verified(),()=>{})).ok,true);
+  assert.equal(gate.blocked,true);
+  assert.deepEqual(await gate.run(()=>verified(),()=>{}),
+    {ok:false,reason:'UI_SAVE_BLOCKED'});
 });
 
 test('P2.50 invalid arguments cannot start or occupy a flight',async()=>{
@@ -129,4 +137,41 @@ test('P2.51 repeated block and transient invalidate cannot reopen blocked gate',
   assert.equal(fresh.blocked,false);
   fresh.invalidate();
   assert.equal((await fresh.run(()=>verified(),()=>{})).ok,true);
+});
+
+test('P2.52 stale and uncertain persistence failures block future operations',async()=>{
+  for(const reason of ['STALE_BASELINE','SAVE_VERIFY_FAILED',
+    'SAVE_REJECTED_OR_UNCERTAIN','SAVE_OUTCOME_UNCERTAIN',
+    'SAVE_LOCK_OUTCOME_UNCERTAIN','STARTUP_READBACK_CHANGED',
+    'BACKUP_OUTCOME_UNCERTAIN','STORAGE_UNAVAILABLE','UNKNOWN_NEW_FAILURE']) {
+    const gate=createNormalUiFlight();
+    let published=0;
+    assert.deepEqual(await gate.run(()=>({ok:false,reason}),()=>published++),
+      {ok:false,reason});
+    assert.equal(gate.blocked,true,reason);
+    assert.deepEqual(await gate.run(()=>verified(),()=>published++),
+      {ok:false,reason:'UI_SAVE_BLOCKED'});
+    assert.equal(published,0);
+  }
+});
+
+test('P2.52 explicitly safe pre-write failures remain retryable',async()=>{
+  for(const reason of ['ACTION_REJECTED','SAVE_LOCK_BUSY',
+    'WEB_LOCKS_UNAVAILABLE','RESET_NOT_CONFIRMED','INVALID_CLOCK',
+    'INVALID_ACTION','ASYNC_ACTION_NOT_ALLOWED','INVALID_BACKUP_POLICY',
+    'INVALID_RESET_FLAG']) {
+    const gate=createNormalUiFlight();
+    assert.deepEqual(await gate.run(()=>({ok:false,reason}),()=>{}),
+      {ok:false,reason});
+    assert.equal(gate.blocked,false,reason);
+    assert.equal((await gate.run(()=>verified(),()=>{})).ok,true);
+  }
+});
+
+test('P2.52 throwing transaction permanently blocks uncertain write outcome',async()=>{
+  const gate=createNormalUiFlight();
+  assert.deepEqual(await gate.run(()=>{throw Error('after write');},()=>{}),
+    {ok:false,reason:'UI_TRANSACTION_FAILED'});
+  assert.equal(gate.busy,false);
+  assert.equal(gate.blocked,true);
 });
