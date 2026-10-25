@@ -5,8 +5,12 @@
  * cross-tab coordination. This module alone does not provide atomic CAS.
  */
 import { commitNormalSaveRestore } from './save-restore-commit.mjs';
+import { NORMAL_SAVE_LOCK_NAME } from './normal-save-lock.mjs';
 
-export const RESTORE_LOCK_NAME = 'toolbox.merge-isle.normal.restore.v1';
+// P2.60: legacy restore and save adapters must share the P2.45+ normal
+// action/clock/reset/startup lock. A separate name permits simultaneous
+// restore and gameplay transactions even when both request exclusive locks.
+export const RESTORE_LOCK_NAME = NORMAL_SAVE_LOCK_NAME;
 const rejected = reason => Object.freeze({ok:false,reason});
 
 /**
