@@ -94,3 +94,52 @@ test('transaction rejection releases lock for a subsequent safe attempt',async()
     {ok:false,reason:'STALE_BASELINE'});
   assert.equal((await withNormalSaveLock(locks,()=>({ok:true}))).ok,true);
 });
+
+test('repeated callback cannot execute a second save, even when provider returns first receipt',async()=>{
+  let writes=0;
+  const fake={async request(name,_options,callback){
+    const lock={name,mode:'exclusive'};
+    const first=await callback(lock);
+    const repeated=await callback(lock);
+    assert.deepEqual(repeated,{ok:false,reason:'SAVE_LOCK_CALLBACK_REPEATED'});
+    return first;
+  }};
+  assert.deepEqual(await withNormalSaveLock(fake,()=>{
+    writes++;return {ok:true};
+  }),{ok:false,reason:'SAVE_LOCK_OUTCOME_UNCERTAIN'});
+  assert.equal(writes,1);
+});
+
+test('concurrent duplicate callback cannot run transaction while first is pending',async()=>{
+  let writes=0,release;
+  const pending=new Promise(resolve=>{release=resolve;});
+  const fake={async request(name,_options,callback){
+    const lock={name,mode:'exclusive'};
+    const first=callback(lock);
+    const second=callback(lock);
+    assert.deepEqual(await second,{ok:false,reason:'SAVE_LOCK_CALLBACK_REPEATED'});
+    release();
+    return first;
+  }};
+  assert.deepEqual(await withNormalSaveLock(fake,async()=>{
+    writes++;await pending;return {ok:true};
+  }),{ok:false,reason:'SAVE_LOCK_OUTCOME_UNCERTAIN'});
+  assert.equal(writes,1);
+});
+
+test('callback delivered after resolved or rejected request cannot write',async()=>{
+  for(const rejected of [false,true]){
+    let late,writes=0;
+    const fake={request(_name,_options,callback){
+      late=callback;
+      if(rejected)throw Error('provider failed');
+      return Promise.resolve({ok:true});
+    }};
+    assert.deepEqual(await withNormalSaveLock(fake,()=>{
+      writes++;return {ok:true};
+    }),{ok:false,reason:rejected?'SAVE_LOCK_REQUEST_FAILED':'SAVE_LOCK_OUTCOME_UNCERTAIN'});
+    assert.deepEqual(await late({name:NORMAL_SAVE_LOCK_NAME,mode:'exclusive'}),
+      {ok:false,reason:'SAVE_LOCK_CALLBACK_REPEATED'});
+    assert.equal(writes,0);
+  }
+});
