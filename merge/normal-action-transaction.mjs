@@ -28,7 +28,13 @@ export async function commitNormalActionWithLock(locks,storage,{expectedRaw,acti
     // accidental no-op/forged economy update with the old revision before it
     // can be persisted as an equal-revision cross-tab conflict.
     const baselineRevision=current.state.revision;
+    // A successful action must not mutate its input even when it returns a
+    // distinct outer object. Detect nested board/economy mutations before
+    // persisting an aliased result; the trusted raw save remains untouched.
+    const baselineSnapshot=JSON.stringify(current.state);
     const result=action(current.state);
+    if(JSON.stringify(current.state)!==baselineSnapshot)
+      return reject('ACTION_MUTATED_BASELINE');
     if(result && typeof result.then==='function')
       return reject('ASYNC_ACTION_NOT_ALLOWED');
     if(!result || result.ok!==true)

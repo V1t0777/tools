@@ -168,3 +168,30 @@ test('P2.61h rejects an in-place success result even with an incremented revisio
   assert.equal(store.raw,raw);
   assert.equal(store.writes,0);
 });
+
+test('P2.61i rejects a nested baseline mutation even with a distinct returned state',async()=>{
+  const state=initial(),raw=JSON.stringify(state),store=memory(raw);
+  const result=await commitNormalActionWithLock(locks(),store,{
+    expectedRaw:raw,action:current=>{
+      current.board[0]=null;
+      return {ok:true,state:{...current,revision:current.revision+1}};
+    }
+  });
+  assert.deepEqual(result,{ok:false,reason:'ACTION_MUTATED_BASELINE'});
+  assert.equal(store.raw,raw);
+  assert.equal(store.writes,0);
+  assert.equal('state' in result,false);
+});
+
+test('P2.61i a rejected action may not silently mutate its input economy',async()=>{
+  const state=initial(),raw=JSON.stringify(state),store=memory(raw);
+  const result=await commitNormalActionWithLock(locks(),store,{
+    expectedRaw:raw,action:current=>{
+      current.coins+=10;
+      return {ok:false,message:'not allowed'};
+    }
+  });
+  assert.deepEqual(result,{ok:false,reason:'ACTION_MUTATED_BASELINE'});
+  assert.equal(store.raw,raw);
+  assert.equal(store.writes,0);
+});
