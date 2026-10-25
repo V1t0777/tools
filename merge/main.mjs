@@ -423,6 +423,11 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('pageshow', event => {
   if (event.persisted && !document.hidden) revalidateResumedSave();
 });
+// Some mobile WebViews restore a focused page without visibilitychange or
+// a BFCache pageshow. Recheck only the raw save, never write on focus.
+window.addEventListener('focus', () => {
+  if (!document.hidden) revalidateResumedSave();
+});
 
 byId('store-selected').addEventListener('click',()=>{
   if(selected < 0){hint('先点击选择一个原料');return;}
