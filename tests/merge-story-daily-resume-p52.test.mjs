@@ -83,7 +83,7 @@ test('P52 missing, damaged, unavailable and racing storage fail closed',()=>{
 
 test('P52 resumed UI only adopts idle WRITE_CONFLICT and retains strict failure path',()=>{
   const ui=readFileSync(new URL('../merge/story/ui.mjs',import.meta.url),'utf8');
-  assert.ok(ui.includes("import {adoptConcurrentDailyPinOnResume} from './daily-pin-reconcile.mjs';"));
+  assert.match(ui,/import \\{adoptConcurrentDailyPinOnResume(?:,canKeepResumedStoryDialogue)?\\} from '\\.\\/daily-pin-reconcile\\.mjs';/);
   assert.ok(ui.includes("if(!check.ok&&!saving&&check.reason==='WRITE_CONFLICT'){"));
   assert.ok(ui.includes('const adopted=adoptConcurrentDailyPinOnResume(store,{'));
   assert.ok(ui.includes('expectedRaw:raw,day:shownDay,pack:CORE_STORY_PACK'));
