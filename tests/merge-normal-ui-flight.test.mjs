@@ -41,15 +41,18 @@ test('P2.50 storage conflict invalidates pending save receipt without publishing
   assert.equal(gate.busy,false);
 });
 
-test('P2.50 rejected or throwing transactions cannot publish state',async()=>{
-  const gate=createNormalUiFlight();
+test('P2.52 stale baseline and throwing transactions each fail closed',async()=>{
+  const staleGate=createNormalUiFlight(),errorGate=createNormalUiFlight();
   let published=0;
-  assert.deepEqual(await gate.run(()=>({ok:false,reason:'STALE_BASELINE'}),
+  assert.deepEqual(await staleGate.run(()=>({ok:false,reason:'STALE_BASELINE'}),
     ()=>published++),{ok:false,reason:'STALE_BASELINE'});
-  assert.deepEqual(await gate.run(()=>{throw Error('storage');},
+  assert.equal(staleGate.blocked,true);
+  assert.deepEqual(await errorGate.run(()=>{throw Error('storage');},
     ()=>published++),{ok:false,reason:'UI_TRANSACTION_FAILED'});
+  assert.equal(errorGate.blocked,true);
   assert.equal(published,0);
-  assert.equal(gate.busy,false);
+  assert.equal(staleGate.busy,false);
+  assert.equal(errorGate.busy,false);
 });
 
 test('P2.52 unverified, malformed and absent receipts block further writes',async()=>{
