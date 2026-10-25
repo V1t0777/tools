@@ -86,7 +86,7 @@ test('P23 storage invalidation while lock is queued aborts reset before write',a
   assert.equal(writeStoryWorkshop(storage,initial,{expectedRaw:null}),true);
   const expectedRaw=storage.getItem(STORY_WORKSHOP_KEY);
   let release;const gate=new Promise(resolve=>{release=resolve;});
-  const blocker=locks.request('toolbox.merge-isle.story.write.'+STORY_WORKSHOP_KEY,{mode:'exclusive'},()=>gate);
+  const blocker=locks.request('toolbox.merge-isle.story.write.'+STORY_SAVE_KEY,{mode:'exclusive'},()=>gate);
   let current=true;
   const reset=resetStoryWorkshopWithLock(locks,storage,{expectedRaw,isCurrent:()=>current});
   current=false;release();
