@@ -2,6 +2,7 @@ import {CORE_STORY_PACK} from './core-pack.mjs';
 import {availableStoryEntries,completedStoryEntries,completeStoryEntry,startCoreStory,dailyStoryIncident} from './runtime.mjs';
 import {readStorySave} from './local-storage.mjs';
 import {incidentWorkshopEcho} from './incident-context.mjs';
+import {incidentChoiceEcho} from './incident-choice-context.mjs';
 import {saveStoryDialogueWithLock} from './dialogue-write.mjs';
 import {captureStoryWorkshopEvidence} from './save-evidence.mjs';
 import {checkStoryResumeSnapshot} from './resume-guard.mjs';
@@ -122,6 +123,10 @@ function open(entry){
   // This is read-only flavor text; corrupt/missing workshop data is never invented.
   const lines=entry.lines.slice();
   if(entry.kind==='incident'){
+    // Choice consequences are read from the validated narrative save even when
+    // the independent workshop save is absent or blocked.
+    const choiceEcho=incidentChoiceEcho(entry,progress);
+    if(choiceEcho)lines.push(choiceEcho);
     const workshop=readStoryWorkshop(store);
     if(!workshop.blocked&&workshop.raw!==null){
       const echo=incidentWorkshopEcho(entry,workshop.state);
