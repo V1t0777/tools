@@ -364,9 +364,10 @@ function completeDrag(event, cancelled = false) {
   drag = null;
   ghost?.remove();
   if (!moved || cancelled) return;
+  // Mobile browsers may dispatch a synthetic click in a later task.
+  // Keep the guard until that click is consumed or a genuine new pointerdown
+  // begins; a zero-delay timer can clear it before the delayed click arrives.
   ignoreNextClick = true;
-  // Drag processing must not be followed by the browser's synthetic click.
-  setTimeout(() => { ignoreNextClick = false; }, 0);
   const target = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-slot]');
   if (target && board.contains(target)) {
     const result = moveOrMerge(state, origin, Number(target.dataset.slot));
