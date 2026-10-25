@@ -452,3 +452,48 @@ test('P2.43 visibility handling leaves unrelated idle state unchanged',()=>{
   assert.equal(ctx.drag,null);
   assert.equal(ctx.ignoreNextClick,false,'idle hidden event must not swallow a tap');
 });
+
+test('P2.44 confirmed reset invalidates an in-flight drag before persistence',()=>{
+  const main=readFileSync(new URL('../merge/main.mjs',import.meta.url),'utf8');
+  const start=main.indexOf("byId('reset').addEventListener('click', () => {");
+  const end=main.indexOf("const dialog = byId('guide')",start);
+  assert.ok(start>=0&&end>start);
+  const handler=main.slice(start,end);
+  for(const scenario of [
+    {name:'reset saved',confirmed:true,saved:true},
+    {name:'reset write rejected',confirmed:true,saved:false},
+    {name:'user declined',confirmed:false,saved:false}
+  ]){
+    const original=initial(),resetState=initial();
+    const drag={id:81,origin:2,moved:true,ghost:{remove(){removed++;}}};
+    let removed=0,attempts=0,renders=0,listener;
+    const ctx={
+      byId(id){assert.equal(id,'reset');return {
+        addEventListener(type,fn){assert.equal(type,'click');listener=fn;}
+      };},
+      window:{confirm(){return scenario.confirmed;}},
+      saveIssue:null,state:original,selected:2,activeGuidance:{boardSlots:[2]},
+      drag,ignoreNextClick:false,
+      createInitialState(){return resetState;},
+      persist(next,options){
+        assert.equal(next,resetState);
+        assert.equal(options.confirmedReset,true);
+        assert.equal(removed,1,'old gesture must be canceled before writing');
+        assert.equal(ctx.drag,null);
+        attempts++;
+        return scenario.saved;
+      },
+      render(){renders++;},hint(){}
+    };
+    runInNewContext(handler,ctx);
+    listener();
+    assert.equal(removed,scenario.confirmed?1:0,scenario.name);
+    assert.equal(attempts,scenario.confirmed?1:0,scenario.name);
+    assert.equal(ctx.drag,scenario.confirmed?null:drag,scenario.name);
+    assert.equal(ctx.ignoreNextClick,scenario.confirmed,scenario.name);
+    assert.equal(ctx.state,scenario.saved?resetState:original,scenario.name);
+    assert.equal(ctx.selected,scenario.saved?-1:2,scenario.name);
+    assert.equal(ctx.activeGuidance,scenario.saved?null:ctx.activeGuidance,scenario.name);
+    assert.equal(renders,scenario.confirmed?1:0,scenario.name);
+  }
+});

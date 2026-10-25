@@ -459,6 +459,14 @@ byId('reset').addEventListener('click', () => {
     ? '当前存档状态异常。重置前将尝试在此浏览器保留原始备份，但仍建议先下载原始文件；确定继续吗？'
     : '确定重置本地试玩进度吗？当前棋盘、金币和订单会被清空，且无法恢复。';
   if (!window.confirm(warning)) return;
+  // A confirmed reset invalidates any pointer that began on the old board.
+  // Even if backup or persistence fails, never let a late pointerup/click
+  // apply the old gesture after the reset attempt.
+  if (drag) {
+    drag.ghost?.remove();
+    drag = null;
+    ignoreNextClick = true;
+  }
   // A damaged or uncertain original must have a verified separate local
   // backup before any confirmed reset is allowed to overwrite its key.
   if(saveIssue) {
