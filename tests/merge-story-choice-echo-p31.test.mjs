@@ -18,6 +18,46 @@ function through(target,choices={}){
   throw new Error('Unknown mainline checkpoint');
 }
 
+test('P35 arrival choice is remembered during the cat incident only after completion',()=>{
+  assert.equal(incidentChoiceEcho(incident('cat-nap'),fresh()),null);
+  for(const [choice,fragment] of [['help','一起打开店门'],['ask','先问起的就是']]){
+    const story=through('arrival',{arrival:choice});
+    assert.match(incidentChoiceEcho(incident('cat-nap'),story).text,new RegExp(fragment));
+  }
+  const help=through('arrival',{arrival:'help'});
+  const ask=through('arrival',{arrival:'ask'});
+  assert.notEqual(incidentChoiceEcho(incident('cat-nap'),help).text,
+    incidentChoiceEcho(incident('cat-nap'),ask).text);
+});
+
+test('P35 first-order choice changes baking echo without altering economic rewards',()=>{
+  const before=through('signboard');
+  assert.equal(incidentChoiceEcho(incident('baking'),before),null);
+  for(const [choice,fragment] of [['listen','慢慢听完食谱'],['smile','不必每一次都完美']]){
+    const story=through('first-order',{'first-order':choice});
+    const snapshot=JSON.stringify(story);
+    assert.match(incidentChoiceEcho(incident('baking'),story).text,new RegExp(fragment));
+    assert.equal(JSON.stringify(story),snapshot);
+    assert.equal('coins' in story,false);
+    assert.equal('energy' in story,false);
+  }
+});
+
+test('P35 new first-chapter echoes reject colliding DLC event objects and uncommitted choices',()=>{
+  const story=through('first-order',{arrival:'help','first-order':'listen'});
+  for(const id of ['cat-nap','baking']){
+    assert.ok(incidentChoiceEcho(incident(id),story));
+    assert.equal(incidentChoiceEcho({...incident(id)},story),null);
+    assert.equal(incidentChoiceEcho({id,kind:'incident'},story),null);
+  }
+  const forged=fresh();
+  forged.packs.core.choices.arrival='help';
+  forged.packs.core.choices['first-order']='listen';
+  assert.equal(validateStoryProgress(forged),true);
+  assert.equal(incidentChoiceEcho(incident('cat-nap'),forged),null);
+  assert.equal(incidentChoiceEcho(incident('baking'),forged),null);
+});
+
 test('P31 seed choice changes rain echo only after committed mainline choice',()=>{
   const early=through('garden-path');
   assert.equal(incidentChoiceEcho(incident('surprise-rain'),early),null);
