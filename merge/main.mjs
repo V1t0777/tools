@@ -381,7 +381,28 @@ board.addEventListener('pointercancel', event => completeDrag(event, true));
 // Drop the stale gesture when the page is hidden; never move a board item or
 // write a save based on a pointer that began before backgrounding.
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden || !drag) return;
+  if (!document.hidden) {
+    // P2.58: a suspended mobile tab may miss or delay storage events.
+    // Revalidate before its next timer tick or player action can save.
+    if (saveIssue) return;
+    const fresh=peekLocalV3(store);
+    if (!fresh.ok || fresh.raw !== persistedRaw) {
+      if (drag) {
+        drag.ghost?.remove();
+        drag = null;
+        ignoreNextClick = true;
+      }
+      saveIssue=fresh.ok?'CURRENT_SAVE_CHANGED':fresh.reason;
+      selected=-1;
+      activeGuidance=null;
+      byId('save-status').textContent =
+        '返回页面后检测到存档变化，已暂停写入 · 请备份并重新打开页面核对';
+      hint('后台期间存档可能已变化，当前页面已暂停操作以保护进度');
+      render();
+    }
+    return;
+  }
+  if (!drag) return;
   completeDrag({pointerId:drag.id}, true);
   // A delayed pointer click must not select a stale board slot. P2.42 clears
   // this guard on the next genuine primary pointerdown.
@@ -564,6 +585,9 @@ window.addEventListener('storage', event => {
   hint('已从其他标签页读取更新进度');
 });
 window.setInterval(() => {
+  // A background tab must not silently race the visible player's save.
+  // Regen catches up on the next visible tick, after resume revalidation.
+  if (document.hidden) return;
   const now=Date.now();
   const updated = advanceTime(state,now);
   if (!saveIssue && updated !== state) {
