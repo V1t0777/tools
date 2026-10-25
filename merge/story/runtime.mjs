@@ -85,8 +85,41 @@ export function dailyStoryIncident(progress,pack,dayKey){
   if(!validLocalCalendarDay(dayKey))
     throw new TypeError('Expected real local calendar day');
   const candidates=availableStoryEntries(progress,pack,'incident');
+  // P47: an incident first displayed today stays fixed after mainline unlocks
+  // more candidates. A malformed pin is never silently rerolled.
+  const pinned=progress.packs[pack.id]?.choices[dailyPinKey(dayKey)];
+  if(pinned!==undefined)return candidates.find(item=>item.id===pinned)??null;
   if(!candidates.length)return null;
   let hash=2166136261;
   for(const char of pack.id+':'+dayKey){hash=Math.imul(hash^char.charCodeAt(0),16777619)>>>0;}
   return candidates[hash%candidates.length];
+}
+
+/** A bounded, schema-v1-compatible selection marker. Stored under the
+ * selected pack, never under normal-mode resources or another DLC pack.
+ * Only call from the existing locked, exact-raw story save transaction.
+ */
+const dailyPinKey=dayKey=>'daily-'+dayKey.replaceAll('-','');
+export function pinnedDailyStoryIncident(progress,pack,dayKey){
+  if(!validLocalCalendarDay(dayKey))throw new TypeError('Expected real local calendar day');
+  const p=context(progress,pack);
+  return !!p&&own(p.choices,dailyPinKey(dayKey));
+}
+export function pinDailyStoryIncident(progress,pack,dayKey){
+  if(!validLocalCalendarDay(dayKey))throw new TypeError('Expected real local calendar day');
+  const p=context(progress,pack);
+  if(!p||own(p.choices,dailyPinKey(dayKey)))return progress;
+  const selected=dailyStoryIncident(progress,pack,dayKey);
+  if(!selected)return progress;
+  if(progress.revision===Number.MAX_SAFE_INTEGER)throw new RangeError('Revision exhausted');
+  const next=structuredClone(progress);
+  const choices=next.packs[pack.id].choices;
+  // Keep only today's marker: old daily selections do not accumulate across
+  // years or exhaust the existing bounded choices dictionary.
+  for(const key of Object.keys(choices))
+    if(/^daily-\d{8}$/.test(key))delete choices[key];
+  choices[dailyPinKey(dayKey)]=selected.id;
+  next.revision++;
+  if(!validateStoryProgress(next))throw new RangeError('Story save budget exceeded');
+  return next;
 }

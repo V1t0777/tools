@@ -21,10 +21,19 @@ export async function withNormalSaveLock(locks, transaction) {
   if (!locks || typeof locks.request !== 'function')
     return reject('WEB_LOCKS_UNAVAILABLE');
   let callbackSeen = false;
+  let callbackRepeated = false;
+  let requestSettled = false;
   let expectedResult;
   try {
     const returned = await locks.request(NORMAL_SAVE_LOCK_NAME,
       {mode:'exclusive',ifAvailable:true}, async lock => {
+        // A nonconforming provider must not invoke this callback twice or
+        // invoke it after its request has already resolved/rejected. In both
+        // cases, refuse any additional transaction, including a late write.
+        if (callbackSeen || requestSettled) {
+          callbackRepeated = true;
+          return reject('SAVE_LOCK_CALLBACK_REPEATED');
+        }
         callbackSeen = true;
         if (!lock) return (expectedResult = reject('SAVE_LOCK_BUSY'));
         if (lock.name !== NORMAL_SAVE_LOCK_NAME || lock.mode !== 'exclusive')
@@ -40,10 +49,12 @@ export async function withNormalSaveLock(locks, transaction) {
       });
     // Do not trust an implementation that claims success without executing the
     // locked callback or returns a different value after releasing the lock.
-    if (!callbackSeen || returned !== expectedResult)
+    requestSettled = true;
+    if (!callbackSeen || callbackRepeated || returned !== expectedResult)
       return reject('SAVE_LOCK_OUTCOME_UNCERTAIN');
     return returned;
   } catch {
+    requestSettled = true;
     return reject('SAVE_LOCK_REQUEST_FAILED');
   }
 }

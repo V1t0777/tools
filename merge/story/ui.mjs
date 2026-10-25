@@ -1,5 +1,5 @@
 import {CORE_STORY_PACK} from './core-pack.mjs';
-import {availableStoryEntries,completedStoryEntries,completeStoryEntry,startCoreStory,dailyStoryIncident} from './runtime.mjs';
+import {availableStoryEntries,completedStoryEntries,completeStoryEntry,startCoreStory,dailyStoryIncident,pinnedDailyStoryIncident,pinDailyStoryIncident} from './runtime.mjs';
 import {readStorySave} from './local-storage.mjs';
 import {incidentWorkshopEcho} from './incident-context.mjs';
 import {incidentChoiceEcho} from './incident-choice-context.mjs';
@@ -22,7 +22,7 @@ const store=(()=>{try{return window.localStorage;}catch{return null;}})();
 const webLocks=(()=>{try{return window.navigator?.locks??null;}catch{return null;}})();
 const loaded=readStorySave(store);
 let progress=loaded.progress,raw=loaded.raw,blocked=loaded.blocked,reason=loaded.reason;
-let saving=false,storageEpoch=0;
+let saving=false,storageEpoch=0,pinQueued=false;
 let kind=readStoryHash(window.location.hash).kind;
 let selected=null,selectedChoice=null,selectedIncidentDay=null;
 let shownDay=localDay();
@@ -110,11 +110,19 @@ function render(){
   $('chapter-hint').textContent=next?'下一段 · '+next.chapter+' · '+next.title:'第一卷完结：灯火重新亮起，但远方仍有未讲完的故事。';
   document.querySelectorAll('.tabs [data-kind]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.kind===kind)));
   const list=$('story-list');list.replaceChildren();
+  const day=localDay();
+  const dayPinned=pinnedDailyStoryIncident(progress,CORE_STORY_PACK,day);
   if(kind==='incident'){
-    const todays=dailyStoryIncident(progress,CORE_STORY_PACK,localDay());
-    if(todays)list.append(card(todays,completed(todays)));
+    const todays=dailyStoryIncident(progress,CORE_STORY_PACK,day);
+    // Never display a provisional event that may change while its durable
+    // same-day marker is still being committed under the story Web Lock.
+    if(todays&&(dayPinned||blocked))list.append(card(todays,completed(todays)));
     const note=document.createElement('p');note.className='muted';
-    note.textContent='每日根据本地日期选择一件岛屿小事。重复阅读不会获得金币或道具；离线不会错失主线。';
+    note.textContent=!dayPinned&&!blocked&&todays
+      ? '正在安全固定今日事件，请稍候。'
+      : dayPinned&&!todays
+        ? '今日事件记录与当前进度不一致，已停止重抽；请保留存档核对。'
+        : '每日事件首次解锁后在当前日期固定。重复阅读不获得金币或道具；离线不会错失主线。';
     list.append(note);
   }else{
     const unlocked=availableStoryEntries(progress,CORE_STORY_PACK,kind);
@@ -129,6 +137,24 @@ function render(){
   }
   $('reset-story').disabled=saving||reason==='STORAGE_UNAVAILABLE';
   $('export-corrupt-story').disabled=saving||reason!=='CORRUPT_SAVE'||typeof raw!=='string';
+  // Claim the first eligible event even while the mainline tab is selected:
+  // later chapter unlocks must not silently reroll today's event.
+  if(!blocked&&!saving&&!pinQueued&&!dayPinned&&
+    dailyStoryIncident(progress,CORE_STORY_PACK,day)){
+    pinQueued=true;
+    queueMicrotask(async()=>{
+      try{
+        if(!blocked&&!saving&&localDay()===day&&
+          !pinnedDailyStoryIncident(progress,CORE_STORY_PACK,day)){
+          const next=pinDailyStoryIncident(progress,CORE_STORY_PACK,day);
+          if(next!==progress)await save(next,false,()=>localDay()===day);
+        }
+      }catch{
+        // Never show or commit an unpinned replacement on a failed claim.
+        blocked=true;reason='WRITE_CONFLICT';render();
+      }finally{pinQueued=false;}
+    });
+  }
 }
 function lineElement(line){
   const row=document.createElement('div');row.className='dialog-line';
