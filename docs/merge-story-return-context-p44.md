@@ -11,7 +11,7 @@ P43 可从对白卡片直达五类真实经营目标，但工作台返回剧情�
 - 保留移动端 44px 触控区、安全区、深色主题与减少动态效果偏好；实际 iPhone VoiceOver/Safari 的焦点体验仍需真机验收。
 
 ## 同步与验证
-安全纳入上游 Draft PR #58 的 P2.59 与 P2.60a：普通模式 bfcache 恢复门禁及持锁模块边界专项回归（仅采用上游原始 blob，剧情分支原先未改这些路径）。此轮无生产部署变更。
+安全纳入上游 Draft PR #58 的 P2.59：普通模式 bfcache 恢复门禁及专项回归（仅采用上游原始 blob，剧情分支原先未改这些路径）。上游 P2.60a 曾临时删除旧持锁导出，导致六个测试文件导入失败；随后上游在 21d31f9a 恢复旧模块与测试，本分支同步采用其最终安全回滚，不保留临时兼容补丁。此轮无生产部署变更。
 
 专项：`node --test tests/merge-story-return-context-p44.test.mjs tests/merge-story-workshop-deeplink-p43.test.mjs`。
 全仓库及安全门禁：`node --test tests/*.test.mjs scripts/*.test.cjs`、`bash scripts/security-check.sh`、完整 Git 历史密钥扫描。**以最终提交 SHA 的 Actions 结果为准**，不可用测试数量或 CI 代替真机体验。
