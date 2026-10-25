@@ -134,3 +134,37 @@ test('failed exact readback never publishes the new state as verified',async()=>
   assert.ok(saved);
   assert.equal('state' in result,false);
 });
+
+test('P2.61h rejects a same-revision economy mutation without touching storage',async()=>{
+  const state=initial(),raw=JSON.stringify(state),store=memory(raw);
+  const result=await commitNormalActionWithLock(locks(),store,{
+    expectedRaw:raw,action:current=>({ok:true,state:{...current,coins:current.coins+999}})
+  });
+  assert.deepEqual(result,{ok:false,reason:'ACTION_REVISION_INVALID'});
+  assert.equal(store.raw,raw);
+  assert.equal(store.writes,0);
+  assert.equal('state' in result,false);
+});
+
+test('P2.61h rejects skipped revisions before saving',async()=>{
+  const state=initial(),raw=JSON.stringify(state),store=memory(raw);
+  const result=await commitNormalActionWithLock(locks(),store,{
+    expectedRaw:raw,action:current=>({ok:true,state:{...current,revision:current.revision+2}})
+  });
+  assert.deepEqual(result,{ok:false,reason:'ACTION_REVISION_INVALID'});
+  assert.equal(store.writes,0);
+  assert.equal(store.raw,raw);
+});
+
+test('P2.61h rejects an in-place success result even with an incremented revision',async()=>{
+  const state=initial(),raw=JSON.stringify(state),store=memory(raw);
+  const result=await commitNormalActionWithLock(locks(),store,{
+    expectedRaw:raw,action:current=>{
+      current.revision++;
+      return {ok:true,state:current};
+    }
+  });
+  assert.deepEqual(result,{ok:false,reason:'ACTION_REVISION_INVALID'});
+  assert.equal(store.raw,raw);
+  assert.equal(store.writes,0);
+});

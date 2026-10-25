@@ -23,11 +23,19 @@ export async function commitNormalActionWithLock(locks,storage,{expectedRaw,acti
     const current=peekLocalV3(storage);
     if(!current.ok)return reject(current.reason);
     if(current.raw!==expectedRaw)return reject('STALE_BASELINE');
+    // Every successful ordinary gameplay action in the V3 engine creates a
+    // distinct snapshot and advances its revision exactly once. Reject an
+    // accidental no-op/forged economy update with the old revision before it
+    // can be persisted as an equal-revision cross-tab conflict.
+    const baselineRevision=current.state.revision;
     const result=action(current.state);
     if(result && typeof result.then==='function')
       return reject('ASYNC_ACTION_NOT_ALLOWED');
     if(!result || result.ok!==true)
       return reject('ACTION_REJECTED');
+    if(!result.state || result.state===current.state ||
+        result.state.revision!==baselineRevision+1)
+      return reject('ACTION_REVISION_INVALID');
     const receipt=commitNormalSnapshot(storage,result.state,{expectedRaw:current.raw});
     if(!receipt.ok)return receipt;
     return Object.freeze({...receipt,state:result.state,
