@@ -61,8 +61,7 @@ export function createNormalUiFlight() {
         }
         if(typeof receipt.raw!=='string'||!receipt.state||
             (receipt.verifiedReadback!==true&&
-             receipt.verifiedBaseline!==true&&
-             !(receipt.changed===false&&receipt.status==='CLOCK_UNCHANGED'))) {
+             receipt.verifiedBaseline!==true)) {
           blockUncertain();
           return reject('UI_RECEIPT_NOT_VERIFIED');
         }

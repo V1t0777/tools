@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {createInitialState,MAX_ENERGY,ENERGY_REGEN_MS} from '../merge/engine.mjs';
 import {SAVE_KEY} from '../merge/storage.mjs';
 import {commitNormalClockWithLock} from '../merge/normal-action-transaction.mjs';
+import {createNormalUiFlight} from '../merge/normal-ui-flight.mjs';
 
 function storage(raw) {
   let value=raw, writes=0;
@@ -31,6 +32,7 @@ test('clock no-op validates trusted save without writing or incrementing revisio
   assert.equal(result.ok,true);
   assert.equal(result.status,'CLOCK_UNCHANGED');
   assert.equal(result.changed,false);
+  assert.equal(result.verifiedBaseline,true);
   assert.equal(result.raw,raw);
   assert.equal(result.state.revision,state.revision);
   assert.equal(store.writes,0);
@@ -92,4 +94,19 @@ test('failed exact readback does not publish clock-updated state',async()=>{
   assert.deepEqual(result,{ok:false,reason:'SAVE_VERIFY_FAILED'});
   assert.ok(saved);
   assert.equal('state' in result,false);
+});
+
+test('real unchanged clock receipt passes UI gate only with lock-verified baseline',async()=>{
+  const state=initial(),raw=JSON.stringify(state),store=storage(raw);
+  const gate=createNormalUiFlight(),seen=[];
+  const outcome=await gate.run(
+    ()=>commitNormalClockWithLock(exclusiveLock(),store,{expectedRaw:raw,now:at}),
+    (next,bytes,receipt)=>seen.push({next,bytes,receipt}));
+  assert.deepEqual(outcome,{ok:true,status:'UI_PUBLISHED'});
+  assert.equal(seen.length,1);
+  assert.deepEqual(seen[0].next,state);
+  assert.equal(seen[0].bytes,raw);
+  assert.equal(seen[0].receipt.verifiedBaseline,true);
+  assert.equal(store.writes,0);
+  assert.equal(gate.blocked,false);
 });
