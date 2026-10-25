@@ -326,13 +326,19 @@ byId('board-guide').addEventListener('click', () => {
 });
 
 board.addEventListener('click', event => {
-  if (ignoreNextClick) { ignoreNextClick = false; return; }
+  // Keyboard activation has detail === 0 and cannot be a canceled drag's
+  // synthetic pointer click. Never swallow it as a stale gesture.
+  if (ignoreNextClick && event.detail !== 0) { ignoreNextClick = false; return; }
   const cell = event.target.closest('[data-slot]');
   if (cell && board.contains(cell)) touchCell(Number(cell.dataset.slot));
 });
 board.addEventListener('pointerdown', event => {
+  if (event.button > 0) return;
+  // A genuine new pointerdown starts a new gesture. The canceled pointer's
+  // delayed synthetic click has no second pointerdown, so allow this tap.
+  ignoreNextClick = false;
   const cell = event.target.closest('[data-slot]');
-  if (!cell || event.button > 0) return;
+  if (!cell) return;
   const index = Number(cell.dataset.slot);
   const item = state.board[index];
   if (!item || item.kind !== 'material') return;
@@ -370,6 +376,17 @@ function completeDrag(event, cancelled = false) {
 }
 board.addEventListener('pointerup', event => completeDrag(event));
 board.addEventListener('pointercancel', event => completeDrag(event, true));
+
+// Mobile browsers can suspend a page mid-drag without delivering pointerup.
+// Drop the stale gesture when the page is hidden; never move a board item or
+// write a save based on a pointer that began before backgrounding.
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden || !drag) return;
+  completeDrag({pointerId:drag.id}, true);
+  // A delayed pointer click must not select a stale board slot. P2.42 clears
+  // this guard on the next genuine primary pointerdown.
+  ignoreNextClick = true;
+});
 
 byId('store-selected').addEventListener('click',()=>{
   if(selected < 0){hint('先点击选择一个原料');return;}
@@ -442,6 +459,14 @@ byId('reset').addEventListener('click', () => {
     ? '当前存档状态异常。重置前将尝试在此浏览器保留原始备份，但仍建议先下载原始文件；确定继续吗？'
     : '确定重置本地试玩进度吗？当前棋盘、金币和订单会被清空，且无法恢复。';
   if (!window.confirm(warning)) return;
+  // A confirmed reset invalidates any pointer that began on the old board.
+  // Even if backup or persistence fails, never let a late pointerup/click
+  // apply the old gesture after the reset attempt.
+  if (drag) {
+    drag.ghost?.remove();
+    drag = null;
+    ignoreNextClick = true;
+  }
   // A damaged or uncertain original must have a verified separate local
   // backup before any confirmed reset is allowed to overwrite its key.
   if(saveIssue) {
@@ -467,11 +492,28 @@ byId('how-to').addEventListener('click', () => dialog.showModal());
 byId('close-guide').addEventListener('click', () => dialog.close());
 // Local preview has no account/session hooks and intentionally sends no game data to the network.
 window.addEventListener('storage', event => {
-  if (event.key !== SAVE_KEY || !store) return;
+  // localStorage.clear() dispatches a storage event with key === null.
+  // Re-read the actual save for clear events: a cleared save must block
+  // gameplay immediately, but clearing unrelated keys must not.
+  // Same-key sessionStorage events from same-origin frames are unrelated.
+  // Only reconcile the actual normal-mode localStorage area.
+  if (!store || event.storageArea !== store ||
+      (event.key !== SAVE_KEY && event.key !== null)) return;
   // Storage events must be read-only. loadLocal can migrate legacy saves and
   // write backup keys; never run it while reacting to another tab's write.
+  // A conflict can arrive mid-gesture. Discard the stale pointer before
+  // leaving the save in a blocked state; never act on an uncertain board.
+  const cancelStaleGesture = () => {
+    if (!drag) return;
+    drag.ghost?.remove();
+    drag = null;
+    // The browser may dispatch a late synthetic click after pointer capture
+    // is lost. Consume it rather than selecting or merging an old slot.
+    ignoreNextClick = true;
+  };
   const fresh = peekLocalV3(store);
   if (!fresh.ok) {
+    cancelStaleGesture();
     saveIssue = fresh.reason;
     byId('save-status').textContent =
       '其他标签页的存档异常或已移除，已暂停同步 · 请勿关闭页面';
@@ -480,10 +522,12 @@ window.addEventListener('storage', event => {
   }
   if (fresh.raw === persistedRaw) return;
   if (saveIssue) {
+    cancelStaleGesture();
     hint('其他标签页更新了存档，当前页面存在未保存进度');
     return;
   }
   if (fresh.state.revision < state.revision) {
+    cancelStaleGesture();
     // Never replace a newer in-memory board with older remote progress.
     // Keep the existing expectedRaw so subsequent writes fail closed.
     saveIssue = 'CURRENT_SAVE_CHANGED';
@@ -494,6 +538,7 @@ window.addEventListener('storage', event => {
   }
   if (fresh.state.revision === state.revision &&
       !isSafeSameRevisionClockUpdate(state,fresh.state)) {
+    cancelStaleGesture();
     // Equal revision does not imply equal economy. Clock-only progress is
     // allowed, but never silently adopt a divergent board/coins/orders.
     saveIssue = 'CURRENT_SAVE_CHANGED';
@@ -502,6 +547,10 @@ window.addEventListener('storage', event => {
     hint('其他标签页存在不同的经营进度，请先备份并重新打开页面核对');
     return;
   }
+  // An in-progress pointer gesture refers to the OLD board. Cancel it before
+  // rendering the remote snapshot, including its ghost, so a late pointerup
+  // or synthetic click cannot move an unrelated item on the new board.
+  cancelStaleGesture();
   // Adopt only the exact verified remote snapshot. Advancing its clock here
   // would show energy/cooldowns that this tab has not persisted. The regular
   // timer performs regeneration through the verified save-before-publish path.
