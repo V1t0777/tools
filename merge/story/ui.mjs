@@ -4,6 +4,7 @@ import {readStorySave} from './local-storage.mjs';
 import {incidentWorkshopEcho} from './incident-context.mjs';
 import {incidentChoiceEcho} from './incident-choice-context.mjs';
 import {mainlineChoiceEcho} from './mainline-choice-context.mjs';
+import {storyWorkshopChapterEcho} from './mainline-workshop-context.mjs';
 import {readStoryHash} from './story-return-route.mjs';
 import {saveStoryDialogueWithLock} from './dialogue-write.mjs';
 import {captureStoryWorkshopEvidence} from './save-evidence.mjs';
@@ -146,6 +147,15 @@ function open(entry){
   if(entry.kind==='main'){
     const mainlineEcho=mainlineChoiceEcho(entry,progress);
     if(mainlineEcho)lines.push(mainlineEcho);
+  }
+  if(entry.kind==='main'||entry.kind==='side'){
+    // Chapter echoes require a real persisted workshop save; the default
+    // in-memory empty state or a corrupt record cannot imply completion.
+    const workshop=readStoryWorkshop(store);
+    if(!workshop.blocked&&workshop.raw!==null){
+      const chapterEcho=storyWorkshopChapterEcho(entry,progress,workshop.state);
+      if(chapterEcho)lines.push(chapterEcho);
+    }
   }
   if(entry.kind==='incident'){
     // Choice consequences are read from the validated narrative save even when
