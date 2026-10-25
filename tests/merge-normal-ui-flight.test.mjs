@@ -249,3 +249,46 @@ test('P2.54 synchronous publication remains compatible',async()=>{
   assert.deepEqual(seen,[[1,'exact-save']]);
   assert.equal(gate.blocked,false);
 });
+
+test('P2.55 synchronous publish that blocks the gate cannot report success',async()=>{
+  const gate=createNormalUiFlight();
+  let published=0;
+  const result=await gate.run(()=>verified(),()=>{
+    published++;
+    gate.block();
+  });
+  assert.deepEqual(result,{ok:false,reason:'UI_SAVE_BLOCKED'});
+  assert.equal(published,1);
+  assert.equal(gate.busy,false);
+  assert.equal(gate.blocked,true);
+  assert.deepEqual(await gate.run(()=>verified(),()=>{}),
+    {ok:false,reason:'UI_SAVE_BLOCKED'});
+});
+
+test('P2.55 synchronous publication invalidation permanently blocks stale UI',async()=>{
+  const gate=createNormalUiFlight();
+  let published=0;
+  const result=await gate.run(()=>verified(),()=>{
+    published++;
+    gate.invalidate();
+  });
+  assert.deepEqual(result,{ok:false,reason:'UI_TRANSACTION_INVALIDATED'});
+  assert.equal(published,1);
+  assert.equal(gate.busy,false);
+  assert.equal(gate.blocked,true);
+  assert.deepEqual(await gate.run(()=>verified(),()=>{}),
+    {ok:false,reason:'UI_SAVE_BLOCKED'});
+});
+
+test('P2.55 nested action during synchronous publish remains busy, outer result valid',async()=>{
+  const gate=createNormalUiFlight();
+  let nested,called=0;
+  const result=await gate.run(()=>verified(),()=>{
+    nested=gate.run(()=>{called++;return verified();},()=>{});
+  });
+  assert.deepEqual(await nested,{ok:false,reason:'UI_TRANSACTION_BUSY'});
+  assert.deepEqual(result,{ok:true,status:'UI_PUBLISHED'});
+  assert.equal(called,0);
+  assert.equal(gate.blocked,false);
+  assert.equal(gate.busy,false);
+});
