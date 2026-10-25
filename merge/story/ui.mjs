@@ -10,6 +10,7 @@ import {canCommitDailyIncident} from './daily-incident-guard.mjs';
 import {isMatchingConcurrentDailyPin} from './daily-pin-reconcile.mjs';
 import {adoptConcurrentDailyPinStorageEvent} from './daily-pin-reconcile.mjs';
 import {canKeepDialogueAfterDailyPin} from './daily-pin-reconcile.mjs';
+import {adoptConcurrentDailyPinOnResume} from './daily-pin-reconcile.mjs';
 import {saveStoryDialogueWithLock} from './dialogue-write.mjs';
 import {captureStoryWorkshopEvidence} from './save-evidence.mjs';
 import {checkStoryResumeSnapshot} from './resume-guard.mjs';
@@ -351,7 +352,19 @@ function recheckStoryOnResume(){
   shownDay=localDay();
   selectedIncidentDay=null;
   if(!blocked){
-    const check=checkStoryResumeSnapshot(store,{key:STORY_SAVE_KEY,expectedRaw:raw});
+    let check=checkStoryResumeSnapshot(store,{key:STORY_SAVE_KEY,expectedRaw:raw});
+    // A suspended tab may miss the peer's StorageEvent. The only safe
+    // exception to the raw mismatch is the same deterministic daily pin.
+    // Never adopt while a local write is pending or on storage failures.
+    if(!check.ok&&!saving&&check.reason==='WRITE_CONFLICT'){
+      const adopted=adoptConcurrentDailyPinOnResume(store,{
+        expectedRaw:raw,day:shownDay,pack:CORE_STORY_PACK
+      });
+      if(adopted){
+        storageEpoch++;progress=adopted.progress;raw=adopted.raw;
+        check={ok:true,reason:null};
+      }
+    }
     if(!check.ok){blocked=true;reason=check.reason;storageEpoch++;}
   }
   if($('story-dialog').open)$('story-dialog').close();

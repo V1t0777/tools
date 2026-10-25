@@ -552,10 +552,18 @@ window.addEventListener('storage', event => {
     // is lost. Consume it rather than selecting or merging an old slot.
     ignoreNextClick = true;
   };
+  // Conflict handling is read-only: keep original state/raw for recovery,
+  // but never leave a stale selected cell or guidance highlight on screen.
+  const clearStaleInteractionView = () => {
+    cancelStaleGesture();
+    selected = -1;
+    activeGuidance = null;
+    render();
+  };
   const fresh = peekLocalV3(store);
   if (!fresh.ok) {
-    cancelStaleGesture();
     saveIssue = fresh.reason;
+    clearStaleInteractionView();
     byId('save-status').textContent =
       '其他标签页的存档异常或已移除，已暂停同步 · 请勿关闭页面';
     hint('跨标签存档发生变化，请先导出原始存档并核对');
@@ -563,15 +571,15 @@ window.addEventListener('storage', event => {
   }
   if (fresh.raw === persistedRaw) return;
   if (saveIssue) {
-    cancelStaleGesture();
+    clearStaleInteractionView();
     hint('其他标签页更新了存档，当前页面存在未保存进度');
     return;
   }
   if (fresh.state.revision < state.revision) {
-    cancelStaleGesture();
     // Never replace a newer in-memory board with older remote progress.
     // Keep the existing expectedRaw so subsequent writes fail closed.
     saveIssue = 'CURRENT_SAVE_CHANGED';
+    clearStaleInteractionView();
     byId('save-status').textContent =
       '检测到其他标签页的旧版进度，已暂停保存 · 请勿关闭页面';
     hint('跨标签进度冲突，请先核对并备份存档');
@@ -579,10 +587,10 @@ window.addEventListener('storage', event => {
   }
   if (fresh.state.revision === state.revision &&
       !isSafeSameRevisionClockUpdate(state,fresh.state)) {
-    cancelStaleGesture();
     // Equal revision does not imply equal economy. Clock-only progress is
     // allowed, but never silently adopt a divergent board/coins/orders.
     saveIssue = 'CURRENT_SAVE_CHANGED';
+    clearStaleInteractionView();
     byId('save-status').textContent =
       '检测到同版本跨标签进度冲突，已暂停保存 · 请先备份核对';
     hint('其他标签页存在不同的经营进度，请先备份并重新打开页面核对');

@@ -188,7 +188,8 @@ test('P2.38 localStorage.clear event immediately blocks a removed normal save',(
   assert.equal(ctx.saveIssue,'SAVE_REMOVED');
   assert.equal(ctx.persistedRaw,raw);
   assert.equal(ctx.state,current);
-  assert.equal(rendered,0);
+  assert.equal(rendered,1,'blocked page clears stale UI');
+  assert.equal(ctx.selected,-1);
   assert.match(status.textContent,/已暂停同步/);
   assert.equal(messages.length,1);
   assert.match(messages[0],/跨标签存档发生变化/);
@@ -345,7 +346,7 @@ test('P2.41 conflicting storage updates cancel active drag without publishing re
       SAVE_KEY:'toolbox.merge-isle.local.v1',store:storage,
       state:scenario.local,persistedRaw:original,saveIssue:scenario.issue,
       drag:{id:4,origin:0,moved:true,ghost:{remove(){removed++;}}},
-      ignoreNextClick:false,selected:0,activeGuidance:null,
+      ignoreNextClick:false,selected:0,activeGuidance:{boardSlots:[0]},
       peekLocalV3(){return scenario.fresh;},
       isSafeSameRevisionClockUpdate(){return false;},
       byId(id){assert.equal(id,'save-status');return {textContent:''};},
@@ -359,7 +360,9 @@ test('P2.41 conflicting storage updates cancel active drag without publishing re
     assert.equal(ctx.drag,null,scenario.name);
     assert.equal(ctx.ignoreNextClick,true,scenario.name);
     assert.equal(removed,1,scenario.name);
-    assert.equal(rendered,0,scenario.name);
+    assert.equal(rendered,1,scenario.name);
+    assert.equal(ctx.selected,-1,scenario.name);
+    assert.equal(ctx.activeGuidance,null,scenario.name);
   }
 });
 

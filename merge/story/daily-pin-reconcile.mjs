@@ -63,3 +63,22 @@ export function canKeepDialogueAfterDailyPin(entry,progress,pack){
       completedStoryEntries(progress,pack,entry.kind).includes(entry);
   }catch{return false;}
 }
+
+/** P52: BFCache/foreground resumes may miss a peer StorageEvent entirely.
+ * Recover ONLY the same byte-exact deterministic pin as P50, after a fresh
+ * localStorage readback. Never reconcile unrelated changes or write a save.
+ */
+export function adoptConcurrentDailyPinOnResume(storage,{expectedRaw,day,pack}={}){
+  if(typeof expectedRaw!=='string'||!storage||!pack)return null;
+  const observed=readStorySave(storage);
+  if(observed.blocked||typeof observed.raw!=='string')return null;
+  try{
+    const baseline=JSON.parse(expectedRaw);
+    if(!validateStoryProgress(baseline))return null;
+    const proposed=pinDailyStoryIncident(baseline,pack,day);
+    if(!isMatchingConcurrentDailyPin({
+      expectedRaw,observedRaw:observed.raw,proposed,day,pack
+    }))return null;
+    return {progress:observed.progress,raw:observed.raw};
+  }catch{return null;}
+}
