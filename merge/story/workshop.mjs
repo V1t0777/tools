@@ -24,7 +24,7 @@ function status(){
       ? '剧情工作台存档损坏：原数据未覆盖。请先考虑导出异常原始记录备份，再决定是否重置。'
       : reason==='STORAGE_UNAVAILABLE'
         ? '无法访问浏览器存储，经营操作已暂停。'
-        : '存档变化或写入失败：已停止操作，请重新打开页面核对。'
+        : '检测到存档变化或写入无法确认：本页已停止操作。请勿重复重置，先重新打开页面核对金币、建筑和订单。'
     : '剧情工作台数据只保存在此浏览器，与普通模式金币及背包完全隔离。';
 }
 function render(){
@@ -249,8 +249,33 @@ $('reset-workshop').addEventListener('click',async()=>{
   if(!attempt.ok||!attempt.value||storageEpoch!==expectedEpoch){
     blocked=true;reason='WRITE_CONFLICT';render();return;
   }
-  state=attempt.value;raw=JSON.stringify(state);
-  blocked=false;reason=null;selected=-1;render();
+  // The reset may have committed, then lost the race to another tab after
+  // releasing the shared lock. A stale page must not announce reset success.
+  const expectedWorkshopRaw=JSON.stringify(attempt.value);
+  const publication=verifyStoryWorkshopPublication(storage,{
+    expectedWorkshopRaw,expectedEpoch,currentEpoch:storageEpoch
+  });
+  if(!publication.ok||blocked){
+    blocked=true;reason=publication.ok?'WRITE_CONFLICT':publication.reason;
+    selected=-1;
+    $('board-notice').textContent='重置后的存档状态无法确认；请勿重复重置，重新打开页面核对。';
+    render();return;
+  }
+  state=attempt.value;raw=expectedWorkshopRaw;
+  blocked=false;reason=null;selected=-1;
+  $('board-notice').textContent='已重置剧情工作台，请确认金币与订单已归零；已读剧情不受影响。';
+  render();
+  // Rendering or a synchronous storage event can invalidate the first check.
+  // This is read-only and cannot make localStorage transactions atomic.
+  const afterResetRender=verifyStoryWorkshopPublication(storage,{
+    expectedWorkshopRaw,expectedEpoch,currentEpoch:storageEpoch
+  });
+  if(!afterResetRender.ok||blocked){
+    blocked=true;reason=afterResetRender.ok?'WRITE_CONFLICT':afterResetRender.reason;
+    selected=-1;
+    $('board-notice').textContent='重置后的存档在页面更新期间发生变化；请勿重复重置，重新打开页面核对。';
+    render();
+  }
 });
 function recheckWorkshopOnResume(){
   if(!blocked){
