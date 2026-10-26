@@ -7,7 +7,7 @@ import {createNormalUiFlight} from './normal-ui-flight.mjs';
 import {prepareNormalStartupWithLock} from './normal-startup-transaction.mjs';
 import {commitNormalActionWithLock,commitNormalClockWithLock} from './normal-action-transaction.mjs';
 import {commitNormalResetWithLock} from './normal-reset-transaction.mjs';
-import {peekLocalV3} from './storage.mjs';
+import {peekLocalV3,SAVE_KEY} from './storage.mjs';
 import {isSafeSameRevisionClockUpdate} from './storage-event-policy.mjs';
 
 const reject=reason=>Object.freeze({ok:false,reason});
@@ -122,11 +122,18 @@ export function createNormalPageRuntime({locks,storage,onVerified}={}) {
         return reject('RESET_RECEIPT_NOT_VERIFIED');
       }
       // Only a verified, user-confirmed reset may clear a blocked baseline.
+      const publicationEpoch=epoch;
       flight=createNormalUiFlight();
       try {publish('reset',receipt.state,receipt.raw,receipt);}
       catch {
         block('UI_PUBLISH_FAILED');
         return reject('UI_PUBLISH_FAILED');
+      }
+      // The synchronous UI hook may invalidate this reset (focus/storage
+      // event, re-entrant block, etc.). Never turn a blocked session ready.
+      if(epoch!==publicationEpoch||phase==='blocked'||flight.blocked) {
+        block('RESET_INVALIDATED');
+        return reject('RESET_INVALIDATED');
       }
       phase='ready';reason=null;
       return Object.freeze({ok:true,status:'RESET_PUBLISHED',
@@ -147,10 +154,23 @@ export function createNormalPageRuntime({locks,storage,onVerified}={}) {
          !isSafeSameRevisionClockUpdate(state,fresh.state))){
         block('CURRENT_SAVE_CHANGED');return reject('CURRENT_SAVE_CHANGED');
       }
+      const publicationEpoch=epoch;
       try {
+        // This is read-only reconciliation, NOT a lock-protected write.
+        // Check again both before and after user-provided UI callbacks.
+        if(storage.getItem(SAVE_KEY)!==fresh.raw) {
+          block('CURRENT_SAVE_CHANGED');return reject('CURRENT_SAVE_CHANGED');
+        }
         publish('external',fresh.state,fresh.raw,Object.freeze({
           ok:true,raw:fresh.raw,state:fresh.state,verifiedBaseline:true}));
+        if(storage.getItem(SAVE_KEY)!==fresh.raw) {
+          block('CURRENT_SAVE_CHANGED');return reject('CURRENT_SAVE_CHANGED');
+        }
       } catch {block('UI_PUBLISH_FAILED');return reject('UI_PUBLISH_FAILED');}
+      if(epoch!==publicationEpoch||phase!=='ready'||flight.blocked||flight.busy) {
+        block('RECONCILE_INVALIDATED');
+        return reject('RECONCILE_INVALIDATED');
+      }
       return Object.freeze({ok:true,changed:true});
     },
 
