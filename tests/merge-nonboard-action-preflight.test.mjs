@@ -100,3 +100,56 @@ test('P2.61n already blocked page does not read or persist on button action',()=
   assert.deepEqual(h.counts,{reads:0,writes:0,commits:0,renders:0});
   assert.ok(h.hints.some(message=>message.includes('已暂停操作')));
 });
+
+test('P2.61o delayed cross-tab replacement never invokes a deferred engine action',()=>{
+  const h=harness();
+  h.setRaw(JSON.stringify({...h.state,revision:h.state.revision+1}));
+  let calls=0;
+  h.act(()=>{calls++;return {ok:true,state:{...h.state,revision:1},message:'完成'};});
+  assert.equal(calls,0);
+  assert.equal(h.ctx.saveIssue,'CURRENT_SAVE_CHANGED');
+  assert.deepEqual(h.counts,{reads:1,writes:0,commits:0,renders:1});
+});
+
+test('P2.61o already blocked page does not invoke deferred engine action',()=>{
+  const h=harness({blocked:true});
+  let calls=0;
+  h.act(()=>{calls++;return {ok:false,message:'不应执行'};});
+  assert.equal(calls,0);
+  assert.deepEqual(h.counts,{reads:0,writes:0,commits:0,renders:0});
+});
+
+test('P2.61o matching raw executes deferred action once after preflight',()=>{
+  const h=harness();
+  let calls=0;
+  const next={...h.state,revision:h.state.revision+1};
+  h.act(current=>{
+    calls++;
+    assert.equal(h.counts.reads,1);
+    assert.equal(current,h.state);
+    return {ok:true,state:next,message:'已完成'};
+  });
+  assert.equal(calls,1);
+  assert.equal(h.ctx.state,next);
+  assert.deepEqual(h.counts,{reads:1,writes:0,commits:1,renders:1});
+});
+
+test('P2.61o rejected deferred action preserves existing no-write behavior',()=>{
+  const h=harness();
+  let calls=0;
+  h.act(()=>{calls++;return {ok:false,message:'库存不足'};});
+  assert.equal(calls,1);
+  assert.equal(h.ctx.state,h.state);
+  assert.deepEqual(h.counts,{reads:1,writes:0,commits:0,renders:1});
+  assert.ok(h.hints.includes('库存不足'));
+});
+
+test('P2.61o ordinary action entrypoints defer engine evaluation to commit gateway',()=>{
+  const actionNames=['produce','moveOrMerge','fulfillOrder','withdrawItem',
+    'upgradeProducer','upgradeBuilding','useSupply','purchaseSupply',
+    'storeItem','upgradeWarehouse'];
+  for(const name of actionNames){
+    assert.match(source,new RegExp('commit\\(current=>'+name+'\\(current'),name);
+    assert.doesNotMatch(source,new RegExp('commit\\('+name+'\\(state'),name);
+  }
+});
