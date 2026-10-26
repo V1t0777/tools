@@ -37,7 +37,7 @@ function harness() {
     document:{elementFromPoint(){targets++;return {closest(){return cell;}};}},
     byId(id){assert.equal(id,'save-status');return status;},
     moveOrMerge(){moves++;return {ok:true,state};},
-    commit(){commits++;},
+    commit(action){commits++;if(typeof action==='function')action(ctx.state);},
     render(){renders++;},hint(){}
   };
   runInNewContext(handlers,ctx);

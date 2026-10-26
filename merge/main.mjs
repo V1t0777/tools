@@ -394,9 +394,11 @@ function completeDrag(event, cancelled = false) {
   if (saveIssue) return;
   const target = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-slot]');
   if (target && board.contains(target)) {
-    const result = moveOrMerge(state, origin, Number(target.dataset.slot));
-    if (result.ok) commit(result);
-    else { render(); hint(result.message); }
+    // Keep the drop's raw-save check, then defer the engine action to the
+    // same preflight gateway used by every other ordinary-mode action.
+    // A different tab can still replace storage during hit testing.
+    const targetSlot = Number(target.dataset.slot);
+    commit(current=>moveOrMerge(current, origin, targetSlot));
   }
 }
 board.addEventListener('pointerup', event => completeDrag(event));
