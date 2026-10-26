@@ -4,6 +4,7 @@ import {readStoryWorkshop,writeStoryWorkshop,STORY_WORKSHOP_KEY} from './worksho
 import {readStorySave} from './local-storage.mjs';
 import {captureStoryWorkshopEvidence} from './save-evidence.mjs';
 import {checkStoryResumeSnapshot} from './resume-guard.mjs';
+import {verifyStoryWorkshopPublication} from './workshop-publication-guard.mjs';
 import {runStoryWriteWithLock} from './write-lock.mjs';
 import {resetStoryWorkshopWithLock} from './workshop-reset.mjs';
 import {shouldBlockStoryStorageEvent} from './storage-event-guard.mjs';
@@ -134,6 +135,9 @@ async function commit(result){
   // The existing exact-raw CAS remains mandatory inside the lock callback.
   if(blocked||saving)return;
   if(!result.ok){$('board-notice').textContent=result.message;return;}
+  const expectedEpoch=storageEpoch;
+  const buildingChanged=['garden','harbor','storefront'].some(name=>
+    state.buildings[name]!==result.state.buildings[name]);
   saving=true;render();
   const expectedRaw=raw;
   // A building spends coins only while its story prerequisite is still current.
@@ -143,12 +147,29 @@ async function commit(result){
     ()=>!blocked&&storyBuildingWriteAllowed(storage,state,result.state,expectedStoryRaw)&&
       writeStoryWorkshop(storage,result.state,{expectedRaw}));
   saving=false;
-  if(!attempt.ok||attempt.value!==true||blocked){
-    blocked=true;reason='WRITE_CONFLICT';render();return;
+  // A verified write can be superseded after the Web Lock is released.
+  // Never publish a success message from an already stale workshop snapshot.
+  const expectedWorkshopRaw=attempt.ok&&attempt.value===true
+    ? JSON.stringify(result.state):null;
+  const publication=expectedWorkshopRaw===null
+    ? {ok:false,reason:'WRITE_CONFLICT'}
+    : verifyStoryWorkshopPublication(storage,{expectedWorkshopRaw,expectedStoryRaw,
+      buildingChanged,expectedEpoch,currentEpoch:storageEpoch});
+  if(!publication.ok||blocked){
+    blocked=true;reason=publication.ok?'WRITE_CONFLICT':publication.reason;
+    selected=-1;render();return;
   }
   state=result.state;raw=JSON.stringify(state);selected=-1;
   $('board-notice').textContent=result.message;
   render();
+  // Rendering may invoke synchronous browser/test hooks. Recheck the exact
+  // raw bytes and epoch; this remains read-only and is not a cross-tab CAS.
+  const afterRender=verifyStoryWorkshopPublication(storage,{expectedWorkshopRaw,
+    expectedStoryRaw,buildingChanged,expectedEpoch,currentEpoch:storageEpoch});
+  if(!afterRender.ok||blocked){
+    blocked=true;reason=afterRender.ok?'WRITE_CONFLICT':afterRender.reason;
+    selected=-1;render();
+  }
 }
 function touch(index){
   if(blocked||saving)return;
