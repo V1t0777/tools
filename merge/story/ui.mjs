@@ -329,6 +329,7 @@ function openWorkshopCurrent(){
     key:STORY_WORKSHOP_KEY,expectedRaw:selectedWorkshopRaw
   }).ok;
 }
+$('close-dialog').addEventListener('click',()=>$('story-dialog').close());
 $('journey-read').addEventListener('click',()=>{
   if(saving||blocked)return;
   const plan=nextCoreStoryJourney(progress,readStoryWorkshop(store));
@@ -336,7 +337,7 @@ $('journey-read').addEventListener('click',()=>{
   kind='main';render();
   open(plan.entry);
 });
-$('close-dialog').addEventListener('click',()=>$('story-dialog').close());
+
 $('complete-story').addEventListener('click',async()=>{
   if(saving||!selected)return;
   // A stale incident must not be completed from an overnight-open dialogue.
