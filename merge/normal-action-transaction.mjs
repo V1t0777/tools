@@ -44,8 +44,14 @@ export async function commitNormalActionWithLock(locks,storage,{expectedRaw,acti
     if(JSON.stringify(current.state)!==baselineSnapshot)
       return reject('ACTION_MUTATED_BASELINE');
     if(asyncResult) return reject('ASYNC_ACTION_NOT_ALLOWED');
-    if(!result || result.ok!==true)
+    if(!result || result.ok!==true) {
+      // A normal engine rejection has no write side effects. Retain its
+      // bounded Chinese UI message for the future async page gateway.
+      if(typeof result?.message==='string')
+        return Object.freeze({ok:false,reason:'ACTION_REJECTED',
+          message:result.message.slice(0,200)});
       return reject('ACTION_REJECTED');
+    }
     if(!result.state || result.state===current.state ||
         result.state.revision!==baselineRevision+1)
       return reject('ACTION_REVISION_INVALID');

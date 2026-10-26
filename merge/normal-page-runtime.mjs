@@ -53,9 +53,27 @@ export function createNormalPageRuntime({locks,storage,onVerified}={}) {
     if(phase!=='ready'||flight.blocked||resetBusy)
       return reject(flight.busy||resetBusy?'UI_TRANSACTION_BUSY':
         phase==='blocked'?'UI_SAVE_BLOCKED':'STARTUP_REQUIRED');
-    const result=await flight.run(transaction,
-      (next,bytes,receipt)=>publish(kind,next,bytes,receipt));
+    // Capture only the transaction receipt for the currently active flight.
+    // Metadata is returned AFTER a verified synchronous UI publication, never
+    // from an uncertain write or an invalidated/busy operation.
+    let receipt;
+    const result=await flight.run(async()=>{
+      receipt=await transaction();
+      return receipt;
+    },(next,bytes,verified)=>publish(kind,next,bytes,verified));
     if(!result.ok&&flight.blocked)block(result.reason||'SAVE_UNCERTAIN');
+    if(!result.ok) {
+      // Engine rejection is a definite no-write outcome. Preserve its
+      // bounded, user-facing reason without exposing an unverified snapshot.
+      if(kind==='action'&&result.reason==='ACTION_REJECTED'&&
+          typeof receipt?.message==='string')
+        return Object.freeze({...result,message:receipt.message.slice(0,200)});
+      return result;
+    }
+    if(kind==='action')return Object.freeze({...result,
+      message:typeof receipt?.message==='string'?receipt.message.slice(0,200):''});
+    if(kind==='clock')return Object.freeze({...result,
+      changed:receipt?.changed===true});
     return result;
   };
 
@@ -70,18 +88,27 @@ export function createNormalPageRuntime({locks,storage,onVerified}={}) {
     async start({now=Date.now()}={}) {
       if(phase!=='cold')return reject('STARTUP_ALREADY_ATTEMPTED');
       phase='starting';
+      let receipt;
       const result=await flight.run(
-        ()=>prepareNormalStartupWithLock(locks,storage,{now}),
-        (next,bytes,receipt)=>{
-          publish('startup',next,bytes,receipt);
+        async()=>{
+          receipt=await prepareNormalStartupWithLock(locks,storage,{now});
+          return receipt;
+        },
+        (next,bytes,verified)=>{
+          publish('startup',next,bytes,verified);
           phase='ready';
           reason=null;
         });
       if(!result.ok){
         if(flight.blocked)block(result.reason||'STARTUP_UNCERTAIN');
         else phase='cold';
+        return result;
       }
-      return result;
+      // These booleans are trustworthy only after the readback and
+      // synchronous publication have both passed.
+      return Object.freeze({...result,
+        recovered:receipt?.recovered===true,
+        migrated:receipt?.migrated===true});
     },
 
     action(operation) {
