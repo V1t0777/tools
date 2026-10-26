@@ -28,6 +28,16 @@ export function createNormalPageRuntime({locks,storage,onVerified}={}) {
     flight.block();
   };
   const publish=(kind,next,bytes,receipt)=>{
+    // A verified transaction receipt proves the write at its readback time.
+    // The Web Lock is released before UI publication, so an old/uncoordinated
+    // tab can still replace localStorage in this narrow window. Never render
+    // or acknowledge a snapshot without checking its exact original bytes.
+    const matches=()=>{
+      try {return typeof bytes==='string' &&
+        storage?.getItem(SAVE_KEY)===bytes;}
+      catch {return false;}
+    };
+    if(!matches())throw new Error('UI_PUBLISH_BASELINE_CHANGED');
     state=next;
     raw=bytes;
     const response=onVerified?.(clone(next),bytes,kind,receipt);
@@ -35,6 +45,9 @@ export function createNormalPageRuntime({locks,storage,onVerified}={}) {
       void Promise.resolve(response).catch(()=>{});
       throw new Error('ASYNC_UI_PUBLICATION');
     }
+    // Synchronous callbacks may dispatch re-entrant storage/focus handlers.
+    // Check again before allowing any new action, clock or reset.
+    if(!matches())throw new Error('UI_PUBLISH_BASELINE_CHANGED');
   };
   const run=async(kind,transaction)=>{
     if(phase!=='ready'||flight.blocked||resetBusy)
