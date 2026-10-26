@@ -219,3 +219,31 @@ test('P2.61j delayed async rejection stays rejected without unhandled failure',a
   assert.equal(store.raw,raw);
   assert.equal(store.writes,0);
 });
+
+test('P2.61k observes a rejected async action even when it mutates the baseline',async()=>{
+  const raw=JSON.stringify(initial()),store=memory(raw);
+  const result=await commitNormalActionWithLock(locks(),store,{
+    expectedRaw:raw,action:current=>{
+      current.coins+=1;
+      return Promise.reject(new Error('rejected action with baseline mutation'));
+    }});
+  assert.deepEqual(result,{ok:false,reason:'ACTION_MUTATED_BASELINE'});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(store.raw,raw);
+  assert.equal(store.writes,0);
+  assert.equal('state' in result,false);
+});
+
+test('P2.61k observes a rejected async action before a cyclic purity check throws',async()=>{
+  const raw=JSON.stringify(initial()),store=memory(raw);
+  const result=await commitNormalActionWithLock(locks(),store,{
+    expectedRaw:raw,action:current=>{
+      current.board[0].unexpectedCycle=current;
+      return Promise.reject(new Error('rejected action with cyclic baseline'));
+    }});
+  assert.deepEqual(result,{ok:false,reason:'SAVE_TRANSACTION_FAILED'});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(store.raw,raw);
+  assert.equal(store.writes,0);
+  assert.equal('state' in result,false);
+});
