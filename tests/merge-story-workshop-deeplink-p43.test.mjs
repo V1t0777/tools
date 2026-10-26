@@ -38,7 +38,7 @@ test('P43 ungated and DLC entries cannot invent workshop anchors',()=>{
 
 test('P43 story cards and modal both navigate to the same goal-specific target',()=>{
   const ui=read('../merge/story/ui.mjs');
-  assert.ok(ui.includes("import {inspectStoryWorkshopRequirement,storyWorkshopRequirement,storyWorkshopGoalHref}"));
+  assert.ok(ui.includes("import {inspectStoryWorkshopRequirement,inspectStoryWorkshopRequirementFromRead,storyWorkshopRequirement,storyWorkshopGoalHref}"));
   assert.ok(ui.includes("go.href=storyWorkshopGoalHref(entry.id);"));
   assert.ok(ui.includes("link.href=storyWorkshopGoalHref(entry.id);"));
   assert.ok(ui.includes("if(!done&&requirement.required){"));
