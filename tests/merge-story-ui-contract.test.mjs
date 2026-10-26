@@ -5,7 +5,9 @@ const read=p=>readFileSync(new URL(p,import.meta.url),'utf8');
 test('story preview is reachable from normal mode but isolated from normal engine',()=>{
   const index=read('../merge/index.html');
   const story=read('../merge/story.html');
-  const normal=read('../merge/main.mjs');
+  const scripts=[...index.matchAll(/<script\b[^>]*\btype="module"[^>]*\bsrc="([^"]+)"[^>]*><\/script>/g)].map(match=>match[1]);
+  assert.deepEqual(scripts,['./main-locked.mjs'],'the story-enabled normal page must load exactly one locked runtime');
+  const normal=read('../merge/'+scripts[0].slice(2));
   const ui=read('../merge/story/ui.mjs');
   assert.ok(index.includes('href="./story.html"'));
   assert.ok(story.includes('src="./story/ui.mjs"'));

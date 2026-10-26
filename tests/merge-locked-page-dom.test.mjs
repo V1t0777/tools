@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {SAVE_KEY,ABNORMAL_RESET_BACKUP_KEY} from '../merge/storage.mjs';
 import {STORY_SAVE_KEY} from '../merge/mode-boundaries.mjs';
 import {NORMAL_SAVE_LOCK_NAME} from '../merge/normal-save-lock.mjs';
@@ -71,6 +72,13 @@ class Element {
   showModal(){this.open=true;}
   close(){this.open=false;}
 }
+// Import the actual script referenced by the ordinary-mode HTML entry,
+ // rather than hardcoding a candidate module that the browser never loads.
+const liveHtml=readFileSync(new URL('../merge/index.html',import.meta.url),'utf8');
+const entryScripts=[...liveHtml.matchAll(/<script\b[^>]*type="module"[^>]*src="\.\/([^"]+)"[^>]*><\/script>/g)];
+assert.equal(entryScripts.length,1,'exactly one ordinary-mode module entry');
+assert.equal(entryScripts[0][1],'main-locked.mjs','live page must use locked entry');
+const liveEntryUrl=new URL('../merge/'+entryScripts[0][1],import.meta.url);
 let fixtureId=0;
 const settle=async()=>{
   for(let i=0;i<8;i++)await new Promise(resolve=>setImmediate(resolve));
@@ -117,7 +125,7 @@ async function mount({initialRaw=null,locksAvailable=true}={}) {
   win.confirm=()=>true;
   globalThis.document=doc;
   globalThis.window=win;
-  await import('../merge/main-locked.mjs?dom-fixture='+fixtureId++);
+  await import(liveEntryUrl.href+'?dom-fixture='+fixtureId++);
   await settle();
   return {doc,win,storage,map,writes,
     id:key=>doc.getElementById(key),
@@ -367,4 +375,23 @@ test('P2.64e keyboard activation also requires a fresh event after external adop
   board.dispatch('click',{target:h.id('board').children[42],detail:0});
   await settle();
   assert.equal(h.saved().revision,otherTab.revision+1);
+});
+
+test('P2.64f live entry guidance never reuses a stale board before delayed storage event',async()=>{
+  const h=await mount(),before=h.saved();
+  const remote={...before,revision:before.revision+1,coins:before.coins+41};
+  h.storage.setItem(SAVE_KEY,JSON.stringify(remote));
+  const writes=h.writes.length;
+  h.id('board-guide').click();
+  await settle();
+  assert.equal(h.writes.length,writes,'read-only guidance must never write');
+  assert.equal(h.saved().revision,remote.revision);
+  assert.equal(h.id('coins').textContent,remote.coins.toLocaleString('zh-CN'));
+  assert.equal(h.id('board-guide').getAttribute('aria-pressed'),'false');
+  assert.match(h.id('notice').textContent,/重新请求整理提示/);
+  h.id('board-guide').click();
+  await settle();
+  assert.equal(h.id('board-guide').getAttribute('aria-pressed'),'true');
+  assert.equal(h.writes.length,writes);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
 });
