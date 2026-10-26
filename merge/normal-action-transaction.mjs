@@ -33,6 +33,9 @@ export async function commitNormalActionWithLock(locks,storage,{expectedRaw,acti
     // persisting an aliased result; the trusted raw save remains untouched.
     const baselineSnapshot=JSON.stringify(current.state);
     const result=action(current.state);
+    // Preserve the existing P2.61h contract for the exact same object.
+    if(result?.ok===true && result.state===current.state)
+      return reject('ACTION_REVISION_INVALID');
     if(JSON.stringify(current.state)!==baselineSnapshot)
       return reject('ACTION_MUTATED_BASELINE');
     if(result && typeof result.then==='function')
