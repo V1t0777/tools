@@ -48,9 +48,12 @@ test('P12 both story UIs recheck after BFCache restore and foreground visibility
     assert.ok(ui.includes("document.visibilityState==='visible'"));
     // P23 workshop increments the invalidation epoch so a queued reset cannot
     // commit after BFCache/foreground detection; dialogue keeps its old guard.
-    const invalidation=key==='STORY_WORKSHOP_KEY'
-      ? "if(!check.ok){storageEpoch++;blocked=true;reason=check.reason;"
-      : "if(!check.ok){blocked=true;reason=check.reason;";
-    assert.ok(ui.includes(invalidation));
+    if(key==='STORY_WORKSHOP_KEY'){
+      const resume=ui.slice(ui.indexOf('function recheckWorkshopOnResume(){'),
+        ui.indexOf("window.addEventListener('pageshow'"));
+      assert.match(resume,/if\(!check\.ok\)\{\s*storageEpoch\+\+;\s*blockWorkshopWithNotice\(check\.reason,/);
+    }else{
+      assert.ok(ui.includes("if(!check.ok){blocked=true;reason=check.reason;"));
+    }
   }
 });

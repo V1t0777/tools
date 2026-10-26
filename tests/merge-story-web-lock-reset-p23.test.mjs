@@ -114,8 +114,11 @@ test('P23 UI confirms before lock, disables actions, and never bypasses CAS',()=
   assert.ok(handler.includes('saving=true;render();'));
   assert.ok(handler.includes('expectedRaw,isCurrent:()=>storageEpoch===expectedEpoch'));
   assert.ok(handler.includes("if(!attempt.ok||!attempt.value||storageEpoch!==expectedEpoch)"));
-  assert.ok(ui.includes("if(!check.ok){storageEpoch++;blocked=true;"));
-  assert.ok(ui.includes("storageEpoch++;blocked=true;reason='WRITE_CONFLICT'"));
+  const resume=ui.slice(ui.indexOf('function recheckWorkshopOnResume(){'),
+    ui.indexOf("window.addEventListener('pageshow'"));
+  assert.match(resume,/if\(!check\.ok\)\{\s*storageEpoch\+\+;\s*blockWorkshopWithNotice\(check\.reason,/);
+  const storageEvent=ui.slice(ui.indexOf("window.addEventListener('storage',event=>{"));
+  assert.match(storageEvent,/storageEpoch\+\+;\s*blockWorkshopWithNotice\('WRITE_CONFLICT',/);
   assert.ok(ui.includes("$('reset-workshop').disabled=saving||"));
   assert.ok(ui.includes('runStoryWriteWithLock(webLocks,STORY_WORKSHOP_KEY,'));
   for(const forbidden of ['innerHTML','insertAdjacentHTML','fetch(','sendBeacon(','localStorage.setItem','SAVE_KEY'])
