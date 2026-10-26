@@ -299,3 +299,72 @@ test('P2.64d corrupt original export is read-only while gameplay remains blocked
   assert.deepEqual(h.writes,[]);
   assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
 });
+
+test('P2.64e delayed storage event: first producer tap adopts external save but never replays stale tap',async()=>{
+  const h=await mount(),before=h.saved();
+  const oldButton=h.id('board').children[42];
+  const otherTab={...before,revision:before.revision+1,coins:before.coins+77};
+  h.storage.setItem(SAVE_KEY,JSON.stringify(otherTab));
+  const writes=h.writes.length;
+  // Deliberately do not dispatch storage: mobile tabs can deliver it late.
+  h.id('board').dispatch('click',{target:oldButton,detail:1});
+  await settle();
+  assert.equal(h.writes.length,writes,'first stale tap must not write');
+  assert.equal(h.saved().revision,otherTab.revision);
+  assert.equal(h.saved().energy,otherTab.energy);
+  assert.equal(h.id('coins').textContent,otherTab.coins.toLocaleString('zh-CN'));
+  assert.match(h.id('notice').textContent,/重新操作/);
+  // A genuinely new tap on the newly rendered board is permitted.
+  h.id('board').dispatch('click',{target:h.id('board').children[42],detail:1});
+  await settle();
+  assert.equal(h.saved().revision,otherTab.revision+1);
+});
+
+test('P2.64e selected inventory action is not redirected to a newly adopted board',async()=>{
+  const h=await mount(),board=h.id('board');
+  board.dispatch('click',{target:board.children[0],detail:1});
+  const before=h.saved();
+  const otherTab={...before,revision:before.revision+1,coins:before.coins+13};
+  h.storage.setItem(SAVE_KEY,JSON.stringify(otherTab));
+  const writes=h.writes.length;
+  h.id('store-selected').click();
+  await settle();
+  assert.equal(h.writes.length,writes,'stale selected item cannot enter warehouse');
+  assert.equal(h.saved().revision,otherTab.revision);
+  assert.deepEqual(h.saved().warehouse,otherTab.warehouse);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});
+
+test('P2.64e pointer drop must not merge a newly adopted board when storage event is late',async()=>{
+  const h=await mount(),board=h.id('board');
+  const origin=board.children[0];
+  board.dispatch('pointerdown',{target:origin,pointerId:31,clientX:0,clientY:0});
+  board.dispatch('pointermove',{target:origin,pointerId:31,clientX:20,clientY:0});
+  assert.equal(h.doc.body.children.length,1);
+  const before=h.saved();
+  const otherTab={...before,revision:before.revision+1,coins:before.coins+29};
+  h.storage.setItem(SAVE_KEY,JSON.stringify(otherTab));
+  const writes=h.writes.length;
+  h.doc.elementFromPoint=()=>board.children[1];
+  board.dispatch('pointerup',{target:origin,pointerId:31,clientX:20,clientY:0});
+  await settle();
+  assert.equal(h.doc.body.children.length,0,'stale drag ghost is removed');
+  assert.equal(h.writes.length,writes,'stale pointerup cannot merge remote board');
+  assert.equal(h.saved().revision,otherTab.revision);
+  assert.equal(h.saved().board[0].tier,1);
+  assert.equal(h.saved().board[1].tier,1);
+});
+
+test('P2.64e keyboard activation also requires a fresh event after external adoption',async()=>{
+  const h=await mount(),board=h.id('board');
+  const before=h.saved();
+  const otherTab={...before,revision:before.revision+1,coins:before.coins+17};
+  h.storage.setItem(SAVE_KEY,JSON.stringify(otherTab));
+  const writes=h.writes.length;
+  board.dispatch('click',{target:board.children[42],detail:0});
+  await settle();
+  assert.equal(h.writes.length,writes,'old keyboard activation is not replayed');
+  board.dispatch('click',{target:h.id('board').children[42],detail:0});
+  await settle();
+  assert.equal(h.saved().revision,otherTab.revision+1);
+});
