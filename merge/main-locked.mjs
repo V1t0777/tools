@@ -9,6 +9,7 @@ import { getBoardGuidance } from './board-guidance.mjs';
 import { getSupplyControlSnapshot } from './supply-controls.mjs';
 import { deriveNormalMilestones } from './normal-milestones.mjs';
 import { prepareLocalSaveExport, prepareAbnormalResetBackupExport } from './save-export.mjs';
+import { requestBrowserSaveDownload } from './save-download.mjs';
 import { createNormalPageRuntime } from './normal-page-runtime.mjs';
 import { attachNormalPageLifecycle } from './normal-page-lifecycle.mjs';
 
@@ -493,25 +494,23 @@ byId('export-local-save').addEventListener('click', () => {
       '浏览器存储不可访问，无法读取原始存档');
     return;
   }
-  let url=null;
-  try{
-    const blob=new Blob([result.content],{type:result.mime});
-    url=URL.createObjectURL(blob);
-    const link=document.createElement('a');
-    link.href=url;
-    link.download=result.filename;
-    document.body.append(link);
-    try{link.click();}finally{link.remove();}
-    // iOS Safari may start a download asynchronously; avoid early revocation.
-    const downloadUrl=url;
-    window.setTimeout(()=>URL.revokeObjectURL(downloadUrl),30_000);
-    url=null;
-    hint(result.wrapped?'检测到异常字符，已请求下载可还原原始字符的 JSON 封装备份；不可直接导入':
-      result.verified?'已请求下载当前浏览器的原始存档':'原始数据可能异常，已请求下载文本备份；请勿直接作为有效存档导入');
-  }catch{
-    if(url)URL.revokeObjectURL(url);
-    hint('浏览器未能启动下载，请勿重置或清理存档');
+  const download=requestBrowserSaveDownload(result,{
+    schedule:(fn,ms)=>window.setTimeout(fn,ms)
+  });
+  if(!download.ok){
+    hint(download.reason==='DOWNLOAD_UNSUPPORTED'
+      ?'当前浏览器不支持此下载方式，请勿重置或清理存档'
+      :'浏览器未能启动下载，请勿重置或清理存档');
+    return;
   }
+  const message=result.wrapped
+    ?'检测到异常字符，已请求下载可还原原始字符的 JSON 封装备份；不可直接导入'
+    :result.verified
+      ?'已请求下载当前浏览器的原始存档，请核实文件已保存'
+      :'原始数据可能异常，已请求下载文本备份；请勿直接作为有效存档导入';
+  hint(download.cleanupDeferred
+    ?message+'；浏览器未能安排临时链接清理'
+    :message);
 });
 
 
@@ -523,24 +522,21 @@ byId('export-abnormal-reset-backup').addEventListener('click', () => {
       '无法读取或编码重置前备份，请勿清理浏览器数据');
     return;
   }
-  let url=null;
-  try {
-    const blob=new Blob([result.content],{type:result.mime});
-    url=URL.createObjectURL(blob);
-    const link=document.createElement('a');
-    link.href=url;
-    link.download=result.filename;
-    document.body.append(link);
-    try{link.click();}finally{link.remove();}
-    const downloadUrl=url;
-    window.setTimeout(()=>URL.revokeObjectURL(downloadUrl),30_000);
-    url=null;
-    hint(result.wrapped?'已请求下载异常字符的 JSON 封装备份，请核实文件并勿直接导入':
-      '已请求下载异常重置前的原始备份，请核实文件存在与内容完整');
-  } catch {
-    if(url)URL.revokeObjectURL(url);
-    hint('浏览器未能启动重置前备份下载，请勿清理存档');
+  const download=requestBrowserSaveDownload(result,{
+    schedule:(fn,ms)=>window.setTimeout(fn,ms)
+  });
+  if(!download.ok){
+    hint(download.reason==='DOWNLOAD_UNSUPPORTED'
+      ?'当前浏览器不支持此下载方式，请勿清理存档'
+      :'浏览器未能启动重置前备份下载，请勿清理存档');
+    return;
   }
+  const message=result.wrapped
+    ?'已请求下载异常字符的 JSON 封装备份，请核实文件并勿直接导入'
+    :'已请求下载异常重置前的原始备份，请核实文件存在与内容完整';
+  hint(download.cleanupDeferred
+    ?message+'；浏览器未能安排临时链接清理'
+    :message);
 });
 
 byId('reset').addEventListener('click',async()=>{

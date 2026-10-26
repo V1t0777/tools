@@ -508,3 +508,75 @@ test('P2.65a local selection rerender invalidates old shop buttons without any s
   assert.equal(h.saved().revision,1);
   assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
 });
+
+test('P2.65b active page requests exact original save download without changing storage',async()=>{
+  const h=await mount(),original=h.storage.getItem(SAVE_KEY);
+  const writes=h.writes.length,created=[];
+  const beforeCreate=URL.createObjectURL,beforeRevoke=URL.revokeObjectURL;
+  try {
+    URL.createObjectURL=blob=>{created.push(blob);return 'blob:p265b-normal';};
+    URL.revokeObjectURL=()=>{throw Error('premature revoke');};
+    h.id('export-local-save').click();
+    assert.match(h.id('notice').textContent,/已请求下载/);
+    assert.equal(created.length,1);
+    assert.equal(await created[0].text(),original);
+    assert.equal(h.writes.length,writes);
+    assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  } finally {
+    URL.createObjectURL=beforeCreate;
+    URL.revokeObjectURL=beforeRevoke;
+  }
+});
+
+test('P2.65b abnormal backup download uses preserved original, never reset result',async()=>{
+  const original='{original-broken',h=await mount({initialRaw:original});
+  h.id('reset').click();
+  await settle();
+  assert.equal(h.storage.getItem(ABNORMAL_RESET_BACKUP_KEY),original);
+  const active=h.storage.getItem(SAVE_KEY),writes=h.writes.length,created=[];
+  const beforeCreate=URL.createObjectURL;
+  try {
+    URL.createObjectURL=blob=>{created.push(blob);return 'blob:p265b-backup';};
+    h.id('export-abnormal-reset-backup').click();
+    assert.match(h.id('notice').textContent,/已请求下载异常重置前/);
+    assert.equal(created.length,1);
+    assert.equal(await created[0].text(),original);
+    assert.equal(h.storage.getItem(SAVE_KEY),active);
+    assert.equal(h.writes.length,writes);
+    assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  } finally {URL.createObjectURL=beforeCreate;}
+});
+
+test('P2.65b blocked object URL download reports failure and never overwrites save',async()=>{
+  const h=await mount(),original=h.storage.getItem(SAVE_KEY);
+  const writes=h.writes.length,beforeCreate=URL.createObjectURL;
+  try {
+    URL.createObjectURL=()=>{throw Error('WebView download blocked');};
+    h.id('export-local-save').click();
+    assert.match(h.id('notice').textContent,/未能启动下载/);
+    assert.equal(h.writes.length,writes);
+    assert.equal(h.storage.getItem(SAVE_KEY),original);
+  } finally {URL.createObjectURL=beforeCreate;}
+});
+
+test('P2.65b failed mobile timer does not immediately revoke pending blob URL',async()=>{
+  const h=await mount(),revoked=[];
+  const beforeCreate=URL.createObjectURL,beforeRevoke=URL.revokeObjectURL;
+  const beforeTimer=h.win.setTimeout;
+  try {
+    URL.createObjectURL=()=> 'blob:p265b-deferred';
+    URL.revokeObjectURL=url=>revoked.push(url);
+    h.win.setTimeout=(fn,ms)=>{
+      if(ms===120000)throw Error('WebView timer unavailable');
+      return beforeTimer(fn,ms);
+    };
+    h.id('export-local-save').click();
+    assert.match(h.id('notice').textContent,/已请求下载/);
+    assert.match(h.id('notice').textContent,/未能安排临时链接清理/);
+    assert.deepEqual(revoked,[],'no premature revoke after click');
+  } finally {
+    URL.createObjectURL=beforeCreate;
+    URL.revokeObjectURL=beforeRevoke;
+    h.win.setTimeout=beforeTimer;
+  }
+});
