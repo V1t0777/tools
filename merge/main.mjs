@@ -58,6 +58,12 @@ function commit(result) {
     // including when it fails or throws. The raw save remains authoritative.
     const baseline=JSON.stringify(state);
     try { result=result(state); } catch { result=null; }
+    // This page is synchronous: observe rejected thenables immediately, even
+    // when the action also corrupts its input and the purity guard wins.
+    let asyncResult=false;
+    try { asyncResult=!!result && typeof result.then==='function'; }
+    catch { asyncResult=true; }
+    if(asyncResult) void Promise.resolve(result).catch(()=>{});
     let mutated=false;
     try { mutated=JSON.stringify(state)!==baseline; } catch { mutated=true; }
     if(mutated) {
@@ -69,6 +75,17 @@ function commit(result) {
       selected=-1; activeGuidance=null;
       render();
       hint('游戏动作异常，原进度已恢复到内存；请备份并重新打开页面核对');
+      return;
+    }
+    if(asyncResult) {
+      // Detach the live state from the action's captured input. A deferred
+      // continuation must not mutate the page after this rejection.
+      state=JSON.parse(baseline);
+      saveIssue='ASYNC_ACTION_NOT_ALLOWED';
+      byId('save-status').textContent='游戏动作返回异步结果，已暂停写入 · 请保留原始存档';
+      selected=-1; activeGuidance=null;
+      render();
+      hint('游戏动作不支持异步结果，已停止保存；请备份并重新打开页面核对');
       return;
     }
   }
