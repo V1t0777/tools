@@ -195,3 +195,27 @@ test('P2.61i a rejected action may not silently mutate its input economy',async(
   assert.equal(store.raw,raw);
   assert.equal(store.writes,0);
 });
+
+test('P2.61j rejected async action is observed without writing or publishing',async()=>{
+  const raw=JSON.stringify(initial()),store=memory(raw);
+  const result=await commitNormalActionWithLock(locks(),store,{
+    expectedRaw:raw,action:()=>Promise.reject(new Error('async engine failure'))});
+  assert.deepEqual(result,{ok:false,reason:'ASYNC_ACTION_NOT_ALLOWED'});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(store.raw,raw);
+  assert.equal(store.writes,0);
+  assert.equal('state' in result,false);
+});
+
+test('P2.61j delayed async rejection stays rejected without unhandled failure',async()=>{
+  const raw=JSON.stringify(initial()),store=memory(raw);
+  let rejectLater;
+  const pending=new Promise((_resolve,reject)=>{rejectLater=reject;});
+  const result=await commitNormalActionWithLock(locks(),store,{
+    expectedRaw:raw,action:()=>pending});
+  assert.deepEqual(result,{ok:false,reason:'ASYNC_ACTION_NOT_ALLOWED'});
+  rejectLater(new Error('late async engine failure'));
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(store.raw,raw);
+  assert.equal(store.writes,0);
+});

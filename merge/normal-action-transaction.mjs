@@ -38,8 +38,13 @@ export async function commitNormalActionWithLock(locks,storage,{expectedRaw,acti
       return reject('ACTION_REVISION_INVALID');
     if(JSON.stringify(current.state)!==baselineSnapshot)
       return reject('ACTION_MUTATED_BASELINE');
-    if(result && typeof result.then==='function')
+    if(result && typeof result.then==='function') {
+      // A rejected async action is still a programmer error, but leaving its
+      // Promise unobserved can crash the page/test runner after the lock exits.
+      // Observe only the rejection; never await or publish an async action.
+      void Promise.resolve(result).catch(()=>{});
       return reject('ASYNC_ACTION_NOT_ALLOWED');
+    }
     if(!result || result.ok!==true)
       return reject('ACTION_REJECTED');
     if(!result.state || result.state===current.state ||
