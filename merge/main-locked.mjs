@@ -9,6 +9,7 @@ import { getBoardGuidance } from './board-guidance.mjs';
 import { getSupplyControlSnapshot } from './supply-controls.mjs';
 import { deriveNormalMilestones } from './normal-milestones.mjs';
 import { prepareLocalSaveExport, prepareAbnormalResetBackupExport } from './save-export.mjs';
+import { requestBrowserSaveDownload } from './save-download.mjs';
 import { createNormalPageRuntime } from './normal-page-runtime.mjs';
 import { attachNormalPageLifecycle } from './normal-page-lifecycle.mjs';
 
@@ -21,6 +22,7 @@ const store = (() => { try { return window.localStorage; } catch { return null; 
 // The locked reset compares the exact bytes again before any overwrite.
 const initialOriginalRaw=(()=>{try{return store?.getItem(SAVE_KEY)??null;}catch{return null;}})();
 let state=createInitialState(),selected=-1,drag=null,ignoreNextClick=false;
+let renderGeneration=0;
 let noticeTimer=0,activeGuidance=null,saveIssue='STARTUP_REQUIRED',persistedRaw=null;
 const runtime=createNormalPageRuntime({
   storage:store,locks:window.navigator?.locks??null,
@@ -141,6 +143,19 @@ function renderBoard(now = Date.now()) {
   board.append(fragment);
   byId('free-cells').textContent = `空位 ${state.board.filter(i=>!i).length} / ${CELL_COUNT}`;
 }
+// Detached DOM controls can still receive queued events after a storage,
+// BFCache or clock-driven rerender. Bind each generated action to its render.
+// A stale event is never replayed against the newly adopted game state.
+function guardRenderedAction(action){
+  const generation=renderGeneration;
+  return ()=>{
+    if(generation!==renderGeneration){
+      hint('界面已更新，请在最新界面重新操作');
+      return;
+    }
+    action();
+  };
+}
 function renderOrders() {
   orders.replaceChildren();
   const fragment = document.createDocumentFragment();
@@ -156,7 +171,8 @@ function renderOrders() {
     const button = document.createElement('button');button.type = 'button';button.className='order-button';
     button.textContent = can ? '交付委托' : '尚缺材料';button.disabled = !can;
     button.classList.toggle('guidance-target', activeGuidance?.orderId === order.id);
-    button.addEventListener('click', () => commit(current=>fulfillOrder(current, order.id)));
+    button.addEventListener('click',guardRenderedAction(
+      ()=>commit(current=>fulfillOrder(current, order.id))));
     card.append(icon,name,prize,button);
     fragment.append(card);
   }
@@ -171,7 +187,7 @@ function actionButton(label, description, action, disabled = false) {
   detail.append(title, text);
   const btn = document.createElement('button'); btn.type = 'button';btn.className='small-action';
   btn.disabled = disabled;btn.textContent = disabled ? '暂不可用' : '解锁 / 升级';
-  if(!disabled)btn.addEventListener('click',action);
+  if(!disabled)btn.addEventListener('click',guardRenderedAction(action));
   row.append(detail, btn);return row;
 }
 function renderSystems() {
@@ -184,7 +200,8 @@ function renderSystems() {
     btn.title = item ? `取出${getItemName(item)}` : i>=state.warehouse.capacity ? '尚未解锁' : '空位';
     btn.setAttribute('aria-label',btn.title);
     btn.textContent = i>=state.warehouse.capacity?'🔒':item?getItemIcon(item):'＋';
-    if(item)btn.addEventListener('click',()=>commit(current=>withdrawItem(current,i)));
+    if(item)btn.addEventListener('click',guardRenderedAction(
+      ()=>commit(current=>withdrawItem(current,i))));
     slots.append(btn);
   });warehouse.append(slots);
   byId('warehouse-count').textContent=`${state.warehouse.slots.filter(Boolean).length}/${state.warehouse.capacity}`;
@@ -265,12 +282,12 @@ function renderSupplies(now=Date.now()) {
     button.dataset.supplyUse=id;
     button.textContent='使用';
     button.setAttribute('aria-label',`使用${def.name}，当前有${owned}个`);
-    button.addEventListener('click',()=>{
+    button.addEventListener('click',guardRenderedAction(()=>{
       // Snapshot the chosen producer before the asynchronous Web Lock wait.
       // A later selection change must not redirect this already-queued tap.
       const producerId=select.value;
       commit(current=>useSupply(current,id,producerId));
-    });
+    }));
     row.append(details,button);bag.append(row);
 
     const used=state.shop.purchases[id];
@@ -286,7 +303,8 @@ function renderSupplies(now=Date.now()) {
     buy.disabled=remaining<=0||state.coins<def.price;
     buy.textContent=remaining<=0?'已售罄':'兑换';
     buy.setAttribute('aria-label',`用${def.price}金币兑换${def.name}`);
-    buy.addEventListener('click',()=>commit(current=>purchaseSupply(current,id)));
+    buy.addEventListener('click',guardRenderedAction(
+      ()=>commit(current=>purchaseSupply(current,id))));
     sale.append(saleDetails,buy);shop.append(sale);
   }
   const milestones=byId('supply-achievements');milestones.replaceChildren();
@@ -342,6 +360,7 @@ function renderNormalMilestones() {
   container.replaceChildren(fragment);
 }
 function render() {
+  renderGeneration++;
   renderResources(); renderBoard(); renderOrders(); renderSystems(); renderSupplies(); renderNormalMilestones();
   byId('guidance-message').textContent = activeGuidance?.message ??
     '棋盘太满时，可以点“整理提示”寻找合法操作。只提示，不自动操作。';
@@ -475,25 +494,23 @@ byId('export-local-save').addEventListener('click', () => {
       '浏览器存储不可访问，无法读取原始存档');
     return;
   }
-  let url=null;
-  try{
-    const blob=new Blob([result.content],{type:result.mime});
-    url=URL.createObjectURL(blob);
-    const link=document.createElement('a');
-    link.href=url;
-    link.download=result.filename;
-    document.body.append(link);
-    try{link.click();}finally{link.remove();}
-    // iOS Safari may start a download asynchronously; avoid early revocation.
-    const downloadUrl=url;
-    window.setTimeout(()=>URL.revokeObjectURL(downloadUrl),30_000);
-    url=null;
-    hint(result.wrapped?'检测到异常字符，已请求下载可还原原始字符的 JSON 封装备份；不可直接导入':
-      result.verified?'已请求下载当前浏览器的原始存档':'原始数据可能异常，已请求下载文本备份；请勿直接作为有效存档导入');
-  }catch{
-    if(url)URL.revokeObjectURL(url);
-    hint('浏览器未能启动下载，请勿重置或清理存档');
+  const download=requestBrowserSaveDownload(result,{
+    schedule:(fn,ms)=>window.setTimeout(fn,ms)
+  });
+  if(!download.ok){
+    hint(download.reason==='DOWNLOAD_UNSUPPORTED'
+      ?'当前浏览器不支持此下载方式，请勿重置或清理存档'
+      :'浏览器未能启动下载，请勿重置或清理存档');
+    return;
   }
+  const message=result.wrapped
+    ?'检测到异常字符，已请求下载可还原原始字符的 JSON 封装备份；不可直接导入'
+    :result.verified
+      ?'已请求下载当前浏览器的原始存档，请核实文件已保存'
+      :'原始数据可能异常，已请求下载文本备份；请勿直接作为有效存档导入';
+  hint(download.cleanupDeferred
+    ?message+'；浏览器未能安排临时链接清理'
+    :message);
 });
 
 
@@ -505,24 +522,21 @@ byId('export-abnormal-reset-backup').addEventListener('click', () => {
       '无法读取或编码重置前备份，请勿清理浏览器数据');
     return;
   }
-  let url=null;
-  try {
-    const blob=new Blob([result.content],{type:result.mime});
-    url=URL.createObjectURL(blob);
-    const link=document.createElement('a');
-    link.href=url;
-    link.download=result.filename;
-    document.body.append(link);
-    try{link.click();}finally{link.remove();}
-    const downloadUrl=url;
-    window.setTimeout(()=>URL.revokeObjectURL(downloadUrl),30_000);
-    url=null;
-    hint(result.wrapped?'已请求下载异常字符的 JSON 封装备份，请核实文件并勿直接导入':
-      '已请求下载异常重置前的原始备份，请核实文件存在与内容完整');
-  } catch {
-    if(url)URL.revokeObjectURL(url);
-    hint('浏览器未能启动重置前备份下载，请勿清理存档');
+  const download=requestBrowserSaveDownload(result,{
+    schedule:(fn,ms)=>window.setTimeout(fn,ms)
+  });
+  if(!download.ok){
+    hint(download.reason==='DOWNLOAD_UNSUPPORTED'
+      ?'当前浏览器不支持此下载方式，请勿清理存档'
+      :'浏览器未能启动重置前备份下载，请勿清理存档');
+    return;
   }
+  const message=result.wrapped
+    ?'已请求下载异常字符的 JSON 封装备份，请核实文件并勿直接导入'
+    :'已请求下载异常重置前的原始备份，请核实文件存在与内容完整';
+  hint(download.cleanupDeferred
+    ?message+'；浏览器未能安排临时链接清理'
+    :message);
 });
 
 byId('reset').addEventListener('click',async()=>{

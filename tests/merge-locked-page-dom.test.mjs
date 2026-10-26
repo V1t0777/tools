@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {SAVE_KEY,ABNORMAL_RESET_BACKUP_KEY} from '../merge/storage.mjs';
 import {STORY_SAVE_KEY} from '../merge/mode-boundaries.mjs';
 import {NORMAL_SAVE_LOCK_NAME} from '../merge/normal-save-lock.mjs';
-import {createInitialState} from '../merge/engine.mjs';
+import {createInitialState,storeItem} from '../merge/engine.mjs';
 
 class Element {
   constructor(tag='div') {
@@ -394,4 +394,189 @@ test('P2.64f live entry guidance never reuses a stale board before delayed stora
   assert.equal(h.id('board-guide').getAttribute('aria-pressed'),'true');
   assert.equal(h.writes.length,writes);
   assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});
+
+function adoptExternalSnapshot(h,bonus=19){
+  const previous=h.saved();
+  const next={...previous,revision:previous.revision+1,
+    coins:previous.coins+bonus};
+  h.storage.setItem(SAVE_KEY,JSON.stringify(next));
+  h.win.dispatch('storage',{storageArea:h.storage,key:SAVE_KEY});
+  return next;
+}
+
+test('P2.65a stale detached order button cannot fulfill a newly adopted order',async()=>{
+  const h=await mount(),oldOrder=h.id('orders').children[0].children[3];
+  assert.equal(oldOrder.disabled,false,'initial tea tier-2 order is fulfillable');
+  const remote=adoptExternalSnapshot(h);
+  const writes=h.writes.length;
+  oldOrder.click();
+  await settle();
+  assert.equal(h.writes.length,writes,'detached order cannot spend remote material');
+  assert.equal(h.saved().revision,remote.revision);
+  assert.match(h.id('notice').textContent,/最新界面重新操作/);
+  const newOrder=h.id('orders').children[0].children[3];
+  assert.notEqual(newOrder,oldOrder);
+  newOrder.click();
+  await settle();
+  assert.equal(h.saved().revision,remote.revision+1);
+  assert.equal(h.saved().board[16],null);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});
+
+test('P2.65a stale warehouse withdrawal after BFCache resume cannot touch adopted inventory',async()=>{
+  const seed=storeItem(createInitialState(Date.now()),0).state;
+  const h=await mount({initialRaw:JSON.stringify(seed)});
+  const oldSlot=h.id('warehouse').children[0];
+  assert.equal(oldSlot.disabled,false);
+  h.doc.hidden=true;
+  h.win.dispatch('pagehide');
+  const before=h.saved();
+  const remote={...before,revision:before.revision+1,coins:before.coins+17};
+  h.storage.setItem(SAVE_KEY,JSON.stringify(remote));
+  h.doc.hidden=false;
+  h.win.dispatch('pageshow',{persisted:true});
+  const writes=h.writes.length;
+  oldSlot.click();
+  await settle();
+  assert.equal(h.writes.length,writes,'detached warehouse button cannot withdraw');
+  assert.deepEqual(h.saved().warehouse,remote.warehouse);
+  const newSlot=h.id('warehouse').children[0];
+  assert.notEqual(newSlot,oldSlot);
+  newSlot.click();
+  await settle();
+  assert.equal(h.saved().revision,remote.revision+1);
+  assert.equal(h.saved().warehouse.slots[0],null);
+});
+
+test('P2.65a detached supply use cannot consume item after remote rerender',async()=>{
+  const now=Date.now(),seed=createInitialState(now);
+  seed.shop.purchases.speed=1;seed.bag.speed=1;
+  seed.board[42].charges=0;seed.board[42].cooldownUntil=now+120_000;
+  const h=await mount({initialRaw:JSON.stringify(seed)});
+  const selector='[data-supply-use="speed"]';
+  const oldUse=h.id('supply-bag').querySelector(selector);
+  assert.equal(oldUse.disabled,false);
+  const remote=adoptExternalSnapshot(h);
+  const writes=h.writes.length;
+  oldUse.click();
+  await settle();
+  assert.equal(h.writes.length,writes,'detached supply button cannot consume bag');
+  assert.equal(h.saved().bag.speed,1);
+  const newUse=h.id('supply-bag').querySelector(selector);
+  assert.notEqual(newUse,oldUse);
+  newUse.click();
+  await settle();
+  assert.equal(h.saved().revision,remote.revision+1);
+  assert.equal(h.saved().bag.speed,0);
+});
+
+test('P2.65a stale producer upgrade after external adoption cannot spend new coins',async()=>{
+  const seed=createInitialState(Date.now());seed.coins=1000;seed.xp=1500;
+  const h=await mount({initialRaw:JSON.stringify(seed)});
+  const oldUpgrade=h.id('producers').children[0].children[1];
+  assert.equal(oldUpgrade.disabled,false);
+  const remote=adoptExternalSnapshot(h);
+  const writes=h.writes.length;
+  oldUpgrade.click();
+  await settle();
+  assert.equal(h.writes.length,writes,'detached upgrade cannot spend coins');
+  assert.equal(h.saved().board[42].level,1);
+  const newUpgrade=h.id('producers').children[0].children[1];
+  newUpgrade.click();
+  await settle();
+  assert.equal(h.saved().revision,remote.revision+1);
+  assert.equal(h.saved().board[42].level,2);
+});
+
+test('P2.65a local selection rerender invalidates old shop buttons without any storage event',async()=>{
+  const seed=createInitialState(Date.now());seed.coins=1000;
+  const h=await mount({initialRaw:JSON.stringify(seed)});
+  const oldBuy=h.id('supply-shop').children[0].children[1];
+  assert.equal(oldBuy.disabled,false);
+  const board=h.id('board');
+  board.dispatch('click',{target:board.children[0],detail:0});
+  const writes=h.writes.length;
+  oldBuy.click();
+  await settle();
+  assert.equal(h.writes.length,writes,'obsolete shop button cannot purchase');
+  assert.equal(h.saved().revision,0);
+  const newBuy=h.id('supply-shop').children[0].children[1];
+  assert.notEqual(newBuy,oldBuy);
+  newBuy.click();
+  await settle();
+  assert.equal(h.saved().revision,1);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});
+
+test('P2.65b active page requests exact original save download without changing storage',async()=>{
+  const h=await mount(),original=h.storage.getItem(SAVE_KEY);
+  const writes=h.writes.length,created=[];
+  const beforeCreate=URL.createObjectURL,beforeRevoke=URL.revokeObjectURL;
+  try {
+    URL.createObjectURL=blob=>{created.push(blob);return 'blob:p265b-normal';};
+    URL.revokeObjectURL=()=>{throw Error('premature revoke');};
+    h.id('export-local-save').click();
+    assert.match(h.id('notice').textContent,/已请求下载/);
+    assert.equal(created.length,1);
+    assert.equal(await created[0].text(),original);
+    assert.equal(h.writes.length,writes);
+    assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  } finally {
+    URL.createObjectURL=beforeCreate;
+    URL.revokeObjectURL=beforeRevoke;
+  }
+});
+
+test('P2.65b abnormal backup download uses preserved original, never reset result',async()=>{
+  const original='{original-broken',h=await mount({initialRaw:original});
+  h.id('reset').click();
+  await settle();
+  assert.equal(h.storage.getItem(ABNORMAL_RESET_BACKUP_KEY),original);
+  const active=h.storage.getItem(SAVE_KEY),writes=h.writes.length,created=[];
+  const beforeCreate=URL.createObjectURL;
+  try {
+    URL.createObjectURL=blob=>{created.push(blob);return 'blob:p265b-backup';};
+    h.id('export-abnormal-reset-backup').click();
+    assert.match(h.id('notice').textContent,/已请求下载异常重置前/);
+    assert.equal(created.length,1);
+    assert.equal(await created[0].text(),original);
+    assert.equal(h.storage.getItem(SAVE_KEY),active);
+    assert.equal(h.writes.length,writes);
+    assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  } finally {URL.createObjectURL=beforeCreate;}
+});
+
+test('P2.65b blocked object URL download reports failure and never overwrites save',async()=>{
+  const h=await mount(),original=h.storage.getItem(SAVE_KEY);
+  const writes=h.writes.length,beforeCreate=URL.createObjectURL;
+  try {
+    URL.createObjectURL=()=>{throw Error('WebView download blocked');};
+    h.id('export-local-save').click();
+    assert.match(h.id('notice').textContent,/未能启动下载/);
+    assert.equal(h.writes.length,writes);
+    assert.equal(h.storage.getItem(SAVE_KEY),original);
+  } finally {URL.createObjectURL=beforeCreate;}
+});
+
+test('P2.65b failed mobile timer does not immediately revoke pending blob URL',async()=>{
+  const h=await mount(),revoked=[];
+  const beforeCreate=URL.createObjectURL,beforeRevoke=URL.revokeObjectURL;
+  const beforeTimer=h.win.setTimeout;
+  try {
+    URL.createObjectURL=()=> 'blob:p265b-deferred';
+    URL.revokeObjectURL=url=>revoked.push(url);
+    h.win.setTimeout=(fn,ms)=>{
+      if(ms===120000)throw Error('WebView timer unavailable');
+      return beforeTimer(fn,ms);
+    };
+    h.id('export-local-save').click();
+    assert.match(h.id('notice').textContent,/已请求下载/);
+    assert.match(h.id('notice').textContent,/未能安排临时链接清理/);
+    assert.deepEqual(revoked,[],'no premature revoke after click');
+  } finally {
+    URL.createObjectURL=beforeCreate;
+    URL.revokeObjectURL=beforeRevoke;
+    h.win.setTimeout=beforeTimer;
+  }
 });

@@ -6,6 +6,7 @@ import {captureStoryWorkshopEvidence} from './save-evidence.mjs';
 import {checkStoryResumeSnapshot} from './resume-guard.mjs';
 import {verifyStoryWorkshopPublication} from './workshop-publication-guard.mjs';
 import {runStoryWriteWithLock} from './write-lock.mjs';
+import {createWorkshopRenderedActionGuard} from './render-action-guard.mjs';
 import {resetStoryWorkshopWithLock} from './workshop-reset.mjs';
 import {shouldBlockStoryStorageEvent} from './storage-event-guard.mjs';
 import {shouldRefreshWorkshopForStoryEvent} from './storage-event-guard.mjs';
@@ -18,6 +19,11 @@ const loaded=readStoryWorkshop(storage);
 let state=loaded.state,raw=loaded.raw,blocked=loaded.blocked,reason=loaded.reason,selected=-1;
 let saving=false;
 let storageEpoch=0; // increments when an external story-workshop snapshot invalidates this page
+let renderGeneration=0;
+const guardRenderedAction=createWorkshopRenderedActionGuard(
+  ()=>renderGeneration,
+  ()=>$('board-notice').textContent='界面已更新，请在最新界面重新操作。'
+);
 function status(){
   $('workshop-status').textContent=blocked
     ? reason==='CORRUPT_SAVE'
@@ -28,6 +34,7 @@ function status(){
     : '剧情工作台数据只保存在此浏览器，与普通模式金币及背包完全隔离。';
 }
 function render(){
+  renderGeneration++;
   status();
   $('energy').textContent=state.energy+' / '+MAX_ENERGY;
   $('coins').textContent=String(state.coins);
@@ -50,7 +57,7 @@ function render(){
       info.textContent=item.kind==='producer'?(item.charges>0?item.charges+'次':'冷却中'):'Lv.'+item.tier;
       button.append(info);
     }
-    button.addEventListener('click',()=>touch(i));fragment.append(button);
+    button.addEventListener('click',guardRenderedAction(()=>touch(i)));fragment.append(button);
   });
   board.append(fragment);
 
@@ -85,7 +92,7 @@ function render(){
     button.textContent=item
       ? getItemIcon(item)+' '+getItemName(item)+' · Lv.'+item.tier+' · 取回'
       : '第'+(i+1)+'格 · 空位';
-    button.addEventListener('click',()=>commit(withdrawItem(state,i)));
+    button.addEventListener('click',guardRenderedAction(()=>commit(withdrawItem(state,i))));
     bankFragment.append(button);
   }
   bank.append(bankFragment);
@@ -96,7 +103,7 @@ function render(){
     mark.textContent=CHAINS[order.chain].icon[order.tier-1]+' '+CHAINS[order.chain].names[order.tier-1]+' · ◈'+order.coins;
     const btn=document.createElement('button');btn.type='button';btn.textContent='交付';
     btn.disabled=blocked||saving||!state.board.some(item=>item?.kind==='material'&&item.chain===order.chain&&item.tier===order.tier);
-    btn.addEventListener('click',()=>commit(fulfillOrder(state,order.id)));
+    btn.addEventListener('click',guardRenderedAction(()=>commit(fulfillOrder(state,order.id))));
     row.append(mark,btn);list.append(row);
   }
   const garden=BUILDINGS.garden,level=getLevel(state.xp),built=state.buildings.garden===1;
