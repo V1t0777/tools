@@ -61,8 +61,9 @@ function maybeProduce(slot) {
   commit(produce(state, slot));
 }
 function touchCell(slot) {
-  // A stale page may still receive keyboard/click input after another tab
-  // replaces or removes its save. Do not even select an old board item.
+  // Storage events can be delayed: verify actual bytes before accepting a
+  // tap or keyboard selection, even if the page never lost focus.
+  if (!saveIssue) revalidateResumedSave();
   if (saveIssue) { hint('存档状态未确认，棋盘操作已暂停；请备份并重新打开页面核对'); return; }
   const item = state.board[slot];
   if (selected === -1) {
@@ -340,6 +341,10 @@ board.addEventListener('pointerdown', event => {
   // Never start a drag against a board whose saved baseline is untrusted.
   if (saveIssue) return;
   if (event.button > 0) return;
+  // A storage event may not yet have arrived from another tab. Never capture
+  // a pointer against an unverified board; this inspection is read-only.
+  revalidateResumedSave();
+  if (saveIssue) return;
   // A genuine new pointerdown starts a new gesture. The canceled pointer's
   // delayed synthetic click has no second pointerdown, so allow this tap.
   ignoreNextClick = false;

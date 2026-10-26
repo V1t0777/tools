@@ -377,6 +377,7 @@ test('P2.42 stale synthetic click is consumed without eating next genuine tap',(
     contains(target){return target===cell;}};
   let taps=0;
   const ctx={board,state:{board:Array(56).fill(null)},ignoreNextClick:true,
+    revalidateResumedSave(){},
     saveIssue:null,drag:null,touchCell(slot){assert.equal(slot,3);taps++;}};
   runInNewContext(handlers,ctx);
   const click=(detail=1)=>board.listeners.click({

@@ -30,6 +30,7 @@ function harness() {
     state:{board:[{kind:'material'},{kind:'material'}]},
     drag:{id:7,origin:0,moved:true,ghost:{remove(){events.ghostRemovals++;}}},
     ignoreNextClick:false,saveIssue:null,
+    revalidateResumedSave(){},
     touchCell(slot){touched.push(slot);},
     moveOrMerge(){events.moves++;return {ok:true};},
     commit(){events.commits++;},
