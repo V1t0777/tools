@@ -634,8 +634,12 @@ window.addEventListener('storage', event => {
 });
 window.setInterval(() => {
   // A background tab must not silently race the visible player's save.
-  // Regen catches up on the next visible tick, after resume revalidation.
+  // Regen catches up on the next visible tick. A visible page may have
+  // missed a delayed storage event even without losing focus; verify its
+  // exact raw baseline before any clock computation, including no-op ticks.
   if (document.hidden) return;
+  if (!saveIssue) revalidateResumedSave();
+  if (saveIssue) return;
   const now=Date.now();
   const updated = advanceTime(state,now);
   if (!saveIssue && updated !== state) {
