@@ -134,3 +134,116 @@ test('failed exact readback never publishes the new state as verified',async()=>
   assert.ok(saved);
   assert.equal('state' in result,false);
 });
+
+test('P2.61h rejects a same-revision economy mutation without touching storage',async()=>{
+  const state=initial(),raw=JSON.stringify(state),store=memory(raw);
+  const result=await commitNormalActionWithLock(locks(),store,{
+    expectedRaw:raw,action:current=>({ok:true,state:{...current,coins:current.coins+999}})
+  });
+  assert.deepEqual(result,{ok:false,reason:'ACTION_REVISION_INVALID'});
+  assert.equal(store.raw,raw);
+  assert.equal(store.writes,0);
+  assert.equal('state' in result,false);
+});
+
+test('P2.61h rejects skipped revisions before saving',async()=>{
+  const state=initial(),raw=JSON.stringify(state),store=memory(raw);
+  const result=await commitNormalActionWithLock(locks(),store,{
+    expectedRaw:raw,action:current=>({ok:true,state:{...current,revision:current.revision+2}})
+  });
+  assert.deepEqual(result,{ok:false,reason:'ACTION_REVISION_INVALID'});
+  assert.equal(store.writes,0);
+  assert.equal(store.raw,raw);
+});
+
+test('P2.61h rejects an in-place success result even with an incremented revision',async()=>{
+  const state=initial(),raw=JSON.stringify(state),store=memory(raw);
+  const result=await commitNormalActionWithLock(locks(),store,{
+    expectedRaw:raw,action:current=>{
+      current.revision++;
+      return {ok:true,state:current};
+    }
+  });
+  assert.deepEqual(result,{ok:false,reason:'ACTION_REVISION_INVALID'});
+  assert.equal(store.raw,raw);
+  assert.equal(store.writes,0);
+});
+
+test('P2.61i rejects a nested baseline mutation even with a distinct returned state',async()=>{
+  const state=initial(),raw=JSON.stringify(state),store=memory(raw);
+  const result=await commitNormalActionWithLock(locks(),store,{
+    expectedRaw:raw,action:current=>{
+      current.board[0]=null;
+      return {ok:true,state:{...current,revision:current.revision+1}};
+    }
+  });
+  assert.deepEqual(result,{ok:false,reason:'ACTION_MUTATED_BASELINE'});
+  assert.equal(store.raw,raw);
+  assert.equal(store.writes,0);
+  assert.equal('state' in result,false);
+});
+
+test('P2.61i a rejected action may not silently mutate its input economy',async()=>{
+  const state=initial(),raw=JSON.stringify(state),store=memory(raw);
+  const result=await commitNormalActionWithLock(locks(),store,{
+    expectedRaw:raw,action:current=>{
+      current.coins+=10;
+      return {ok:false,message:'not allowed'};
+    }
+  });
+  assert.deepEqual(result,{ok:false,reason:'ACTION_MUTATED_BASELINE'});
+  assert.equal(store.raw,raw);
+  assert.equal(store.writes,0);
+});
+
+test('P2.61j rejected async action is observed without writing or publishing',async()=>{
+  const raw=JSON.stringify(initial()),store=memory(raw);
+  const result=await commitNormalActionWithLock(locks(),store,{
+    expectedRaw:raw,action:()=>Promise.reject(new Error('async engine failure'))});
+  assert.deepEqual(result,{ok:false,reason:'ASYNC_ACTION_NOT_ALLOWED'});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(store.raw,raw);
+  assert.equal(store.writes,0);
+  assert.equal('state' in result,false);
+});
+
+test('P2.61j delayed async rejection stays rejected without unhandled failure',async()=>{
+  const raw=JSON.stringify(initial()),store=memory(raw);
+  let rejectLater;
+  const pending=new Promise((_resolve,reject)=>{rejectLater=reject;});
+  const result=await commitNormalActionWithLock(locks(),store,{
+    expectedRaw:raw,action:()=>pending});
+  assert.deepEqual(result,{ok:false,reason:'ASYNC_ACTION_NOT_ALLOWED'});
+  rejectLater(new Error('late async engine failure'));
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(store.raw,raw);
+  assert.equal(store.writes,0);
+});
+
+test('P2.61k observes a rejected async action even when it mutates the baseline',async()=>{
+  const raw=JSON.stringify(initial()),store=memory(raw);
+  const result=await commitNormalActionWithLock(locks(),store,{
+    expectedRaw:raw,action:current=>{
+      current.coins+=1;
+      return Promise.reject(new Error('rejected action with baseline mutation'));
+    }});
+  assert.deepEqual(result,{ok:false,reason:'ACTION_MUTATED_BASELINE'});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(store.raw,raw);
+  assert.equal(store.writes,0);
+  assert.equal('state' in result,false);
+});
+
+test('P2.61k observes a rejected async action before a cyclic purity check throws',async()=>{
+  const raw=JSON.stringify(initial()),store=memory(raw);
+  const result=await commitNormalActionWithLock(locks(),store,{
+    expectedRaw:raw,action:current=>{
+      current.board[0].unexpectedCycle=current;
+      return Promise.reject(new Error('rejected action with cyclic baseline'));
+    }});
+  assert.deepEqual(result,{ok:false,reason:'SAVE_TRANSACTION_FAILED'});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(store.raw,raw);
+  assert.equal(store.writes,0);
+  assert.equal('state' in result,false);
+});

@@ -14,6 +14,7 @@ test('P2.61c blocked normal save cannot select or produce an old board item',()=
   for(const issue of ['CURRENT_SAVE_CHANGED','SAVE_REMOVED','CORRUPT_SAVE']){
     const messages=[],board=[{kind:'material'},{kind:'producer'}];
     const ctx={saveIssue:issue,state:{board},selected:-1,
+      revalidateResumedSave(){},
       hint(x){messages.push(x);},render(){throw Error('blocked render');},
       maybeProduce(){throw Error('blocked produce');},
       moveOrMerge(){throw Error('blocked move');},commit(){throw Error('blocked commit');}};
@@ -25,6 +26,7 @@ test('P2.61c blocked normal save cannot select or produce an old board item',()=
   }
   let renders=0;
   const ctx={saveIssue:null,state:{board:[{kind:'material'}]},selected:-1,
+    revalidateResumedSave(){},
     hint(){throw Error('healthy select should not warn');},render(){renders++;}};
   runInNewContext(code,ctx);
   ctx.touchCell(0);
@@ -40,6 +42,7 @@ test('P2.61c blocked save cannot start stale pointer capture or drag',()=>{
     const board={listener:null,addEventListener(name,fn){
       assert.equal(name,'pointerdown');this.listener=fn;}};
     const ctx={board,saveIssue:issue,ignoreNextClick:true,drag:null,
+      revalidateResumedSave(){},
       state:{board:[{kind:'material'}]}};
     runInNewContext(code,ctx);
     board.listener({button:0,pointerId:4,clientX:12,clientY:15,

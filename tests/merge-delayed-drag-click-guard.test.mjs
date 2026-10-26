@@ -30,9 +30,10 @@ function harness() {
     state:{board:[{kind:'material'},{kind:'material'}]},
     drag:{id:7,origin:0,moved:true,ghost:{remove(){events.ghostRemovals++;}}},
     ignoreNextClick:false,saveIssue:null,
+    revalidateResumedSave(){},
     touchCell(slot){touched.push(slot);},
     moveOrMerge(){events.moves++;return {ok:true};},
-    commit(){events.commits++;},
+    commit(action){events.commits++;if(typeof action==='function')action(context.state);},
     render(){throw Error('unexpected render');},
     hint(){throw Error('unexpected hint');},
     setTimeout(){events.timers++;throw Error('early click guard timer');}

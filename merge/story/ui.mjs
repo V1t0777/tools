@@ -17,7 +17,7 @@ import {checkStoryResumeSnapshot} from './resume-guard.mjs';
 import {shouldBlockStoryStorageEvent} from './storage-event-guard.mjs';
 import {shouldRefreshStoryDependencyEvent} from './storage-event-guard.mjs';
 import {STORY_WORKSHOP_KEY,readStoryWorkshop} from './workshop-storage.mjs';
-import {inspectStoryWorkshopRequirement,storyWorkshopRequirement,storyWorkshopGoalHref} from './workshop-gate.mjs';
+import {inspectStoryWorkshopRequirement,inspectStoryWorkshopRequirementFromRead,storyWorkshopRequirement,storyWorkshopGoalHref} from './workshop-gate.mjs';
 import {storyDialogueCommitAllowed} from './dialogue-commit-guard.mjs';
 import {createEmptyStoryProgress,STORY_SAVE_KEY} from '../mode-boundaries.mjs';
 
@@ -222,7 +222,7 @@ function open(entry){
   if(entry.kind==='main'||entry.kind==='side'){
     // Chapter echoes require a real persisted workshop save; the default
     // in-memory empty state or a corrupt record cannot imply completion.
-    const workshop=readStoryWorkshop(store);
+    const workshop=workshopAtOpen;
     if(!workshop.blocked&&workshop.raw!==null){
       const chapterEcho=storyWorkshopChapterEcho(entry,progress,workshop.state);
       if(chapterEcho)lines.push(chapterEcho);
@@ -233,7 +233,7 @@ function open(entry){
     // the independent workshop save is absent or blocked.
     const choiceEcho=incidentChoiceEcho(entry,progress);
     if(choiceEcho)lines.push(choiceEcho);
-    const workshop=readStoryWorkshop(store);
+    const workshop=workshopAtOpen;
     if(!workshop.blocked&&workshop.raw!==null){
       const echo=incidentWorkshopEcho(entry,workshop.state);
       if(echo)lines.push(echo);
@@ -247,7 +247,7 @@ function open(entry){
     const picked=entry.choices.find(c=>c.id===previous);
     if(picked)$('dialog-reply').textContent='上次选择：'+picked.label+'。'+picked.reply;
   }
-  const requirement=inspectStoryWorkshopRequirement(entry.id,store);
+  const requirement=inspectStoryWorkshopRequirementFromRead(entry.id,workshopAtOpen);
   if(!done&&requirement.required&&!requirement.met){
     const notice=document.createElement('p');notice.className='muted';
     notice.textContent=requirement.blocked
@@ -276,6 +276,13 @@ function open(entry){
   finish.disabled=saving||(!done&&(blocked||!requirement.met||entry.choices.length>0));
   $('story-dialog').showModal();
 }
+// Preserve the exact workshop evidence that this dialogue actually rendered.
+// This also protects non-gated choices if their StorageEvent was missed.
+function openWorkshopCurrent(){
+  return !selectedWorkshopReadable||checkStoryResumeSnapshot(store,{
+    key:STORY_WORKSHOP_KEY,expectedRaw:selectedWorkshopRaw
+  }).ok;
+}
 $('close-dialog').addEventListener('click',()=>$('story-dialog').close());
 $('complete-story').addEventListener('click',async()=>{
   if(saving||!selected)return;
@@ -286,6 +293,10 @@ $('complete-story').addEventListener('click',async()=>{
     refreshIncidentDay();render();return;
   }
   if(completed(selected)){$('story-dialog').close();return;}
+  if(!openWorkshopCurrent()){
+    $('dialog-reply').textContent='剧情工作台存档已变化，请关闭对白后重新打开，核对最新经营进度。';
+    $('complete-story').disabled=true;return;
+  }
   try{
     // Capture the exact workshop snapshot before queueing the dialogue write.
     // Recheck inside the story Web Lock: the other tab may reset its workshop.
@@ -293,7 +304,8 @@ $('complete-story').addEventListener('click',async()=>{
     const requiresWorkshop=storyWorkshopRequirement(entryId,null).required;
     const workshopSnapshot=requiresWorkshop?readStoryWorkshop(store):null;
     const expectedWorkshopRaw=workshopSnapshot?.raw;
-    const commitGuard=()=>storyDialogueCommitAllowed(store,entryId,expectedWorkshopRaw)&&
+    const commitGuard=()=>openWorkshopCurrent()&&
+      storyDialogueCommitAllowed(store,entryId,expectedWorkshopRaw)&&
       canCommitDailyIncident(selected,selectedIncidentDay,localDay(),progress,CORE_STORY_PACK);
     if(!commitGuard()){
       $('dialog-reply').textContent='经营目标尚未完成，或工作台存档已变化，请核对后重试。';return;

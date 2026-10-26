@@ -47,11 +47,16 @@ export function storyWorkshopRequirement(entryId,workshopState){
   return Object.freeze({required:true,met:valid&&count>=spec.goal,
     goal:spec.goal,current:count,description:spec.description});
 }
-export function inspectStoryWorkshopRequirement(entryId,storage){
+/** Project a prerequisite from the same workshop read used for dialogue echoes. */
+export function inspectStoryWorkshopRequirementFromRead(entryId,read){
   if(!Object.hasOwn(GOALS,entryId))return storyWorkshopRequirement(entryId,null);
-  const read=readStoryWorkshop(storage);
-  const gate=read.blocked
+  const blocked=read?.blocked!==false;
+  const gate=blocked
     ? storyWorkshopRequirement(entryId,null)
     : storyWorkshopRequirement(entryId,read.state);
-  return Object.freeze({...gate,blocked:read.blocked,reason:read.reason});
+  return Object.freeze({...gate,blocked,reason:blocked?(read?.reason??'STORAGE_UNAVAILABLE'):null});
+}
+export function inspectStoryWorkshopRequirement(entryId,storage){
+  if(!Object.hasOwn(GOALS,entryId))return storyWorkshopRequirement(entryId,null);
+  return inspectStoryWorkshopRequirementFromRead(entryId,readStoryWorkshop(storage));
 }

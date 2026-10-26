@@ -46,8 +46,61 @@ function persist(nextState=state,{confirmedReset=false}={}) {
   return receipt.ok;
 }
 function commit(result) {
-  if(!result.ok) { render(); hint(result.message); return; }
+  // Buttons outside the board (orders, upgrades, warehouse and supplies)
+  // must not process a stale save when storage events arrive late. Revalidate
+  // even rejected engine results, which otherwise skip the persistence CAS.
+  if (!saveIssue) revalidateResumedSave();
   if(saveIssue) { hint('存档状态未确认，已暂停操作；请先备份并重新打开页面核对'); return; }
+  // Defer engine evaluation until after the actual raw save is verified.
+  // This remains a synchronous CAS path, not a cross-tab Web Lock.
+  if(typeof result==='function') {
+    // An engine action must never mutate the published in-memory baseline,
+    // including when it fails or throws. The raw save remains authoritative.
+    const baseline=JSON.stringify(state);
+    try { result=result(state); } catch { result=null; }
+    // This page is synchronous: observe rejected thenables immediately, even
+    // when the action also corrupts its input and the purity guard wins.
+    let asyncResult=false;
+    try { asyncResult=!!result && typeof result.then==='function'; }
+    catch { asyncResult=true; }
+    if(asyncResult) void Promise.resolve(result).catch(()=>{});
+    let mutated=false;
+    try { mutated=JSON.stringify(state)!==baseline; } catch { mutated=true; }
+    if(mutated) {
+      // Rebuild the verified pre-action snapshot; do not leave a damaged
+      // board visible or let a later timer persist the mutated object.
+      state=JSON.parse(baseline);
+      saveIssue='ACTION_MUTATED_BASELINE';
+      byId('save-status').textContent='游戏动作修改了原始进度，已暂停写入 · 请保留原始存档';
+      selected=-1; activeGuidance=null;
+      render();
+      hint('游戏动作异常，原进度已恢复到内存；请备份并重新打开页面核对');
+      return;
+    }
+    if(asyncResult) {
+      // Detach the live state from the action's captured input. A deferred
+      // continuation must not mutate the page after this rejection.
+      state=JSON.parse(baseline);
+      saveIssue='ASYNC_ACTION_NOT_ALLOWED';
+      byId('save-status').textContent='游戏动作返回异步结果，已暂停写入 · 请保留原始存档';
+      selected=-1; activeGuidance=null;
+      render();
+      hint('游戏动作不支持异步结果，已停止保存；请备份并重新打开页面核对');
+      return;
+    }
+  }
+  // Every successful ordinary engine action must advance exactly one revision.
+  // The synchronous page still lacks an atomic cross-tab Web Lock, so never
+  // let a malformed action result bypass this additional write invariant.
+  if(!result || typeof result!=='object' ||
+      (result.ok===true && (result.state===state ||
+        result.state?.revision!==state.revision+1))) {
+    saveIssue='ACTION_REVISION_INVALID';
+    byId('save-status').textContent='游戏动作版本异常，已暂停写入 · 请保留原始存档';
+    hint('游戏动作结果异常，已停止保存；请备份并重新打开页面核对');
+    return;
+  }
+  if(!result.ok) { render(); hint(result.message); return; }
   if(!persist(result.state)) {
     render();
     hint('操作未确认保存，画面保持原进度；请备份并重新打开页面核对');
@@ -58,11 +111,12 @@ function commit(result) {
   render(); hint(result.message);
 }
 function maybeProduce(slot) {
-  commit(produce(state, slot));
+  commit(current=>produce(current, slot));
 }
 function touchCell(slot) {
-  // A stale page may still receive keyboard/click input after another tab
-  // replaces or removes its save. Do not even select an old board item.
+  // Storage events can be delayed: verify actual bytes before accepting a
+  // tap or keyboard selection, even if the page never lost focus.
+  if (!saveIssue) revalidateResumedSave();
   if (saveIssue) { hint('存档状态未确认，棋盘操作已暂停；请备份并重新打开页面核对'); return; }
   const item = state.board[slot];
   if (selected === -1) {
@@ -73,7 +127,7 @@ function touchCell(slot) {
     return;
   }
   if (selected === slot) { selected = -1; render(); return; }
-  commit(moveOrMerge(state, selected, slot));
+  commit(current=>moveOrMerge(current, selected, slot));
 }
 function formatSeconds(ms) {
   const seconds = Math.max(0, Math.ceil(ms / 1000));
@@ -135,7 +189,7 @@ function renderOrders() {
     const button = document.createElement('button');button.type = 'button';button.className='order-button';
     button.textContent = can ? '交付委托' : '尚缺材料';button.disabled = !can;
     button.classList.toggle('guidance-target', activeGuidance?.orderId === order.id);
-    button.addEventListener('click', () => commit(fulfillOrder(state, order.id)));
+    button.addEventListener('click', () => commit(current=>fulfillOrder(current, order.id)));
     card.append(icon,name,prize,button);
     fragment.append(card);
   }
@@ -163,7 +217,7 @@ function renderSystems() {
     btn.title = item ? `取出${getItemName(item)}` : i>=state.warehouse.capacity ? '尚未解锁' : '空位';
     btn.setAttribute('aria-label',btn.title);
     btn.textContent = i>=state.warehouse.capacity?'🔒':item?getItemIcon(item):'＋';
-    if(item)btn.addEventListener('click',()=>commit(withdrawItem(state,i)));
+    if(item)btn.addEventListener('click',()=>commit(current=>withdrawItem(current,i)));
     slots.append(btn);
   });warehouse.append(slots);
   byId('warehouse-count').textContent=`${state.warehouse.slots.filter(Boolean).length}/${state.warehouse.capacity}`;
@@ -182,13 +236,13 @@ function renderSystems() {
     const rule=getProducerUpgrade(p.level);
     upgrades.append(actionButton(`${CHAINS[p.chain].name}工坊 · Lv.${p.level}`,
       rule?`${rule.coins} 金币 · 需要 Lv.${rule.minLevel} · 下一等级提升高阶产物概率`:'生产器已达到最高等级',
-      ()=>commit(upgradeProducer(state,p.id)),!rule||state.coins<rule.coins||level<rule.minLevel));
+      ()=>commit(current=>upgradeProducer(current,p.id)),!rule||state.coins<rule.coins||level<rule.minLevel));
   }
   for(const [id,rule] of Object.entries(BUILDINGS)){
     const complete=state.buildings[id]===1;
     buildings.append(actionButton(`${rule.name}${complete?' · 已建成':''}`,
       complete?'此区域已完成基础建设':`${rule.coins} 金币 · 需要 Lv.${rule.minLevel}`,
-      ()=>commit(upgradeBuilding(state,id)),complete||state.coins<rule.coins||level<rule.minLevel));
+      ()=>commit(current=>upgradeBuilding(current,id)),complete||state.coins<rule.coins||level<rule.minLevel));
   }
 }
 /** Update cooldown eligibility on selection and every clock tick.
@@ -244,7 +298,7 @@ function renderSupplies(now=Date.now()) {
     button.dataset.supplyUse=id;
     button.textContent='使用';
     button.setAttribute('aria-label',`使用${def.name}，当前有${owned}个`);
-    button.addEventListener('click',()=>commit(useSupply(state,id,select.value)));
+    button.addEventListener('click',()=>commit(current=>useSupply(current,id,select.value)));
     row.append(details,button);bag.append(row);
 
     const used=state.shop.purchases[id];
@@ -260,7 +314,7 @@ function renderSupplies(now=Date.now()) {
     buy.disabled=remaining<=0||state.coins<def.price;
     buy.textContent=remaining<=0?'已售罄':'兑换';
     buy.setAttribute('aria-label',`用${def.price}金币兑换${def.name}`);
-    buy.addEventListener('click',()=>commit(purchaseSupply(state,id)));
+    buy.addEventListener('click',()=>commit(current=>purchaseSupply(current,id)));
     sale.append(saleDetails,buy);shop.append(sale);
   }
   const milestones=byId('supply-achievements');milestones.replaceChildren();
@@ -340,6 +394,10 @@ board.addEventListener('pointerdown', event => {
   // Never start a drag against a board whose saved baseline is untrusted.
   if (saveIssue) return;
   if (event.button > 0) return;
+  // A storage event may not yet have arrived from another tab. Never capture
+  // a pointer against an unverified board; this inspection is read-only.
+  revalidateResumedSave();
+  if (saveIssue) return;
   // A genuine new pointerdown starts a new gesture. The canceled pointer's
   // delayed synthetic click has no second pointerdown, so allow this tap.
   ignoreNextClick = false;
@@ -374,11 +432,19 @@ function completeDrag(event, cancelled = false) {
   // Keep the guard until that click is consumed or a genuine new pointerdown
   // begins; a zero-delay timer can clear it before the delayed click arrives.
   ignoreNextClick = true;
+  // The save may change after pointerdown while the pointer is moving and
+  // before a delayed storage event arrives. Recheck exact bytes at drop time
+  // before resolving the target or computing a move against an old board.
+  // A blocked drop still consumes its delayed synthetic click.
+  if (!saveIssue) revalidateResumedSave();
+  if (saveIssue) return;
   const target = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-slot]');
   if (target && board.contains(target)) {
-    const result = moveOrMerge(state, origin, Number(target.dataset.slot));
-    if (result.ok) commit(result);
-    else { render(); hint(result.message); }
+    // Keep the drop's raw-save check, then defer the engine action to the
+    // same preflight gateway used by every other ordinary-mode action.
+    // A different tab can still replace storage during hit testing.
+    const targetSlot = Number(target.dataset.slot);
+    commit(current=>moveOrMerge(current, origin, targetSlot));
   }
 }
 board.addEventListener('pointerup', event => completeDrag(event));
@@ -431,9 +497,9 @@ window.addEventListener('focus', () => {
 
 byId('store-selected').addEventListener('click',()=>{
   if(selected < 0){hint('先点击选择一个原料');return;}
-  commit(storeItem(state,selected));
+  commit(current=>storeItem(current,selected));
 });
-byId('warehouse-upgrade').addEventListener('click',()=>commit(upgradeWarehouse(state)));
+byId('warehouse-upgrade').addEventListener('click',()=>commit(current=>upgradeWarehouse(current)));
 byId('supply-producer').addEventListener('change',()=>refreshSupplyControls());
 
 byId('export-local-save').addEventListener('click', () => {
@@ -614,8 +680,12 @@ window.addEventListener('storage', event => {
 });
 window.setInterval(() => {
   // A background tab must not silently race the visible player's save.
-  // Regen catches up on the next visible tick, after resume revalidation.
+  // Regen catches up on the next visible tick. A visible page may have
+  // missed a delayed storage event even without losing focus; verify its
+  // exact raw baseline before any clock computation, including no-op ticks.
   if (document.hidden) return;
+  if (!saveIssue) revalidateResumedSave();
+  if (saveIssue) return;
   const now=Date.now();
   const updated = advanceTime(state,now);
   if (!saveIssue && updated !== state) {
