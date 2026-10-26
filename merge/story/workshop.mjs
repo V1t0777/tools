@@ -130,10 +130,22 @@ function render(){
   $('reset-workshop').disabled=saving||reason==='STORAGE_UNAVAILABLE';
   $('export-corrupt-workshop').disabled=saving||reason!=='CORRUPT_SAVE'||typeof raw!=='string';
 }
+// Storage events may arrive after a tap. Refuse stale actions before
+// computing an operation or selecting a slot; the later Web Lock/CAS still
+// protects against changes between this read and the eventual write.
+function revalidateWorkshopBeforeInteraction(){
+  if(blocked||saving)return false;
+  const check=checkStoryResumeSnapshot(storage,{key:STORY_WORKSHOP_KEY,expectedRaw:raw});
+  if(check.ok)return true;
+  storageEpoch++;blocked=true;reason=check.reason;selected=-1;
+  render();
+  $('board-notice').textContent='检测到工作台存档已变化或无法读取，本次操作已取消。请重新打开页面核对进度。';
+  return false;
+}
 async function commit(result){
   // One in-flight action per tab; Web Locks serializes participating tabs.
   // The existing exact-raw CAS remains mandatory inside the lock callback.
-  if(blocked||saving)return;
+  if(!revalidateWorkshopBeforeInteraction())return;
   if(!result.ok){$('board-notice').textContent=result.message;return;}
   const expectedEpoch=storageEpoch;
   const buildingChanged=['garden','harbor','storefront'].some(name=>
@@ -172,7 +184,7 @@ async function commit(result){
   }
 }
 function touch(index){
-  if(blocked||saving)return;
+  if(!revalidateWorkshopBeforeInteraction())return;
   const item=state.board[index];
   if(item?.kind==='producer'){commit(produce(state,index));return;}
   if(selected===-1){if(item){selected=index;render();}return;}
