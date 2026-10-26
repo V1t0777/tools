@@ -498,9 +498,13 @@ byId('export-local-save').addEventListener('click', () => {
     schedule:(fn,ms)=>window.setTimeout(fn,ms)
   });
   if(!download.ok){
-    hint(download.reason==='DOWNLOAD_UNSUPPORTED'
-      ?'当前浏览器不支持此下载方式，请勿重置或清理存档'
-      :'浏览器未能启动下载，请勿重置或清理存档');
+    hint(download.reason==='DOWNLOAD_LIMIT_REACHED'
+      ?'下载过于频繁，临时链接尚未清理；请稍后再试，勿重置或清理存档'
+      :download.reason==='DOWNLOAD_TOO_LARGE'
+        ?'备份文件超过浏览器安全下载上限，请勿重置或清理存档'
+        :download.reason==='DOWNLOAD_UNSUPPORTED'
+          ?'当前浏览器不支持此下载方式，请勿重置或清理存档'
+          :'浏览器未能启动下载，请勿重置或清理存档');
     return;
   }
   const message=result.wrapped
@@ -526,9 +530,13 @@ byId('export-abnormal-reset-backup').addEventListener('click', () => {
     schedule:(fn,ms)=>window.setTimeout(fn,ms)
   });
   if(!download.ok){
-    hint(download.reason==='DOWNLOAD_UNSUPPORTED'
-      ?'当前浏览器不支持此下载方式，请勿清理存档'
-      :'浏览器未能启动重置前备份下载，请勿清理存档');
+    hint(download.reason==='DOWNLOAD_LIMIT_REACHED'
+      ?'下载过于频繁，临时链接尚未清理；请稍后再试，勿清理存档'
+      :download.reason==='DOWNLOAD_TOO_LARGE'
+        ?'重置前备份超过浏览器安全下载上限，请勿清理存档'
+        :download.reason==='DOWNLOAD_UNSUPPORTED'
+          ?'当前浏览器不支持此下载方式，请勿清理存档'
+          :'浏览器未能启动重置前备份下载，请勿清理存档');
     return;
   }
   const message=result.wrapped

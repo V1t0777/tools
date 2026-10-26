@@ -580,3 +580,46 @@ test('P2.65b failed mobile timer does not immediately revoke pending blob URL',a
     h.win.setTimeout=beforeTimer;
   }
 });
+
+test('P2.65c download capacity protects normal save and explains retry without storage writes',async()=>{
+  const h=await mount(),raw=h.storage.getItem(SAVE_KEY),writes=h.writes.length;
+  const oldCreate=URL.createObjectURL,oldRevoke=URL.revokeObjectURL;
+  let created=0;
+  try {
+    URL.createObjectURL=()=>`blob:p265c-${++created}`;
+    URL.revokeObjectURL=()=>{};
+    // Mobile timers are suspended in the DOM fixture; repeated downloads
+    // must stop before unbounded Blob URLs are allocated.
+    for(let i=0;i<12;i++)h.id('export-local-save').click();
+    assert.match(h.id('notice').textContent,/下载过于频繁/);
+    assert.ok(created<=8,'bounded pending object URLs');
+    assert.equal(h.storage.getItem(SAVE_KEY),raw);
+    assert.equal(h.writes.length,writes);
+    assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  } finally {
+    URL.createObjectURL=oldCreate;
+    URL.revokeObjectURL=oldRevoke;
+  }
+});
+
+test('P2.65c backup download quota never overwrites confirmed reset evidence',async()=>{
+  const original='{broken-original',h=await mount({initialRaw:original});
+  h.id('reset').click();
+  await settle();
+  assert.equal(h.storage.getItem(ABNORMAL_RESET_BACKUP_KEY),original);
+  const active=h.storage.getItem(SAVE_KEY),writes=h.writes.length;
+  const oldCreate=URL.createObjectURL,oldRevoke=URL.revokeObjectURL;
+  try {
+    URL.createObjectURL=()=> 'blob:p265c-backup';
+    URL.revokeObjectURL=()=>{};
+    for(let i=0;i<12;i++)h.id('export-abnormal-reset-backup').click();
+    assert.match(h.id('notice').textContent,/下载过于频繁/);
+    assert.equal(h.storage.getItem(SAVE_KEY),active);
+    assert.equal(h.storage.getItem(ABNORMAL_RESET_BACKUP_KEY),original);
+    assert.equal(h.writes.length,writes);
+    assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  } finally {
+    URL.createObjectURL=oldCreate;
+    URL.revokeObjectURL=oldRevoke;
+  }
+});
