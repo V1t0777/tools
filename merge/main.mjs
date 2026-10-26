@@ -54,6 +54,17 @@ function commit(result) {
   // Defer engine evaluation until after the actual raw save is verified.
   // This remains a synchronous CAS path, not a cross-tab Web Lock.
   if(typeof result==='function') result=result(state);
+  // Every successful ordinary engine action must advance exactly one revision.
+  // The synchronous page still lacks an atomic cross-tab Web Lock, so never
+  // let a malformed action result bypass this additional write invariant.
+  if(!result || typeof result!=='object' ||
+      (result.ok===true && (result.state===state ||
+        result.state?.revision!==state.revision+1))) {
+    saveIssue='ACTION_REVISION_INVALID';
+    byId('save-status').textContent='游戏动作版本异常，已暂停写入 · 请保留原始存档';
+    hint('游戏动作结果异常，已停止保存；请备份并重新打开页面核对');
+    return;
+  }
   if(!result.ok) { render(); hint(result.message); return; }
   if(!persist(result.state)) {
     render();
