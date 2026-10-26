@@ -179,7 +179,17 @@ export function createNormalPageRuntime({locks,storage,onVerified}={}) {
         if(storage.getItem(SAVE_KEY)!==fresh.raw) {
           block('CURRENT_SAVE_CHANGED');return reject('CURRENT_SAVE_CHANGED');
         }
-      } catch {block('UI_PUBLISH_FAILED');return reject('UI_PUBLISH_FAILED');}
+      } catch {
+        // A publication callback can race a second tab's write. Keep the
+        // precise cross-tab conflict reason from the existing contract,
+        // rather than masking a changed raw baseline as a rendering error.
+        let changed=false;
+        try {changed=storage.getItem(SAVE_KEY)!==fresh.raw;}
+        catch {changed=true;}
+        const why=changed?'CURRENT_SAVE_CHANGED':'UI_PUBLISH_FAILED';
+        block(why);
+        return reject(why);
+      }
       if(epoch!==publicationEpoch||phase!=='ready'||flight.blocked||flight.busy) {
         block('RECONCILE_INVALIDATED');
         return reject('RECONCILE_INVALIDATED');
