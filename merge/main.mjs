@@ -50,7 +50,7 @@ function commit(result) {
   // must not process a stale save when storage events arrive late. Revalidate
   // even rejected engine results, which otherwise skip the persistence CAS.
   if (!saveIssue) revalidateResumedSave();
-  if (saveIssue) { hint('存档状态未确认，已暂停操作；请先备份并重新打开页面核对'); return; }
+  if(saveIssue) { hint('存档状态未确认，已暂停操作；请先备份并重新打开页面核对'); return; }
   if(!result.ok) { render(); hint(result.message); return; }
   if(!persist(result.state)) {
     render();
