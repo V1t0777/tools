@@ -80,7 +80,8 @@ test('P62 workshop UI checks the released-lock snapshot before and after renderi
   assert.ok(ui.includes("import {verifyStoryWorkshopPublication} from './workshop-publication-guard.mjs';"));
   assert.ok(ui.includes('const expectedEpoch=storageEpoch;'));
   assert.ok(ui.includes('const buildingChanged='));
-  assert.equal(ui.match(/verifyStoryWorkshopPublication\(storage,\{/g)?.length,2);
+  const commitHandler=ui.slice(ui.indexOf('async function commit(result){'),ui.indexOf('function touch(index){'));
+  assert.equal(commitHandler.match(/verifyStoryWorkshopPublication\(storage,\{/g)?.length,2);
   const lock=ui.indexOf('const attempt=await runStoryWriteWithLock(');
   const guard=ui.indexOf('const publication=expectedWorkshopRaw===null');
   const publish=ui.indexOf('state=result.state;raw=JSON.stringify(state);');
