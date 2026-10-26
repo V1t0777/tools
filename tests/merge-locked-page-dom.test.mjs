@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {SAVE_KEY,ABNORMAL_RESET_BACKUP_KEY} from '../merge/storage.mjs';
 import {STORY_SAVE_KEY} from '../merge/mode-boundaries.mjs';
 import {NORMAL_SAVE_LOCK_NAME} from '../merge/normal-save-lock.mjs';
-import {createInitialState} from '../merge/engine.mjs';
+import {createInitialState,storeItem} from '../merge/engine.mjs';
 
 class Element {
   constructor(tag='div') {
@@ -393,5 +393,118 @@ test('P2.64f live entry guidance never reuses a stale board before delayed stora
   await settle();
   assert.equal(h.id('board-guide').getAttribute('aria-pressed'),'true');
   assert.equal(h.writes.length,writes);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});
+
+function adoptExternalSnapshot(h,bonus=19){
+  const previous=h.saved();
+  const next={...previous,revision:previous.revision+1,
+    coins:previous.coins+bonus};
+  h.storage.setItem(SAVE_KEY,JSON.stringify(next));
+  h.win.dispatch('storage',{storageArea:h.storage,key:SAVE_KEY});
+  return next;
+}
+
+test('P2.65a stale detached order button cannot fulfill a newly adopted order',async()=>{
+  const h=await mount(),oldOrder=h.id('orders').children[0].children[3];
+  assert.equal(oldOrder.disabled,false,'initial tea tier-2 order is fulfillable');
+  const remote=adoptExternalSnapshot(h);
+  const writes=h.writes.length;
+  oldOrder.click();
+  await settle();
+  assert.equal(h.writes.length,writes,'detached order cannot spend remote material');
+  assert.equal(h.saved().revision,remote.revision);
+  assert.match(h.id('notice').textContent,/最新界面重新操作/);
+  const newOrder=h.id('orders').children[0].children[3];
+  assert.notEqual(newOrder,oldOrder);
+  newOrder.click();
+  await settle();
+  assert.equal(h.saved().revision,remote.revision+1);
+  assert.equal(h.saved().board[16],null);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});
+
+test('P2.65a stale warehouse withdrawal after BFCache resume cannot touch adopted inventory',async()=>{
+  const seed=storeItem(createInitialState(Date.now()),0).state;
+  const h=await mount({initialRaw:JSON.stringify(seed)});
+  const oldSlot=h.id('warehouse').children[0];
+  assert.equal(oldSlot.disabled,false);
+  h.doc.hidden=true;
+  h.win.dispatch('pagehide');
+  const before=h.saved();
+  const remote={...before,revision:before.revision+1,coins:before.coins+17};
+  h.storage.setItem(SAVE_KEY,JSON.stringify(remote));
+  h.doc.hidden=false;
+  h.win.dispatch('pageshow',{persisted:true});
+  const writes=h.writes.length;
+  oldSlot.click();
+  await settle();
+  assert.equal(h.writes.length,writes,'detached warehouse button cannot withdraw');
+  assert.deepEqual(h.saved().warehouse,remote.warehouse);
+  const newSlot=h.id('warehouse').children[0];
+  assert.notEqual(newSlot,oldSlot);
+  newSlot.click();
+  await settle();
+  assert.equal(h.saved().revision,remote.revision+1);
+  assert.equal(h.saved().warehouse.slots[0],null);
+});
+
+test('P2.65a detached supply use cannot consume item after remote rerender',async()=>{
+  const now=Date.now(),seed=createInitialState(now);
+  seed.shop.purchases.speed=1;seed.bag.speed=1;
+  seed.board[42].charges=0;seed.board[42].cooldownUntil=now+120_000;
+  const h=await mount({initialRaw:JSON.stringify(seed)});
+  const selector='[data-supply-use="speed"]';
+  const oldUse=h.id('supply-bag').querySelector(selector);
+  assert.equal(oldUse.disabled,false);
+  const remote=adoptExternalSnapshot(h);
+  const writes=h.writes.length;
+  oldUse.click();
+  await settle();
+  assert.equal(h.writes.length,writes,'detached supply button cannot consume bag');
+  assert.equal(h.saved().bag.speed,1);
+  const newUse=h.id('supply-bag').querySelector(selector);
+  assert.notEqual(newUse,oldUse);
+  newUse.click();
+  await settle();
+  assert.equal(h.saved().revision,remote.revision+1);
+  assert.equal(h.saved().bag.speed,0);
+});
+
+test('P2.65a stale producer upgrade after external adoption cannot spend new coins',async()=>{
+  const seed=createInitialState(Date.now());seed.coins=1000;seed.xp=1500;
+  const h=await mount({initialRaw:JSON.stringify(seed)});
+  const oldUpgrade=h.id('producers').children[0].children[1];
+  assert.equal(oldUpgrade.disabled,false);
+  const remote=adoptExternalSnapshot(h);
+  const writes=h.writes.length;
+  oldUpgrade.click();
+  await settle();
+  assert.equal(h.writes.length,writes,'detached upgrade cannot spend coins');
+  assert.equal(h.saved().board[42].level,1);
+  const newUpgrade=h.id('producers').children[0].children[1];
+  newUpgrade.click();
+  await settle();
+  assert.equal(h.saved().revision,remote.revision+1);
+  assert.equal(h.saved().board[42].level,2);
+});
+
+test('P2.65a local selection rerender invalidates old shop buttons without any storage event',async()=>{
+  const seed=createInitialState(Date.now());seed.coins=1000;
+  const h=await mount({initialRaw:JSON.stringify(seed)});
+  const oldBuy=h.id('supply-shop').children[0].children[1];
+  assert.equal(oldBuy.disabled,false);
+  const board=h.id('board');
+  board.dispatch('click',{target:board.children[0],detail:0});
+  const writes=h.writes.length;
+  oldBuy.click();
+  await settle();
+  assert.equal(h.writes.length,writes,'obsolete shop button cannot purchase');
+  assert.equal(h.saved().revision,0);
+  const newBuy=h.id('supply-shop').children[0].children[1];
+  assert.notEqual(newBuy,oldBuy);
+  newBuy.click();
+  await settle();
+  assert.equal(h.saved().revision,1);
   assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
 });
