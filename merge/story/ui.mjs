@@ -19,7 +19,7 @@ import {shouldRefreshStoryDependencyEvent} from './storage-event-guard.mjs';
 import {STORY_WORKSHOP_KEY,readStoryWorkshop} from './workshop-storage.mjs';
 import {inspectStoryWorkshopRequirement,inspectStoryWorkshopRequirementFromRead,storyWorkshopRequirement,storyWorkshopGoalHref} from './workshop-gate.mjs';
 import {storyDialogueCommitAllowed} from './dialogue-commit-guard.mjs';
-import {nextCoreStoryJourney} from './journey-guide.mjs';
+import {nextCoreStoryJourney,nextCoreSideJourney} from './journey-guide.mjs';
 import {createEmptyStoryProgress,STORY_SAVE_KEY} from '../mode-boundaries.mjs';
 
 const $=id=>document.getElementById(id);
@@ -159,6 +159,20 @@ function render(){
           '暂时没有可继续的主线，请核对存档与故事前置条件。';
   $('journey-side').textContent=!blocked&&journey.sideCount>0
     ? '另有 '+journey.sideCount+' 段已解锁的人物支线可以阅读。':'';
+  // A side scene with an unmet real warehouse goal must never be advertised
+  // as directly readable. Prefer other genuinely available side scenes.
+  const sideJourney=blocked?{kind:'unavailable'}:
+    nextCoreSideJourney(progress,readStoryWorkshop(store));
+  const sideButton=$('journey-side-read'),sideLink=$('journey-side-workshop');
+  sideButton.hidden=sideJourney.kind!=='story';
+  sideButton.disabled=blocked||saving;
+  if(sideJourney.kind==='story')sideButton.textContent='阅读人物支线 · '+sideJourney.entry.title;
+  sideLink.hidden=sideJourney.kind!=='workshop';
+  if(sideJourney.kind==='workshop'){
+    sideLink.href=sideJourney.href;
+    sideLink.textContent=sideJourney.blocked?'先核对剧情仓库存档 →':
+      '先完成支线经营目标 · '+sideJourney.requirement.description+' →';
+  }
 
   document.querySelectorAll('.tabs [data-kind]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.kind===kind)));
   const list=$('story-list');list.replaceChildren();
@@ -335,6 +349,14 @@ $('journey-read').addEventListener('click',()=>{
   const plan=nextCoreStoryJourney(progress,readStoryWorkshop(store));
   if(plan.kind!=='story')return;
   kind='main';render();
+  open(plan.entry);
+});
+$('journey-side-read').addEventListener('click',()=>{
+  if(saving||blocked)return;
+  const plan=nextCoreSideJourney(progress,readStoryWorkshop(store));
+  if(plan.kind!=='story')return;
+  kind='side';render();
+  // open() rechecks the exact narrative save and the scene's unlock status.
   open(plan.entry);
 });
 

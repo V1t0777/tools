@@ -38,3 +38,7 @@ dialog{border:1px solid var(--line);border-radius:22px;max-width:min(560px,calc(
 .journey-primary:disabled{opacity:.55;cursor:not-allowed}
 .journey-actions .muted{margin:0;overflow-wrap:anywhere}
 @media(prefers-color-scheme:dark){.journey-primary{background:#527d6d;color:white}}
+
+/* P58: optional side-story action remains accessible on narrow iPhone screens. */
+.journey-secondary{background:#e4ede5;color:var(--ink);border:1px solid var(--line);overflow-wrap:anywhere}
+@media(prefers-color-scheme:dark){.journey-secondary{background:#345249;color:var(--ink)}}
