@@ -110,7 +110,7 @@ test('P47 DLC pack has its own day marker; core choice and economy stay isolated
 test('P47 UI waits for durable same-day pin before exposing an actionable event',()=>{
   const ui=readFileSync(new URL('../merge/story/ui.mjs',import.meta.url),'utf8');
   assert.ok(ui.includes('const dayPinned=pinnedDailyStoryIncident(progress,CORE_STORY_PACK,day);'));
-  assert.ok(ui.includes('if(todays&&(dayPinned||blocked))list.append(card(todays,completed(todays)));'));
+  assert.ok(ui.includes('if(todays&&dayPinned&&!blocked)list.append(card(todays,completed(todays)));'));
   assert.ok(ui.includes('const next=pinDailyStoryIncident(progress,CORE_STORY_PACK,day);'));
   assert.ok(ui.includes('if(next!==progress)await save(next,false,()=>localDay()===day,day);'));
   assert.ok(ui.includes('queueMicrotask(async()=>{'));

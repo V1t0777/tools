@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createEmptyStoryProgress} from '../merge/mode-boundaries.mjs';
 import {CORE_STORY_PACK} from '../merge/story/core-pack.mjs';
-import {startCoreStory,completeStoryEntry,dailyStoryIncident} from '../merge/story/runtime.mjs';
+import {startCoreStory,completeStoryEntry,dailyStoryIncident,pinDailyStoryIncident} from '../merge/story/runtime.mjs';
 import {canCommitDailyIncident} from '../merge/story/daily-incident-guard.mjs';
 
 function afterSignboard(){
@@ -15,13 +15,25 @@ const pack=CORE_STORY_PACK;
 const day='2026-10-25';
 
 test('P46 same-day selected incident may commit without mutating saves',()=>{
-  const story=afterSignboard(),raw=JSON.stringify(story);
+  const story=pinDailyStoryIncident(afterSignboard(),pack,day),raw=JSON.stringify(story);
   const incident=dailyStoryIncident(story,pack,day);
   assert.ok(incident);
   assert.equal(canCommitDailyIncident(incident,day,day,story,pack),true);
   assert.equal(JSON.stringify(story),raw);
   for(const key of ['coins','energy','board','warehouse'])
     assert.equal(Object.hasOwn(story,key),false);
+});
+
+test('P61 an unpinned hash candidate cannot be opened or completed',()=>{
+  const provisional=afterSignboard(),incident=dailyStoryIncident(provisional,pack,day);
+  assert.ok(incident);
+  assert.equal(canCommitDailyIncident(incident,day,day,provisional,pack),false);
+  const pinned=pinDailyStoryIncident(provisional,pack,day);
+  assert.equal(canCommitDailyIncident(incident,day,day,pinned,pack),true);
+  assert.equal(canCommitDailyIncident(incident,day,'2026-10-26',pinned,pack),false);
+  const bad=structuredClone(pinned);
+  bad.packs.core.choices['daily-20261025']='not-a-core-event';
+  assert.equal(canCommitDailyIncident(incident,day,day,bad,pack),false);
 });
 
 test('P46 midnight invalidates an overnight-open incident, even with the same event ID',()=>{

@@ -197,10 +197,12 @@ function render(){
     const todays=dailyStoryIncident(progress,CORE_STORY_PACK,day);
     // Never display a provisional event that may change while its durable
     // same-day marker is still being committed under the story Web Lock.
-    if(todays&&(dayPinned||blocked))list.append(card(todays,completed(todays)));
+    if(todays&&dayPinned&&!blocked)list.append(card(todays,completed(todays)));
     const note=document.createElement('p');note.className='muted';
-    note.textContent=!dayPinned&&!blocked&&todays
-      ? '正在安全固定今日事件，请稍候。'
+    note.textContent=blocked
+      ? '剧情存档需核对，今日事件入口已暂停；不会展示未固定的临时事件。'
+      : !dayPinned&&todays
+        ? '正在安全固定今日事件，请稍候。'
       : dayPinned&&!todays
         ? '今日事件记录与当前进度不一致，已停止重抽；请保留存档核对。'
         : '每日事件首次解锁后在当前日期固定。重复阅读不获得金币或道具；离线不会错失主线。';
