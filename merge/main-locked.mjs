@@ -69,8 +69,9 @@ function handleTransactionResult(result,kind){
 }
 async function commit(operation){
   if(saveIssue||runtime.busy){hint('存档尚未就绪或正在安全保存，请稍后重试');return;}
-  revalidateResumedSave();
-  if(saveIssue)return;
+  // A newly adopted cross-tab snapshot invalidates the old UI button's
+  // captured target, even if its revision is otherwise safe to adopt.
+  if(!revalidateResumedSave())return;
   try{handleTransactionResult(await runtime.action(operation),'action');}
   catch{pauseUnsafe('ACTION_OUTCOME_UNCERTAIN');}
 }
@@ -80,8 +81,9 @@ function maybeProduce(slot) {
 function touchCell(slot) {
   // Storage events can be delayed: verify actual bytes before accepting a
   // tap or keyboard selection, even if the page never lost focus.
-  if (!saveIssue && !runtime.busy) revalidateResumedSave();
-  if (saveIssue || runtime.busy) { hint('存档尚未就绪或正在保存，棋盘操作已暂停'); return; }
+  if (!revalidateResumedSave()) {
+    hint('存档已更新或正在保存，请在最新棋盘上重新操作');return;
+  }
   const item = state.board[slot];
   if (selected === -1) {
     if (!item) return;
@@ -366,8 +368,7 @@ board.addEventListener('pointerdown', event => {
   if (event.button > 0) return;
   // A storage event may not yet have arrived from another tab. Never capture
   // a pointer against an unverified board; this inspection is read-only.
-  revalidateResumedSave();
-  if (saveIssue || runtime.busy) return;
+  if(!revalidateResumedSave())return;
   // A genuine new pointerdown starts a new gesture. The canceled pointer's
   // delayed synthetic click has no second pointerdown, so allow this tap.
   ignoreNextClick = false;
@@ -413,8 +414,7 @@ function completeDrag(event, cancelled = false) {
   // before a delayed storage event arrives. Recheck exact bytes at drop time
   // before resolving the target or computing a move against an old board.
   // A blocked drop still consumes its delayed synthetic click.
-  if (!saveIssue && !runtime.busy) revalidateResumedSave();
-  if (saveIssue || runtime.busy) return;
+  if(!revalidateResumedSave())return;
   const target = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-slot]');
   if (target && board.contains(target)) {
     // Keep the drop's raw-save check, then defer the engine action to the
@@ -433,10 +433,24 @@ board.addEventListener('pointercancel', event => completeDrag(event, true));
 // Both visibility restoration and BFCache pageshow must validate the actual
 // saved bytes before the resumed tab can advance its clock or accept actions.
 function revalidateResumedSave(){
-  if(saveIssue||runtime.busy||runtime.phase!=='ready')return;
+  if(saveIssue||runtime.busy||runtime.phase!=='ready')return false;
   const result=runtime.reconcile();
-  if(!result.ok)pauseUnsafe(result.reason,
-    '检测到跨标签或后台存档变化，已暂停操作；请备份并重新打开页面核对');
+  if(!result.ok){
+    pauseUnsafe(result.reason,
+      '检测到跨标签或后台存档变化，已暂停操作；请备份并重新打开页面核对');
+    return false;
+  }
+  if(result.changed){
+    // A verified external update is safe to DISPLAY, but the input event
+    // that discovered it was created against an older DOM/board. Do not
+    // reinterpret that event as a fresh action on the newly adopted state.
+    cancelStaleGesture();
+    selected=-1;activeGuidance=null;
+    // onVerified('external') already rendered the adopted state.
+    hint('已同步其他标签页进度，请在最新棋盘上重新操作');
+    return false;
+  }
+  return true;
 }
 byId('store-selected').addEventListener('click',()=>{
   if(selected < 0){hint('先点击选择一个原料');return;}
@@ -541,8 +555,7 @@ window.setInterval(async()=>{
   if(document.hidden||saveIssue||runtime.busy||timerPending)return;
   timerPending=true;
   try{
-    revalidateResumedSave();
-    if(saveIssue)return;
+    if(!revalidateResumedSave())return;
     handleTransactionResult(await runtime.clock({now:Date.now()}),'clock');
   }catch{pauseUnsafe('CLOCK_OUTCOME_UNCERTAIN');}
   finally{timerPending=false;}
