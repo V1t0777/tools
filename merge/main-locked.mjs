@@ -350,6 +350,12 @@ function render() {
 
 byId('board-guide').addEventListener('click', () => {
   if (saveIssue || runtime.busy) { hint('存档尚未就绪或正在保存，整理提示已暂停'); return; }
+  // A read-only hint must also use the latest verified board. Delayed
+  // storage events must never leave a guidance overlay on an old snapshot.
+  if (!revalidateResumedSave()) {
+    hint('存档已更新，请在最新棋盘上重新请求整理提示');
+    return;
+  }
   if (activeGuidance) { activeGuidance = null; render(); return; }
   try { activeGuidance = getBoardGuidance(state); selected = -1; render(); }
   catch { hint('存档状态异常，请保留原始数据，不要重置'); }

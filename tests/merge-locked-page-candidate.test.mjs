@@ -53,12 +53,14 @@ test('P2.64b confirmed abnormal reset backs up original bytes',()=>{
   assert.match(candidate,/if\(saveIssue&&!damaged\)/);
 });
 
-test('P2.64b candidate preserves UI and cannot silently replace live page',()=>{
+test('P2.64f reviewed atomic entry promotes the locked page without losing UI',()=>{
   for(const fn of ['renderBoard','renderOrders','renderSystems','renderSupplies',
     'renderNormalMilestones','completeDrag','refreshSupplyControls'])
     assert.match(candidate,new RegExp('function '+fn+'\\('),fn);
-  assert.match(html,/src="\.\/main\.mjs"/);
-  assert.doesNotMatch(html,/main-locked\.mjs/);
+  assert.match(html,/src="\.\/main-locked\.mjs"/);
+  assert.doesNotMatch(html,/src="\.\/main\.mjs"/);
+  assert.equal((html.match(/<script\b[^>]*type="module"/g)||[]).length,1);
+  // The old synchronous file remains for historical tests but is not loaded.
   assert.match(live,/const loaded = loadLocal\(store\)/);
   assert.doesNotMatch(live,/createNormalPageRuntime/);
 });
