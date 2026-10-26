@@ -137,6 +137,14 @@ function render(){
   $('reset-workshop').disabled=saving||reason==='STORAGE_UNAVAILABLE';
   $('export-corrupt-workshop').disabled=saving||reason!=='CORRUPT_SAVE'||typeof raw!=='string';
 }
+// A committed write can be superseded before the user reads its feedback.
+// Render the protected state first, then replace any prior success notice.
+// Never auto-replay an uncertain action: it may already have consumed resources.
+function blockWorkshopWithNotice(nextReason,notice){
+  blocked=true;reason=nextReason;selected=-1;
+  render();
+  $('board-notice').textContent=notice;
+}
 // Storage events may arrive after a tap. Refuse stale actions before
 // computing an operation or selecting a slot; the later Web Lock/CAS still
 // protects against changes between this read and the eventual write.
@@ -175,8 +183,9 @@ async function commit(result){
     : verifyStoryWorkshopPublication(storage,{expectedWorkshopRaw,expectedStoryRaw,
       buildingChanged,expectedEpoch,currentEpoch:storageEpoch});
   if(!publication.ok||blocked){
-    blocked=true;reason=publication.ok?'WRITE_CONFLICT':publication.reason;
-    selected=-1;render();return;
+    blockWorkshopWithNotice(publication.ok?'WRITE_CONFLICT':publication.reason,
+      '本次操作可能已经写入，但存档结果无法确认；请勿重复操作，重新打开页面核对金币、建筑与订单。');
+    return;
   }
   state=result.state;raw=JSON.stringify(state);selected=-1;
   $('board-notice').textContent=result.message;
@@ -186,8 +195,8 @@ async function commit(result){
   const afterRender=verifyStoryWorkshopPublication(storage,{expectedWorkshopRaw,
     expectedStoryRaw,buildingChanged,expectedEpoch,currentEpoch:storageEpoch});
   if(!afterRender.ok||blocked){
-    blocked=true;reason=afterRender.ok?'WRITE_CONFLICT':afterRender.reason;
-    selected=-1;render();
+    blockWorkshopWithNotice(afterRender.ok?'WRITE_CONFLICT':afterRender.reason,
+      '页面更新期间存档发生变化；刚才的成功提示已撤回，请重新打开页面核对进度。');
   }
 }
 function touch(index){
@@ -299,7 +308,12 @@ $('reset-workshop').addEventListener('click',async()=>{
 function recheckWorkshopOnResume(){
   if(!blocked){
     const check=checkStoryResumeSnapshot(storage,{key:STORY_WORKSHOP_KEY,expectedRaw:raw});
-    if(!check.ok){storageEpoch++;blocked=true;reason=check.reason;selected=-1;}
+    if(!check.ok){
+      storageEpoch++;
+      blockWorkshopWithNotice(check.reason,
+        '页面恢复时发现工作台存档已变化或无法读取；此前提示不再可信，请重新打开页面核对进度。');
+      return;
+    }
   }
   render();
 }
@@ -309,7 +323,9 @@ document.addEventListener('visibilitychange',()=>{
 });
 window.addEventListener('storage',event=>{
   if(shouldBlockStoryStorageEvent(event,{key:STORY_WORKSHOP_KEY,storage})){
-    storageEpoch++;blocked=true;reason='WRITE_CONFLICT';selected=-1;render();
+    storageEpoch++;
+    blockWorkshopWithNotice('WRITE_CONFLICT',
+      '检测到其他标签页修改了工作台存档；此前成功提示不再可信，请重新打开页面核对进度。');
   }else if(shouldRefreshWorkshopForStoryEvent(event,storage)){
     // Story chapter progress changes building eligibility without changing the board.
     render();
