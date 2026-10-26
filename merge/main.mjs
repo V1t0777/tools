@@ -45,7 +45,7 @@ function persist(nextState=state,{confirmedReset=false}={}) {
     : '无法确认安全保存 · 游戏操作已暂停，请备份并重新打开页面核对';
   return receipt.ok;
 }
-function commit(actionOrResult) {
+function commit(result) {
   // Buttons outside the board (orders, upgrades, warehouse and supplies)
   // must not process a stale save when storage events arrive late. Revalidate
   // even rejected engine results, which otherwise skip the persistence CAS.
@@ -53,7 +53,7 @@ function commit(actionOrResult) {
   if(saveIssue) { hint('存档状态未确认，已暂停操作；请先备份并重新打开页面核对'); return; }
   // Defer engine evaluation until after the actual raw save is verified.
   // This remains a synchronous CAS path, not a cross-tab Web Lock.
-  const result=typeof actionOrResult==='function'?actionOrResult(state):actionOrResult;
+  if(typeof result==='function') result=result(state);
   if(!result.ok) { render(); hint(result.message); return; }
   if(!persist(result.state)) {
     render();
