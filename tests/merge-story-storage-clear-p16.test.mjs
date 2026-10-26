@@ -51,7 +51,8 @@ test('P16 UI invalidates queued actions and closes stale dialogue after cross-ta
     assert.ok(file.includes('shouldBlockStoryStorageEvent(event,'));
   }
   assert.ok(workshop.includes('async function commit(result){\n  // One in-flight action'));
-  assert.ok(workshop.includes('if(!revalidateWorkshopBeforeInteraction())return;\n  if(!result.ok)'),\n    'the P64 preflight must cancel stale actions before engine result handling');
+  assert.ok(workshop.includes('if(!revalidateWorkshopBeforeInteraction())return;\n  if(!result.ok)'),
+    'the P64 preflight must cancel stale actions before engine result handling');
   assert.ok(workshop.includes("selected=-1;render();"));
   assert.ok(dialogue.includes("if(blocked&&!reset)return false;"));
   assert.ok(dialogue.includes("selectedChoice=null;"));
