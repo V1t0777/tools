@@ -211,3 +211,91 @@ test('P2.64c supply tap captures producer selection before delayed Web Lock',asy
   assert.ok(firstAfter.cooldownUntil<seed.board[42].cooldownUntil);
   assert.equal(secondAfter.cooldownUntil,seed.board[44].cooldownUntil);
 });
+
+test('P2.64d canceled mobile pointer consumes delayed compatibility click but not a fresh tap',async()=>{
+  const h=await mount(),board=h.id('board');
+  const first=board.children[0],producer=board.children[42];
+  board.dispatch('pointerdown',{target:first,pointerId:7,clientX:0,clientY:0});
+  board.dispatch('pointermove',{target:first,pointerId:7,clientX:16,clientY:0});
+  assert.equal(h.doc.body.children.length,1,'drag ghost must exist');
+  board.dispatch('pointercancel',{target:first,pointerId:7,clientX:16,clientY:0});
+  assert.equal(h.doc.body.children.length,0,'canceled drag ghost removed');
+  board.dispatch('click',{target:producer,detail:1});
+  await settle();
+  assert.equal(h.saved().revision,0,'late canceled click must not produce');
+  board.dispatch('pointerdown',{target:producer,pointerId:8});
+  board.dispatch('click',{target:producer,detail:1});
+  await settle();
+  assert.equal(h.saved().revision,1,'new real pointerdown clears guard');
+});
+
+test('P2.64d BFCache resume adopts verified other-tab progress before next action',async()=>{
+  const h=await mount(),old=h.saved();
+  h.doc.hidden=true;
+  h.win.dispatch('pagehide');
+  const newer={...old,coins:old.coins+123,revision:old.revision+1};
+  h.storage.setItem(SAVE_KEY,JSON.stringify(newer));
+  h.win.dispatch('pageshow',{persisted:true});
+  assert.equal(h.id('coins').textContent,old.coins.toLocaleString('zh-CN'));
+  h.doc.hidden=false;
+  h.win.dispatch('pageshow',{persisted:true});
+  assert.equal(h.id('coins').textContent,newer.coins.toLocaleString('zh-CN'));
+  assert.match(h.id('save-status').textContent,/已同步其他标签页进度/);
+  const board=h.id('board');
+  board.dispatch('click',{target:board.children[0],detail:1});
+  board.dispatch('click',{target:board.children[1],detail:1});
+  await settle();
+  assert.equal(h.saved().revision,newer.revision+1);
+  assert.equal(h.saved().coins,newer.coins);
+});
+
+test('P2.64d hiding while an action waits on Web Locks blocks stale UI publication',async()=>{
+  const h=await mount(),board=h.id('board');
+  h.win.pauseNextLock=true;
+  board.dispatch('click',{target:board.children[0],detail:1});
+  board.dispatch('click',{target:board.children[1],detail:1});
+  await settle();
+  assert.equal(typeof h.win.releaseLock,'function');
+  const writesBefore=h.writes.length;
+  h.doc.hidden=true;
+  h.doc.dispatch('visibilitychange');
+  h.win.dispatch('pagehide');
+  h.win.releaseLock();
+  await settle();
+  assert.match(h.id('save-status').textContent,/已暂停/);
+  assert.ok(h.writes.length>=writesBefore,
+    'a pending write may have committed; do not claim rollback');
+  const count=h.writes.length;
+  h.doc.hidden=false;
+  h.win.dispatch('pageshow',{persisted:true});
+  board.dispatch('click',{target:board.children[42],detail:1});
+  await settle();
+  assert.equal(h.writes.length,count,'blocked session must never replay input');
+});
+
+test('P2.64d active lock cancels old drag ghost before a second pointer move',async()=>{
+  const h=await mount(),board=h.id('board');
+  board.dispatch('pointerdown',{target:board.children[0],pointerId:5});
+  board.dispatch('pointermove',{target:board.children[0],pointerId:5,clientX:15});
+  assert.equal(h.doc.body.children.length,1);
+  h.win.pauseNextLock=true;
+  board.dispatch('click',{target:board.children[42],detail:1});
+  await settle();
+  assert.equal(typeof h.win.releaseLock,'function');
+  board.dispatch('pointermove',{target:board.children[0],pointerId:5,clientX:30});
+  assert.equal(h.doc.body.children.length,0);
+  h.win.releaseLock();
+  await settle();
+  assert.equal(h.saved().revision,1);
+  assert.deepEqual(h.writes,[SAVE_KEY,SAVE_KEY]);
+});
+
+test('P2.64d corrupt original export is read-only while gameplay remains blocked',async()=>{
+  const raw='{original-unparseable',h=await mount({initialRaw:raw});
+  assert.match(h.id('save-status').textContent,/异常存档/);
+  h.id('export-local-save').click();
+  assert.match(h.id('notice').textContent,/已请求下载/);
+  assert.equal(h.storage.getItem(SAVE_KEY),raw);
+  assert.deepEqual(h.writes,[]);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});

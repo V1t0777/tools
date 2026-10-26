@@ -381,6 +381,9 @@ board.addEventListener('pointerdown', event => {
 });
 board.addEventListener('pointermove', event => {
   if (!drag || event.pointerId !== drag.id) return;
+  // A save may begin while a pointer is held. Never keep showing a ghost
+  // for a gesture that can no longer safely commit.
+  if (saveIssue || runtime.busy) { cancelStaleGesture(); return; }
   const dist = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
   if (!drag.moved && dist < 9) return;
   if (!drag.moved) {
@@ -397,7 +400,11 @@ function completeDrag(event, cancelled = false) {
   const { origin, moved, ghost } = drag;
   drag = null;
   ghost?.remove();
-  if (!moved || cancelled) return;
+  // A canceled pointer (scroll, OS interruption, browser gesture) must not
+  // become a late compatibility click. The next genuine pointerdown clears
+  // this guard; keyboard activation (detail === 0) is never suppressed.
+  if (cancelled) { ignoreNextClick = true; return; }
+  if (!moved) return;
   // Mobile browsers may dispatch a synthetic click in a later task.
   // Keep the guard until that click is consumed or a genuine new pointerdown
   // begins; a zero-delay timer can clear it before the delayed click arrives.
