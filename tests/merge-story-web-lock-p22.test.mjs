@@ -85,7 +85,14 @@ test('P22 workshop UI disables actions while waiting, and retains exact-raw CAS'
   assert.ok(ui.includes('storyBuildingWriteAllowed(storage,state,result.state,expectedStoryRaw)'));
   assert.ok(ui.includes('writeStoryWorkshop(storage,result.state,{expectedRaw})'));
   assert.ok(ui.includes('saving=false;'));
-  assert.ok(ui.includes("if(!attempt.ok||attempt.value!==true||blocked)"));
+  // P62 supersedes the old boolean-only check: a successful lock callback
+  // is not publishable until the exact snapshot is rechecked after release.
+  assert.ok(ui.includes('const expectedWorkshopRaw=attempt.ok&&attempt.value===true'));
+  assert.ok(ui.includes('if(!publication.ok||blocked)'));
+  const lockAt=ui.indexOf('const attempt=await runStoryWriteWithLock(');
+  const guardAt=ui.indexOf('const publication=expectedWorkshopRaw===null');
+  const publishAt=ui.indexOf('state=result.state;raw=JSON.stringify(state);');
+  assert.ok(lockAt>=0&&lockAt<guardAt&&guardAt<publishAt);
   assert.ok(ui.includes("$('reset-workshop').disabled=saving||"));
   assert.ok(ui.includes("if(saving)return;"));
   for(const forbidden of ['innerHTML','insertAdjacentHTML','fetch(','sendBeacon(','localStorage.setItem','SAVE_KEY'])
