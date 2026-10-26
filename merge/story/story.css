@@ -29,3 +29,12 @@ dialog{border:1px solid var(--line);border-radius:22px;max-width:min(560px,calc(
 
 /* P44: returning to a scene focuses the real card without auto-opening dialogue. */
 .story-card:target,.story-card:focus{outline:3px solid var(--accent);outline-offset:3px;scroll-margin-top:16px}
+
+/* P57: mobile-first mainline guidance, without fixed bottom overlays. */
+.journey-actions{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);display:grid;gap:8px}
+.journey-actions [hidden]{display:none!important}
+.journey-guidance{font-size:13px;color:var(--ink);font-weight:700;margin:0;overflow-wrap:anywhere}
+.journey-primary{display:flex;align-items:center;justify-content:center;min-height:44px;border:0;border-radius:12px;background:var(--accent);color:white;font-weight:800;text-align:center;padding:10px 14px;text-decoration:none}
+.journey-primary:disabled{opacity:.55;cursor:not-allowed}
+.journey-actions .muted{margin:0;overflow-wrap:anywhere}
+@media(prefers-color-scheme:dark){.journey-primary{background:#527d6d;color:white}}

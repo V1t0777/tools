@@ -19,6 +19,7 @@ import {shouldRefreshStoryDependencyEvent} from './storage-event-guard.mjs';
 import {STORY_WORKSHOP_KEY,readStoryWorkshop} from './workshop-storage.mjs';
 import {inspectStoryWorkshopRequirement,inspectStoryWorkshopRequirementFromRead,storyWorkshopRequirement,storyWorkshopGoalHref} from './workshop-gate.mjs';
 import {storyDialogueCommitAllowed} from './dialogue-commit-guard.mjs';
+import {nextCoreStoryJourney} from './journey-guide.mjs';
 import {createEmptyStoryProgress,STORY_SAVE_KEY} from '../mode-boundaries.mjs';
 
 const $=id=>document.getElementById(id);
@@ -137,6 +138,28 @@ function render(){
   $('progress-fill').style.width=(100*count/main.length)+'%';
   const next=main.find(item=>!completed(item));
   $('chapter-hint').textContent=next?'下一段 · '+next.chapter+' · '+next.title:'第一卷完结：灯火重新亮起，但远方仍有未讲完的故事。';
+  // Read-only first-volume guide: take the same real prerequisite path as
+  // story cards; a locked scene never becomes a shortcut or a reward grant.
+  const journey=blocked?{kind:'unavailable',sideCount:0}:
+    nextCoreStoryJourney(progress,readStoryWorkshop(store));
+  const journeyButton=$('journey-read'),journeyLink=$('journey-workshop');
+  journeyButton.hidden=journey.kind!=='story';
+  journeyButton.disabled=blocked||saving;
+  if(journey.kind==='story')journeyButton.textContent='阅读下一幕 · '+journey.entry.title;
+  journeyLink.hidden=blocked||journey.kind!=='workshop';
+  if(journey.kind==='workshop'){
+    journeyLink.href=journey.href;
+    journeyLink.textContent=journey.blocked?'前往核对剧情工作台存档 →':'前往完成经营目标 →';
+  }
+  $('journey-guidance').textContent=blocked?'剧情存档需要核对，已停止下一步操作。':
+    journey.kind==='story'?'下一步：继续 '+journey.entry.title+'。':
+      journey.kind==='workshop'?'下一步：'+journey.requirement.description+'（'+
+        Math.min(journey.requirement.current,journey.requirement.goal)+' / '+journey.requirement.goal+'）。':
+        journey.kind==='complete'?'第一卷主线已完成，人物支线仍可继续体验。':
+          '暂时没有可继续的主线，请核对存档与故事前置条件。';
+  $('journey-side').textContent=!blocked&&journey.sideCount>0
+    ? '另有 '+journey.sideCount+' 段已解锁的人物支线可以阅读。':'';
+
   document.querySelectorAll('.tabs [data-kind]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.kind===kind)));
   const list=$('story-list');list.replaceChildren();
   const day=localDay();
@@ -198,6 +221,15 @@ function lineElement(line){
 }
 function open(entry){
   if(saving)return;
+  if(!blocked){
+    const snapshot=checkStoryResumeSnapshot(store,{key:STORY_SAVE_KEY,expectedRaw:raw});
+    if(!snapshot.ok){
+      storageEpoch++;blocked=true;reason=snapshot.reason;render();return;
+    }
+    // A pre-rendered card is not proof that this scene remains unlocked.
+    if(!availableStoryEntries(progress,CORE_STORY_PACK,entry.kind).includes(entry)&&
+      !completedStoryEntries(progress,CORE_STORY_PACK,entry.kind).includes(entry))return;
+  }
   const openedDay=localDay();
   // A card rendered before local midnight must never open yesterday's event.
   if(entry.kind==='incident'&&!canCommitDailyIncident(entry,openedDay,openedDay,progress,CORE_STORY_PACK)){
@@ -263,10 +295,24 @@ function open(entry){
       button.setAttribute('aria-pressed','false');
       button.addEventListener('click',()=>{
         if(saving||blocked)return;
+        const storyAtChoice=checkStoryResumeSnapshot(store,{key:STORY_SAVE_KEY,expectedRaw:raw});
+        if(!storyAtChoice.ok){
+          storageEpoch++;blocked=true;reason=storyAtChoice.reason;
+          selectedChoice=null;
+          if($('story-dialog').open)$('story-dialog').close();
+          render();return;
+        }
+        if(!openWorkshopCurrent()){
+          selectedChoice=null;
+          $('dialog-reply').textContent='工作台进度已变化，请关闭并重新打开对白后选择。';
+          $('complete-story').disabled=true;
+          $('dialog-choices').querySelectorAll('button').forEach(b=>b.disabled=true);
+          return;
+        }
         selectedChoice=choice.id;
         $('dialog-choices').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));
         $('dialog-reply').textContent=choice.reply;
-        $('complete-story').disabled=blocked||!inspectStoryWorkshopRequirement(entry.id,store).met;
+        $('complete-story').disabled=blocked||!inspectStoryWorkshopRequirementFromRead(entry.id,workshopAtOpen).met;
       });
       $('dialog-choices').append(button);
     }
@@ -283,6 +329,13 @@ function openWorkshopCurrent(){
     key:STORY_WORKSHOP_KEY,expectedRaw:selectedWorkshopRaw
   }).ok;
 }
+$('journey-read').addEventListener('click',()=>{
+  if(saving||blocked)return;
+  const plan=nextCoreStoryJourney(progress,readStoryWorkshop(store));
+  if(plan.kind!=='story')return;
+  kind='main';render();
+  open(plan.entry);
+});
 $('close-dialog').addEventListener('click',()=>$('story-dialog').close());
 $('complete-story').addEventListener('click',async()=>{
   if(saving||!selected)return;
