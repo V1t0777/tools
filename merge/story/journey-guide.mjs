@@ -1,7 +1,7 @@
 /** P57: read-only, core-only next-step guidance, never an unlock or reward. */
 import {validateStoryProgress} from '../mode-boundaries.mjs';
 import {CORE_STORY_PACK} from './core-pack.mjs';
-import {availableStoryEntries,completedStoryEntries} from './runtime.mjs';
+import {availableStoryEntries,completedStoryEntries,dailyStoryIncident,pinnedDailyStoryIncident} from './runtime.mjs';
 import {inspectStoryWorkshopRequirementFromRead,storyWorkshopGoalHref} from './workshop-gate.mjs';
 
 /** Return the next real unlocked first-volume action. Never trust injected DLC IDs. */
@@ -44,4 +44,26 @@ export function nextCoreSideJourney(progress,workshopRead){
   return Object.freeze({kind:'workshop',entry:firstGated.entry,available:unlocked.length,
     requirement:firstGated.requirement,blocked:firstGated.requirement.blocked,
     href:storyWorkshopGoalHref(firstGated.entry.id)});
+}
+
+/** P60: only an already durably pinned local-day incident is actionable.
+ * A provisional hash selection must never be advertised as an available
+ * event while the story Web Lock is still committing its daily marker.
+ * Read-only, core-only, and independent of workshop/normal-mode resources.
+ */
+export function nextCoreDailyJourney(progress,dayKey){
+  if(!validateStoryProgress(progress)||!Object.hasOwn(progress.packs,'core'))
+    return Object.freeze({kind:'unavailable'});
+  try{
+    const pinned=pinnedDailyStoryIncident(progress,CORE_STORY_PACK,dayKey);
+    const entry=dailyStoryIncident(progress,CORE_STORY_PACK,dayKey);
+    if(!pinned)return Object.freeze({kind:entry?'pending':'none'});
+    // A pin referring to a no-longer-eligible scene is a consistency error,
+    // not permission to reroll or display a different event.
+    if(!entry)return Object.freeze({kind:'blocked'});
+    return Object.freeze({kind:'story',entry,
+      completed:progress.packs.core.completed.incident.includes(entry.id)});
+  }catch{
+    return Object.freeze({kind:'unavailable'});
+  }
 }

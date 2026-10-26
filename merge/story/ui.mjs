@@ -19,7 +19,7 @@ import {shouldRefreshStoryDependencyEvent} from './storage-event-guard.mjs';
 import {STORY_WORKSHOP_KEY,readStoryWorkshop} from './workshop-storage.mjs';
 import {inspectStoryWorkshopRequirement,inspectStoryWorkshopRequirementFromRead,storyWorkshopRequirement,storyWorkshopGoalHref} from './workshop-gate.mjs';
 import {storyDialogueCommitAllowed} from './dialogue-commit-guard.mjs';
-import {nextCoreStoryJourney,nextCoreSideJourney} from './journey-guide.mjs';
+import {nextCoreStoryJourney,nextCoreSideJourney,nextCoreDailyJourney} from './journey-guide.mjs';
 import {createEmptyStoryProgress,STORY_SAVE_KEY} from '../mode-boundaries.mjs';
 
 const $=id=>document.getElementById(id);
@@ -132,6 +132,7 @@ function card(entry,done=false){
 }
 function render(){
   status();
+  const day=localDay();
   const count=progress.packs.core?.completed.main.length??0;
   $('progress-count').textContent=count+' / '+main.length;
   $('progress-track').setAttribute('aria-valuenow',String(count));
@@ -174,9 +175,23 @@ function render(){
       '先完成支线经营目标 · '+sideJourney.requirement.description+' →';
   }
 
+  // Never offer a provisional daily event before its Web-Locked pin lands.
+  // The guide only reads the core story save; it never rerolls an incident.
+  const dailyPlan=blocked?{kind:'unavailable'}:nextCoreDailyJourney(progress,day);
+  const dailyButton=$('journey-daily-read');
+  dailyButton.hidden=dailyPlan.kind!=='story';
+  dailyButton.disabled=blocked||saving;
+  if(dailyPlan.kind==='story')
+    dailyButton.textContent=(dailyPlan.completed?'回看':'阅读')+'今日事件 · '+dailyPlan.entry.title;
+  $('journey-daily').textContent=blocked?'今日事件入口已暂停：请先核对剧情存档。':
+    dailyPlan.kind==='pending'?'今日事件正在安全固定，稍候即可阅读。':
+      dailyPlan.kind==='blocked'?'今日事件固定记录与当前剧情不一致；已停止重抽，请保留存档核对。':
+        dailyPlan.kind==='story'?'今日事件已固定；不会因主线推进而重抽。':
+          dailyPlan.kind==='none'?'目前尚无已解锁的今日事件。':
+            '今日事件暂不可用，请核对存档或设备日期。';
+
   document.querySelectorAll('.tabs [data-kind]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.kind===kind)));
   const list=$('story-list');list.replaceChildren();
-  const day=localDay();
   const dayPinned=pinnedDailyStoryIncident(progress,CORE_STORY_PACK,day);
   if(kind==='incident'){
     const todays=dailyStoryIncident(progress,CORE_STORY_PACK,day);
@@ -360,6 +375,24 @@ $('journey-side-read').addEventListener('click',()=>{
   open(plan.entry);
 });
 
+// A shortcut is only a focus aid: never reuse an old day's pinned candidate
+// or skip the existing exact-raw save and incident-day guards in open().
+$('journey-daily-read').addEventListener('click',()=>{
+  if(saving||blocked)return;
+  const day=localDay();
+  const plan=nextCoreDailyJourney(progress,day);
+  if(plan.kind!=='story')return;
+  const snapshot=checkStoryResumeSnapshot(store,{key:STORY_SAVE_KEY,expectedRaw:raw});
+  if(!snapshot.ok){
+    storageEpoch++;blocked=true;reason=snapshot.reason;render();return;
+  }
+  if(localDay()!==day)return;
+  kind='incident';render();
+  if(localDay()!==day)return;
+  const current=nextCoreDailyJourney(progress,day);
+  if(current.kind!=='story'||current.entry!==plan.entry)return;
+  open(plan.entry);
+});
 $('complete-story').addEventListener('click',async()=>{
   if(saving||!selected)return;
   // A stale incident must not be completed from an overnight-open dialogue.

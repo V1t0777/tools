@@ -42,3 +42,7 @@ dialog{border:1px solid var(--line);border-radius:22px;max-width:min(560px,calc(
 /* P58: optional side-story action remains accessible on narrow iPhone screens. */
 .journey-secondary{background:#e4ede5;color:var(--ink);border:1px solid var(--line);overflow-wrap:anywhere}
 @media(prefers-color-scheme:dark){.journey-secondary{background:#345249;color:var(--ink)}}
+
+/* P60: optional daily event shortcut uses the existing 44px touch target;
+   no sticky overlays, no unsafe motion, and both color schemes inherit. */
+#journey-daily-read{min-height:44px;overflow-wrap:anywhere}
