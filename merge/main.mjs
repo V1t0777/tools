@@ -53,7 +53,25 @@ function commit(result) {
   if(saveIssue) { hint('存档状态未确认，已暂停操作；请先备份并重新打开页面核对'); return; }
   // Defer engine evaluation until after the actual raw save is verified.
   // This remains a synchronous CAS path, not a cross-tab Web Lock.
-  if(typeof result==='function') result=result(state);
+  if(typeof result==='function') {
+    // An engine action must never mutate the published in-memory baseline,
+    // including when it fails or throws. The raw save remains authoritative.
+    const baseline=JSON.stringify(state);
+    try { result=result(state); } catch { result=null; }
+    let mutated=false;
+    try { mutated=JSON.stringify(state)!==baseline; } catch { mutated=true; }
+    if(mutated) {
+      // Rebuild the verified pre-action snapshot; do not leave a damaged
+      // board visible or let a later timer persist the mutated object.
+      state=JSON.parse(baseline);
+      saveIssue='ACTION_MUTATED_BASELINE';
+      byId('save-status').textContent='游戏动作修改了原始进度，已暂停写入 · 请保留原始存档';
+      selected=-1; activeGuidance=null;
+      render();
+      hint('游戏动作异常，原进度已恢复到内存；请备份并重新打开页面核对');
+      return;
+    }
+  }
   // Every successful ordinary engine action must advance exactly one revision.
   // The synchronous page still lacks an atomic cross-tab Web Lock, so never
   // let a malformed action result bypass this additional write invariant.
