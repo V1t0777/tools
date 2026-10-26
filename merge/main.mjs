@@ -379,6 +379,12 @@ function completeDrag(event, cancelled = false) {
   // Keep the guard until that click is consumed or a genuine new pointerdown
   // begins; a zero-delay timer can clear it before the delayed click arrives.
   ignoreNextClick = true;
+  // The save may change after pointerdown while the pointer is moving and
+  // before a delayed storage event arrives. Recheck exact bytes at drop time
+  // before resolving the target or computing a move against an old board.
+  // A blocked drop still consumes its delayed synthetic click.
+  if (!saveIssue) revalidateResumedSave();
+  if (saveIssue) return;
   const target = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-slot]');
   if (target && board.contains(target)) {
     const result = moveOrMerge(state, origin, Number(target.dataset.slot));
