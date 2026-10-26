@@ -263,7 +263,12 @@ function renderSupplies(now=Date.now()) {
     button.dataset.supplyUse=id;
     button.textContent='使用';
     button.setAttribute('aria-label',`使用${def.name}，当前有${owned}个`);
-    button.addEventListener('click',()=>commit(current=>useSupply(current,id,select.value)));
+    button.addEventListener('click',()=>{
+      // Snapshot the chosen producer before the asynchronous Web Lock wait.
+      // A later selection change must not redirect this already-queued tap.
+      const producerId=select.value;
+      commit(current=>useSupply(current,id,producerId));
+    });
     row.append(details,button);bag.append(row);
 
     const used=state.shop.purchases[id];

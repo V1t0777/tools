@@ -1,0 +1,213 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {SAVE_KEY,ABNORMAL_RESET_BACKUP_KEY} from '../merge/storage.mjs';
+import {STORY_SAVE_KEY} from '../merge/mode-boundaries.mjs';
+import {NORMAL_SAVE_LOCK_NAME} from '../merge/normal-save-lock.mjs';
+import {createInitialState} from '../merge/engine.mjs';
+
+class Element {
+  constructor(tag='div') {
+    this.tagName=tag.toUpperCase();this.children=[];this.parentElement=null;
+    this.dataset={};this.style={};this.listeners=new Map();this.attributes=new Map();
+    this.classList={toggle(){},add(){},remove(){}};
+    this._text='';this._value='';this.disabled=false;
+  }
+  get textContent(){return this._text||this.children.map(e=>e.textContent).join('');}
+  set textContent(value){this._text=String(value);this.children=[];}
+  get value(){
+    return this.tagName==='SELECT'&&!this._value
+      ?(this.options[0]?.value??''):this._value;
+  }
+  set value(value){this._value=String(value);}
+  get options(){return this.children.filter(e=>e.tagName==='OPTION');}
+  append(...nodes) {
+    for(const node of nodes){
+      if(node.tagName==='#FRAGMENT'){this.append(...node.children);continue;}
+      node.parentElement=this;this.children.push(node);
+    }
+  }
+  replaceChildren(...nodes){this.children=[];this._text='';this.append(...nodes);}
+  setAttribute(key,value){this.attributes.set(key,String(value));}
+  getAttribute(key){return this.attributes.get(key)??null;}
+  addEventListener(type,fn){
+    const handlers=this.listeners.get(type)??[];
+    handlers.push(fn);this.listeners.set(type,handlers);
+  }
+  removeEventListener(type,fn){
+    this.listeners.set(type,(this.listeners.get(type)??[]).filter(x=>x!==fn));
+  }
+  dispatch(type,extra={}) {
+    for(const fn of this.listeners.get(type)??[])
+      fn({type,target:this,detail:1,button:0,pointerId:1,
+        clientX:0,clientY:0,...extra});
+  }
+  closest(selector){
+    if(selector!=='[data-slot]')throw Error('unexpected selector '+selector);
+    for(let node=this;node;node=node.parentElement)
+      if(node.dataset.slot!==undefined)return node;
+    return null;
+  }
+  contains(node){
+    for(let parent=node;parent;parent=parent.parentElement)
+      if(parent===this)return true;
+    return false;
+  }
+  querySelector(selector){
+    const match=/^\[data-supply-use="([^"]+)"\]$/.exec(selector);
+    if(!match)throw Error('unexpected selector '+selector);
+    const find=node=>{
+      if(node.dataset.supplyUse===match[1])return node;
+      for(const child of node.children){const found=find(child);if(found)return found;}
+      return null;
+    };
+    return find(this);
+  }
+  remove(){
+    if(this.parentElement)
+      this.parentElement.children=this.parentElement.children.filter(x=>x!==this);
+    this.parentElement=null;
+  }
+  click(){this.dispatch('click');}
+  showModal(){this.open=true;}
+  close(){this.open=false;}
+}
+let fixtureId=0;
+const settle=async()=>{
+  for(let i=0;i<8;i++)await new Promise(resolve=>setImmediate(resolve));
+};
+async function mount({initialRaw=null,locksAvailable=true}={}) {
+  const map=new Map(),writes=[];
+  if(initialRaw!==null)map.set(SAVE_KEY,initialRaw);
+  map.set(STORY_SAVE_KEY,'story-not-touched');
+  const storage={
+    getItem:key=>map.has(key)?map.get(key):null,
+    setItem(key,value){writes.push(key);map.set(key,String(value));}
+  };
+  let held=false;
+  const locks={request(name,options,callback){
+    assert.equal(name,NORMAL_SAVE_LOCK_NAME);
+    assert.deepEqual(options,{mode:'exclusive',ifAvailable:true});
+    if(held)return Promise.resolve(callback(null));
+    held=true;
+    return Promise.resolve().then(async()=>{
+      if(win.pauseNextLock){
+        win.pauseNextLock=false;
+        await new Promise(resolve=>{win.releaseLock=resolve;});
+      }
+      return callback({name,mode:'exclusive'});
+    }).finally(()=>{held=false;});
+  }};
+  const ids=new Map();
+  const doc=new Element('document');
+  doc.hidden=false;
+  doc.body=new Element('body');
+  doc.getElementById=id=>{
+    if(!ids.has(id))ids.set(id,new Element(id==='supply-producer'?'select':'div'));
+    return ids.get(id);
+  };
+  doc.createElement=tag=>new Element(tag);
+  doc.createDocumentFragment=()=>new Element('#fragment');
+  doc.elementFromPoint=()=>null;
+  const win=new Element('window');
+  win.localStorage=storage;
+  win.navigator={locks:locksAvailable?locks:null};
+  win.setInterval=fn=>{win.timer=fn;return 1;};
+  win.setTimeout=()=>1;
+  win.clearTimeout=()=>{};
+  win.confirm=()=>true;
+  globalThis.document=doc;
+  globalThis.window=win;
+  await import('../merge/main-locked.mjs?dom-fixture='+fixtureId++);
+  await settle();
+  return {doc,win,storage,map,writes,
+    id:key=>doc.getElementById(key),
+    saved:()=>JSON.parse(storage.getItem(SAVE_KEY))};
+}
+
+test('P2.64c actual candidate DOM: verified startup, board merge and confirmed reset',async()=>{
+  const h=await mount();
+  assert.match(h.id('save-status').textContent,/已保存于此浏览器/);
+  assert.equal(h.saved().revision,0);
+  const board=h.id('board');
+  board.dispatch('click',{target:board.children[0],detail:1});
+  board.dispatch('click',{target:board.children[1],detail:1});
+  await settle();
+  assert.equal(h.saved().revision,1);
+  assert.equal(h.saved().board[0],null);
+  assert.equal(h.saved().board[1].tier,2);
+  h.id('reset').click();
+  await settle();
+  assert.equal(h.saved().revision,0);
+  assert.equal(h.saved().board[0].tier,1);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  assert.deepEqual(h.writes,[SAVE_KEY,SAVE_KEY,SAVE_KEY]);
+});
+
+test('P2.64c actual candidate DOM: storage fork during drag blocks and consumes late click',async()=>{
+  const h=await mount(),board=h.id('board');
+  const first=board.children[0],second=board.children[1];
+  board.dispatch('pointerdown',{target:first,pointerId:5,clientX:0,clientY:0});
+  board.dispatch('pointermove',{target:first,pointerId:5,clientX:15,clientY:0});
+  const saved=h.saved();
+  h.storage.setItem(SAVE_KEY,JSON.stringify({...saved,coins:saved.coins+99}));
+  const count=h.writes.length;
+  h.win.dispatch('storage',{storageArea:h.storage,key:SAVE_KEY});
+  assert.match(h.id('save-status').textContent,/已暂停/);
+  board.dispatch('click',{target:second,detail:1});
+  await settle();
+  assert.equal(h.writes.length,count);
+  assert.equal(h.saved().coins,99);
+  assert.equal(h.saved().revision,0);
+});
+
+test('P2.64c actual candidate DOM: corrupt original remains until backed-up confirmed reset',async()=>{
+  const raw='{bad-original',h=await mount({initialRaw:raw});
+  assert.equal(h.storage.getItem(SAVE_KEY),raw);
+  assert.match(h.id('save-status').textContent,/异常存档/);
+  assert.equal(h.writes.length,0);
+  h.id('reset').click();
+  await settle();
+  assert.equal(h.storage.getItem(ABNORMAL_RESET_BACKUP_KEY),raw);
+  assert.equal(h.saved().revision,0);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});
+
+test('P2.64c actual candidate DOM: absent Web Locks never writes or resets',async()=>{
+  const h=await mount({locksAvailable:false});
+  assert.equal(h.storage.getItem(SAVE_KEY),null);
+  assert.equal(h.writes.length,0);
+  h.id('board').dispatch('click',{target:h.id('board').children[0],detail:1});
+  h.id('reset').click();
+  await settle();
+  assert.equal(h.writes.length,0);
+  assert.match(h.id('save-status').textContent,/已暂停/);
+});
+
+test('P2.64c supply tap captures producer selection before delayed Web Lock',async()=>{
+  const now=Date.now(),seed=createInitialState(now);
+  seed.shop.purchases.speed=1;seed.bag.speed=1;
+  seed.board[42].charges=0;seed.board[42].cooldownUntil=now+120_000;
+  seed.board[44].charges=0;seed.board[44].cooldownUntil=now+150_000;
+  const h=await mount({initialRaw:JSON.stringify(seed)});
+  const select=h.id('supply-producer');
+  assert.equal(select.options.length,3);
+  const first=select.options[0].value,second=select.options[1].value;
+  assert.notEqual(first,second);
+  select.value=first;
+  h.win.pauseNextLock=true;
+  const speed=h.id('supply-bag').querySelector('[data-supply-use="speed"]');
+  assert.equal(speed.disabled,false);
+  speed.click();
+  await settle();
+  assert.equal(typeof h.win.releaseLock,'function');
+  select.value=second;
+  h.win.releaseLock();
+  await settle();
+  const after=h.saved();
+  assert.equal(after.revision,1);
+  assert.equal(after.bag.speed,0);
+  const firstAfter=after.board.find(p=>p?.id===first);
+  const secondAfter=after.board.find(p=>p?.id===second);
+  assert.ok(firstAfter.cooldownUntil<seed.board[42].cooldownUntil);
+  assert.equal(secondAfter.cooldownUntil,seed.board[44].cooldownUntil);
+});

@@ -130,6 +130,12 @@ export function createNormalPageRuntime({locks,storage,onVerified}={}) {
       if(phase==='starting'||phase==='cold'||flight.busy||resetBusy)
         return reject('UI_TRANSACTION_BUSY');
       const hadConflict=phase==='blocked';
+      // A conflict or uncertain write must NEVER be reset from a caller-
+      // supplied new baseline. Only known malformed original bytes can be
+      // preserved and explicitly reset without reloading the page.
+      if(hadConflict&&reason!=='CORRUPT_SAVE'&&
+          reason!=='UNSUPPORTED_OR_CORRUPT_SAVE')
+        return reject('BLOCKED_RESET_REQUIRES_RELOAD');
       if(hadConflict&&typeof expectedRaw!=='string')
         return reject('NO_TRUSTED_BASELINE');
       if(!hadConflict&&phase!=='ready')return reject('STARTUP_REQUIRED');
