@@ -7,8 +7,9 @@ import {SAVE_KEY} from '../merge/storage.mjs';
 // Runs the actual story workshop entry module with an event-capable DOM.
 // This is a Node fault-injection harness, NOT an iPhone/WebView emulator.
 let sequence=0;
-async function mount({makeLocks}={}){
+async function mount({makeLocks,corruptWorkshop=false}={}){
   const data=new Map([[STORY_SAVE_KEY,'story-sentinel'],[SAVE_KEY,'normal-sentinel']]);
+  if(corruptWorkshop)data.set(STORY_WORKSHOP_KEY,'{broken');
   let writes=0;
   const storage={
     getItem:key=>data.has(key)?data.get(key):null,
@@ -161,6 +162,31 @@ test('P70 pending Web Lock reset is cancelled by pagehide without a second write
     assert.equal(h.writes,0);
     assert.match(h.notice(),/重置操作的最终状态无法确认/);
     assert.equal(h.data.has(STORY_WORKSHOP_KEY),false);
+    assert.equal(h.data.get(SAVE_KEY),'normal-sentinel');
+  }finally{h.restore();}
+});
+
+
+test('P82 workshop reset refuses consent after pagehide without any write',async()=>{
+  const h=await mount();
+  try{
+    let calls=0;
+    h.window.confirm=()=>{calls++;h.window.emit('pagehide');return true;};
+    await h.reset();
+    assert.equal(calls,1);
+    assert.equal(h.writes,0);
+    assert.equal(h.data.has(STORY_WORKSHOP_KEY),false);
+    assert.equal(h.data.get(SAVE_KEY),'normal-sentinel');
+  }finally{h.restore();}
+});
+
+test('P82 corrupt workshop export rejects pagehide during native consent',async()=>{
+  const h=await mount({corruptWorkshop:true});
+  try{
+    h.window.confirm=()=>{h.window.emit('pagehide');return true;};
+    await h.document.getElementById('export-corrupt-workshop').fire('click');
+    assert.equal(h.writes,0);
+    assert.equal(h.data.get(STORY_WORKSHOP_KEY),'{broken');
     assert.equal(h.data.get(SAVE_KEY),'normal-sentinel');
   }finally{h.restore();}
 });

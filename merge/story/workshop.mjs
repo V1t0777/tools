@@ -321,8 +321,11 @@ $('build-storefront').addEventListener('click',()=>{
   commit(upgradeBuilding(state,'storefront'));
 });
 $('export-corrupt-workshop').addEventListener('click',()=>{
-  if(pageSuspended()||reason!=='CORRUPT_SAVE'||typeof raw!=='string')return;
+  if(saving||pageSuspended()||reason!=='CORRUPT_SAVE'||typeof raw!=='string')return;
+  // Native confirmation may suspend or BFCache a mobile page.
+  const confirmationEpoch=storageEpoch;
   if(!window.confirm('将异常剧情工作台记录保存为本地文本文件？文件可能包含个人游玩信息，请妥善保管；不会上传或修改浏览器存档。'))return;
+  if(saving||pageSuspended()||storageEpoch!==confirmationEpoch)return;
   const evidence=captureStoryWorkshopEvidence(storage,{key:STORY_WORKSHOP_KEY,expectedRaw:raw,confirmedByUser:true});
   if(!evidence.ok){
     if(evidence.code==='STALE_SNAPSHOT'){blocked=true;reason='WRITE_CONFLICT';render();}
@@ -348,8 +351,17 @@ $('reset-workshop').addEventListener('click',async()=>{
   if(saving||pageSuspended())return;
   // A queued click must not bypass the disabled reset button on storage failure.
   if(reason==='STORAGE_UNAVAILABLE')return;
+  // Both dialogs belong to one uninterrupted visible-page interaction.
+  const confirmationEpoch=storageEpoch;
   if(reason==='CORRUPT_SAVE'&&!window.confirm('异常原始记录会被重置覆盖。建议先导出并确认备份文件可用。仍要继续重置吗？'))return;
+  if(pageSuspended()||storageEpoch!==confirmationEpoch)return;
   if(!window.confirm('确认重置剧情工作台？此处的金币、物品和订单进度将丢失，不影响普通经营或已读剧情。'))return;
+  if(pageSuspended()||storageEpoch!==confirmationEpoch)return;
+  const preflight=checkStoryResumeSnapshot(storage,{key:STORY_WORKSHOP_KEY,expectedRaw:raw});
+  if(!preflight.ok){
+    blockWorkshopWithNotice(preflight.reason,'确认期间工作台存档发生变化，重置已取消；请重新打开页面核对。');
+    return;
+  }
   // Only enter the same Web Locks protocol as normal workshop writes AFTER confirmation.
   // The lock callback re-reads the original snapshot and still requires exact-raw CAS.
   const expectedRaw=raw,expectedEpoch=storageEpoch;

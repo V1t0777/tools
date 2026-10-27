@@ -38,8 +38,9 @@ test('P81 stale epoch, suspended page and invalid storage fail closed',()=>{
 });
 
 let sequence=0;
-async function mount({replaceAfterLock=false}={}){
-  const original=initial(),peer=JSON.stringify({...JSON.parse(original),revision:50});
+async function mount({replaceAfterLock=false,corruptStory=false}={}){
+  const original=corruptStory?'{broken':initial();
+  const peer=corruptStory?null:JSON.stringify({...JSON.parse(original),revision:50});
   const storage=store(original),writes=[];
   const set=storage.setItem;
   storage.setItem=(key,value)=>{writes.push(key);set(key,value);};
@@ -84,7 +85,8 @@ async function mount({replaceAfterLock=false}={}){
   const window={
     localStorage:storage,navigator:{locks},location:{hash:''},
     confirm:()=>true,setInterval(){},setTimeout(){},requestAnimationFrame(){},
-    addEventListener:(...args)=>winEvents.addEventListener(...args)
+    addEventListener:(...args)=>winEvents.addEventListener(...args),
+    emit:(...args)=>winEvents.fire(...args)
   };
   const oldWindow=globalThis.window,oldDocument=globalThis.document;
   globalThis.window=window;globalThis.document=document;
@@ -94,7 +96,7 @@ async function mount({replaceAfterLock=false}={}){
     globalThis.window=oldWindow;globalThis.document=oldDocument;throw error;
   }
   return {
-    storage,original,peer,writes,
+    storage,original,peer,writes,window,document,
     reset:()=>document.getElementById('reset-story').fire('click'),
     status:()=>document.getElementById('save-state').textContent,
     restore(){globalThis.window=oldWindow;globalThis.document=oldDocument;}
@@ -121,6 +123,31 @@ test('P81 unchanged story reset publishes normally and leaves other modes intact
     assert.notEqual(h.storage.getItem(STORY_SAVE_KEY),h.original);
     assert.match(h.status(),/剧情进度已保存/);
     assert.equal(h.storage.getItem(SAVE_KEY),'normal-sentinel');
+    assert.equal(h.storage.getItem(STORY_WORKSHOP_KEY),'workshop-sentinel');
+  }finally{h.restore();}
+});
+
+
+test('P82 dialogue reset refuses consent after pagehide without any write',async()=>{
+  const h=await mount();
+  try{
+    let calls=0;
+    h.window.confirm=()=>{calls++;h.window.emit('pagehide');return true;};
+    await h.reset();
+    assert.equal(calls,1);
+    assert.deepEqual(h.writes,[]);
+    assert.equal(h.storage.getItem(STORY_SAVE_KEY),h.original);
+    assert.equal(h.storage.getItem(SAVE_KEY),'normal-sentinel');
+  }finally{h.restore();}
+});
+
+test('P82 corrupt dialogue export rejects pagehide during native consent',async()=>{
+  const h=await mount({corruptStory:true});
+  try{
+    h.window.confirm=()=>{h.window.emit('pagehide');return true;};
+    await h.document.getElementById('export-corrupt-story').fire('click');
+    assert.deepEqual(h.writes,[]);
+    assert.equal(h.storage.getItem(STORY_SAVE_KEY),'{broken');
     assert.equal(h.storage.getItem(STORY_WORKSHOP_KEY),'workshop-sentinel');
   }finally{h.restore();}
 });

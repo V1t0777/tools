@@ -479,7 +479,9 @@ document.querySelectorAll('.tabs [data-kind]').forEach(btn=>btn.addEventListener
 }));
 $('export-corrupt-story').addEventListener('click',()=>{
   if(saving||pageSuspended()||reason!=='CORRUPT_SAVE'||typeof raw!=='string')return;
+  const confirmationEpoch=storageEpoch;
   if(!window.confirm('将异常剧情对白存档保存为本地文本文件？文件可能包含个人游玩信息，不会上传或修改浏览器存档。'))return;
+  if(saving||pageSuspended()||storageEpoch!==confirmationEpoch)return;
   const evidence=captureStoryWorkshopEvidence(store,{key:STORY_SAVE_KEY,expectedRaw:raw,confirmedByUser:true});
   if(!evidence.ok){
     if(evidence.code==='STALE_SNAPSHOT'){blocked=true;reason='WRITE_CONFLICT';render();}
@@ -503,8 +505,12 @@ $('export-corrupt-story').addEventListener('click',()=>{
 });
 $('reset-story').addEventListener('click',async()=>{
   if(saving||pageSuspended())return;
+  // Do not reuse consent after a native modal backgrounds/resumes this page.
+  const confirmationEpoch=storageEpoch;
   if(reason==='CORRUPT_SAVE'&&!window.confirm('异常剧情对白存档会被重置覆盖。建议先导出并确认备份文件可用。仍要继续重置吗？'))return;
+  if(saving||pageSuspended()||storageEpoch!==confirmationEpoch)return;
   if(!window.confirm('确认重置此浏览器的剧情进度吗？此操作不影响普通经营存档，但剧情选择与已读记录不可恢复。'))return;
+  if(saving||pageSuspended()||storageEpoch!==confirmationEpoch)return;
   const current=readStorySave(store);
   if(current.reason==='STORAGE_UNAVAILABLE')return;
   if(current.raw!==raw){
