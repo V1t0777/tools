@@ -595,6 +595,10 @@ byId('export-abnormal-reset-backup').addEventListener('click', () => {
 // File import is an explicit user gesture; never modify shared story HTML.
 // A detached file chooser is not a restore permission. The exact observed
 // baseline is revalidated after asynchronous reading and every confirmation.
+// A native iOS/WeChat chooser may return without firing the input 'cancel'
+// event. Release only an orphaned chooser after a visible/focused return and
+// a generous grace period for delayed 'change'; never authorize a stale file.
+const IMPORT_PICKER_RETURN_GRACE_MS=15_000;
 let importEpoch=0,importBusy=false,importPicker=null,queuedHiddenSelection=null;
 let activeImportRead=null;
 let deliverHiddenSelection=()=>{};
@@ -645,6 +649,23 @@ if(saveActions){
   backupButton.className='text-button';
   backupButton.textContent='导出恢复前备份';
   saveActions.append(importButton,importFile,backupButton);
+  const releaseOrphanedPickerAfterReturn=()=>{
+    const picker=importPicker;
+    if(!picker||document.hidden)return;
+    try{
+      window.setTimeout(()=>{
+        // An old timeout must never cancel a newer chooser, active file read,
+        // or a legitimate selection delivered after the focus event.
+        if(importPicker!==picker||importBusy||pageSuspended())return;
+        importPicker=null;queuedHiddenSelection=null;importFile.value='';
+        hint('文件选择器未返回结果，已解除等待；请重新点击导入');
+      },IMPORT_PICKER_RETURN_GRACE_MS);
+    }catch{/* No timer: preserve the fail-closed chooser lease. */}
+  };
+  window.addEventListener('focus',releaseOrphanedPickerAfterReturn);
+  document.addEventListener('visibilitychange',()=>{
+    if(!document.hidden)releaseOrphanedPickerAfterReturn();
+  });
   importButton.addEventListener('click',()=>{
     if(importBusy||runtime.busy||saveIssue||pageSuspended()){
       hint('存档未就绪或页面处于后台，暂不能导入');return;
