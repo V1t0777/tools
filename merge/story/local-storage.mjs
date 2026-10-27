@@ -27,6 +27,14 @@ export function writeStorySave(storage,progress,{expectedRaw,confirmedReset=fals
       const previous=JSON.parse(current);
       if(!validateStoryProgress(previous)||progress.revision<=previous.revision)return false;
     }
+    if(confirmedReset&&typeof current==='string'&&current.length<=MAX_STORY_SAVE_BYTES){
+      // A confirmed reset may replace damaged data, but a VALID snapshot
+      // must still advance revision. Otherwise a stale tab can replay an
+      // older (or identical) snapshot after reset, defeating ABA protection.
+      let previous;
+      try{previous=JSON.parse(current);}catch{}
+      if(validateStoryProgress(previous)&&progress.revision<=previous.revision)return false;
+    }
     const serialized=JSON.stringify(progress);
     if(serialized.length>MAX_STORY_SAVE_BYTES)return false;
     // Serialization may take time while another tab writes. Narrow the race window;

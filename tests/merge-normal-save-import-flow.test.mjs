@@ -84,3 +84,54 @@ test('P2.65i suspended page and locked UI fail closed before file read',async()=
   assert.equal((await performNormalSaveImport(f.config)).reason,'SAVE_NOT_READY');
   assert.equal(reads,0);assert.equal(f.calls.length,0);
 });
+
+test('P2.65o a hung native file read times out without any restore or confirmation',async()=>{
+  const f=fixture();let timeout,late,cleared=0,confirms=0;
+  f.config.file.text=()=>new Promise(resolve=>{late=resolve;});
+  f.config.schedule=(callback,ms)=>{
+    assert.equal(ms,45_000);timeout=callback;return 12;
+  };
+  f.config.cancelSchedule=id=>{assert.equal(id,12);cleared++;};
+  f.config.confirm=()=>{confirms++;return true;};
+  const pending=performNormalSaveImport(f.config);
+  assert.equal(typeof timeout,'function');
+  timeout();
+  assert.equal((await pending).reason,'FILE_READ_TIMEOUT');
+  late(f.candidate);
+  await Promise.resolve();
+  assert.equal(cleared,1);
+  assert.equal(confirms,0);
+  assert.equal(f.calls.length,0);
+  assert.equal(f.map.get(SAVE_KEY),f.current);
+  assert.equal(f.map.get(STORY_SAVE_KEY),'story-untouched');
+});
+test('P2.65o successful file read clears deadline before confirmation',async()=>{
+  const f=fixture();let timeout,cleared=0;
+  f.config.schedule=(callback,ms)=>{timeout=callback;return 13;};
+  f.config.cancelSchedule=id=>{assert.equal(id,13);cleared++;};
+  assert.equal((await performNormalSaveImport(f.config)).ok,true);
+  assert.equal(cleared,1);
+  timeout();
+  assert.equal(f.calls.length,1,'late timer cannot replay a restore');
+});
+test('P2.65o a missing timer fails closed without reading the file',async()=>{
+  const f=fixture();let reads=0;
+  f.config.schedule=undefined;
+  // Explicitly unavailable timer: avoid the default parameter.
+  f.config.schedule=null;
+  f.config.file.text=()=>{reads++;return Promise.resolve(f.candidate);};
+  assert.equal((await performNormalSaveImport(f.config)).reason,'FILE_READ_UNAVAILABLE');
+  assert.equal(reads,0);
+  assert.equal(f.calls.length,0);
+});
+test('P2.65o changed lifecycle during a hung read takes priority over timeout',async()=>{
+  const f=fixture();let timeout,epoch=0;
+  f.config.getEpoch=()=>epoch;
+  f.config.file.text=()=>new Promise(()=>{});
+  f.config.schedule=callback=>{timeout=callback;return 14;};
+  f.config.cancelSchedule=()=>{};
+  const pending=performNormalSaveImport(f.config);
+  epoch++;timeout();
+  assert.equal((await pending).reason,'PAGE_SUSPENDED');
+  assert.equal(f.calls.length,0);
+});
