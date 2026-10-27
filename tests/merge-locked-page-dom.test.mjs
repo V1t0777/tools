@@ -1190,3 +1190,70 @@ test('P2.65p pagehide immediately releases hung import and ignores late file res
   assert.equal(h.storage.getItem(SAVE_KEY),imported);
   assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),original);
 });
+
+test('P2.65s native cancel after change aborts hung file read and permits a fresh import',async()=>{
+  const h=await mount(),original=h.storage.getItem(SAVE_KEY);
+  const controls=h.id('export-local-save').parentElement.children;
+  const button=controls.find(e=>e.id==='import-normal-save');
+  const input=controls.find(e=>e.id==='import-normal-file');
+  const imported=JSON.stringify({...h.saved(),coins:67,revision:1});
+  let late;
+  button.click();
+  input.files=[{size:imported.length,text:()=>new Promise(resolve=>{late=resolve;})}];
+  input.dispatch('change');await settle();
+  assert.equal(button.disabled,true);
+  input.dispatch('cancel');await settle();
+  assert.equal(button.disabled,false,'cancel must release pending file read immediately');
+  late(imported);await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),original);
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  button.click();
+  input.files=[{size:imported.length,text:async()=>imported}];
+  input.dispatch('change');await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),imported);
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),original);
+});
+
+test('P2.65s native cancel after confirmation revokes restore waiting for Web Lock',async()=>{
+  const h=await mount(),original=h.storage.getItem(SAVE_KEY);
+  const controls=h.id('export-local-save').parentElement.children;
+  const button=controls.find(e=>e.id==='import-normal-save');
+  const input=controls.find(e=>e.id==='import-normal-file');
+  const imported=JSON.stringify({...h.saved(),coins:91,revision:1});
+  h.win.pauseNextLock=true;
+  button.click();
+  input.files=[{size:imported.length,text:async()=>imported}];
+  input.dispatch('change');await settle();
+  assert.equal(typeof h.win.releaseLock,'function','restore must be waiting on lock');
+  input.dispatch('cancel');
+  h.win.releaseLock();await settle();
+  assert.equal(button.disabled,false);
+  assert.equal(h.storage.getItem(SAVE_KEY),original,'cancelled lock cannot write save');
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null,'cannot reserve backup');
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  button.click();
+  input.files=[{size:imported.length,text:async()=>imported}];
+  input.dispatch('change');await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),imported,'safe cancellation remains retryable');
+});
+
+test('P2.65s missing AbortController refuses import before opening native chooser',async()=>{
+  const h=await mount(),original=h.storage.getItem(SAVE_KEY);
+  const controls=h.id('export-local-save').parentElement.children;
+  const button=controls.find(e=>e.id==='import-normal-save');
+  const input=controls.find(e=>e.id==='import-normal-file');
+  let opens=0;
+  input.click=()=>{opens++;};
+  const originalController=globalThis.AbortController;
+  try{
+    globalThis.AbortController=undefined;
+    button.click();
+    assert.equal(opens,0);
+    assert.match(h.id('notice').textContent,/缺少安全取消能力/);
+    assert.equal(h.storage.getItem(SAVE_KEY),original);
+    assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null);
+  }finally{globalThis.AbortController=originalController;}
+  button.click();
+  assert.equal(opens,1,'restored capability permits a new chooser');
+});

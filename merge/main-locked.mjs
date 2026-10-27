@@ -622,6 +622,11 @@ if(saveActions){
     // Do not let a second click reauthorize an older native chooser result.
     if(importPicker){hint('文件选择尚未结束，请先完成或取消当前选择');return;}
     if(!revalidateResumedSave())return;
+    // Without a working cancellation signal, a native chooser cancellation
+    // cannot revoke a restore waiting for its Web Lock. Fail closed.
+    if(typeof AbortController!=='function'){
+      hint('当前浏览器缺少安全取消能力，暂不能导入存档');return;
+    }
     // The chooser is bound to the exact save and page lifecycle at the
     // initiating user gesture, not to whichever save is current on return.
     importPicker={epoch:importEpoch,raw:runtime.raw,hiddenOnce:false};
@@ -632,6 +637,10 @@ if(saveActions){
     catch{importPicker=null;hint('当前浏览器无法打开文件选择器');}
   });
   importFile.addEventListener('cancel',()=>{
+    // A late native cancel may arrive AFTER change and while File.text() or
+    // the locked restore is pending. Revoke that gesture, not just the picker.
+    activeImportRead?.abort();
+    importEpoch++;
     importPicker=null;queuedHiddenSelection=null;importFile.value='';
   });
   importFile.addEventListener('change',()=>{
@@ -673,9 +682,19 @@ if(saveActions){
       return;
     }
     if(importBusy){importFile.value='';hint('已有文件正在核验，请稍后重试');return;}
+    // Construct the cancellation lease before occupying the UI flight.
+    // A broken/polyfilled controller must not strand the import button.
+    let controller;
+    try{
+      controller=new AbortController();
+      if(typeof controller.abort!=='function'||!controller.signal)
+        throw Error('INVALID_ABORT_CONTROLLER');
+    }catch{
+      importFile.value='';
+      hint('当前浏览器无法安全取消文件读取，未开始导入');return;
+    }
     importBusy=true;importButton.disabled=true;
     // Abort the UI wait on backgrounding; the native read may still finish.
-    const controller=typeof AbortController==='function'?new AbortController():null;
     activeImportRead=controller;
     try{
       const result=await performNormalSaveImport({
@@ -693,12 +712,14 @@ if(saveActions){
         DOWNGRADE_CANCELLED:'已取消降级恢复，当前进度未更改',
         FILE_TOO_LARGE:'文件超过安全大小限制，未执行导入',
         FILE_READ_TIMEOUT:'读取文件超时，未恢复存档；请重新选择文件',
+        FILE_READ_CANCELLED:'文件导入已取消，当前进度未更改',
+        RESTORE_CANCELLED_BEFORE_WRITE:'文件导入已取消，未覆盖存档，可重新选择',
         FILE_READ_UNAVAILABLE:'当前浏览器无法安全安排文件读取，请重新打开页面',
         FILE_READ_FAILED:'读取文件失败，未恢复存档；请重新选择文件',
         STORY_MODE_FILE:'这是剧情模式文件，不能导入普通模式',
         CURRENT_SAVE_CHANGED:'读取期间存档已变化，请在最新页面重新选择文件',
         SAVE_CHANGED:'存档已变化，请重新选择文件',
-        PAGE_SUSPENDED:'页面切换期间已取消导入，请重新选择文件',
+        PAGE_SUSPENDED:'文件导入已取消或页面已切换，请重新选择文件',
         BACKUP_SLOT_CONFLICT:'恢复前备份槽已存在不同内容，请先导出并核对备份',
         LOCK_BUSY:'其他标签正在保存，请稍后重新选择文件',
         ALREADY_PRESENT:'所选文件与当前存档完全相同，无需导入'
