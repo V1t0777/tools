@@ -565,19 +565,33 @@ byId('export-abnormal-reset-backup').addEventListener('click', () => {
 // File import is an explicit user gesture; never modify shared story HTML.
 // A detached file chooser is not a restore permission. The exact observed
 // baseline is revalidated after asynchronous reading and every confirmation.
-let importEpoch=0,importBusy=false,importPicker=null;
-window.addEventListener('pagehide',()=>{importEpoch++;importPicker=null;});
+let importEpoch=0,importBusy=false,importPicker=null,queuedHiddenSelection=null;
+let deliverHiddenSelection=()=>{};
+window.addEventListener('pagehide',()=>{
+  importEpoch++;importPicker=null;queuedHiddenSelection=null;
+});
 document.addEventListener('visibilitychange',()=>{
-  if(!document.hidden)return;
-  // A native iOS file chooser can briefly hide its originating page without
-  // pagehide. Preserve ONE explicitly opened chooser across that transition;
-  // the runtime still suspends all writes and revalidates the exact save on
-  // return. A second hide or any pagehide permanently revokes the chooser.
+  if(!document.hidden){
+    if(queuedHiddenSelection){
+      const queued=queuedHiddenSelection;
+      // Wait for the lifecycle bridge's visible-state reconciliation before
+      // examining the file. Never read or confirm a save while hidden.
+      void Promise.resolve().then(()=>{
+        if(queuedHiddenSelection!==queued)return;
+        queuedHiddenSelection=null;
+        deliverHiddenSelection(queued);
+      });
+    }
+    return;
+  }
+  // One native chooser hide is tolerated; every other background transition
+  // invalidates pending selections and any in-flight restore confirmation.
   importEpoch++;
   if(importPicker){
-    if(importPicker.hiddenOnce)importPicker=null;
-    else importPicker.hiddenOnce=true;
-  }
+    if(importPicker.hiddenOnce){
+      importPicker=null;queuedHiddenSelection=null;
+    }else importPicker.hiddenOnce=true;
+  }else queuedHiddenSelection=null;
 });
 const saveActions=byId('export-local-save').parentElement;
 if(saveActions){
@@ -608,16 +622,41 @@ if(saveActions){
     // The chooser is bound to the exact save and page lifecycle at the
     // initiating user gesture, not to whichever save is current on return.
     importPicker={epoch:importEpoch,raw:runtime.raw,hiddenOnce:false};
+    // Re-selecting the same file after a rejected/aborted chooser must still
+    // produce a new change event on mobile browsers.
+    importFile.value='';
     try{importFile.click();}
     catch{importPicker=null;hint('当前浏览器无法打开文件选择器');}
   });
   importFile.addEventListener('cancel',()=>{
-    importPicker=null;importFile.value='';
+    importPicker=null;queuedHiddenSelection=null;importFile.value='';
   });
-  importFile.addEventListener('change',async()=>{
-    const picker=importPicker;
-    importPicker=null;
-    const file=importFile.files?.[0];
+  importFile.addEventListener('change',()=>{
+    const picker=importPicker,file=importFile.files?.[0];
+    // Some iOS/WebView choosers deliver change before visibility becomes
+    // visible. Hold only the File handle, never read, confirm or write hidden.
+    if(document.hidden&&picker?.hiddenOnce&&file){
+      if(!queuedHiddenSelection){
+        queuedHiddenSelection={file,picker};
+      }else{
+        importPicker=null;queuedHiddenSelection=null;importFile.value='';
+        hint('文件选择事件重复，已取消导入，请重新选择');
+      }
+      return;
+    }
+    if(queuedHiddenSelection){
+      importPicker=null;queuedHiddenSelection=null;importFile.value='';
+      hint('文件选择事件重复，已取消导入，请重新选择');
+      return;
+    }
+    void acceptSelectedFile(file,picker);
+  });
+  deliverHiddenSelection=({file,picker})=>{
+    if(importPicker===picker)void acceptSelectedFile(file,picker);
+  };
+  async function acceptSelectedFile(file,picker){
+    if(importPicker===picker)importPicker=null;
+    else picker=null;
     if(!file){importFile.value='';return;}
     // One hide-only native chooser roundtrip is permitted, but never a
     // pagehide/BFCache return, a second hide, or a changed original save.
@@ -657,7 +696,7 @@ if(saveActions){
       }[result.reason]||'导入预检或恢复未通过，当前存档不得视为已恢复');
     }catch{pauseUnsafe('RESTORE_UI_FAILED');}
     finally{importBusy=false;importButton.disabled=false;importFile.value='';}
-  });
+  }
   backupButton.addEventListener('click',()=>{
     const backupView={getItem:key=>{
       if(key!==SAVE_KEY||typeof store?.getItem!=='function')throw Error('STORAGE_UNAVAILABLE');
