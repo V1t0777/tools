@@ -18,7 +18,7 @@ const unchanged=Object.freeze({ok:true,changed:false,skipped:true});
  * @param {function} options.onResult synchronous UI status/update hook
  */
 export function attachNormalPageLifecycle({
-  runtime,win,doc,storage,cancelGesture=()=>{},onResult=()=>{}
+  runtime,win,doc,storage,cancelGesture=()=>{},onResult=()=>{},onFocus=()=>{}
 }={}) {
   if(!runtime||typeof runtime.reconcile!=='function'||
       typeof runtime.invalidate!=='function'||typeof runtime.block!=='function'||
@@ -27,7 +27,8 @@ export function attachNormalPageLifecycle({
       !doc||typeof doc.addEventListener!=='function'||
       typeof doc.removeEventListener!=='function'||
       typeof storage?.getItem!=='function'||
-      typeof cancelGesture!=='function'||typeof onResult!=='function')
+      typeof cancelGesture!=='function'||typeof onResult!=='function'||
+      typeof onFocus!=='function')
     throw new TypeError('INVALID_NORMAL_PAGE_LIFECYCLE');
 
   let detached=false,handling=false,pageGone=false,visibilitySuspended=false,resumePending=false;
@@ -127,7 +128,18 @@ export function attachNormalPageLifecycle({
   const focused=()=>{
     if(detached||doc.hidden||pageGone)return;
     const result=inspect('focus');
-    if(result.ok&&runtime.phase==='ready')visibilitySuspended=false;
+    if(result.ok&&runtime.phase==='ready'){
+      visibilitySuspended=false;
+      // The normal import chooser may omit native cancel. Reuse this
+      // verified focus event rather than installing a second window handler.
+      try{
+        const response=onFocus();
+        if(response&&typeof response.then==='function'){
+          void Promise.resolve(response).catch(()=>{});
+          throw new Error('ASYNC_FOCUS_CALLBACK');
+        }
+      }catch{fail('LIFECYCLE_HANDLER_FAILED','focus');}
+    }
   };
 
   win.addEventListener('storage',storageChanged);

@@ -602,6 +602,7 @@ const IMPORT_PICKER_RETURN_GRACE_MS=15_000;
 let importEpoch=0,importBusy=false,importPicker=null,queuedHiddenSelection=null;
 let activeImportRead=null;
 let deliverHiddenSelection=()=>{};
+let releaseOrphanedPickerAfterReturn=()=>{};
 window.addEventListener('pagehide',()=>{
   activeImportRead?.abort();
   importEpoch++;importPicker=null;queuedHiddenSelection=null;
@@ -649,7 +650,7 @@ if(saveActions){
   backupButton.className='text-button';
   backupButton.textContent='导出恢复前备份';
   saveActions.append(importButton,importFile,backupButton);
-  const releaseOrphanedPickerAfterReturn=()=>{
+  releaseOrphanedPickerAfterReturn=()=>{
     const picker=importPicker;
     if(!picker||document.hidden)return;
     try{
@@ -662,7 +663,6 @@ if(saveActions){
       },IMPORT_PICKER_RETURN_GRACE_MS);
     }catch{/* No timer: preserve the fail-closed chooser lease. */}
   };
-  window.addEventListener('focus',releaseOrphanedPickerAfterReturn);
   document.addEventListener('visibilitychange',()=>{
     if(!document.hidden)releaseOrphanedPickerAfterReturn();
   });
@@ -875,6 +875,7 @@ byId('close-guide').addEventListener('click', () => dialog.close());
 if(store)lifecycle=attachNormalPageLifecycle({
   runtime,win:window,doc:document,storage:store,
   cancelGesture(){cancelStaleGesture();selected=-1;activeGuidance=null;},
+  onFocus(){releaseOrphanedPickerAfterReturn();},
   onResult(result){
     if(!result.ok)pauseUnsafe(result.reason,
       '跨标签或后台存档状态异常，已暂停操作；请备份并重新打开页面核对');
