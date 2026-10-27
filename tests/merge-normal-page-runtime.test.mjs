@@ -298,3 +298,95 @@ test('P2.65n second restore cannot replace earlier evidence or lock ordinary pla
   assert.equal(db.read(STORY_SAVE_KEY),'story-untouched');
   assert.equal((await r.action(s=>moveOrMerge(s,0,2))).ok,true);
 });
+
+
+test('P2.65q BFCache invalidation while awaiting restore lock writes no backup',async()=>{
+  const old=encoded(createInitialState(now));
+  const next=encoded({...createInitialState(now),revision:2,coins:57});
+  const db=memory(old),base=locks();
+  let delay=false,release,entered;
+  const gate=new Promise(resolve=>{release=resolve;});
+  const waiting=new Promise(resolve=>{entered=resolve;});
+  const slow={request(name,opts,callback){
+    if(!delay)return base.request(name,opts,callback);
+    return base.request(name,opts,async lock=>{
+      entered();await gate;return callback(lock);
+    });
+  }};
+  const r=createNormalPageRuntime({storage:db,locks:slow});
+  assert.equal((await r.start({now})).ok,true);
+  delay=true;
+  const writes=db.writes.length;
+  const pending=r.restore(next,{expectedRaw:old,confirmed:true});
+  await waiting;r.invalidate();release();
+  assert.equal((await pending).ok,false);
+  assert.equal(r.blocked,true);
+  assert.equal(db.writes.length,writes);
+  assert.equal(db.read(SAVE_KEY),old);
+  assert.equal(db.read(RESTORE_BACKUP_KEY),null);
+  assert.equal(db.read(STORY_SAVE_KEY),'story-untouched');
+});
+
+test('P2.65q aborted file-read permission while awaiting lock can safely retry',async()=>{
+  const old=encoded(createInitialState(now));
+  const next=encoded({...createInitialState(now),revision:2,coins:57});
+  const db=memory(old),base=locks();
+  let delay=false,release,entered;
+  const gate=new Promise(resolve=>{release=resolve;});
+  const waiting=new Promise(resolve=>{entered=resolve;});
+  const slow={request(name,opts,callback){
+    if(!delay)return base.request(name,opts,callback);
+    return base.request(name,opts,async lock=>{
+      entered();await gate;return callback(lock);
+    });
+  }};
+  const r=createNormalPageRuntime({storage:db,locks:slow});
+  await r.start({now});delay=true;
+  const controller=new AbortController();
+  const writes=db.writes.length;
+  const pending=r.restore(next,{expectedRaw:old,confirmed:true,
+    signal:controller.signal});
+  await waiting;controller.abort();release();
+  assert.deepEqual(await pending,error('RESTORE_CANCELLED_BEFORE_WRITE'));
+  assert.equal(r.blocked,false);
+  assert.equal(db.writes.length,writes);
+  assert.equal(db.read(RESTORE_BACKUP_KEY),null);
+  delay=false;
+  assert.equal((await r.restore(next,{expectedRaw:old,confirmed:true})).ok,true);
+  assert.equal(db.read(SAVE_KEY),next);
+});
+
+
+for(const kind of ['action','clock','reset']){
+  test('P2.65r pagehide while waiting for '+kind+' lock never writes stale progress',async()=>{
+    const original=encoded(createInitialState(now)),db=memory(original),base=locks();
+    let delayed=false,release,entered;
+    const gate=new Promise(resolve=>{release=resolve;});
+    const waiting=new Promise(resolve=>{entered=resolve;});
+    const slow={request(name,opts,callback){
+      if(!delayed)return base.request(name,opts,callback);
+      return base.request(name,opts,async lock=>{
+        entered();await gate;return callback(lock);
+      });
+    }};
+    const events=[];
+    const r=createNormalPageRuntime({storage:db,locks:slow,
+      onVerified:(_s,_raw,event)=>events.push(event)});
+    assert.equal((await r.start({now})).ok,true);
+    delayed=true;
+    const writes=db.writes.length;
+    const pending=kind==='action'?r.action(s=>moveOrMerge(s,0,2)):
+      kind==='clock'?r.clock({now:now+ENERGY_REGEN_MS}):
+        r.reset({confirmed:true,now:now+10});
+    await waiting;
+    r.invalidate(); // pagehide/BFCache lifecycle bridge
+    release();
+    assert.equal((await pending).ok,false);
+    assert.equal(r.blocked,true);
+    assert.equal(db.writes.length,writes,'no write after revoked UI permission');
+    assert.equal(db.read(SAVE_KEY),original);
+    assert.equal(db.read(ABNORMAL_RESET_BACKUP_KEY),null);
+    assert.equal(db.read(STORY_SAVE_KEY),'story-untouched');
+    assert.deepEqual(events,['startup']);
+  });
+}

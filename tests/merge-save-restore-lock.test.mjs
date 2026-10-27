@@ -169,3 +169,29 @@ test('P2.61e forged lock return cannot claim successful restore',async()=>{
   assert.equal(db.read(SAVE_KEY),next);
   assert.deepEqual(db.writes.map(([key])=>key),[RESTORE_BACKUP_KEY,SAVE_KEY]);
 });
+
+
+test('P2.65q late lock grant checks cancelled chooser before backup or save writes',async()=>{
+  const old=raw(1),next=raw(2),db=storage(old);
+  let allow=true,release,entered;
+  const gate=new Promise(resolve=>{release=resolve;});
+  const waiting=new Promise(resolve=>{entered=resolve;});
+  const manager={async request(name,_opts,callback){
+    entered();await gate;return callback({name,mode:'exclusive'});
+  }};
+  const pending=restore(next,db,manager,{expectedRaw:old,confirmed:true,
+    canCommit:()=>allow});
+  await waiting;allow=false;release();
+  assert.deepEqual(await pending,{ok:false,reason:'RESTORE_CANCELLED_BEFORE_WRITE'});
+  assert.deepEqual(db.writes,[]);
+  assert.equal(db.read(SAVE_KEY),old);
+  assert.equal(db.read(RESTORE_BACKUP_KEY),null);
+});
+
+test('P2.65q throwing lock-time guard fails closed without touching storage',async()=>{
+  const old=raw(1),db=storage(old),manager=locks();
+  assert.deepEqual(await restore(raw(2),db,manager,{expectedRaw:old,
+    confirmed:true,canCommit:()=>{throw Error('page gone');}}),
+    {ok:false,reason:'RESTORE_CANCELLED_BEFORE_WRITE'});
+  assert.deepEqual(db.writes,[]);
+});

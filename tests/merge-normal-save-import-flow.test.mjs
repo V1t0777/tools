@@ -135,3 +135,38 @@ test('P2.65o changed lifecycle during a hung read takes priority over timeout',a
   assert.equal((await pending).reason,'PAGE_SUSPENDED');
   assert.equal(f.calls.length,0);
 });
+
+test('P2.65p pagehide abort releases hung File.text and discards late content',async()=>{
+  const f=fixture(),controller=new AbortController();
+  let late,timeout,cleared=0,confirms=0;
+  f.config.signal=controller.signal;
+  f.config.file.text=()=>new Promise(resolve=>{late=resolve;});
+  f.config.schedule=callback=>{timeout=callback;return 21;};
+  f.config.cancelSchedule=id=>{assert.equal(id,21);cleared++;};
+  f.config.confirm=()=>{confirms++;return true;};
+  const pending=performNormalSaveImport(f.config);
+  controller.abort();
+  assert.equal((await pending).reason,'PAGE_SUSPENDED');
+  assert.equal(cleared,1);
+  late(f.candidate);timeout();await Promise.resolve();
+  assert.equal(confirms,0);
+  assert.equal(f.calls.length,0);
+  assert.equal(f.map.get(SAVE_KEY),f.current);
+  assert.equal(f.map.get(STORY_SAVE_KEY),'story-untouched');
+});
+test('P2.65p pre-aborted signal never reads native file',async()=>{
+  const f=fixture(),controller=new AbortController();
+  let reads=0;
+  controller.abort();f.config.signal=controller.signal;
+  f.config.file.text=()=>{reads++;return Promise.resolve(f.candidate);};
+  assert.equal((await performNormalSaveImport(f.config)).reason,'PAGE_SUSPENDED');
+  assert.equal(reads,0);assert.equal(f.calls.length,0);
+});
+test('P2.65p backgrounding during confirmation cannot restore',async()=>{
+  const f=fixture(),controller=new AbortController();
+  f.config.signal=controller.signal;
+  f.config.confirm=()=>{controller.abort();return true;};
+  assert.equal((await performNormalSaveImport(f.config)).reason,'PAGE_SUSPENDED');
+  assert.equal(f.calls.length,0);
+  assert.equal(f.map.get(SAVE_KEY),f.current);
+});

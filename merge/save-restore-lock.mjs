@@ -19,7 +19,8 @@ const rejected = reason => Object.freeze({ok:false,reason});
  * Inject the browser's navigator.locks explicitly for testability.
  */
 export async function coordinateNormalSaveRestore(fileText,storage,lockManager,
-  {expectedRaw,confirmed=false,allowDowngrade=false}={}) {
+  {expectedRaw,confirmed=false,allowDowngrade=false,canCommit=()=>true}={}) {
+  if(typeof canCommit!=='function')return rejected('RESTORE_GUARD_UNAVAILABLE');
   if(confirmed!==true)return rejected('CONFIRMATION_REQUIRED');
   if(typeof lockManager?.request!=='function')return rejected('LOCKS_UNAVAILABLE');
   let entered=false,attempted=false,callbackRepeated=false,requestSettled=false;
@@ -38,6 +39,12 @@ export async function coordinateNormalSaveRestore(fileText,storage,lockManager,
         if(lock?.name!==RESTORE_LOCK_NAME||lock.mode!=='exclusive')
           return (expectedResult=rejected('LOCK_INVALID'));
         attempted=true;
+        // A pagehide, BFCache transition or cancelled file read may happen
+        // while a lock request is pending. Re-check inside the acquired lock
+        // BEFORE reserving the original backup or writing the normal save.
+        let allowed=false;
+        try {allowed=canCommit()===true;}catch{/* Fail closed. */}
+        if(!allowed)return (expectedResult=rejected('RESTORE_CANCELLED_BEFORE_WRITE'));
         // The restore checks expectedRaw, reserves a backup and verifies
         // the write while the participating Web Lock is held.
         return (expectedResult=commitNormalSaveRestore(fileText,storage,

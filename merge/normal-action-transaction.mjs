@@ -16,10 +16,16 @@ const reject=reason=>Object.freeze({ok:false,reason});
  * The returned state must not be published until exact storage readback.
  * This helper never performs a reset, migration, network call or cloud sync.
  */
-export async function commitNormalActionWithLock(locks,storage,{expectedRaw,action}={}) {
+export async function commitNormalActionWithLock(locks,storage,{expectedRaw,action,canCommit=()=>true}={}) {
   if(typeof expectedRaw!=='string')return reject('NO_TRUSTED_BASELINE');
   if(typeof action!=='function')return reject('INVALID_ACTION');
+  if(typeof canCommit!=='function')return reject('ACTION_GUARD_UNAVAILABLE');
   return withNormalSaveLock(locks,()=>{
+    // Pagehide/BFCache may invalidate a gesture while Web Locks is pending.
+    // Refuse before even evaluating the engine action or reading a new save.
+    let allowed=false;
+    try{allowed=canCommit()===true;}catch{/* Fail closed. */}
+    if(!allowed)return reject('ACTION_CANCELLED_BEFORE_WRITE');
     const current=peekLocalV3(storage);
     if(!current.ok)return reject(current.reason);
     if(current.raw!==expectedRaw)return reject('STALE_BASELINE');
@@ -67,10 +73,14 @@ export async function commitNormalActionWithLock(locks,storage,{expectedRaw,acti
  * exclusive lock as gameplay. A no-op tick never rewrites the save.
  * Deliberately not wired into the synchronous page until ALL writers migrate.
  */
-export async function commitNormalClockWithLock(locks,storage,{expectedRaw,now=Date.now()}={}) {
+export async function commitNormalClockWithLock(locks,storage,{expectedRaw,now=Date.now(),canCommit=()=>true}={}) {
   if(typeof expectedRaw!=='string')return reject('NO_TRUSTED_BASELINE');
   if(!Number.isFinite(now)||now<0)return reject('INVALID_CLOCK');
+  if(typeof canCommit!=='function')return reject('CLOCK_GUARD_UNAVAILABLE');
   return withNormalSaveLock(locks,()=>{
+    let allowed=false;
+    try{allowed=canCommit()===true;}catch{/* Fail closed. */}
+    if(!allowed)return reject('CLOCK_CANCELLED_BEFORE_WRITE');
     const current=peekLocalV3(storage);
     if(!current.ok)return reject(current.reason);
     if(current.raw!==expectedRaw)return reject('STALE_BASELINE');
