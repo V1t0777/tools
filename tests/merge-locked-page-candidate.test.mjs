@@ -47,8 +47,10 @@ test('P2.64b startup and UI interactions fail closed during asynchronous writes'
 
 test('P2.64b confirmed abnormal reset backs up original bytes',()=>{
   assert.match(candidate,/window\.confirm\(/);
-  assert.match(candidate,/requireOriginalBackup:true/);
-  assert.match(candidate,/expectedRaw:initialOriginalRaw/);
+  // The reset confirmation is now leased to the exact original bytes.
+  // For damaged saves, damaged===true forces backup under the same Web Lock.
+  assert.match(candidate,/const confirmedRaw=damaged\?initialOriginalRaw:runtime\.raw/);
+  assert.match(candidate,/expectedRaw:confirmedRaw,requireOriginalBackup:damaged/);
   assert.match(candidate,/runtime\.reset\(\{confirmed:true/);
   assert.match(candidate,/if\(saveIssue&&!damaged\)/);
 });
