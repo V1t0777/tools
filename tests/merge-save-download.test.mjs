@@ -105,3 +105,36 @@ test('P2.65u failed clicks release reserved slots and overflow clocks fail close
     now:()=>Number.MAX_SAFE_INTEGER}),
     {ok:false,reason:'DOWNLOAD_CLOCK_UNAVAILABLE'});
 });
+
+
+test('P2.65w last-moment source change after anchor append revokes URL without clicking',()=>{
+  const e=env();let current='original';
+  e.doc.body.append=el=>{e.calls.push(['append',el.href,el.download]);current='changed';};
+  const result=requestBrowserSaveDownload(receipt,{...e,now:()=>1_000,
+    authorizeClick:()=>current==='original'});
+  assert.deepEqual(result,{ok:false,reason:'DOWNLOAD_SOURCE_CHANGED'});
+  assert.deepEqual(e.calls.map(x=>x[0]),['create','append','revoke','remove']);
+  assert.equal(e.calls.some(x=>x[0]==='click'),false);
+  assert.equal(e.calls.some(x=>x[0]==='schedule'),false);
+});
+
+test('P2.65w throwing or malformed pre-click authorization fails closed',()=>{
+  const e=env();
+  assert.deepEqual(requestBrowserSaveDownload(receipt,{...e,authorizeClick:'yes'}),
+    {ok:false,reason:'DOWNLOAD_AUTHORIZATION_UNAVAILABLE'});
+  assert.deepEqual(e.calls,[]);
+  assert.deepEqual(requestBrowserSaveDownload(receipt,{...e,now:()=>1_000,
+    authorizeClick:()=>{throw Error('storage denied');}}),
+    {ok:false,reason:'DOWNLOAD_SOURCE_CHANGED'});
+  assert.equal(e.calls.some(x=>x[0]==='click'),false);
+  assert.equal(e.calls.filter(x=>x[0]==='revoke').length,1);
+});
+
+test('P2.65w unchanged pre-click authorization still requests a download',()=>{
+  const e=env();let checks=0;
+  const result=requestBrowserSaveDownload(receipt,{...e,now:()=>1_000,
+    authorizeClick:()=>{checks++;return true;}});
+  assert.equal(result.ok,true);
+  assert.equal(checks,1);
+  assert.equal(e.calls.filter(x=>x[0]==='click').length,1);
+});
