@@ -13,7 +13,11 @@ const SAFE_NO_WRITE_REJECTIONS=new Set([
   'ACTION_REJECTED','SAVE_LOCK_BUSY','WEB_LOCKS_UNAVAILABLE',
   'RESET_NOT_CONFIRMED','INVALID_CLOCK','INVALID_ACTION',
   'ASYNC_ACTION_NOT_ALLOWED','INVALID_BACKUP_POLICY','INVALID_RESET_FLAG',
-  'LOCK_BUSY','LOCKS_UNAVAILABLE','LOCK_INVALID','LOCK_FAILED'
+  'LOCK_BUSY','LOCKS_UNAVAILABLE','LOCK_INVALID','LOCK_FAILED',
+  // An already occupied restore-backup slot is rejected BEFORE any write.
+  // Never include BACKUP_OR_SAVE_CHANGED/BACKUP_VERIFY_FAILED here: those
+  // outcomes may involve a partial backup write or a changed save baseline.
+  'BACKUP_SLOT_CONFLICT'
 ]);
 
 export function createNormalUiFlight() {

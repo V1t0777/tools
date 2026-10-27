@@ -1049,3 +1049,119 @@ test('P2.65k reset confirmation expires after pagehide and pageshow within dialo
   assert.equal(h.saved().revision,0,'fresh post-BFCache confirmation remains usable');
   assert.equal(h.writes.length,before+1);
 });
+
+test('P2.65m hidden native change defers file read and restore until verified visible',async()=>{
+  const h=await mount(),original=h.storage.getItem(SAVE_KEY);
+  const controls=h.id('export-local-save').parentElement.children;
+  const button=controls.find(e=>e.id==='import-normal-save');
+  const input=controls.find(e=>e.id==='import-normal-file');
+  const imported=JSON.stringify({...h.saved(),coins:64,revision:1});
+  let reads=0,confirmations=0;
+  h.win.confirm=()=>{confirmations++;return true;};
+  button.click();
+  h.doc.hidden=true;h.doc.dispatch('visibilitychange');
+  input.files=[{size:imported.length,text:async()=>{reads++;return imported;}}];
+  input.dispatch('change');await settle();
+  assert.equal(reads,0,'hidden file must not be read');
+  assert.equal(confirmations,0,'hidden page must not show restore confirmation');
+  assert.equal(h.storage.getItem(SAVE_KEY),original);
+  h.doc.hidden=false;h.doc.dispatch('visibilitychange');
+  await settle();
+  assert.equal(reads,1);
+  assert.equal(confirmations,1);
+  assert.equal(h.storage.getItem(SAVE_KEY),imported);
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),original);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});
+
+test('P2.65m queued hidden file is revoked by BFCache pagehide',async()=>{
+  const h=await mount(),original=h.storage.getItem(SAVE_KEY),before=h.writes.length;
+  const controls=h.id('export-local-save').parentElement.children;
+  const input=controls.find(e=>e.id==='import-normal-file');
+  controls.find(e=>e.id==='import-normal-save').click();
+  h.doc.hidden=true;h.doc.dispatch('visibilitychange');
+  let reads=0;
+  const imported=JSON.stringify({...h.saved(),coins:64,revision:1});
+  input.files=[{size:imported.length,text:async()=>{reads++;return imported;}}];
+  input.dispatch('change');
+  h.win.dispatch('pagehide');
+  h.win.dispatch('pageshow',{persisted:true});
+  h.doc.hidden=false;h.doc.dispatch('visibilitychange');
+  await settle();
+  assert.equal(reads,0);
+  assert.equal(h.storage.getItem(SAVE_KEY),original);
+  assert.equal(h.writes.length,before);
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null);
+});
+
+test('P2.65m queued hidden file rejects cross-tab changes before visibility resumes',async()=>{
+  const h=await mount();
+  const controls=h.id('export-local-save').parentElement.children;
+  const input=controls.find(e=>e.id==='import-normal-file');
+  controls.find(e=>e.id==='import-normal-save').click();
+  h.doc.hidden=true;h.doc.dispatch('visibilitychange');
+  let reads=0;
+  const imported=JSON.stringify({...h.saved(),coins:64,revision:1});
+  input.files=[{size:imported.length,text:async()=>{reads++;return imported;}}];
+  input.dispatch('change');
+  const newer=JSON.stringify({...h.saved(),coins:37,revision:1});
+  h.storage.setItem(SAVE_KEY,newer);
+  h.doc.hidden=false;h.doc.dispatch('visibilitychange');
+  await settle();
+  assert.equal(reads,0,'changed baseline must reject before reading file');
+  assert.equal(h.storage.getItem(SAVE_KEY),newer);
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});
+
+test('P2.65m duplicate or canceled hidden change cannot restore',async()=>{
+  for(const kind of ['duplicate','cancel','second-hide']){
+    const h=await mount(),original=h.storage.getItem(SAVE_KEY),before=h.writes.length;
+    const controls=h.id('export-local-save').parentElement.children;
+    const input=controls.find(e=>e.id==='import-normal-file');
+    controls.find(e=>e.id==='import-normal-save').click();
+    h.doc.hidden=true;h.doc.dispatch('visibilitychange');
+    let reads=0;
+    const imported=JSON.stringify({...h.saved(),coins:64,revision:1});
+    input.files=[{size:imported.length,text:async()=>{reads++;return imported;}}];
+    input.dispatch('change');
+    if(kind==='duplicate')input.dispatch('change');
+    if(kind==='cancel')input.dispatch('cancel');
+    if(kind==='second-hide'){
+      h.doc.hidden=false;h.doc.dispatch('visibilitychange');
+      h.doc.hidden=true;h.doc.dispatch('visibilitychange');
+    }
+    h.doc.hidden=false;h.doc.dispatch('visibilitychange');
+    await settle();
+    assert.equal(reads,0,kind);
+    assert.equal(h.storage.getItem(SAVE_KEY),original,kind);
+    assert.equal(h.writes.length,before,kind);
+    assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null,kind);
+  }
+});
+
+
+test('P2.65n second file import preserves original backup without blocking gameplay',async()=>{
+  const h=await mount(),original=h.storage.getItem(SAVE_KEY);
+  const controls=h.id('export-local-save').parentElement.children;
+  const button=controls.find(e=>e.id==='import-normal-save');
+  const input=controls.find(e=>e.id==='import-normal-file');
+  const first=JSON.stringify({...h.saved(),revision:1,coins:42});
+  button.click();input.files=[{size:first.length,text:async()=>first}];
+  input.dispatch('change');await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),first);
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),original);
+  const writes=h.writes.length;
+  const second=JSON.stringify({...h.saved(),revision:2,coins:84});
+  button.click();input.files=[{size:second.length,text:async()=>second}];
+  input.dispatch('change');await settle();
+  assert.match(h.id('notice').textContent,/备份槽/);
+  assert.equal(h.writes.length,writes,'second import must not overwrite either slot');
+  assert.equal(h.storage.getItem(SAVE_KEY),first);
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),original);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  h.id('board').dispatch('click',{target:h.id('board').children[42],detail:1});
+  await settle();
+  assert.equal(h.saved().revision,2,'ordinary actions still work after backup conflict');
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),original);
+});
