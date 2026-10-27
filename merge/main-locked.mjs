@@ -736,15 +736,39 @@ if(saveActions){
       return store.getItem(RESTORE_BACKUP_KEY);
     }};
     const prepared=prepareLocalSaveExport(backupView);
-    if(!prepared.ok){hint(prepared.reason==='NO_SAVED_DATA'
-      ?'此浏览器尚无恢复前备份':'无法安全读取恢复前备份，请勿清理浏览器数据');return;}
+    if(!prepared.ok){
+      hint(prepared.reason==='NO_SAVED_DATA'
+        ?'此浏览器尚无恢复前备份'
+        :prepared.reason==='EXPORT_TOO_LARGE'
+          ?'恢复前备份超过安全导出上限，请勿重置或清理浏览器数据'
+          :prepared.reason==='EXPORT_ENCODING_UNAVAILABLE'
+            ?'当前浏览器无法安全编码恢复前备份，请勿清理浏览器数据'
+            :'无法读取恢复前备份，请勿清理浏览器数据');
+      return;
+    }
     const result=requestBrowserSaveDownload({...prepared,
       filename:prepared.wrapped?'yunyu-before-restore-utf16.json':
         prepared.verified?'yunyu-before-restore-v3.json':'yunyu-before-restore-original.txt'},{
       schedule:(fn,ms)=>window.setTimeout(fn,ms)
     });
-    hint(result.ok?'已请求下载恢复前原始备份，请核实文件确实保存':
-      '恢复前备份下载未启动，请勿清理浏览器数据');
+    if(!result.ok){
+      hint(result.reason==='DOWNLOAD_LIMIT_REACHED'
+        ?'恢复前备份下载过于频繁，请稍后重试，勿清理浏览器数据'
+        :result.reason==='DOWNLOAD_TOO_LARGE'
+          ?'恢复前备份文件超过浏览器下载上限，请勿清理浏览器数据'
+          :result.reason==='DOWNLOAD_UNSUPPORTED'
+            ?'当前浏览器不支持恢复前备份下载，请勿清理浏览器数据'
+            :'恢复前备份下载未启动，请勿清理浏览器数据');
+      return;
+    }
+    const message=prepared.wrapped
+      ?'已请求下载恢复前异常字符 JSON 封装备份，不可直接导入；请核实文件已保存'
+      :prepared.verified
+        ?'已请求下载恢复前原始存档，请核实文件已保存'
+        :'恢复前原始备份可能异常，已请求下载文本备份；请勿直接导入';
+    hint(result.cleanupDeferred
+      ?message+'；浏览器未能安排临时链接清理'
+      :message);
   });
 }
 
