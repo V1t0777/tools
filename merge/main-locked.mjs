@@ -525,7 +525,6 @@ byId('export-local-save').addEventListener('click', () => {
     return;
   }
   if(!allowCurrentExport(result,SAVE_KEY))return;
-  if(!allowCurrentExport(result,ABNORMAL_RESET_BACKUP_KEY))return;
   const download=requestBrowserSaveDownload(result,{
     schedule:(fn,ms)=>window.setTimeout(fn,ms)
   });
@@ -559,6 +558,7 @@ byId('export-abnormal-reset-backup').addEventListener('click', () => {
       '无法读取或编码重置前备份，请勿清理浏览器数据');
     return;
   }
+  if(!allowCurrentExport(result,ABNORMAL_RESET_BACKUP_KEY))return;
   const download=requestBrowserSaveDownload(result,{
     schedule:(fn,ms)=>window.setTimeout(fn,ms)
   });

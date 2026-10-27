@@ -12,3 +12,6 @@
 - `tests/merge-locked-page-dom.test.mjs`：三组实际 HTML 入口模拟，覆盖后台三个下载按钮、普通存档跨标签变化及两类备份变化；最终全仓库 Node、`bash scripts/security-check.sh` 和完整 Git 历史密钥扫描以新 SHA 的 Actions 结果为准。
 - 这只是读取前后两次比较，不是跨标签原子快照；第二次读取与原生下载点击之间仍可能变化，但已准备的 Blob 内容不会被混入新旧数据。真正保存落盘与文件字节仍需 iPhone Safari、微信 WebView、真实双标签人工核验。
 - 仅修改普通模式源文件/专项测试及本说明。PR #58/#59 保持 Open/Draft，不合并 main、不改正式导航/白名单、不部署 Pages/Cloudflare/Edge、不执行 Supabase SQL/迁移、不制作后门。Cloudflare 后台真实部署状态无法由 GitHub Actions 单独证明。
+
+## 首次 CI 接线纠错
+首次 SHA `0e37a150` 的 Node 回归失败（1093 通过、6 失败）：普通存档导出错误地同时核对异常重置备份键，异常备份入口却漏接对应复核；旧下载测试被错误阻断。本修订将两个键的检查精确绑定到各自按钮，保留原有业务断言和三类新增回归，不修改存档或下载配额规则。最终验收必须使用本修订的新 SHA。
