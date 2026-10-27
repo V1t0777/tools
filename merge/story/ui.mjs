@@ -296,6 +296,9 @@ function lineElement(line){
   const text=document.createElement('p');text.textContent=line.text;
   row.append(name,text);return row;
 }
+// A later choice/commit may re-read; opening a scene still uses only one
+// workshop snapshot for all displayed text and goal checks.
+const recheckUnreadableWorkshop=()=>readStoryWorkshop(store);
 function open(entry){
   if(saving||pageSuspended())return;
   if(!blocked){
@@ -410,7 +413,7 @@ function openWorkshopCurrent(){
   // repair or replace it without this tab receiving a StorageEvent.
   return storyDialogueWorkshopSnapshotCurrent({
     raw:selectedWorkshopRaw,blocked:true,reason:selectedWorkshopReason
-  },readStoryWorkshop(store));
+  },recheckUnreadableWorkshop());
 }
 $('close-dialog').addEventListener('click',()=>$('story-dialog').close());
 $('journey-read').addEventListener('click',()=>{
