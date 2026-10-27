@@ -108,11 +108,11 @@ test('P23 UI confirms before lock, disables actions, and never bypasses CAS',()=
   const ui=readFileSync(new URL('../merge/story/workshop.mjs',import.meta.url),'utf8');
   assert.ok(ui.includes("import {resetStoryWorkshopWithLock} from './workshop-reset.mjs';"));
   const handler=ui.slice(ui.indexOf("$('reset-workshop').addEventListener('click',async()=>{"));
-  assert.ok(handler.includes("if(saving)return;"));
+  assert.ok(handler.includes("if(saving||pageSuspended())return;"));
   assert.ok(handler.includes("window.confirm('确认重置剧情工作台"));
   assert.ok(handler.indexOf("window.confirm('确认重置剧情工作台")<handler.indexOf('resetStoryWorkshopWithLock('));
   assert.ok(handler.includes('saving=true;render();'));
-  assert.ok(handler.includes('expectedRaw,isCurrent:()=>storageEpoch===expectedEpoch'));
+  assert.ok(handler.includes('expectedRaw,isCurrent:()=>storageEpoch===expectedEpoch&&!pageSuspended()'));
   assert.ok(handler.includes("if(!attempt.ok||!attempt.value||storageEpoch!==expectedEpoch)"));
   const resume=ui.slice(ui.indexOf('function recheckWorkshopOnResume(){'),
     ui.indexOf("window.addEventListener('pageshow'"));

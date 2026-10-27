@@ -94,7 +94,10 @@ test('P22 workshop UI disables actions while waiting, and retains exact-raw CAS'
   const publishAt=ui.indexOf('state=result.state;raw=JSON.stringify(state);');
   assert.ok(lockAt>=0&&lockAt<guardAt&&guardAt<publishAt);
   assert.ok(ui.includes("$('reset-workshop').disabled=saving||"));
-  assert.ok(ui.includes("if(saving)return;"));
+  assert.ok(ui.includes("if(saving||pageSuspended())return;"));
+  assert.ok(ui.includes('storageEpoch===expectedEpoch&&'));
+  assert.ok(ui.includes('!pageSuspended()&&storageEpoch===expectedEpoch'));
+
   for(const forbidden of ['innerHTML','insertAdjacentHTML','fetch(','sendBeacon(','localStorage.setItem','SAVE_KEY'])
     assert.equal(ui.includes(forbidden),false,forbidden);
 });

@@ -58,7 +58,9 @@ test('story warehouse mobile UI exposes real store/withdraw and actionable full-
   assert.ok(ui.includes('state.warehouse.capacity'));
   assert.ok(ui.includes('boardHasSpace'));
   assert.ok(ui.includes('棋盘和仓库都满'));
-  assert.ok(ui.includes('button.disabled=blocked||saving||!item||!boardHasSpace'));
+  assert.ok(ui.includes('const disabled=blocked||saving||pageSuspended();'));
+  assert.ok(ui.includes('button.disabled=disabled||!item||!boardHasSpace'));
+  assert.ok(ui.includes('if(blocked||saving||pageSuspended())return false;'));
   assert.ok(css.includes('min-height:48px'));
   assert.ok(css.includes('grid-template-columns:repeat(2,minmax(0,1fr))'));
   assert.ok(css.includes('prefers-color-scheme:dark'));

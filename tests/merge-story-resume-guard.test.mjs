@@ -43,9 +43,18 @@ test('P12 both story UIs recheck after BFCache restore and foreground visibility
     assert.ok(ui.includes("import {checkStoryResumeSnapshot} from './resume-guard.mjs';"));
     assert.ok(ui.includes('checkStoryResumeSnapshot('));
     assert.ok(ui.includes('key:'+key+',expectedRaw:raw'));
-    assert.ok(ui.includes("window.addEventListener('pageshow',"+fn+")"));
     assert.ok(ui.includes("document.addEventListener('visibilitychange'"));
-    assert.ok(ui.includes("document.visibilityState==='visible'"));
+    if(key==='STORY_WORKSHOP_KEY'){
+      // P70: a hidden BFCache pageshow is NOT an immediate resume.
+      assert.ok(ui.includes("window.addEventListener('pagehide',"));
+      assert.ok(ui.includes("window.addEventListener('pageshow',()=>{"));
+      assert.ok(ui.includes("if(pageGone)resumePending=true;"));
+      assert.ok(ui.includes("else if(!pageGone||resumePending)recheckWorkshopOnResume();"));
+      assert.ok(ui.includes("document.visibilityState==='hidden'"));
+    }else{
+      assert.ok(ui.includes("window.addEventListener('pageshow',"+fn+")"));
+      assert.ok(ui.includes("document.visibilityState==='visible'"));
+    }
     // P23 workshop increments the invalidation epoch so a queued reset cannot
     // commit after BFCache/foreground detection; dialogue keeps its old guard.
     if(key==='STORY_WORKSHOP_KEY'){
