@@ -54,11 +54,13 @@ async function save(next,reset=false,commitGuard=()=>true,pinDay=null){
   if(saving)return false;
   if(pageSuspended())return false;
   const expectedRaw=raw,expectedEpoch=storageEpoch;
+  // Preserve the original cross-save guard and also reject hidden callbacks.
+  const originalCommitGuard=commitGuard;
+  commitGuard=()=>!pageSuspended()&&originalCommitGuard();
   saving=true;render();
   const attempt=await saveStoryDialogueWithLock(webLocks,store,next,{
-    expectedRaw,confirmedReset:reset,
-    commitGuard:()=>!pageSuspended()&&commitGuard(),
-    isCurrent:()=>storageEpoch===expectedEpoch&&!pageSuspended()&&(!blocked||reset)
+    expectedRaw,confirmedReset:reset,commitGuard,
+    isCurrent:()=>storageEpoch===expectedEpoch&&(!blocked||reset)
   });
   saving=false;
   // A midnight rollover can cancel an auto-pin while waiting for the lock.
@@ -123,7 +125,8 @@ function card(entry,done=false){
   const place=document.createElement('p');place.textContent=entry.chapter+' · '+entry.place;
   const button=document.createElement('button');button.type='button';
   button.textContent=done?'回看剧情':'阅读故事';
-  button.disabled=saving||pageSuspended();
+  button.disabled=saving;
+  if(pageSuspended())button.disabled=true;
   button.addEventListener('click',()=>open(entry));
   wrapper.append(head,place);
   if(!done&&requirement.required){
