@@ -12,6 +12,7 @@ import {shouldBlockStoryStorageEvent} from './storage-event-guard.mjs';
 import {shouldRefreshWorkshopForStoryEvent} from './storage-event-guard.mjs';
 import {storyGardenBuildAvailable,storyHarborBuildAvailable,storyStorefrontBuildAvailable} from './workshop-gate.mjs';
 import {storyBuildingWriteAllowed} from './building-commit-guard.mjs';
+import {nextStoryConstructionBudget,wouldSpendStoryConstructionReserve} from './supply-budget.mjs';
 const $=id=>document.getElementById(id);
 const storage=(()=>{try{return window.localStorage;}catch{return null;}})();
 const webLocks=(()=>{try{return window.navigator?.locks??null;}catch{return null;}})();
@@ -139,16 +140,36 @@ function render(){
     }
     cooldownList.append(row);
   }
+  const budget=nextStoryConstructionBudget(state);
+  $('story-supply-budget-hint').textContent=budget.ok
+    ? budget.description
+    : '无法核对建设金币预算，补给购买已暂停。';
   const shop=$('story-supply-shop');shop.replaceChildren();
   for(const [id,item] of Object.entries(SUPPLY_ITEMS)){
     const button=document.createElement('button');
     button.type='button';button.className='story-supply-action';
     button.dataset.supplyBuy=id;
     const left=item.limit-state.shop.purchases[id];
-    button.textContent=item.icon+' '+item.name+' · ◈'+item.price+'（剩余限购 '+left+'）';
-    button.disabled=disabled||left===0||state.coins<item.price;
-    button.addEventListener('click',guardRenderedAction(()=>
-      commit(purchaseSupply(state,id))));
+    const spendsReserve=wouldSpendStoryConstructionReserve(budget,item.price);
+    button.textContent=item.icon+' '+item.name+' · ◈'+item.price+'（剩余限购 '+left+'）'+
+      (spendsReserve?' · 将动用建设储备':'');
+    button.disabled=disabled||!budget.ok||left===0||state.coins<item.price;
+    button.addEventListener('click',guardRenderedAction(()=>{
+      if(spendsReserve){
+        // A risky spend requires an explicit user gesture. The usual exact-
+        // byte preflight, lock and publication guards still run AFTER consent.
+        let approved=false;
+        try{
+          approved=window.confirm('购买'+item.name+'会使下一处建设「'+
+            BUILDINGS[budget.id].name+'」金币不足。确认继续购买吗？')===true;
+        }catch{}
+        if(!approved){
+          $('board-notice').textContent='已取消补给购买，金币未扣除。';
+          return;
+        }
+      }
+      return commit(purchaseSupply(state,id));
+    }));
     shop.append(button);
   }
   const list=$('workshop-orders');list.replaceChildren();

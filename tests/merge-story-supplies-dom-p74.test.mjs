@@ -19,7 +19,7 @@ function initial({coins=600,cooldown=false}={}){
   assert.equal(validateSave(state),true);
   return state;
 }
-async function mount(state,{locks=null}={}){
+async function mount(state,{locks=null,confirm=()=>true}={}){
   const data=new Map([[STORY_WORKSHOP_KEY,JSON.stringify(state)],
     [STORY_SAVE_KEY,null],[SAVE_KEY,'normal-sentinel']]);
   const writes=[];
@@ -56,7 +56,7 @@ async function mount(state,{locks=null}={}){
     body:new Node()
   };
   const window={localStorage:storage,navigator:{locks},
-    addEventListener(){},confirm(){return true;},setTimeout(){}};
+    addEventListener(){},confirm,setTimeout(){}};
   const priorWindow=globalThis.window,priorDocument=globalThis.document;
   globalThis.window=window;globalThis.document=document;
   try{
@@ -173,5 +173,45 @@ test('P74 finite soda stock remains exhausted after reloading the isolated story
     assert.equal(validateSave(state),true);
     assert.equal(f.button('story-supply-shop','supplyBuy','soda').disabled,true);
     assert.equal(readStoryWorkshop(f.storage,now).state.shop.purchases.soda,4);
+  }finally{f.restore();}
+});
+
+test('P75 spending a construction reserve needs confirmation; cancellation preserves both mode saves',async()=>{
+  let prompts=0;
+  const f=await mount(initial({coins:160}),{confirm:message=>{
+    prompts++;assert.match(message,/后院花园/);return false;
+  }});
+  try{
+    const buy=f.button('story-supply-shop','supplyBuy','soda');
+    assert.match(f.node('story-supply-budget-hint').textContent,/后院花园/);
+    assert.match(buy.textContent,/将动用建设储备/);
+    await buy.fire('click');
+    assert.equal(prompts,1);
+    assert.deepEqual(f.writes,[]);
+    assert.equal(f.saved().coins,160);
+    assert.equal(f.saved().shop.purchases.soda,0);
+    assert.match(f.node('board-notice').textContent,/已取消补给购买/);
+    assert.equal(f.data.get(SAVE_KEY),'normal-sentinel');
+    assert.equal(f.data.get(STORY_SAVE_KEY),null);
+  }finally{f.restore();}
+});
+
+test('P75 confirmed reserve spend remains finite and shows exact next-building shortfall',async()=>{
+  let prompts=0;
+  const f=await mount(initial({coins:160}),{confirm:()=>{
+    prompts++;return true;
+  }});
+  try{
+    await f.button('story-supply-shop','supplyBuy','soda').fire('click');
+    const saved=f.saved();
+    assert.equal(prompts,1);
+    assert.equal(saved.coins,70);
+    assert.equal(saved.bag.soda,1);
+    assert.equal(saved.shop.purchases.soda,1);
+    assert.equal(validateSave(saved),true);
+    assert.match(f.node('story-supply-budget-hint').textContent,/还差 ◈90/);
+    assert.deepEqual(f.writes,[STORY_WORKSHOP_KEY]);
+    assert.equal(f.data.get(SAVE_KEY),'normal-sentinel');
+    assert.equal(f.data.get(STORY_SAVE_KEY),null);
   }finally{f.restore();}
 });
