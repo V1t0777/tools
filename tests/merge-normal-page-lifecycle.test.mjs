@@ -201,3 +201,35 @@ test('V3.1 P2.63 detached bridge removes every listener and ignores later events
   assert.deepEqual(h.changes,[]);
   assert.deepEqual(h.cancels,[]);
 });
+
+
+test('P2.65d pagehide suspends writes without document.hidden until verified pageshow',async()=>{
+  const h=harness();
+  await h.runtime.start({now});
+  assert.equal(h.bridge.suspended,false);
+  h.ui.win.emit('pagehide');
+  assert.equal(h.bridge.suspended,true);
+  h.ui.win.emit('focus');
+  assert.equal(h.bridge.suspended,true,'focus cannot revive pagehide session');
+  h.ui.win.emit('pageshow',{persisted:true});
+  assert.equal(h.bridge.suspended,false);
+  assert.equal(h.runtime.blocked,false);
+});
+
+test('P2.65d visibility restoration requires verified reconciliation',async()=>{
+  const h=harness();
+  await h.runtime.start({now});
+  h.ui.doc.hidden=true;
+  h.ui.doc.emit('visibilitychange');
+  assert.equal(h.bridge.suspended,true);
+  h.ui.doc.hidden=false;
+  h.ui.doc.emit('visibilitychange');
+  assert.equal(h.bridge.suspended,false);
+  h.ui.doc.hidden=true;
+  h.ui.doc.emit('visibilitychange');
+  h.db.setItem(SAVE_KEY,'{corrupt');
+  h.ui.doc.hidden=false;
+  h.ui.doc.emit('visibilitychange');
+  assert.equal(h.bridge.suspended,true);
+  assert.equal(h.runtime.blocked,true);
+});

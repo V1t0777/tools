@@ -30,7 +30,7 @@ export function attachNormalPageLifecycle({
       typeof cancelGesture!=='function'||typeof onResult!=='function')
     throw new TypeError('INVALID_NORMAL_PAGE_LIFECYCLE');
 
-  let detached=false,handling=false;
+  let detached=false,handling=false,pageGone=false,visibilitySuspended=false;
   const cancel=()=>{
     const result=cancelGesture();
     if(result&&typeof result.then==='function') {
@@ -87,19 +87,34 @@ export function attachNormalPageLifecycle({
   const visibilityChanged=()=>{
     if(detached)return;
     if(doc.hidden) {
+      visibilitySuspended=true;
       try {cancel();} catch {runtime.block('LIFECYCLE_HANDLER_FAILED');}
       runtime.invalidate();
-    } else inspect('visible');
+    } else if(!pageGone) {
+      const result=inspect('visible');
+      if(result.ok&&runtime.phase==='ready')visibilitySuspended=false;
+    }
   };
   const pageHidden=()=>{
     if(detached)return;
+    // Safari/BFCache may fire pagehide before document.hidden changes.
+    pageGone=true;
     try {cancel();} catch {runtime.block('LIFECYCLE_HANDLER_FAILED');}
     runtime.invalidate();
   };
   const pageShown=event=>{
-    if(!detached&&event?.persisted===true&&!doc.hidden)inspect('bfcache');
+    if(detached||doc.hidden||(event?.persisted!==true&&!pageGone))return;
+    const result=inspect('bfcache');
+    if(result.ok&&runtime.phase==='ready') {
+      pageGone=false;
+      visibilitySuspended=false;
+    }
   };
-  const focused=()=>{if(!detached&&!doc.hidden)inspect('focus');};
+  const focused=()=>{
+    if(detached||doc.hidden||pageGone)return;
+    const result=inspect('focus');
+    if(result.ok&&runtime.phase==='ready')visibilitySuspended=false;
+  };
 
   win.addEventListener('storage',storageChanged);
   win.addEventListener('pagehide',pageHidden);
@@ -108,6 +123,7 @@ export function attachNormalPageLifecycle({
   doc.addEventListener('visibilitychange',visibilityChanged);
 
   return Object.freeze({
+    get suspended(){return pageGone||visibilitySuspended||doc.hidden;},
     inspect,
     detach(){
       if(detached)return;

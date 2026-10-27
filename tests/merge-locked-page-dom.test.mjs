@@ -623,3 +623,54 @@ test('P2.65c backup download quota never overwrites confirmed reset evidence',as
     URL.revokeObjectURL=oldRevoke;
   }
 });
+
+
+test('P2.65d pagehide without hidden blocks click, timer and reset until pageshow',async()=>{
+  const h=await mount(),raw=h.storage.getItem(SAVE_KEY),writes=h.writes.length;
+  h.win.dispatch('pagehide');
+  h.id('board').dispatch('click',{target:h.id('board').children[42],detail:1});
+  h.id('reset').click();
+  await h.win.timer();
+  await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),raw);
+  assert.equal(h.writes.length,writes);
+  h.win.dispatch('focus');
+  h.id('board').dispatch('click',{target:h.id('board').children[42],detail:1});
+  await settle();
+  assert.equal(h.writes.length,writes,'focus cannot unsuspend BFCache page');
+  h.win.dispatch('pageshow',{persisted:true});
+  h.id('board').dispatch('click',{target:h.id('board').children[42],detail:1});
+  await settle();
+  assert.equal(h.saved().revision,1);
+});
+
+test('P2.65d reset confirmation interrupted by pagehide never writes',async()=>{
+  const h=await mount(),raw=h.storage.getItem(SAVE_KEY),writes=h.writes.length;
+  h.win.confirm=()=>{h.win.dispatch('pagehide');return true;};
+  h.id('reset').click();
+  await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),raw);
+  assert.equal(h.writes.length,writes);
+  assert.match(h.id('notice').textContent,/重置已取消/);
+  h.win.dispatch('pageshow',{persisted:true});
+  h.win.confirm=()=>true;
+  h.id('reset').click();
+  await settle();
+  assert.equal(h.writes.length,writes+1);
+  assert.equal(h.saved().revision,0);
+});
+
+test('P2.65d hidden visibility prevents queued producer click and reset until visible',async()=>{
+  const h=await mount(),writes=h.writes.length;
+  h.doc.hidden=true;
+  h.doc.dispatch('visibilitychange');
+  h.id('board').dispatch('click',{target:h.id('board').children[42],detail:1});
+  h.id('reset').click();
+  await settle();
+  assert.equal(h.writes.length,writes);
+  h.doc.hidden=false;
+  h.doc.dispatch('visibilitychange');
+  h.id('board').dispatch('click',{target:h.id('board').children[42],detail:1});
+  await settle();
+  assert.equal(h.saved().revision,1);
+});
