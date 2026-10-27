@@ -924,3 +924,128 @@ test('P2.65j unrequested file change and canceled chooser never restore',async()
   assert.equal(h.writes.length,before);
   assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null);
 });
+
+test('P2.65l native chooser one visibility roundtrip preserves verified import',async()=>{
+  const h=await mount(),original=h.storage.getItem(SAVE_KEY);
+  const controls=h.id('export-local-save').parentElement.children;
+  const button=controls.find(e=>e.id==='import-normal-save');
+  const input=controls.find(e=>e.id==='import-normal-file');
+  button.click();
+  h.doc.hidden=true;h.doc.dispatch('visibilitychange');
+  h.doc.hidden=false;h.doc.dispatch('visibilitychange');
+  const imported=JSON.stringify({...h.saved(),coins:46,revision:1});
+  input.files=[{size:imported.length,text:async()=>imported}];
+  input.dispatch('change');await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),imported);
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),original);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});
+
+test('P2.65l chooser hide-return refuses a changed cross-tab baseline',async()=>{
+  const h=await mount();
+  const controls=h.id('export-local-save').parentElement.children;
+  const input=controls.find(e=>e.id==='import-normal-file');
+  controls.find(e=>e.id==='import-normal-save').click();
+  h.doc.hidden=true;h.doc.dispatch('visibilitychange');
+  const newer=JSON.stringify({...h.saved(),coins:52,revision:1});
+  h.storage.setItem(SAVE_KEY,newer);
+  h.doc.hidden=false;h.doc.dispatch('visibilitychange');
+  const before=h.writes.length;
+  const imported=JSON.stringify({...h.saved(),coins:99,revision:2});
+  input.files=[{size:imported.length,text:async()=>imported}];
+  input.dispatch('change');await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),newer);
+  assert.equal(h.writes.length,before);
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});
+
+test('P2.65l chooser pagehide or second hide always revokes selection',async()=>{
+  for(const sequence of ['pagehide','second-hide']){
+    const h=await mount(),original=h.storage.getItem(SAVE_KEY),before=h.writes.length;
+    const controls=h.id('export-local-save').parentElement.children;
+    const input=controls.find(e=>e.id==='import-normal-file');
+    controls.find(e=>e.id==='import-normal-save').click();
+    h.doc.hidden=true;h.doc.dispatch('visibilitychange');
+    if(sequence==='pagehide'){
+      h.win.dispatch('pagehide');
+      h.win.dispatch('pageshow',{persisted:true});
+    }else{
+      h.doc.hidden=false;h.doc.dispatch('visibilitychange');
+      h.doc.hidden=true;h.doc.dispatch('visibilitychange');
+    }
+    h.doc.hidden=false;h.doc.dispatch('visibilitychange');
+    const imported=JSON.stringify({...h.saved(),coins:71,revision:1});
+    input.files=[{size:imported.length,text:async()=>imported}];
+    input.dispatch('change');await settle();
+    assert.equal(h.storage.getItem(SAVE_KEY),original,sequence);
+    assert.equal(h.writes.length,before,sequence);
+    assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null,sequence);
+  }
+});
+
+test('P2.65l duplicate import click cannot replace a pending chooser lease',async()=>{
+  const h=await mount();
+  const controls=h.id('export-local-save').parentElement.children;
+  const button=controls.find(e=>e.id==='import-normal-save');
+  const input=controls.find(e=>e.id==='import-normal-file');
+  let chooserOpens=0;
+  input.click=()=>{chooserOpens++;};
+  button.click();button.click();
+  assert.equal(chooserOpens,1,'only one native chooser may be outstanding');
+  input.dispatch('cancel');
+  button.click();
+  assert.equal(chooserOpens,2,'explicit cancellation permits a fresh chooser');
+});
+
+test('P2.65k reset confirmation cannot erase a newer cross-tab save adopted during dialog',async()=>{
+  const h=await mount(),before=h.writes.length;
+  const newer=JSON.stringify({...h.saved(),coins:117,revision:1});
+  let confirmations=0;
+  h.win.confirm=()=>{
+    confirmations++;
+    h.storage.setItem(SAVE_KEY,newer);
+    h.win.dispatch('storage',{storageArea:h.storage,key:SAVE_KEY});
+    return true;
+  };
+  h.id('reset').click();await settle();
+  assert.equal(confirmations,1);
+  assert.equal(h.storage.getItem(SAVE_KEY),newer);
+  assert.equal(h.writes.length,before+1,'only the external write may occur');
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  assert.match(h.id('notice').textContent,/重置已取消/);
+  // A second, fresh confirmation against the newly visible state is allowed.
+  h.win.confirm=()=>true;
+  h.id('reset').click();await settle();
+  assert.equal(h.saved().revision,0);
+  assert.equal(h.writes.length,before+2);
+});
+
+test('P2.65k reset confirmation re-reads an unannounced cross-tab save',async()=>{
+  const h=await mount(),before=h.writes.length;
+  const newer=JSON.stringify({...h.saved(),coins:82,revision:1});
+  h.win.confirm=()=>{h.storage.setItem(SAVE_KEY,newer);return true;};
+  h.id('reset').click();await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),newer);
+  assert.equal(h.writes.length,before+1,'unannounced external update must not be reset');
+  assert.equal(h.storage.getItem(ABNORMAL_RESET_BACKUP_KEY),null);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  assert.match(h.id('notice').textContent,/重置已取消/);
+});
+
+test('P2.65k reset confirmation expires after pagehide and pageshow within dialog',async()=>{
+  const h=await mount(),original=h.storage.getItem(SAVE_KEY),before=h.writes.length;
+  h.win.confirm=()=>{
+    h.win.dispatch('pagehide');
+    h.win.dispatch('pageshow',{persisted:true});
+    return true;
+  };
+  h.id('reset').click();await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),original);
+  assert.equal(h.writes.length,before);
+  assert.match(h.id('notice').textContent,/页面已切换，重置已取消/);
+  h.win.confirm=()=>true;
+  h.id('reset').click();await settle();
+  assert.equal(h.saved().revision,0,'fresh post-BFCache confirmation remains usable');
+  assert.equal(h.writes.length,before+1);
+});

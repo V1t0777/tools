@@ -568,7 +568,16 @@ byId('export-abnormal-reset-backup').addEventListener('click', () => {
 let importEpoch=0,importBusy=false,importPicker=null;
 window.addEventListener('pagehide',()=>{importEpoch++;importPicker=null;});
 document.addEventListener('visibilitychange',()=>{
-  if(document.hidden){importEpoch++;importPicker=null;}
+  if(!document.hidden)return;
+  // A native iOS file chooser can briefly hide its originating page without
+  // pagehide. Preserve ONE explicitly opened chooser across that transition;
+  // the runtime still suspends all writes and revalidates the exact save on
+  // return. A second hide or any pagehide permanently revokes the chooser.
+  importEpoch++;
+  if(importPicker){
+    if(importPicker.hiddenOnce)importPicker=null;
+    else importPicker.hiddenOnce=true;
+  }
 });
 const saveActions=byId('export-local-save').parentElement;
 if(saveActions){
@@ -593,10 +602,12 @@ if(saveActions){
     if(importBusy||runtime.busy||saveIssue||pageSuspended()){
       hint('存档未就绪或页面处于后台，暂不能导入');return;
     }
+    // Do not let a second click reauthorize an older native chooser result.
+    if(importPicker){hint('文件选择尚未结束，请先完成或取消当前选择');return;}
     if(!revalidateResumedSave())return;
     // The chooser is bound to the exact save and page lifecycle at the
     // initiating user gesture, not to whichever save is current on return.
-    importPicker={epoch:importEpoch,raw:runtime.raw};
+    importPicker={epoch:importEpoch,raw:runtime.raw,hiddenOnce:false};
     try{importFile.click();}
     catch{importPicker=null;hint('当前浏览器无法打开文件选择器');}
   });
@@ -608,7 +619,12 @@ if(saveActions){
     importPicker=null;
     const file=importFile.files?.[0];
     if(!file){importFile.value='';return;}
-    if(!picker||picker.epoch!==importEpoch||picker.raw!==runtime.raw||
+    // One hide-only native chooser roundtrip is permitted, but never a
+    // pagehide/BFCache return, a second hide, or a changed original save.
+    // Import still requires a visible verified page and explicit confirmation.
+    const chooserEpochValid=!!picker&&(picker.epoch===importEpoch||
+      (picker.hiddenOnce===true&&picker.epoch+1===importEpoch));
+    if(!chooserEpochValid||picker.raw!==runtime.raw||
         pageSuspended()||saveIssue||runtime.busy||!revalidateResumedSave()){
       importFile.value='';
       hint('文件选择期间页面或存档已变化，请重新点击导入并选择文件');
@@ -667,14 +683,33 @@ byId('reset').addEventListener('click',async()=>{
   if(saveIssue&&!damaged){
     hint('当前进度存在冲突或锁不可用，请先导出原始存档并重新打开页面核对');return;
   }
+  // Confirmation authorizes only the save visible when the dialog opens.
+  // A storage event can adopt a newer revision DURING window.confirm; never
+  // reset that unseen new baseline under an earlier confirmation.
+  if(!damaged&&!revalidateResumedSave()){
+    hint('存档尚未核验，重置已取消；请在最新棋盘上重新确认');return;
+  }
+  const confirmedRaw=damaged?initialOriginalRaw:runtime.raw;
+  const confirmedEpoch=importEpoch;
   if(!window.confirm(damaged
     ?'存档异常：将先核实并保留原始备份，再重置普通模式。建议先下载原始文件，确定继续吗？'
     :'确定重置本地试玩进度吗？当前棋盘、金币和订单会被清空，且无法恢复。'))return;
-  if(pageSuspended()){hint('页面已切换，重置已取消；请返回并重新确认');return;}
+  if(pageSuspended()||importEpoch!==confirmedEpoch){
+    hint('页面已切换，重置已取消；请返回并重新确认');return;
+  }
+  if(!damaged&&(saveIssue||runtime.phase!=='ready'||
+      runtime.raw!==confirmedRaw||!revalidateResumedSave()||
+      runtime.raw!==confirmedRaw)){
+    hint('确认期间存档已变化，重置已取消；请核对最新进度后重新确认');return;
+  }
+  if(damaged&&saveIssue!=='CORRUPT_SAVE'&&
+      saveIssue!=='UNSUPPORTED_OR_CORRUPT_SAVE'){
+    hint('异常存档状态已变化，重置已取消；请重新打开页面核对');return;
+  }
   cancelStaleGesture();
   try{
     const result=await runtime.reset({confirmed:true,
-      ...(damaged?{expectedRaw:initialOriginalRaw,requireOriginalBackup:true}:{}),
+      expectedRaw:confirmedRaw,requireOriginalBackup:damaged,
       now:Date.now()});
     if(result.ok)hint('已重置试玩进度');
     else handleTransactionResult(result,'reset');

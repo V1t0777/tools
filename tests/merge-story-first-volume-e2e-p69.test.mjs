@@ -112,3 +112,10 @@ test('P71 novice first-volume replay respects all twelve story beats and four re
   const seeds=[0,0xffffffff,...Array.from({length:48},(_,i)=>i*7919+1)];
   for(const seed of seeds)firstVolume(seed,'novice');
 });
+
+// P77: the finite-supply novice policy must still clear every real narrative
+// gate; optional side stories and daily events must remain non-mandatory.
+test('P77 finite-supply novice policy clears the full four-chapter story',()=>{
+  for(const seed of [0,7,42,20261027,0xffffffff,...Array.from({length:11},(_,i)=>i*7919+1)])
+    firstVolume(seed,'novice-supplies');
+});
