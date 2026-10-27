@@ -24,7 +24,8 @@ export function requestBrowserSaveDownload(prepared,{
   urlApi=globalThis.URL,
   BlobCtor=globalThis.Blob,
   schedule=globalThis.setTimeout,
-  now=Date.now
+  now=Date.now,
+  authorizeClick
 }={}) {
   if(prepared?.ok!==true||typeof prepared.content!=='string'||
       typeof prepared.mime!=='string'||typeof prepared.filename!=='string'||
@@ -39,6 +40,8 @@ export function requestBrowserSaveDownload(prepared,{
       typeof urlApi?.revokeObjectURL!=='function'||
       typeof BlobCtor!=='function')
     return reject('DOWNLOAD_UNSUPPORTED');
+  if(authorizeClick!==undefined&&typeof authorizeClick!=='function')
+    return reject('DOWNLOAD_AUTHORIZATION_UNAVAILABLE');
   let timestamp;
   try {timestamp=now();} catch {return reject('DOWNLOAD_CLOCK_UNAVAILABLE');}
   if(!Number.isSafeInteger(timestamp)||timestamp<0||
@@ -57,7 +60,7 @@ export function requestBrowserSaveDownload(prepared,{
   // must not bypass the bounded number of outstanding object URLs.
   const entry={url:null,expiresAt:timestamp+DOWNLOAD_URL_LIFETIME_MS};
   pending.add(entry);
-  let objectUrl=null,link=null,clicked=false;
+  let objectUrl=null,link=null,clicked=false,failedReason='DOWNLOAD_REQUEST_FAILED';
   try {
     const blob=new BlobCtor([prepared.content],{type:prepared.mime});
     if(!Number.isFinite(blob.size)||blob.size>MAX_DOWNLOAD_BYTES){
@@ -72,12 +75,23 @@ export function requestBrowserSaveDownload(prepared,{
     link.href=objectUrl;
     link.download=prepared.filename;
     doc.body.append(link);
+    // Recheck after all synchronous Blob/DOM preparation but before the
+    // native click. This reduces the stale cross-tab/lifecycle window; it
+    // does not claim an atomic snapshot across browser processes.
+    if(authorizeClick){
+      let authorized=false;
+      try{authorized=authorizeClick()===true;}catch{/* Fail closed. */}
+      if(!authorized){
+        failedReason='DOWNLOAD_SOURCE_CHANGED';
+        throw new Error('STALE_DOWNLOAD_SOURCE');
+      }
+    }
     link.click();
     clicked=true;
   } catch {
     pending.delete(entry);
     if(objectUrl){try{urlApi.revokeObjectURL(objectUrl);}catch{ /* Best effort. */ }}
-    return reject('DOWNLOAD_REQUEST_FAILED');
+    return reject(failedReason);
   } finally {
     try{link?.remove();}catch{ /* Do not undo an already requested download. */ }
   }

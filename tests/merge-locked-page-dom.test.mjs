@@ -1409,3 +1409,73 @@ test('P2.65v abnormal and restore backup exports reject changed original bytes',
     }finally{URL.createObjectURL=oldCreate;h.storage.getItem=oldGet;}
   }
 });
+
+
+test('P2.65w all three real export buttons reject source change during anchor insertion',async()=>{
+  for(const [key,buttonId] of [
+    [SAVE_KEY,'export-local-save'],
+    [ABNORMAL_RESET_BACKUP_KEY,'export-abnormal-reset-backup'],
+    [RESTORE_BACKUP_KEY,'export-restore-backup']
+  ]){
+    const h=await mount(),originalURL=globalThis.URL;
+    if(key!==SAVE_KEY)h.map.set(key,'backup-original');
+    const before=h.writes.length;
+    let clicked=0,revoked=0;
+    const oldCreate=h.doc.createElement.bind(h.doc);
+    h.doc.createElement=tag=>{
+      const node=oldCreate(tag);
+      if(tag==='a')node.click=()=>{clicked++;};
+      return node;
+    };
+    const oldAppend=h.doc.body.append.bind(h.doc.body);
+    h.doc.body.append=(...nodes)=>{
+      oldAppend(...nodes);
+      h.map.set(key,'source-changed-before-click');
+    };
+    globalThis.URL=class extends originalURL{
+      static createObjectURL(){return 'blob:p265w-preclick';}
+      static revokeObjectURL(){revoked++;}
+    };
+    try{
+      const button=buttonId==='export-restore-backup'
+        ?h.id('export-local-save').parentElement.children.find(e=>e.id===buttonId)
+        :h.id(buttonId);
+      button.click();
+      assert.equal(clicked,0,key);
+      assert.equal(revoked,1,key);
+      assert.match(h.id('notice').textContent,/下载前.*变化/,key);
+      assert.equal(h.writes.length,before,key);
+      assert.equal(h.storage.getItem(key),'source-changed-before-click',key);
+      assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched',key);
+    }finally{globalThis.URL=originalURL;}
+  }
+});
+
+test('P2.65w BFCache/hidden transition during download preparation blocks native click',async()=>{
+  const h=await mount(),originalURL=globalThis.URL;
+  const before=h.writes.length;
+  let clicked=0,revoked=0;
+  const oldCreate=h.doc.createElement.bind(h.doc);
+  h.doc.createElement=tag=>{
+    const node=oldCreate(tag);
+    if(tag==='a')node.click=()=>{clicked++;};
+    return node;
+  };
+  const oldAppend=h.doc.body.append.bind(h.doc.body);
+  h.doc.body.append=(...nodes)=>{
+    oldAppend(...nodes);
+    h.win.dispatch('pagehide',{persisted:true});
+  };
+  globalThis.URL=class extends originalURL{
+    static createObjectURL(){return 'blob:p265w-pagehide';}
+    static revokeObjectURL(){revoked++;}
+  };
+  try{
+    h.id('export-local-save').click();
+    assert.equal(clicked,0);
+    assert.equal(revoked,1);
+    assert.match(h.id('notice').textContent,/下载前.*变化/);
+    assert.equal(h.writes.length,before);
+    assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  }finally{globalThis.URL=originalURL;}
+});

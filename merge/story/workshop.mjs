@@ -351,9 +351,19 @@ $('export-corrupt-workshop').addEventListener('click',()=>{
     const receipt=requestBrowserSaveDownload({
       ok:true,content:download.content,filename:download.filename,
       mime:download.wrapped?'application/json;charset=utf-8':'text/plain;charset=utf-8'
+    },{
+      // P88: Blob creation and DOM insertion can synchronously change storage
+      // or suspend a mobile page; authorize only immediately before a.click().
+      authorizeClick:()=>!saving&&!pageSuspended()&&storageEpoch===confirmationEpoch&&
+        isPreparedStoryEvidenceCurrent(storage,{
+          key:STORY_WORKSHOP_KEY,expectedRaw:evidence.content,download
+        })
     });
     if(!receipt.ok){
-      $('board-notice').textContent=receipt.reason==='DOWNLOAD_TOO_LARGE'
+      $('board-notice').textContent=receipt.reason==='DOWNLOAD_SOURCE_CHANGED'||
+        receipt.reason==='DOWNLOAD_AUTHORIZATION_UNAVAILABLE'
+        ? '异常工作台记录在下载发起前已变化或页面暂停，已取消下载；请重新打开页面核对原始存档。'
+        : receipt.reason==='DOWNLOAD_TOO_LARGE'
         ? '异常记录编码后超过安全下载上限，已拒绝导出；原始存档仍保留，请勿重置。'
         : receipt.reason==='DOWNLOAD_LIMIT_REACHED'
           ? '待处理下载过多，请稍后再试并核对已有文件；原始存档仍保留。'

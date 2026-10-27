@@ -56,9 +56,12 @@ function allowVisibleExport(){
 }
 // Read-only exact-byte recheck: this rejects known stale exports, but does
 // not pretend localStorage reads and native downloads are cross-tab atomic.
+function exportSourceStillCurrent(prepared,key){
+  return !pageSuspended()&&isPreparedExportUnchanged(prepared,()=>store?.getItem(key));
+}
 function allowCurrentExport(prepared,key){
   if(!allowVisibleExport())return false;
-  if(isPreparedExportUnchanged(prepared,()=>store?.getItem(key)))return true;
+  if(exportSourceStillCurrent(prepared,key))return true;
   hint('导出期间原始存档或备份已变化、或无法再次读取；请重新点击导出，勿清理浏览器数据');
   return false;
 }
@@ -526,9 +529,13 @@ byId('export-local-save').addEventListener('click', () => {
   }
   if(!allowCurrentExport(result,SAVE_KEY))return;
   const download=requestBrowserSaveDownload(result,{
-    schedule:(fn,ms)=>window.setTimeout(fn,ms)
+    schedule:(fn,ms)=>window.setTimeout(fn,ms),
+    authorizeClick:()=>exportSourceStillCurrent(result,SAVE_KEY)
   });
   if(!download.ok){
+    if(download.reason==='DOWNLOAD_SOURCE_CHANGED'){
+      hint('下载前页面或原始存档已变化，未发起下载；请重新点击导出');return;
+    }
     hint(download.reason==='DOWNLOAD_LIMIT_REACHED'
       ?'下载过于频繁，临时链接尚未清理；请稍后再试，勿重置或清理存档'
       :download.reason==='DOWNLOAD_TOO_LARGE'
@@ -560,9 +567,13 @@ byId('export-abnormal-reset-backup').addEventListener('click', () => {
   }
   if(!allowCurrentExport(result,ABNORMAL_RESET_BACKUP_KEY))return;
   const download=requestBrowserSaveDownload(result,{
-    schedule:(fn,ms)=>window.setTimeout(fn,ms)
+    schedule:(fn,ms)=>window.setTimeout(fn,ms),
+    authorizeClick:()=>exportSourceStillCurrent(result,ABNORMAL_RESET_BACKUP_KEY)
   });
   if(!download.ok){
+    if(download.reason==='DOWNLOAD_SOURCE_CHANGED'){
+      hint('下载前页面或原始备份已变化，未发起下载；请重新点击导出');return;
+    }
     hint(download.reason==='DOWNLOAD_LIMIT_REACHED'
       ?'下载过于频繁，临时链接尚未清理；请稍后再试，勿清理存档'
       :download.reason==='DOWNLOAD_TOO_LARGE'
@@ -770,9 +781,13 @@ if(saveActions){
     const result=requestBrowserSaveDownload({...prepared,
       filename:prepared.wrapped?'yunyu-before-restore-utf16.json':
         prepared.verified?'yunyu-before-restore-v3.json':'yunyu-before-restore-original.txt'},{
-      schedule:(fn,ms)=>window.setTimeout(fn,ms)
+      schedule:(fn,ms)=>window.setTimeout(fn,ms),
+      authorizeClick:()=>exportSourceStillCurrent(prepared,RESTORE_BACKUP_KEY)
     });
     if(!result.ok){
+      if(result.reason==='DOWNLOAD_SOURCE_CHANGED'){
+        hint('下载前页面或恢复前备份已变化，未发起下载；请重新点击导出');return;
+      }
       hint(result.reason==='DOWNLOAD_LIMIT_REACHED'
         ?'恢复前备份下载过于频繁，请稍后重试，勿清理浏览器数据'
         :result.reason==='DOWNLOAD_TOO_LARGE'
