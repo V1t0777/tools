@@ -14,6 +14,7 @@ import {adoptConcurrentDailyPinOnResume,canKeepResumedStoryDialogue} from './dai
 import {saveStoryDialogueWithLock} from './dialogue-write.mjs';
 import {captureStoryWorkshopEvidence} from './save-evidence.mjs';
 import {checkStoryResumeSnapshot} from './resume-guard.mjs';
+import {verifyStoryDialoguePublication} from './dialogue-publication-guard.mjs';
 import {shouldBlockStoryStorageEvent} from './storage-event-guard.mjs';
 import {shouldRefreshStoryDependencyEvent} from './storage-event-guard.mjs';
 import {STORY_WORKSHOP_KEY,readStoryWorkshop} from './workshop-storage.mjs';
@@ -81,7 +82,15 @@ async function save(next,reset=false,commitGuard=()=>true,pinDay=null){
     if(!current.blocked&&
       isMatchingConcurrentDailyPin({expectedRaw,observedRaw:current.raw,proposed:next,day:pinDay,pack:CORE_STORY_PACK})){
       progress=current.progress;raw=current.raw;blocked=false;reason=null;
-      render();return true;
+      render();
+      const adoptedPublication=verifyStoryDialoguePublication(store,{
+        expectedRaw:raw,expectedEpoch,currentEpoch:storageEpoch,
+        suspended:pageSuspended()
+      });
+      if(!adoptedPublication.ok){
+        blocked=true;reason=adoptedPublication.reason;render();return false;
+      }
+      return true;
     }
   }
   if(pageSuspended()){
@@ -90,8 +99,27 @@ async function save(next,reset=false,commitGuard=()=>true,pinDay=null){
   if(!attempt.ok||attempt.value!==true||storageEpoch!==expectedEpoch||(!reset&&blocked)){
     blocked=true;reason='WRITE_CONFLICT';render();return false;
   }
-  progress=next;raw=JSON.stringify(next);blocked=false;reason=null;
-  render();return true;
+  // The Web Lock callback may have written successfully while a peer
+  // replaced the save before this awaiting page resumes. Do not announce
+  // success from a stale snapshot; check again after rendering as well.
+  const committedRaw=JSON.stringify(next);
+  const publication=verifyStoryDialoguePublication(store,{
+    expectedRaw:committedRaw,expectedEpoch,currentEpoch:storageEpoch,
+    suspended:pageSuspended()
+  });
+  if(!publication.ok){
+    blocked=true;reason=publication.reason;render();return false;
+  }
+  progress=next;raw=committedRaw;blocked=false;reason=null;
+  render();
+  const afterRender=verifyStoryDialoguePublication(store,{
+    expectedRaw:committedRaw,expectedEpoch,currentEpoch:storageEpoch,
+    suspended:pageSuspended()
+  });
+  if(!afterRender.ok){
+    blocked=true;reason=afterRender.reason;render();return false;
+  }
+  return true;
 }
 if(!blocked&&!progress.packs.core){
   const next=startCoreStory(progress,CORE_STORY_PACK);
