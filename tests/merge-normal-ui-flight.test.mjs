@@ -143,7 +143,8 @@ test('P2.52 stale and uncertain persistence failures block future operations',as
   for(const reason of ['STALE_BASELINE','SAVE_VERIFY_FAILED',
     'SAVE_REJECTED_OR_UNCERTAIN','SAVE_OUTCOME_UNCERTAIN',
     'SAVE_LOCK_OUTCOME_UNCERTAIN','STARTUP_READBACK_CHANGED',
-    'BACKUP_OUTCOME_UNCERTAIN','STORAGE_UNAVAILABLE','UNKNOWN_NEW_FAILURE']) {
+    'BACKUP_OUTCOME_UNCERTAIN','BACKUP_OR_SAVE_CHANGED',
+    'BACKUP_VERIFY_FAILED','STORAGE_UNAVAILABLE','UNKNOWN_NEW_FAILURE']) {
     const gate=createNormalUiFlight();
     let published=0;
     assert.deepEqual(await gate.run(()=>({ok:false,reason}),()=>published++),
@@ -159,7 +160,7 @@ test('P2.52 explicitly safe pre-write failures remain retryable',async()=>{
   for(const reason of ['ACTION_REJECTED','SAVE_LOCK_BUSY',
     'WEB_LOCKS_UNAVAILABLE','RESET_NOT_CONFIRMED','INVALID_CLOCK',
     'INVALID_ACTION','ASYNC_ACTION_NOT_ALLOWED','INVALID_BACKUP_POLICY',
-    'INVALID_RESET_FLAG']) {
+    'INVALID_RESET_FLAG','BACKUP_SLOT_CONFLICT']) {
     const gate=createNormalUiFlight();
     assert.deepEqual(await gate.run(()=>({ok:false,reason}),()=>{}),
       {ok:false,reason});

@@ -1139,3 +1139,29 @@ test('P2.65m duplicate or canceled hidden change cannot restore',async()=>{
     assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null,kind);
   }
 });
+
+
+test('P2.65n second file import preserves original backup without blocking gameplay',async()=>{
+  const h=await mount(),original=h.storage.getItem(SAVE_KEY);
+  const controls=h.id('export-local-save').parentElement.children;
+  const button=controls.find(e=>e.id==='import-normal-save');
+  const input=controls.find(e=>e.id==='import-normal-file');
+  const first=JSON.stringify({...h.saved(),revision:1,coins:42});
+  button.click();input.files=[{size:first.length,text:async()=>first}];
+  input.dispatch('change');await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),first);
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),original);
+  const writes=h.writes.length;
+  const second=JSON.stringify({...h.saved(),revision:2,coins:84});
+  button.click();input.files=[{size:second.length,text:async()=>second}];
+  input.dispatch('change');await settle();
+  assert.match(h.id('notice').textContent,/备份槽/);
+  assert.equal(h.writes.length,writes,'second import must not overwrite either slot');
+  assert.equal(h.storage.getItem(SAVE_KEY),first);
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),original);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  h.id('board').dispatch('click',{target:h.id('board').children[42],detail:1});
+  await settle();
+  assert.equal(h.saved().revision,2,'ordinary actions still work after backup conflict');
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),original);
+});

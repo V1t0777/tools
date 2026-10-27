@@ -272,8 +272,29 @@ test('P2.65h unrelated backup slot blocks overwrite and preserves story',async()
   await r.start({now});
   assert.deepEqual(await r.restore(incoming,
     {expectedRaw:original,confirmed:true}),error('BACKUP_SLOT_CONFLICT'));
-  assert.equal(r.blocked,true);
+  assert.equal(r.blocked,false,'occupied backup slot is a definite no-write rejection');
   assert.equal(db.read(SAVE_KEY),original);
   assert.equal(db.read(RESTORE_BACKUP_KEY),'older-backup');
   assert.equal(db.read(STORY_SAVE_KEY),'story-untouched');
+  assert.equal((await r.action(s=>moveOrMerge(s,0,2))).ok,true,
+    'ordinary play remains available after refused import');
+});
+
+test('P2.65n second restore cannot replace earlier evidence or lock ordinary play',async()=>{
+  const original=encoded(createInitialState(now));
+  const first=encoded({...createInitialState(now),revision:1,coins:37});
+  const second=encoded({...createInitialState(now),revision:2,coins:83});
+  const db=memory(original),r=createNormalPageRuntime({storage:db,locks:locks()});
+  assert.equal((await r.start({now})).ok,true);
+  assert.equal((await r.restore(first,{expectedRaw:original,confirmed:true})).ok,true);
+  assert.equal(db.read(RESTORE_BACKUP_KEY),original);
+  const writes=db.writes.length;
+  assert.deepEqual(await r.restore(second,{expectedRaw:first,confirmed:true}),
+    error('BACKUP_SLOT_CONFLICT'));
+  assert.equal(r.blocked,false);
+  assert.equal(db.writes.length,writes,'failed second restore must not write');
+  assert.equal(db.read(SAVE_KEY),first);
+  assert.equal(db.read(RESTORE_BACKUP_KEY),original);
+  assert.equal(db.read(STORY_SAVE_KEY),'story-untouched');
+  assert.equal((await r.action(s=>moveOrMerge(s,0,2))).ok,true);
 });
