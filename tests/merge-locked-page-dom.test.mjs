@@ -674,3 +674,36 @@ test('P2.65d hidden visibility prevents queued producer click and reset until vi
   await settle();
   assert.equal(h.saved().revision,1);
 });
+
+test('P2.65e live page resumes after hidden BFCache pageshow and visible event',async()=>{
+  const h=await mount(),raw=h.storage.getItem(SAVE_KEY),writes=h.writes.length;
+  h.win.dispatch('pagehide');
+  h.doc.hidden=true;
+  h.doc.dispatch('visibilitychange');
+  h.win.dispatch('pageshow',{persisted:true});
+  h.id('board').dispatch('click',{target:h.id('board').children[42],detail:1});
+  await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),raw,'hidden BFCache must not write');
+  h.doc.hidden=false;
+  h.doc.dispatch('visibilitychange');
+  h.id('board').dispatch('click',{target:h.id('board').children[42],detail:1});
+  await settle();
+  assert.equal(h.saved().revision,1,'verified visible BFCache must restore input');
+  assert.equal(h.writes.length,writes+1);
+});
+
+test('P2.65e live page blocks corrupt external save on deferred BFCache resume',async()=>{
+  const h=await mount();
+  h.win.dispatch('pagehide');
+  h.doc.hidden=true;
+  h.win.dispatch('pageshow',{persisted:true});
+  h.storage.setItem(SAVE_KEY,'{corrupt');
+  const writes=h.writes.length;
+  h.doc.hidden=false;
+  h.doc.dispatch('visibilitychange');
+  h.id('board').dispatch('click',{target:h.id('board').children[42],detail:1});
+  await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),'{corrupt');
+  assert.equal(h.writes.length,writes);
+  assert.match(h.id('save-status').textContent,/暂停|异常|无法/);
+});
