@@ -1479,3 +1479,65 @@ test('P2.65w BFCache/hidden transition during download preparation blocks native
     assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
   }finally{globalThis.URL=originalURL;}
 });
+
+// P2.65z: older Safari/WeChat file pickers may omit the native cancel event.
+test('P2.65z orphaned native chooser recovers after focus grace without any save write',async()=>{
+  const h=await mount(),before=h.writes.length;
+  const controls=h.id('export-local-save').parentElement.children;
+  const button=controls.find(e=>e.id==='import-normal-save');
+  const input=controls.find(e=>e.id==='import-normal-file');
+  let opens=0;input.click=()=>{opens++;};
+  const deadlines=[];
+  h.win.setTimeout=(fn,ms)=>{if(ms===15_000)deadlines.push(fn);return 1;};
+  button.click();assert.equal(opens,1);
+  h.win.dispatch('focus');
+  assert.equal(deadlines.length,1,'focus return must schedule bounded recovery');
+  button.click();assert.equal(opens,1,'do not overlap native choosers before grace');
+  deadlines.shift()();
+  button.click();assert.equal(opens,2,'an orphaned chooser no longer blocks retry');
+  assert.equal(h.writes.length,before);
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});
+
+test('P2.65z valid delayed chooser change wins over stale focus recovery timer',async()=>{
+  const h=await mount(),original=h.storage.getItem(SAVE_KEY);
+  const controls=h.id('export-local-save').parentElement.children;
+  const button=controls.find(e=>e.id==='import-normal-save');
+  const input=controls.find(e=>e.id==='import-normal-file');
+  const deadlines=[];
+  h.win.setTimeout=(fn,ms)=>{if(ms===15_000)deadlines.push(fn);return 1;};
+  button.click();h.win.dispatch('focus');
+  assert.equal(deadlines.length,1);
+  const imported=JSON.stringify({...h.saved(),coins:73,revision:1});
+  input.files=[{size:imported.length,text:async()=>imported}];
+  input.dispatch('change');
+  await settle();
+  deadlines.shift()();
+  assert.equal(h.storage.getItem(SAVE_KEY),imported);
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),original);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});
+
+test('P2.65z old picker timeout cannot clear a fresh picker; visible return also recovers',async()=>{
+  const h=await mount(),before=h.writes.length;
+  const controls=h.id('export-local-save').parentElement.children;
+  const button=controls.find(e=>e.id==='import-normal-save');
+  const input=controls.find(e=>e.id==='import-normal-file');
+  let opens=0;input.click=()=>{opens++;};
+  const deadlines=[];
+  h.win.setTimeout=(fn,ms)=>{if(ms===15_000)deadlines.push(fn);return 1;};
+  button.click();h.win.dispatch('focus');
+  assert.equal(deadlines.length,1);
+  input.dispatch('cancel');
+  button.click();assert.equal(opens,2);
+  deadlines.shift()();
+  button.click();assert.equal(opens,2,'old callback cannot release newer picker');
+  h.doc.hidden=true;h.doc.dispatch('visibilitychange');
+  h.doc.hidden=false;h.doc.dispatch('visibilitychange');
+  assert.equal(deadlines.length,1,'visible return schedules a new grace period');
+  deadlines.shift()();
+  button.click();assert.equal(opens,3);
+  assert.equal(h.writes.length,before);
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null);
+});

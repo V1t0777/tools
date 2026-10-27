@@ -15,6 +15,7 @@ import {saveStoryDialogueWithLock} from './dialogue-write.mjs';
 import {captureStoryWorkshopEvidence,prepareStoryEvidenceDownload,isPreparedStoryEvidenceCurrent} from './save-evidence.mjs';
 import {requestBrowserSaveDownload} from '../save-download.mjs';
 import {checkStoryResumeSnapshot} from './resume-guard.mjs';
+import {storyDialogueWorkshopSnapshotCurrent} from './workshop-dialogue-snapshot.mjs';
 import {verifyStoryDialoguePublication} from './dialogue-publication-guard.mjs';
 import {shouldBlockStoryStorageEvent} from './storage-event-guard.mjs';
 import {shouldRefreshStoryDependencyEvent} from './storage-event-guard.mjs';
@@ -39,7 +40,7 @@ let kind=readStoryHash(window.location.hash).kind;
 let selected=null,selectedChoice=null,selectedIncidentDay=null;
 // A resumed dialogue must not reuse workshop-dependent text or choices after
 // a peer changed the separate story-workshop save while this page was asleep.
-let selectedWorkshopRaw=null,selectedWorkshopReadable=false;
+let selectedWorkshopRaw=null,selectedWorkshopReadable=false,selectedWorkshopReason=null;
 let shownDay=localDay();
 const entries=CORE_STORY_PACK.entries;
 const main=entries.filter(x=>x.kind==='main');
@@ -315,6 +316,7 @@ function open(entry){
   const workshopAtOpen=readStoryWorkshop(store);
   selectedWorkshopRaw=workshopAtOpen.raw;
   selectedWorkshopReadable=!workshopAtOpen.blocked;
+  selectedWorkshopReason=workshopAtOpen.reason;
   selectedIncidentDay=entry.kind==='incident'?openedDay:null;
   const done=completed(entry);
   $('dialog-chapter').textContent=entry.chapter;
@@ -401,9 +403,14 @@ function open(entry){
 // Preserve the exact workshop evidence that this dialogue actually rendered.
 // This also protects non-gated choices if their StorageEvent was missed.
 function openWorkshopCurrent(){
-  return !selectedWorkshopReadable||checkStoryResumeSnapshot(store,{
+  if(selectedWorkshopReadable)return checkStoryResumeSnapshot(store,{
     key:STORY_WORKSHOP_KEY,expectedRaw:selectedWorkshopRaw
   }).ok;
+  // An unreadable workshop must not become a permanent bypass: a peer may
+  // repair or replace it without this tab receiving a StorageEvent.
+  return storyDialogueWorkshopSnapshotCurrent({
+    raw:selectedWorkshopRaw,blocked:true,reason:selectedWorkshopReason
+  },readStoryWorkshop(store));
 }
 $('close-dialog').addEventListener('click',()=>$('story-dialog').close());
 $('journey-read').addEventListener('click',()=>{
