@@ -568,7 +568,16 @@ byId('export-abnormal-reset-backup').addEventListener('click', () => {
 let importEpoch=0,importBusy=false,importPicker=null;
 window.addEventListener('pagehide',()=>{importEpoch++;importPicker=null;});
 document.addEventListener('visibilitychange',()=>{
-  if(document.hidden){importEpoch++;importPicker=null;}
+  if(!document.hidden)return;
+  // A native iOS file chooser can briefly hide its originating page without
+  // pagehide. Preserve ONE explicitly opened chooser across that transition;
+  // the runtime still suspends all writes and revalidates the exact save on
+  // return. A second hide or any pagehide permanently revokes the chooser.
+  importEpoch++;
+  if(importPicker){
+    if(importPicker.hiddenOnce)importPicker=null;
+    else importPicker.hiddenOnce=true;
+  }
 });
 const saveActions=byId('export-local-save').parentElement;
 if(saveActions){
@@ -593,10 +602,12 @@ if(saveActions){
     if(importBusy||runtime.busy||saveIssue||pageSuspended()){
       hint('存档未就绪或页面处于后台，暂不能导入');return;
     }
+    // Do not let a second click reauthorize an older native chooser result.
+    if(importPicker){hint('文件选择尚未结束，请先完成或取消当前选择');return;}
     if(!revalidateResumedSave())return;
     // The chooser is bound to the exact save and page lifecycle at the
     // initiating user gesture, not to whichever save is current on return.
-    importPicker={epoch:importEpoch,raw:runtime.raw};
+    importPicker={epoch:importEpoch,raw:runtime.raw,hiddenOnce:false};
     try{importFile.click();}
     catch{importPicker=null;hint('当前浏览器无法打开文件选择器');}
   });
@@ -608,7 +619,12 @@ if(saveActions){
     importPicker=null;
     const file=importFile.files?.[0];
     if(!file){importFile.value='';return;}
-    if(!picker||picker.epoch!==importEpoch||picker.raw!==runtime.raw||
+    // One hide-only native chooser roundtrip is permitted, but never a
+    // pagehide/BFCache return, a second hide, or a changed original save.
+    // Import still requires a visible verified page and explicit confirmation.
+    const chooserEpochValid=!!picker&&(picker.epoch===importEpoch||
+      (picker.hiddenOnce===true&&picker.epoch+1===importEpoch));
+    if(!chooserEpochValid||picker.raw!==runtime.raw||
         pageSuspended()||saveIssue||runtime.busy||!revalidateResumedSave()){
       importFile.value='';
       hint('文件选择期间页面或存档已变化，请重新点击导入并选择文件');
