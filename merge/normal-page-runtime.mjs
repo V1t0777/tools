@@ -9,6 +9,9 @@ import {commitNormalActionWithLock,commitNormalClockWithLock} from './normal-act
 import {commitNormalResetWithLock} from './normal-reset-transaction.mjs';
 import {peekLocalV3,SAVE_KEY} from './storage.mjs';
 import {isSafeSameRevisionClockUpdate} from './storage-event-policy.mjs';
+import {coordinateNormalSaveRestore} from './save-restore-lock.mjs';
+import {previewNormalSaveImport} from './save-import-preflight.mjs';
+import {validateSave} from './engine.mjs';
 
 const reject=reason=>Object.freeze({ok:false,reason});
 const clone=value=>JSON.parse(JSON.stringify(value));
@@ -184,6 +187,40 @@ export function createNormalPageRuntime({locks,storage,onVerified}={}) {
       phase='ready';reason=null;
       return Object.freeze({ok:true,status:'RESET_PUBLISHED',
         backupVerified:receipt.backupVerified===true});
+    },
+
+    // Restore a previously previewed file using the same exclusive Web Lock
+    // as all other writers. Never replace the reviewed raw baseline silently.
+    async restore(fileText,{expectedRaw,confirmed=false,allowDowngrade=false}={}) {
+      if(confirmed!==true)return reject('CONFIRMATION_REQUIRED');
+      if(phase!=='ready'||flight.blocked)
+        return reject(phase==='blocked'?'UI_SAVE_BLOCKED':'STARTUP_REQUIRED');
+      if(flight.busy||resetBusy)return reject('UI_TRANSACTION_BUSY');
+      if(typeof expectedRaw!=='string'||expectedRaw!==raw)
+        return reject('STALE_BASELINE');
+      const preview=previewNormalSaveImport(fileText,storage,{expectedRaw});
+      if(!preview.ok){
+        if(preview.reason==='CURRENT_SAVE_CHANGED')block(preview.reason);
+        return reject(preview.reason);
+      }
+      if(preview.wouldDecreaseRevision&&allowDowngrade!==true)
+        return reject('DOWNGRADE_CONFIRMATION_REQUIRED');
+      return run('restore',async()=>{
+        const receipt=await coordinateNormalSaveRestore(fileText,storage,locks,
+          {expectedRaw,confirmed:true,allowDowngrade});
+        if(!receipt.ok)return receipt;
+        // A noncooperating tab can write after lock release; verify again
+        // before publishing any restored snapshot.
+        try{
+          if(storage.getItem(SAVE_KEY)!==fileText)
+            return reject('RESTORE_OUTCOME_UNCERTAIN');
+          const restored=JSON.parse(fileText);
+          if(!validateSave(restored))
+            return reject('RESTORE_OUTCOME_UNCERTAIN');
+          return Object.freeze({...receipt,raw:fileText,state:restored,
+            verifiedReadback:true});
+        }catch{return reject('RESTORE_OUTCOME_UNCERTAIN');}
+      });
     },
 
     // Storage, focus and BFCache hooks are read-only. No event writes back.
