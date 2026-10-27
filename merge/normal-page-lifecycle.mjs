@@ -18,7 +18,8 @@ const unchanged=Object.freeze({ok:true,changed:false,skipped:true});
  * @param {function} options.onResult synchronous UI status/update hook
  */
 export function attachNormalPageLifecycle({
-  runtime,win,doc,storage,cancelGesture=()=>{},onResult=()=>{},onFocus=()=>{}
+  runtime,win,doc,storage,cancelGesture=()=>{},onResult=()=>{},
+  onFocus=()=>{},onBlur=()=>{}
 }={}) {
   if(!runtime||typeof runtime.reconcile!=='function'||
       typeof runtime.invalidate!=='function'||typeof runtime.block!=='function'||
@@ -28,7 +29,7 @@ export function attachNormalPageLifecycle({
       typeof doc.removeEventListener!=='function'||
       typeof storage?.getItem!=='function'||
       typeof cancelGesture!=='function'||typeof onResult!=='function'||
-      typeof onFocus!=='function')
+      typeof onFocus!=='function'||typeof onBlur!=='function')
     throw new TypeError('INVALID_NORMAL_PAGE_LIFECYCLE');
 
   let detached=false,handling=false,pageGone=false,visibilitySuspended=false,resumePending=false;
@@ -142,10 +143,24 @@ export function attachNormalPageLifecycle({
     }
   };
 
+  const blurred=()=>{
+    if(detached||pageGone)return;
+    // The native import picker may omit cancel. Only a real blur can mark
+    // its return as eligible for the verified-focus grace period.
+    try{
+      const response=onBlur();
+      if(response&&typeof response.then==='function'){
+        void Promise.resolve(response).catch(()=>{});
+        throw new Error('ASYNC_BLUR_CALLBACK');
+      }
+    }catch{fail('LIFECYCLE_HANDLER_FAILED','blur');}
+  };
+
   win.addEventListener('storage',storageChanged);
   win.addEventListener('pagehide',pageHidden);
   win.addEventListener('pageshow',pageShown);
   win.addEventListener('focus',focused);
+  win.addEventListener('blur',blurred);
   doc.addEventListener('visibilitychange',visibilityChanged);
 
   return Object.freeze({
@@ -158,6 +173,7 @@ export function attachNormalPageLifecycle({
       win.removeEventListener('pagehide',pageHidden);
       win.removeEventListener('pageshow',pageShown);
       win.removeEventListener('focus',focused);
+      win.removeEventListener('blur',blurred);
       doc.removeEventListener('visibilitychange',visibilityChanged);
     }
   });

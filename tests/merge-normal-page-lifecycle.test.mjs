@@ -103,7 +103,7 @@ test('V3.1 P2.63 lifecycle ignores unrelated storage and initial pageshow',async
   assert.deepEqual(h.cancels,[]);
   assert.deepEqual(h.changes,[]);
   assert.equal(h.runtime.phase,'ready');
-  assert.equal(h.ui.w.size,4);
+  assert.equal(h.ui.w.size,5);
   assert.equal(h.ui.d.size,1);
 });
 
@@ -297,4 +297,19 @@ test('P2.65e second pagehide clears pending resume token until a new pageshow',a
   assert.equal(h.bridge.suspended,true,'visibility alone cannot revive second pagehide');
   h.ui.win.emit('pageshow',{persisted:true});
   assert.equal(h.bridge.suspended,false);
+});
+
+test('P2.65aa lifecycle blur callback is synchronous and detached with listeners',async()=>{
+  const db=storage(),ui=events(),calls=[];
+  const runtime=createNormalPageRuntime({storage:db,locks:locks()});
+  await runtime.start({now});
+  const before=db.writes.length;
+  const bridge=attachNormalPageLifecycle({runtime,win:ui.win,doc:ui.doc,
+    storage:db,onBlur:()=>calls.push('blur')});
+  ui.win.emit('blur');ui.win.emit('focus');
+  assert.deepEqual(calls,['blur']);
+  assert.equal(db.writes.length,before,'blur and focus are read-only');
+  bridge.detach();ui.win.emit('blur');
+  assert.deepEqual(calls,['blur']);
+  assert.equal(ui.w.size,0);
 });

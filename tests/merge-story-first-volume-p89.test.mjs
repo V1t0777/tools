@@ -7,7 +7,7 @@ import {CORE_STORY_PACK} from '../merge/story/core-pack.mjs';
 import {startCoreStory,completeStoryEntry} from '../merge/story/runtime.mjs';
 import {readStorySave,writeStorySave} from '../merge/story/local-storage.mjs';
 import {readStoryWorkshop,writeStoryWorkshop,STORY_WORKSHOP_KEY} from '../merge/story/workshop-storage.mjs';
-import {nextCoreStoryJourney} from '../merge/story/journey-guide.mjs';
+import {nextCoreStoryJourney,nextCoreSideJourney} from '../merge/story/journey-guide.mjs';
 import {storyDialogueCommitAllowed} from '../merge/story/dialogue-commit-guard.mjs';
 import {saveStoryDialogueWithLock} from '../merge/story/dialogue-write.mjs';
 import {checkStoryResumeSnapshot} from '../merge/story/resume-guard.mjs';
@@ -157,4 +157,77 @@ test('P89 peer warehouse update invalidates stale chapter completion but permits
   assert.equal(readStorySave(storage).progress.packs.core.completed.main.includes('first-order'),true);
   assert.equal(storage.getItem(STORY_WORKSHOP_KEY),current.raw);
   assert.equal(storage.getItem(SAVE_KEY),normalRaw);
+});
+
+test('P92 post-finale optional stories persist independently and the toolbox requires real warehouse storage',()=>{
+  const {storage,writes}=fixture();
+  // P89 separately verifies all four economic gates; here the completed
+  // first volume is a fixture for optional-story persistence, not a bypass.
+  let progress=readStorySave(storage).progress;
+  for(const entry of main)
+    progress=completeStoryEntry(progress,CORE_STORY_PACK,entry.id,entry.choices[0]?.id??null);
+  assert.equal(writeStorySave(storage,progress,{
+    expectedRaw:storage.getItem(STORY_SAVE_KEY)}),true);
+  assert.equal(nextCoreStoryJourney(readStorySave(storage).progress,
+    readStoryWorkshop(storage)).kind,'complete');
+  assert.equal(nextCoreSideJourney(readStorySave(storage).progress,
+    readStoryWorkshop(storage)).entry.id,'wrong-letter');
+
+  for(const id of ['wrong-letter','old-seeds','postcard','wood-mark','after-festival']){
+    const before=readStorySave(storage);
+    const entry=CORE_STORY_PACK.entries.find(item=>item.id===id);
+    assert.ok(entry);
+    const updated=completeStoryEntry(before.progress,CORE_STORY_PACK,id,
+      entry.choices[0]?.id??null);
+    assert.equal(writeStorySave(storage,updated,{expectedRaw:before.raw}),true,id);
+    const restored=readStorySave(storage);
+    assert.equal(restored.blocked,false);
+    assert.equal(restored.progress.packs.core.completed.side.includes(id),true,id);
+    assert.equal(storage.getItem(SAVE_KEY),normalRaw);
+  }
+  const pending=nextCoreSideJourney(readStorySave(storage).progress,
+    readStoryWorkshop(storage));
+  assert.equal(pending.kind,'workshop');
+  assert.equal(pending.entry.id,'toolbox');
+  assert.equal(storyDialogueCommitAllowed(storage,'toolbox',null),false);
+
+  const stored=storeItem(createInitialState(1_000_000),0);
+  assert.equal(stored.ok,true);
+  const beforeWorkshop=readStoryWorkshop(storage);
+  assert.equal(writeStoryWorkshop(storage,stored.state,{
+    expectedRaw:beforeWorkshop.raw}),true);
+  const workshop=readStoryWorkshop(storage);
+  assert.equal(nextCoreSideJourney(readStorySave(storage).progress,workshop).kind,'story');
+  assert.equal(storyDialogueCommitAllowed(storage,'toolbox',workshop.raw),true);
+  const before=readStorySave(storage);
+  const completed=completeStoryEntry(before.progress,CORE_STORY_PACK,'toolbox','label');
+  assert.equal(writeStorySave(storage,completed,{expectedRaw:before.raw}),true);
+  const restored=readStorySave(storage);
+  assert.equal(nextCoreSideJourney(restored.progress,readStoryWorkshop(storage)).kind,'complete');
+  assert.equal(restored.progress.packs.core.completed.side.length,6);
+  assert.equal(restored.progress.packs.core.choices.postcard,'send');
+  assert.equal(restored.progress.packs.core.choices.toolbox,'label');
+  assert.equal(restored.progress.packs.core.completed.main.length,main.length);
+  assert.equal(storage.getItem(SAVE_KEY),normalRaw);
+  assert.equal(writes.filter(key=>key===SAVE_KEY).length,0);
+});
+
+test('P92 stale optional-story save cannot overwrite another tab choice or normal-mode save',()=>{
+  const {storage}=fixture();
+  let progress=readStorySave(storage).progress;
+  for(const entry of main.slice(0,3))
+    progress=completeStoryEntry(progress,CORE_STORY_PACK,entry.id,
+      entry.choices[0]?.id??null);
+  assert.equal(writeStorySave(storage,progress,{
+    expectedRaw:storage.getItem(STORY_SAVE_KEY)}),true);
+  const stale=readStorySave(storage);
+  const peer=completeStoryEntry(stale.progress,CORE_STORY_PACK,'wrong-letter');
+  assert.equal(writeStorySave(storage,peer,{expectedRaw:stale.raw}),true);
+  const peerRaw=storage.getItem(STORY_SAVE_KEY);
+  const staleAttempt=completeStoryEntry(stale.progress,CORE_STORY_PACK,'wrong-letter');
+  assert.equal(writeStorySave(storage,staleAttempt,{expectedRaw:stale.raw}),false);
+  assert.equal(storage.getItem(STORY_SAVE_KEY),peerRaw);
+  assert.equal(readStorySave(storage).progress.packs.core.completed.side.includes('wrong-letter'),true);
+  assert.equal(storage.getItem(SAVE_KEY),normalRaw);
+  assert.equal(storage.getItem(STORY_WORKSHOP_KEY),null);
 });
