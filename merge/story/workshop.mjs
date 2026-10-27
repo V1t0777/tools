@@ -20,6 +20,10 @@ let state=loaded.state,raw=loaded.raw,blocked=loaded.blocked,reason=loaded.reaso
 let saving=false;
 let storageEpoch=0; // increments when an external story-workshop snapshot invalidates this page
 let renderGeneration=0;
+// Pagehide/hidden must suspend queued DOM actions until a visible, read-only
+// save recheck. A hidden BFCache pageshow alone never resumes writes.
+let pageGone=false,visibilitySuspended=false,resumePending=false;
+const pageSuspended=()=>pageGone||visibilitySuspended||document.visibilityState==='hidden';
 const guardRenderedAction=createWorkshopRenderedActionGuard(
   ()=>renderGeneration,
   ()=>$('board-notice').textContent='界面已更新，请在最新界面重新操作。'
@@ -31,10 +35,13 @@ function status(){
       : reason==='STORAGE_UNAVAILABLE'
         ? '无法访问浏览器存储，经营操作已暂停。'
         : '检测到存档变化或写入无法确认：本页已停止操作。请勿重复重置，先重新打开页面核对金币、建筑和订单。'
-    : '剧情工作台数据只保存在此浏览器，与普通模式金币及背包完全隔离。';
+    : pageSuspended()
+      ? '页面已暂停：返回前不会继续经营操作；恢复可见后将核对原始存档。'
+      : '剧情工作台数据只保存在此浏览器，与普通模式金币及背包完全隔离。';
 }
 function render(){
   renderGeneration++;
+  const disabled=blocked||saving||pageSuspended();
   status();
   $('energy').textContent=state.energy+' / '+MAX_ENERGY;
   $('coins').textContent=String(state.coins);
@@ -47,7 +54,7 @@ function render(){
   state.board.forEach((item,i)=>{
     const button=document.createElement('button');button.type='button';
     button.className='workshop-cell'+(item?.kind==='producer'?' producer':'')+(selected===i?' selected':'');
-    button.disabled=blocked||saving;
+    button.disabled=disabled;
     button.dataset.slot=String(i);
     button.setAttribute('aria-label','第'+(Math.floor(i/WIDTH)+1)+'行第'+(i%WIDTH+1)+'列，'+(item?getItemName(item):'空格'));
     if(item){
@@ -69,7 +76,7 @@ function render(){
   const selectedMaterial=selected>=0&&state.board[selected]?.kind==='material';
   $('board-occupancy').textContent=used+' / '+state.board.length;
   $('warehouse-occupancy').textContent=stored+' / '+state.warehouse.capacity;
-  $('store-selected').disabled=blocked||saving||!selectedMaterial||!warehouseHasSpace;
+  $('store-selected').disabled=disabled||!selectedMaterial||!warehouseHasSpace;
   $('warehouse-hint').textContent=blocked
     ? '存档处于保护状态，仓库操作已暂停；请先核对存档提示。'
     : !boardHasSpace
@@ -87,7 +94,7 @@ function render(){
     const item=state.warehouse.slots[i];
     const button=document.createElement('button');button.type='button';
     button.className='workshop-warehouse-slot';
-    button.disabled=blocked||saving||!item||!boardHasSpace;
+    button.disabled=disabled||!item||!boardHasSpace;
     button.setAttribute('aria-label','仓库第'+(i+1)+'格，'+(item?'取回'+getItemName(item):'空位'));
     button.textContent=item
       ? getItemIcon(item)+' '+getItemName(item)+' · Lv.'+item.tier+' · 取回'
@@ -102,7 +109,7 @@ function render(){
     const mark=document.createElement('span');
     mark.textContent=CHAINS[order.chain].icon[order.tier-1]+' '+CHAINS[order.chain].names[order.tier-1]+' · ◈'+order.coins;
     const btn=document.createElement('button');btn.type='button';btn.textContent='交付';
-    btn.disabled=blocked||saving||!state.board.some(item=>item?.kind==='material'&&item.chain===order.chain&&item.tier===order.tier);
+    btn.disabled=disabled||!state.board.some(item=>item?.kind==='material'&&item.chain===order.chain&&item.tier===order.tier);
     btn.addEventListener('click',guardRenderedAction(()=>commit(fulfillOrder(state,order.id))));
     row.append(mark,btn);list.append(row);
   }
@@ -115,7 +122,7 @@ function render(){
     : !gardenStoryReady
       ? '先在剧情页完成《没有开花的花圃》，再来修复后院花园。'
       : '需要 '+garden.minLevel+' 级和 '+garden.coins+' 金币；当前 '+level+' 级、'+state.coins+' 金币。通过交付委托积累资源。';
-  $('build-garden').disabled=blocked||saving||built||!gardenStoryReady||level<garden.minLevel||state.coins<garden.coins;
+  $('build-garden').disabled=disabled||built||!gardenStoryReady||level<garden.minLevel||state.coins<garden.coins;
   const harbor=BUILDINGS.harbor,harborBuilt=state.buildings.harbor===1;
   const harborStoryReady=!narrative.blocked&&storyHarborBuildAvailable(narrative.progress);
   $('harbor-status').textContent=harborBuilt?'已修缮':'未修缮';
@@ -124,7 +131,7 @@ function render(){
     : !harborStoryReady
       ? '先完成《第一次独立修理》，确认学徒与岚叔的安全准备，再进行港湾修缮。'
       : '需要 '+harbor.minLevel+' 级和 '+harbor.coins+' 金币；当前 '+level+' 级、'+state.coins+' 金币。';
-  $('build-harbor').disabled=blocked||saving||harborBuilt||!harborStoryReady||level<harbor.minLevel||state.coins<harbor.coins;
+  $('build-harbor').disabled=disabled||harborBuilt||!harborStoryReady||level<harbor.minLevel||state.coins<harbor.coins;
   const storefront=BUILDINGS.storefront,storefrontBuilt=state.buildings.storefront===1;
   const storefrontStoryReady=!narrative.blocked&&storyStorefrontBuildAvailable(narrative.progress);
   $('storefront-status').textContent=storefrontBuilt?'已修整':'未修整';
@@ -133,9 +140,9 @@ function render(){
     : !storefrontStoryReady
       ? '先读完《海雾里的灯》，再为居民们准备开张庆典。'
       : '修整门面需要 '+storefront.minLevel+' 级和 '+storefront.coins+' 金币；目前 '+level+' 级、'+state.coins+' 金币。';
-  $('build-storefront').disabled=blocked||saving||storefrontBuilt||!storefrontStoryReady||level<storefront.minLevel||state.coins<storefront.coins;
-  $('reset-workshop').disabled=saving||reason==='STORAGE_UNAVAILABLE';
-  $('export-corrupt-workshop').disabled=saving||reason!=='CORRUPT_SAVE'||typeof raw!=='string';
+  $('build-storefront').disabled=disabled||storefrontBuilt||!storefrontStoryReady||level<storefront.minLevel||state.coins<storefront.coins;
+  $('reset-workshop').disabled=saving||pageSuspended()||reason==='STORAGE_UNAVAILABLE';
+  $('export-corrupt-workshop').disabled=saving||pageSuspended()||reason!=='CORRUPT_SAVE'||typeof raw!=='string';
 }
 // A committed write can be superseded before the user reads its feedback.
 // Render the protected state first, then replace any prior success notice.
@@ -149,7 +156,7 @@ function blockWorkshopWithNotice(nextReason,notice){
 // computing an operation or selecting a slot; the later Web Lock/CAS still
 // protects against changes between this read and the eventual write.
 function revalidateWorkshopBeforeInteraction(){
-  if(blocked||saving)return false;
+  if(blocked||saving||pageSuspended())return false;
   const check=checkStoryResumeSnapshot(storage,{key:STORY_WORKSHOP_KEY,expectedRaw:raw});
   if(check.ok)return true;
   storageEpoch++;blocked=true;reason=check.reason;selected=-1;
@@ -171,7 +178,8 @@ async function commit(result){
   // Recheck after acquiring the workshop lock, not just when the button was tapped.
   const expectedStoryRaw=readStorySave(storage).raw;
   const attempt=await runStoryWriteWithLock(webLocks,STORY_WORKSHOP_KEY,
-    ()=>!blocked&&storyBuildingWriteAllowed(storage,state,result.state,expectedStoryRaw)&&
+    ()=>!blocked&&!pageSuspended()&&storageEpoch===expectedEpoch&&
+      storyBuildingWriteAllowed(storage,state,result.state,expectedStoryRaw)&&
       writeStoryWorkshop(storage,result.state,{expectedRaw}));
   saving=false;
   // A verified write can be superseded after the Web Lock is released.
@@ -239,7 +247,7 @@ $('build-storefront').addEventListener('click',()=>{
   commit(upgradeBuilding(state,'storefront'));
 });
 $('export-corrupt-workshop').addEventListener('click',()=>{
-  if(reason!=='CORRUPT_SAVE'||typeof raw!=='string')return;
+  if(pageSuspended()||reason!=='CORRUPT_SAVE'||typeof raw!=='string')return;
   if(!window.confirm('将异常剧情工作台记录保存为本地文本文件？文件可能包含个人游玩信息，请妥善保管；不会上传或修改浏览器存档。'))return;
   const evidence=captureStoryWorkshopEvidence(storage,{key:STORY_WORKSHOP_KEY,expectedRaw:raw,confirmedByUser:true});
   if(!evidence.ok){
@@ -263,7 +271,7 @@ $('export-corrupt-workshop').addEventListener('click',()=>{
   }
 });
 $('reset-workshop').addEventListener('click',async()=>{
-  if(saving)return;
+  if(saving||pageSuspended())return;
   // A queued click must not bypass the disabled reset button on storage failure.
   if(reason==='STORAGE_UNAVAILABLE')return;
   if(reason==='CORRUPT_SAVE'&&!window.confirm('异常原始记录会被重置覆盖。建议先导出并确认备份文件可用。仍要继续重置吗？'))return;
@@ -273,7 +281,7 @@ $('reset-workshop').addEventListener('click',async()=>{
   const expectedRaw=raw,expectedEpoch=storageEpoch;
   saving=true;render();
   const attempt=await resetStoryWorkshopWithLock(webLocks,storage,{
-    expectedRaw,isCurrent:()=>storageEpoch===expectedEpoch
+    expectedRaw,isCurrent:()=>storageEpoch===expectedEpoch&&!pageSuspended()
   });
   saving=false;
   if(!attempt.ok||!attempt.value||storageEpoch!==expectedEpoch){
@@ -309,6 +317,9 @@ $('reset-workshop').addEventListener('click',async()=>{
   }
 });
 function recheckWorkshopOnResume(){
+  // A pagehide requires an actual pageshow; visibility/focus alone is not a
+  // trusted BFCache return. Never inspect hidden pages to enable controls.
+  if(document.visibilityState==='hidden'||(pageGone&&!resumePending))return;
   if(!blocked){
     const check=checkStoryResumeSnapshot(storage,{key:STORY_WORKSHOP_KEY,expectedRaw:raw});
     if(!check.ok){
@@ -318,11 +329,29 @@ function recheckWorkshopOnResume(){
       return;
     }
   }
+  pageGone=false;visibilitySuspended=false;resumePending=false;
   render();
 }
-window.addEventListener('pageshow',recheckWorkshopOnResume);
+function suspendWorkshopPage({gone=false}={}){
+  if(gone){pageGone=true;resumePending=false;}
+  else visibilitySuspended=true;
+  // An in-flight Web Lock must not publish a success after page suspension.
+  storageEpoch++;selected=-1;
+  render();
+  $('board-notice').textContent='页面已暂停经营操作；返回后请先核对存档，不要重复提交。';
+}
+window.addEventListener('pagehide',()=>suspendWorkshopPage({gone:true}));
+window.addEventListener('pageshow',()=>{
+  if(document.visibilityState==='hidden'){
+    if(pageGone)resumePending=true;
+    return;
+  }
+  resumePending=pageGone;
+  recheckWorkshopOnResume();
+});
 document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='visible')recheckWorkshopOnResume();
+  if(document.visibilityState==='hidden')suspendWorkshopPage();
+  else if(!pageGone||resumePending)recheckWorkshopOnResume();
 });
 window.addEventListener('storage',event=>{
   if(shouldBlockStoryStorageEvent(event,{key:STORY_WORKSHOP_KEY,storage})){
