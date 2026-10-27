@@ -1190,3 +1190,150 @@ test('P2.65p pagehide immediately releases hung import and ignores late file res
   assert.equal(h.storage.getItem(SAVE_KEY),imported);
   assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),original);
 });
+
+test('P2.65s native cancel after change aborts hung file read and permits a fresh import',async()=>{
+  const h=await mount(),original=h.storage.getItem(SAVE_KEY);
+  const controls=h.id('export-local-save').parentElement.children;
+  const button=controls.find(e=>e.id==='import-normal-save');
+  const input=controls.find(e=>e.id==='import-normal-file');
+  const imported=JSON.stringify({...h.saved(),coins:67,revision:1});
+  let late;
+  button.click();
+  input.files=[{size:imported.length,text:()=>new Promise(resolve=>{late=resolve;})}];
+  input.dispatch('change');await settle();
+  assert.equal(button.disabled,true);
+  input.dispatch('cancel');await settle();
+  assert.equal(button.disabled,false,'cancel must release pending file read immediately');
+  late(imported);await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),original);
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  button.click();
+  input.files=[{size:imported.length,text:async()=>imported}];
+  input.dispatch('change');await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),imported);
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),original);
+});
+
+test('P2.65s native cancel after confirmation revokes restore waiting for Web Lock',async()=>{
+  const h=await mount(),original=h.storage.getItem(SAVE_KEY);
+  const controls=h.id('export-local-save').parentElement.children;
+  const button=controls.find(e=>e.id==='import-normal-save');
+  const input=controls.find(e=>e.id==='import-normal-file');
+  const imported=JSON.stringify({...h.saved(),coins:91,revision:1});
+  h.win.pauseNextLock=true;
+  button.click();
+  input.files=[{size:imported.length,text:async()=>imported}];
+  input.dispatch('change');await settle();
+  assert.equal(typeof h.win.releaseLock,'function','restore must be waiting on lock');
+  input.dispatch('cancel');
+  h.win.releaseLock();await settle();
+  assert.equal(button.disabled,false);
+  assert.equal(h.storage.getItem(SAVE_KEY),original,'cancelled lock cannot write save');
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null,'cannot reserve backup');
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  button.click();
+  input.files=[{size:imported.length,text:async()=>imported}];
+  input.dispatch('change');await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),imported,'safe cancellation remains retryable');
+});
+
+test('P2.65s missing AbortController refuses import before opening native chooser',async()=>{
+  const h=await mount(),original=h.storage.getItem(SAVE_KEY);
+  const controls=h.id('export-local-save').parentElement.children;
+  const button=controls.find(e=>e.id==='import-normal-save');
+  const input=controls.find(e=>e.id==='import-normal-file');
+  let opens=0;
+  input.click=()=>{opens++;};
+  const originalController=globalThis.AbortController;
+  try{
+    globalThis.AbortController=undefined;
+    button.click();
+    assert.equal(opens,0);
+    assert.match(h.id('notice').textContent,/缺少安全取消能力/);
+    assert.equal(h.storage.getItem(SAVE_KEY),original);
+    assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null);
+  }finally{globalThis.AbortController=originalController;}
+  button.click();
+  assert.equal(opens,1,'restored capability permits a new chooser');
+});
+
+test('P2.65t restore-before backup requests exact historical bytes without any gameplay write',async()=>{
+  const h=await mount(),raw=JSON.stringify(createInitialState(1_000_000));
+  h.storage.setItem(RESTORE_BACKUP_KEY,raw);
+  const writes=h.writes.length,originalURL=globalThis.URL,blobs=[],links=[];
+  const originalCreate=h.doc.createElement;
+  h.doc.createElement=tag=>{
+    const element=originalCreate(tag);
+    if(tag==='a')links.push(element);
+    return element;
+  };
+  globalThis.URL=class extends originalURL{
+    static createObjectURL(blob){blobs.push(blob);return 'blob:p265t-valid';}
+    static revokeObjectURL(){}
+  };
+  try{
+    h.id('export-local-save').parentElement.children.find(e=>e.id==='export-restore-backup').click();
+    assert.match(h.id('notice').textContent,/已请求下载恢复前原始存档/);
+    assert.equal(links[0].download,'yunyu-before-restore-v3.json');
+    assert.equal(await blobs[0].text(),raw);
+    assert.equal(h.writes.length,writes);
+    assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  }finally{
+    globalThis.URL=originalURL;
+    h.doc.createElement=originalCreate;
+  }
+});
+
+test('P2.65t malformed UTF-16 restore backup is explicitly non-importable and lossless',async()=>{
+  const h=await mount(),raw='{"damaged":"'+String.fromCharCode(0xD800)+'"}';
+  h.storage.setItem(RESTORE_BACKUP_KEY,raw);
+  const writes=h.writes.length,originalURL=globalThis.URL,blobs=[],links=[];
+  const originalCreate=h.doc.createElement;
+  h.doc.createElement=tag=>{
+    const element=originalCreate(tag);
+    if(tag==='a')links.push(element);
+    return element;
+  };
+  globalThis.URL=class extends originalURL{
+    static createObjectURL(blob){blobs.push(blob);return 'blob:p265t-utf16';}
+    static revokeObjectURL(){}
+  };
+  try{
+    h.id('export-local-save').parentElement.children.find(e=>e.id==='export-restore-backup').click();
+    assert.match(h.id('notice').textContent,/不可直接导入/);
+    assert.equal(links[0].download,'yunyu-before-restore-utf16.json');
+    assert.equal(JSON.parse(await blobs[0].text()).raw,raw);
+    assert.equal(h.writes.length,writes);
+    assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),raw);
+    assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  }finally{
+    globalThis.URL=originalURL;
+    h.doc.createElement=originalCreate;
+  }
+});
+
+test('P2.65t restore backup download failures preserve evidence and give distinct guidance',async()=>{
+  const h=await mount();
+  h.id('export-local-save').parentElement.children.find(e=>e.id==='export-restore-backup').click();
+  assert.match(h.id('notice').textContent,/尚无恢复前备份/);
+  h.storage.setItem(RESTORE_BACKUP_KEY,'x'.repeat(2_000_001));
+  const largeWrites=h.writes.length;
+  h.id('export-local-save').parentElement.children.find(e=>e.id==='export-restore-backup').click();
+  assert.match(h.id('notice').textContent,/超过安全导出上限/);
+  assert.equal(h.writes.length,largeWrites);
+  h.storage.setItem(RESTORE_BACKUP_KEY,'{broken');
+  const originalURL=globalThis.URL;
+  globalThis.URL=class extends originalURL{
+    static createObjectURL(){throw Error('WebView denied');}
+    static revokeObjectURL(){}
+  };
+  const failedWrites=h.writes.length;
+  try{
+    h.id('export-local-save').parentElement.children.find(e=>e.id==='export-restore-backup').click();
+    assert.match(h.id('notice').textContent,/下载未启动/);
+    assert.equal(h.writes.length,failedWrites);
+    assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),'{broken');
+    assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  }finally{globalThis.URL=originalURL;}
+});
