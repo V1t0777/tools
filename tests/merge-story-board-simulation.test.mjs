@@ -112,9 +112,9 @@ test('P6 audit module cannot write saves, contact network or change mode',()=>{
   }
   // P77 intentionally exercises finite supplies via the real deterministic
   // engine. Keep explicit simulation-clock calls and prohibit any save I/O.
-  assert.match(source,/purchaseSupply\\(state,'soda'\\)/);
-  assert.match(source,/useSupply\\(state,id,null,now\\)/);
-  assert.match(source,/useSupply\\(state,id,state\\.board\\[slot\\]\\.id,now\\)/);
+  assert.equal(source.includes("purchaseSupply(state,'soda')"),true);
+  assert.equal(source.includes('useSupply(state,id,null,now)'),true);
+  assert.equal(source.includes('useSupply(state,id,state.board[slot].id,now)'),true);
   const before=simulateStoryBoard({seed:7});
   const after=simulateStoryBoard({seed:7});
   assert.deepEqual(after,before);
