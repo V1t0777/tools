@@ -2,7 +2,7 @@ import {WIDTH,MAX_ENERGY,CHAINS,getLevel,moveOrMerge,produce,fulfillOrder,storeI
 import {BUILDINGS} from '../economy.mjs';
 import {readStoryWorkshop,writeStoryWorkshop,STORY_WORKSHOP_KEY} from './workshop-storage.mjs';
 import {readStorySave} from './local-storage.mjs';
-import {captureStoryWorkshopEvidence} from './save-evidence.mjs';
+import {captureStoryWorkshopEvidence,prepareStoryEvidenceDownload} from './save-evidence.mjs';
 import {checkStoryResumeSnapshot} from './resume-guard.mjs';
 import {verifyStoryWorkshopPublication} from './workshop-publication-guard.mjs';
 import {runStoryWriteWithLock} from './write-lock.mjs';
@@ -336,12 +336,15 @@ $('export-corrupt-workshop').addEventListener('click',()=>{
   }
   let url;
   try{
-    url=URL.createObjectURL(new Blob([evidence.content],{type:'text/plain;charset=utf-8'}));
+    const download=prepareStoryEvidenceDownload(evidence.content,'yunyu-story-workshop-corrupt-save');
+    url=URL.createObjectURL(new Blob([download.content],{type:download.wrapped?'application/json;charset=utf-8':'text/plain;charset=utf-8'}));
     const a=document.createElement('a');
-    a.href=url;a.download='yunyu-story-workshop-corrupt-save.txt';
+    a.href=url;a.download=download.filename;
     document.body.append(a);a.click();a.remove();
     window.setTimeout(()=>URL.revokeObjectURL(url),60000);
-    $('board-notice').textContent='已尝试下载异常记录，请先在设备“文件”中确认备份存在；原浏览器存档未修改。';
+    $('board-notice').textContent='已尝试下载异常记录'+
+      (download.wrapped?'（UTF-16 JSON 证据封装，非可直接导入的存档）':'')+
+      '，请先在设备“文件”中确认备份存在；原浏览器存档未修改。';
   }catch{
     if(url)URL.revokeObjectURL(url);
     $('board-notice').textContent='设备未能触发文件导出。原浏览器存档未修改，请勿重置。';

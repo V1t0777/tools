@@ -20,3 +20,32 @@ export function captureStoryWorkshopEvidence(storage,{key,expectedRaw,confirmedB
     return {ok:true,code:'OK',content:current};
   }catch{return {ok:false,code:'STORAGE_UNAVAILABLE'};}
 }
+
+/**
+ * Preserve JavaScript UTF-16 code units in an explicitly requested local
+ * evidence download. Blob UTF-8 encoding replaces isolated surrogates with
+ * U+FFFD, which would silently alter a damaged localStorage record.
+ * A well-formed record remains a plain .txt; a record containing an unpaired
+ * surrogate becomes a reversible JSON evidence envelope (not an import file).
+ */
+function hasUnpairedStorySurrogate(raw){
+  for(let i=0;i<raw.length;i++){
+    const code=raw.charCodeAt(i);
+    if(code>=0xD800&&code<=0xDBFF){
+      const next=i+1<raw.length?raw.charCodeAt(i+1):-1;
+      if(next>=0xDC00&&next<=0xDFFF){i++;continue;}
+      return true;
+    }
+    if(code>=0xDC00&&code<=0xDFFF)return true;
+  }
+  return false;
+}
+export function prepareStoryEvidenceDownload(raw,baseName){
+  if(typeof raw!=='string'||typeof baseName!=='string'||!/^[a-z0-9-]+$/i.test(baseName))
+    throw new TypeError('Invalid story evidence download');
+  const wrapped=hasUnpairedStorySurrogate(raw);
+  return wrapped
+    ? {content:JSON.stringify({format:'yunyu-story-evidence-utf16-v1',raw}),
+      filename:baseName+'.utf16.json',wrapped:true}
+    : {content:raw,filename:baseName+'.txt',wrapped:false};
+}

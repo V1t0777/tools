@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {captureStoryWorkshopEvidence,MAX_STORY_EVIDENCE_CHARS} from '../merge/story/save-evidence.mjs';
+import {captureStoryWorkshopEvidence,prepareStoryEvidenceDownload,MAX_STORY_EVIDENCE_CHARS} from '../merge/story/save-evidence.mjs';
 import {STORY_WORKSHOP_KEY} from '../merge/story/workshop-storage.mjs';
 import {SAVE_KEY} from '../merge/storage.mjs';
 import {STORY_SAVE_KEY} from '../merge/mode-boundaries.mjs';
@@ -87,4 +87,52 @@ test('P11 corrupt evidence export is restricted to story keys before any storage
   assert.equal(captureStoryWorkshopEvidence(guarded,{
     key:STORY_SAVE_KEY,expectedRaw:'{damaged narrative',confirmedByUser:true
   }).code,'OK');
+});
+
+test('P85 story evidence download preserves normal Unicode text and paired emoji as plain UTF-8',async()=>{
+  const raw='{ invalid 🏝️ }\n中文';
+  const download=prepareStoryEvidenceDownload(raw,'yunyu-story-dialogue-corrupt-save');
+  assert.equal(download.wrapped,false);
+  assert.equal(download.filename,'yunyu-story-dialogue-corrupt-save.txt');
+  assert.equal(await new Blob([download.content]).text(),raw);
+});
+
+test('P85 isolated high/low UTF-16 surrogates use a reversible non-import JSON envelope',async()=>{
+  for(const raw of [
+    'before'+String.fromCharCode(0xD800)+'after',
+    'before'+String.fromCharCode(0xDC00)+'after',
+    'paired 🏝️ and '+String.fromCharCode(0xD800)+' broken'
+  ]){
+    const download=prepareStoryEvidenceDownload(raw,'yunyu-story-workshop-corrupt-save');
+    assert.equal(download.wrapped,true);
+    assert.equal(download.filename,'yunyu-story-workshop-corrupt-save.utf16.json');
+    const decoded=JSON.parse(await new Blob([download.content]).text());
+    assert.equal(decoded.format,'yunyu-story-evidence-utf16-v1');
+    assert.equal(decoded.raw,raw,'all original UTF-16 code units survive browser Blob encoding');
+    assert.equal(decoded.raw.length,raw.length);
+  }
+});
+
+test('P85 corrupt narrative/workshop evidence remains read-only and mode isolated',()=>{
+  const store=storage(),normal=store.getItem(SAVE_KEY);
+  for(const key of [STORY_SAVE_KEY,STORY_WORKSHOP_KEY]){
+    const raw='damaged '+String.fromCharCode(0xD800);
+    store.setItem(key,raw);
+    const captured=captureStoryWorkshopEvidence(store,{key,expectedRaw:raw,confirmedByUser:true});
+    assert.equal(captured.ok,true);
+    assert.equal(JSON.parse(prepareStoryEvidenceDownload(captured.content,'yunyu-story-evidence').content).raw,raw);
+    assert.equal(store.getItem(key),raw);
+    assert.equal(store.getItem(SAVE_KEY),normal);
+  }
+});
+
+test('P85 both story export entry points label reversible evidence without claiming disk success',()=>{
+  for(const path of ['../merge/story/workshop.mjs','../merge/story/ui.mjs']){
+    const source=readFileSync(new URL(path,import.meta.url),'utf8');
+    assert.ok(source.includes('prepareStoryEvidenceDownload(evidence.content'),path);
+    assert.ok(source.includes('download.filename'),path);
+    assert.ok(source.includes('download.wrapped'),path);
+    assert.ok(source.includes('非可直接导入的存档'),path);
+    assert.ok(source.includes('已尝试下载'),path);
+  }
 });

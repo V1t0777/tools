@@ -12,7 +12,7 @@ import {adoptConcurrentDailyPinStorageEvent} from './daily-pin-reconcile.mjs';
 import {canKeepDialogueAfterDailyPin} from './daily-pin-reconcile.mjs';
 import {adoptConcurrentDailyPinOnResume,canKeepResumedStoryDialogue} from './daily-pin-reconcile.mjs';
 import {saveStoryDialogueWithLock} from './dialogue-write.mjs';
-import {captureStoryWorkshopEvidence} from './save-evidence.mjs';
+import {captureStoryWorkshopEvidence,prepareStoryEvidenceDownload} from './save-evidence.mjs';
 import {checkStoryResumeSnapshot} from './resume-guard.mjs';
 import {verifyStoryDialoguePublication} from './dialogue-publication-guard.mjs';
 import {shouldBlockStoryStorageEvent} from './storage-event-guard.mjs';
@@ -492,12 +492,15 @@ $('export-corrupt-story').addEventListener('click',()=>{
   }
   let url;
   try{
-    url=URL.createObjectURL(new Blob([evidence.content],{type:'text/plain;charset=utf-8'}));
+    const download=prepareStoryEvidenceDownload(evidence.content,'yunyu-story-dialogue-corrupt-save');
+    url=URL.createObjectURL(new Blob([download.content],{type:download.wrapped?'application/json;charset=utf-8':'text/plain;charset=utf-8'}));
     const link=document.createElement('a');
-    link.href=url;link.download='yunyu-story-dialogue-corrupt-save.txt';
+    link.href=url;link.download=download.filename;
     document.body.append(link);link.click();link.remove();
     window.setTimeout(()=>URL.revokeObjectURL(url),60000);
-    $('save-state').textContent='已尝试下载异常对白记录。请先在设备“文件”中确认备份存在；原浏览器存档未修改。';
+    $('save-state').textContent='已尝试下载异常对白记录'+
+      (download.wrapped?'（UTF-16 JSON 证据封装，非可直接导入的存档）':'')+
+      '。请先在设备“文件”中确认备份存在；原浏览器存档未修改。';
   }catch{
     if(url)URL.revokeObjectURL(url);
     $('save-state').textContent='设备未能触发文件导出；原浏览器存档未修改，请勿重置。';
