@@ -155,19 +155,24 @@ function render(){
       (spendsReserve?' · 将动用建设储备':'');
     button.disabled=disabled||!budget.ok||left===0||state.coins<item.price;
     button.addEventListener('click',guardRenderedAction(()=>{
+      // The save may have changed before the delayed click, even if its
+      // storage event has not arrived. Never prompt against stale coins.
+      if(!revalidateWorkshopBeforeInteraction())return;
       if(spendsReserve){
-        // A risky spend requires an explicit user gesture. The usual exact-
-        // byte preflight, lock and publication guards still run AFTER consent.
+        // Consent does not lease the save: a second exact-byte read is
+        // required after the native modal closes (including cancellation).
         let approved=false;
         try{
           approved=window.confirm('购买'+item.name+'会使下一处建设「'+
             BUILDINGS[budget.id].name+'」金币不足。确认继续购买吗？')===true;
         }catch{}
         if(!approved){
+          if(!revalidateWorkshopBeforeInteraction())return;
           $('board-notice').textContent='已取消补给购买，金币未扣除。';
           return;
         }
       }
+      // commit() independently rechecks raw bytes and epoch before writing.
       return commit(purchaseSupply(state,id));
     }));
     shop.append(button);
