@@ -107,9 +107,14 @@ test('P6 bounded failure and invalid seed/options are explicit',()=>{
 test('P6 audit module cannot write saves, contact network or change mode',()=>{
   const source=readFileSync(new URL('../merge/story/board-simulation.mjs',import.meta.url),'utf8');
   for(const forbidden of ['localStorage','sessionStorage','fetch(','XMLHttpRequest',
-    'writeStorySave','writeStoryWorkshop','purchaseSupply','useSupply','Math.random(']){
+    'writeStorySave','writeStoryWorkshop','Math.random(']){
     assert.equal(source.includes(forbidden),false,forbidden);
   }
+  // P77 intentionally exercises finite supplies via the real deterministic
+  // engine. Keep explicit simulation-clock calls and prohibit any save I/O.
+  assert.match(source,/purchaseSupply\\(state,'soda'\\)/);
+  assert.match(source,/useSupply\\(state,id,null,now\\)/);
+  assert.match(source,/useSupply\\(state,id,state\\.board\\[slot\\]\\.id,now\\)/);
   const before=simulateStoryBoard({seed:7});
   const after=simulateStoryBoard({seed:7});
   assert.deepEqual(after,before);
