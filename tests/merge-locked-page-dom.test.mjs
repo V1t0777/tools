@@ -707,3 +707,61 @@ test('P2.65e live page blocks corrupt external save on deferred BFCache resume',
   assert.equal(h.writes.length,writes);
   assert.match(h.id('save-status').textContent,/暂停|异常|无法/);
 });
+
+test('P2.65f guidance rerender cancels a live drag and consumes its late click',async()=>{
+  const h=await mount(),board=h.id('board'),origin=board.children[0];
+  board.dispatch('pointerdown',{target:origin,pointerId:21,clientX:0,clientY:0});
+  board.dispatch('pointermove',{target:origin,pointerId:21,clientX:18,clientY:0});
+  assert.equal(h.doc.body.children.length,1,'drag ghost exists before rerender');
+  h.doc.elementFromPoint=()=>board.children[1];
+  const before=h.writes.length;
+  h.id('board-guide').click();
+  assert.equal(h.doc.body.children.length,0,'rerender must remove old drag ghost');
+  board.dispatch('pointerup',{target:origin,pointerId:21,clientX:25,clientY:0});
+  board.dispatch('click',{target:board.children[42],detail:1});
+  await settle();
+  assert.equal(h.writes.length,before,'old drop and synthetic click must not write');
+  assert.equal(h.saved().revision,0);
+  board.dispatch('pointerdown',{target:board.children[42],pointerId:22});
+  board.dispatch('click',{target:board.children[42],detail:1});
+  await settle();
+  assert.equal(h.saved().revision,1,'fresh pointer gesture remains usable');
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});
+
+test('P2.65f a local producer transaction rerender invalidates a prior material drag',async()=>{
+  const h=await mount(),board=h.id('board'),origin=board.children[0];
+  board.dispatch('pointerdown',{target:origin,pointerId:23,clientX:0,clientY:0});
+  board.dispatch('pointermove',{target:origin,pointerId:23,clientX:18,clientY:0});
+  assert.equal(h.doc.body.children.length,1);
+  h.doc.elementFromPoint=()=>board.children[1];
+  board.dispatch('click',{target:board.children[42],detail:0});
+  await settle();
+  assert.equal(h.saved().revision,1,'producer action committed exactly once');
+  assert.equal(h.doc.body.children.length,0,'verified local rerender cancels drag');
+  const before=h.writes.length;
+  board.dispatch('pointerup',{target:origin,pointerId:23,clientX:25,clientY:0});
+  await settle();
+  assert.equal(h.writes.length,before,'stale drop cannot become a second write');
+  assert.equal(h.saved().revision,1);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});
+
+test('P2.65f lost pointer capture cancels mobile drag without pointercancel',async()=>{
+  const h=await mount(),board=h.id('board'),origin=board.children[0];
+  board.dispatch('pointerdown',{target:origin,pointerId:24,clientX:0,clientY:0});
+  board.dispatch('pointermove',{target:origin,pointerId:24,clientX:18,clientY:0});
+  assert.equal(h.doc.body.children.length,1);
+  h.doc.elementFromPoint=()=>board.children[1];
+  const before=h.writes.length;
+  board.dispatch('lostpointercapture',{target:origin,pointerId:24});
+  assert.equal(h.doc.body.children.length,0,'capture loss removes drag ghost');
+  board.dispatch('pointerup',{target:origin,pointerId:24,clientX:25,clientY:0});
+  board.dispatch('click',{target:board.children[42],detail:1});
+  await settle();
+  assert.equal(h.writes.length,before,'late click after capture loss is consumed');
+  board.dispatch('pointerdown',{target:board.children[42],pointerId:25});
+  board.dispatch('click',{target:board.children[42],detail:1});
+  await settle();
+  assert.equal(h.saved().revision,1,'subsequent genuine tap works');
+});

@@ -63,6 +63,10 @@ test('P7 novice strategy stresses real board with 24 reproducible seeds',()=>{
   assert.ok(results.every(x=>x.peakBoardUsed<=56&&x.boardUsed<=56));
   assert.ok(results.every(x=>x.energy>=0&&x.energy<=MAX_ENERGY&&x.coins>=0));
   assert.ok(results.every(x=>x.reason!=='invalid-state'));
+  assert.deepEqual(results.filter(x=>!x.complete).map(x=>({seed:x.seed,reason:x.reason})),[],
+    'a novice run must finish all three real construction gates within the budget');
+  assert.ok(results.every(x=>x.milestones.map(m=>m.id).join(',')===
+    'first-order,garden,harbor,storefront'));
   assert.ok(results.some(x=>x.peakBoardUsed>=44),'novice policy must exercise crowded boards');
   assert.ok(results.some(x=>x.offTargetProductions>0),'round-robin must produce off-target items');
   for(const result of results){

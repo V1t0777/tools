@@ -19,7 +19,7 @@ function storage(){
   return {data,getItem:key=>data.has(key)?data.get(key):null,
     setItem:(key,value)=>data.set(key,value)};
 }
-function firstVolume(seed){
+function firstVolume(seed,strategy='greedy'){
   const store=storage();
   let progress=startCoreStory(createEmptyStoryProgress(),CORE_STORY_PACK);
   let nextIndex=0;
@@ -47,7 +47,7 @@ function firstVolume(seed){
   through('signboard');
   assert.equal(nextCoreStoryJourney(progress,read(createInitialState(1_000_000))).kind,
     'workshop','first order must not be narrated before delivery');
-  const result=simulateStoryBoard({seed,onMilestone:(milestone,state)=>{
+  const result=simulateStoryBoard({seed,strategy,maxActions:10_000,onMilestone:(milestone,state)=>{
     observed.push(milestone.id);
     if(milestone.id==='first-order'){
       checkGoal('first-order',state);
@@ -73,7 +73,9 @@ function firstVolume(seed){
       assert.equal(nextCoreStoryJourney(progress,read(state)).kind,'complete');
     }else assert.fail('unexpected milestone '+milestone.id);
   }});
-  assert.equal(result.complete,true,'seed '+seed+': '+result.reason);
+  assert.equal(result.complete,true,strategy+' seed '+seed+': '+result.reason);
+  assert.equal(result.strategy,strategy);
+  assert.ok(result.actions<10_000,'unexpected action-cap pressure: '+strategy+' seed '+seed);
   assert.deepEqual(observed,['first-order','garden','harbor','storefront']);
   assert.equal(progress.packs.core.completed.main.length,main.length);
   assert.equal(progress.packs.core.completed.side.length,0,
@@ -104,4 +106,9 @@ test('P69 detached milestone snapshots cannot mutate the live simulation',()=>{
   assert.deepEqual(replay,baseline);
   assert.deepEqual(observed,['first-order','garden','harbor','storefront']);
   assert.throws(()=>simulateStoryBoard({onMilestone:true}),RangeError);
+});
+
+test('P71 novice first-volume replay respects all twelve story beats and four real gates',()=>{
+  const seeds=[0,0xffffffff,...Array.from({length:48},(_,i)=>i*7919+1)];
+  for(const seed of seeds)firstVolume(seed,'novice');
 });
