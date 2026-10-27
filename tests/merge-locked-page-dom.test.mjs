@@ -1337,3 +1337,75 @@ test('P2.65t restore backup download failures preserve evidence and give distinc
     assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
   }finally{globalThis.URL=originalURL;}
 });
+
+test('P2.65v background/BFCache export clicks cannot start any of three downloads',async()=>{
+  const h=await mount();
+  h.map.set(ABNORMAL_RESET_BACKUP_KEY,'{abnormal-original');
+  h.map.set(RESTORE_BACKUP_KEY,'{restore-original');
+  const oldCreate=URL.createObjectURL,created=[];
+  const before=h.writes.length;
+  try{
+    URL.createObjectURL=()=>{created.push(true);return 'blob:p265v-hidden';};
+    h.doc.hidden=true;h.doc.dispatch('visibilitychange');
+    const buttons=[h.id('export-local-save'),h.id('export-abnormal-reset-backup'),
+      h.id('export-local-save').parentElement.children.find(e=>e.id==='export-restore-backup')];
+    for(const button of buttons){
+      button.click();
+      assert.match(h.id('notice').textContent,/后台|尚未恢复核验/);
+    }
+    assert.deepEqual(created,[]);
+    assert.equal(h.writes.length,before);
+    assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  }finally{URL.createObjectURL=oldCreate;}
+});
+
+test('P2.65v normal export refuses a save changed by another tab during preparation',async()=>{
+  const h=await mount(),oldGet=h.storage.getItem.bind(h.storage);
+  const changed=JSON.stringify({...h.saved(),coins:913});
+  const before=h.writes.length,oldCreate=URL.createObjectURL;
+  let reads=0,created=0;
+  h.storage.getItem=key=>{
+    const value=oldGet(key);
+    if(key===SAVE_KEY&&++reads===1)h.map.set(SAVE_KEY,changed);
+    return value;
+  };
+  try{
+    URL.createObjectURL=()=>{created++;return 'blob:p265v-stale';};
+    h.id('export-local-save').click();
+    assert.match(h.id('notice').textContent,/导出期间.*变化/);
+    assert.equal(created,0);
+    assert.equal(oldGet(SAVE_KEY),changed);
+    assert.equal(h.writes.length,before);
+    assert.equal(oldGet(STORY_SAVE_KEY),'story-not-touched');
+  }finally{URL.createObjectURL=oldCreate;h.storage.getItem=oldGet;}
+});
+
+test('P2.65v abnormal and restore backup exports reject changed original bytes',async()=>{
+  for(const [key,buttonId] of [
+    [ABNORMAL_RESET_BACKUP_KEY,'export-abnormal-reset-backup'],
+    [RESTORE_BACKUP_KEY,'export-restore-backup']
+  ]){
+    const h=await mount(),oldGet=h.storage.getItem.bind(h.storage);
+    const before=h.writes.length,oldCreate=URL.createObjectURL;
+    const original='backup\\ud800original',changed='backup-updated';
+    h.map.set(key,original);
+    let reads=0,created=0;
+    h.storage.getItem=readKey=>{
+      const value=oldGet(readKey);
+      if(readKey===key&&++reads===1)h.map.set(key,changed);
+      return value;
+    };
+    try{
+      URL.createObjectURL=()=>{created++;return 'blob:p265v-backup';};
+      const button=buttonId==='export-restore-backup'
+        ?h.id('export-local-save').parentElement.children.find(e=>e.id===buttonId)
+        :h.id(buttonId);
+      button.click();
+      assert.match(h.id('notice').textContent,/导出期间.*变化/);
+      assert.equal(created,0);
+      assert.equal(oldGet(key),changed);
+      assert.equal(h.writes.length,before);
+      assert.equal(oldGet(STORY_SAVE_KEY),'story-not-touched');
+    }finally{URL.createObjectURL=oldCreate;h.storage.getItem=oldGet;}
+  }
+});
