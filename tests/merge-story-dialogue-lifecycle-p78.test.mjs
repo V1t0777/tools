@@ -155,8 +155,8 @@ test('P78 lifecycle contract suspends story writes, daily pin and damaged export
   const ui=readFileSync(new URL('../merge/story/ui.mjs',import.meta.url),'utf8');
   assert.ok(ui.includes("window.addEventListener('pagehide',()=>suspendStoryPage({gone:true}))"));
   assert.ok(ui.includes('storageEpoch++; // invalidate every pending story Web Lock callback'));
-  assert.ok(ui.includes('isCurrent:()=>storageEpoch===expectedEpoch&&!pageSuspended()'));
-  assert.ok(ui.includes('commitGuard:()=>!pageSuspended()&&commitGuard()'));
+  assert.ok(ui.includes('isCurrent:()=>storageEpoch===expectedEpoch&&(!blocked||reset)'));
+  assert.ok(ui.includes('commitGuard=()=>!pageSuspended()&&originalCommitGuard()'));
   assert.ok(ui.includes('if(!blocked&&!saving&&!pageSuspended()&&!pinQueued'));
   assert.ok(ui.includes("if(saving||pageSuspended()||reason!=='CORRUPT_SAVE'"));
   assert.ok(ui.includes("if(document.visibilityState==='hidden'||(pageGone&&!resumePending))return;"));
