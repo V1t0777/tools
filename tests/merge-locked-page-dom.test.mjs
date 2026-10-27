@@ -1273,7 +1273,7 @@ test('P2.65t restore-before backup requests exact historical bytes without any g
     static revokeObjectURL(){}
   };
   try{
-    h.id('export-restore-backup').click();
+    h.id('export-local-save').parentElement.children.find(e=>e.id==='export-restore-backup').click();
     assert.match(h.id('notice').textContent,/已请求下载恢复前原始存档/);
     assert.equal(links[0].download,'yunyu-before-restore-v3.json');
     assert.equal(await blobs[0].text(),raw);
@@ -1300,7 +1300,7 @@ test('P2.65t malformed UTF-16 restore backup is explicitly non-importable and lo
     static revokeObjectURL(){}
   };
   try{
-    h.id('export-restore-backup').click();
+    h.id('export-local-save').parentElement.children.find(e=>e.id==='export-restore-backup').click();
     assert.match(h.id('notice').textContent,/不可直接导入/);
     assert.equal(links[0].download,'yunyu-before-restore-utf16.json');
     assert.equal(JSON.parse(await blobs[0].text()).raw,raw);
@@ -1315,11 +1315,11 @@ test('P2.65t malformed UTF-16 restore backup is explicitly non-importable and lo
 
 test('P2.65t restore backup download failures preserve evidence and give distinct guidance',async()=>{
   const h=await mount();
-  h.id('export-restore-backup').click();
+  h.id('export-local-save').parentElement.children.find(e=>e.id==='export-restore-backup').click();
   assert.match(h.id('notice').textContent,/尚无恢复前备份/);
   h.storage.setItem(RESTORE_BACKUP_KEY,'x'.repeat(2_000_001));
   const largeWrites=h.writes.length;
-  h.id('export-restore-backup').click();
+  h.id('export-local-save').parentElement.children.find(e=>e.id==='export-restore-backup').click();
   assert.match(h.id('notice').textContent,/超过安全导出上限/);
   assert.equal(h.writes.length,largeWrites);
   h.storage.setItem(RESTORE_BACKUP_KEY,'{broken');
@@ -1330,7 +1330,7 @@ test('P2.65t restore backup download failures preserve evidence and give distinc
   };
   const failedWrites=h.writes.length;
   try{
-    h.id('export-restore-backup').click();
+    h.id('export-local-save').parentElement.children.find(e=>e.id==='export-restore-backup').click();
     assert.match(h.id('notice').textContent,/下载未启动/);
     assert.equal(h.writes.length,failedWrites);
     assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),'{broken');
