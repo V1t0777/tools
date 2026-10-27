@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {SAVE_KEY,ABNORMAL_RESET_BACKUP_KEY} from '../merge/storage.mjs';
+import {RESTORE_BACKUP_KEY} from '../merge/save-restore-backup.mjs';
 import {STORY_SAVE_KEY} from '../merge/mode-boundaries.mjs';
 import {NORMAL_SAVE_LOCK_NAME} from '../merge/normal-save-lock.mjs';
 import {createInitialState,storeItem} from '../merge/engine.mjs';
@@ -113,6 +114,9 @@ async function mount({initialRaw=null,locksAvailable=true}={}) {
     if(!ids.has(id))ids.set(id,new Element(id==='supply-producer'?'select':'div'));
     return ids.get(id);
   };
+  // Mirror the real HTML save-actions parent without polluting body drag tests.
+  const saveActions=new Element('div');
+  saveActions.append(doc.getElementById('export-local-save'));
   doc.createElement=tag=>new Element(tag);
   doc.createDocumentFragment=()=>new Element('#fragment');
   doc.elementFromPoint=()=>null;
@@ -839,4 +843,30 @@ test('P2.65g background pointerdown does not clear canceled drag click guard',as
   board.dispatch('click',{target:board.children[42],detail:1});
   await settle();
   assert.equal(h.saved().revision,1,'fresh cell pointerdown restores normal click');
+});
+
+test('P2.65i live page import restores verified normal file and keeps story isolated',async()=>{
+  const h=await mount();
+  const original=h.storage.getItem(SAVE_KEY);
+  const imported=JSON.stringify({...h.saved(),coins:88,revision:1});
+  const controls=h.id('export-local-save').parentElement.children;
+  const input=controls.find(e=>e.id==='import-normal-file');
+  assert.ok(input,'import chooser is attached to real save action row');
+  input.files=[{size:new TextEncoder().encode(imported).length,text:async()=>imported}];
+  input.dispatch('change');
+  await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),imported);
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),original);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  assert.match(h.id('save-status').textContent,/已保存于此浏览器/);
+});
+test('P2.65i live page cancellation does not write or consume backup slot',async()=>{
+  const h=await mount(),before=h.writes.length;
+  h.win.confirm=()=>false;
+  const imported=JSON.stringify({...h.saved(),coins:22,revision:1});
+  const input=h.id('export-local-save').parentElement.children.find(e=>e.id==='import-normal-file');
+  input.files=[{size:imported.length,text:async()=>imported}];
+  input.dispatch('change');await settle();
+  assert.equal(h.writes.length,before);
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null);
 });

@@ -12,6 +12,8 @@ import { prepareLocalSaveExport, prepareAbnormalResetBackupExport } from './save
 import { requestBrowserSaveDownload } from './save-download.mjs';
 import { createNormalPageRuntime } from './normal-page-runtime.mjs';
 import { attachNormalPageLifecycle } from './normal-page-lifecycle.mjs';
+import {performNormalSaveImport} from './normal-save-import-flow.mjs';
+import {RESTORE_BACKUP_KEY} from './save-restore-backup.mjs';
 
 const byId = id => document.getElementById(id);
 const board = byId('board');
@@ -558,6 +560,88 @@ byId('export-abnormal-reset-backup').addEventListener('click', () => {
     ?message+'；浏览器未能安排临时链接清理'
     :message);
 });
+
+
+// File import is an explicit user gesture; never modify shared story HTML.
+// A detached file chooser is not a restore permission. The exact observed
+// baseline is revalidated after asynchronous reading and every confirmation.
+let importEpoch=0,importBusy=false;
+window.addEventListener('pagehide',()=>{importEpoch++;});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)importEpoch++;});
+const saveActions=byId('export-local-save').parentElement;
+if(saveActions){
+  const importButton=document.createElement('button');
+  importButton.id='import-normal-save';
+  importButton.type='button';
+  importButton.className='text-button';
+  importButton.textContent='导入普通模式存档';
+  const importFile=document.createElement('input');
+  importFile.id='import-normal-file';
+  importFile.type='file';
+  importFile.accept='.json,application/json';
+  importFile.hidden=true;
+  importFile.setAttribute('aria-label','选择普通模式 V3 JSON 存档文件');
+  const backupButton=document.createElement('button');
+  backupButton.id='export-restore-backup';
+  backupButton.type='button';
+  backupButton.className='text-button';
+  backupButton.textContent='导出恢复前备份';
+  saveActions.append(importButton,importFile,backupButton);
+  importButton.addEventListener('click',()=>{
+    if(importBusy||runtime.busy||saveIssue||pageSuspended()){
+      hint('存档未就绪或页面处于后台，暂不能导入');return;
+    }
+    if(!revalidateResumedSave())return;
+    importFile.click();
+  });
+  importFile.addEventListener('change',async()=>{
+    const file=importFile.files?.[0];
+    if(!file)return;
+    if(importBusy){hint('已有文件正在核验，请稍后重试');return;}
+    importBusy=true;importButton.disabled=true;
+    try{
+      const result=await performNormalSaveImport({
+        file,storage:store,runtime,
+        confirm:message=>window.confirm(message),
+        isSuspended:pageSuspended,revalidate:revalidateResumedSave,
+        getEpoch:()=>importEpoch
+      });
+      if(result.ok)hint('普通模式存档已核验并恢复；请核对棋盘，并导出恢复前备份');
+      else if(runtime.blocked||['RESTORE_OUTCOME_UNCERTAIN','UI_PUBLISH_FAILED',
+        'UI_TRANSACTION_INVALIDATED','RESTORE_VERIFY_FAILED'].includes(result.reason))
+        pauseUnsafe(result.reason,'恢复结果无法安全确认，已暂停操作；请保留原始存档及恢复前备份');
+      else hint({
+        USER_CANCELLED:'已取消导入，当前进度未更改',
+        DOWNGRADE_CANCELLED:'已取消降级恢复，当前进度未更改',
+        FILE_TOO_LARGE:'文件超过安全大小限制，未执行导入',
+        STORY_MODE_FILE:'这是剧情模式文件，不能导入普通模式',
+        CURRENT_SAVE_CHANGED:'读取期间存档已变化，请在最新页面重新选择文件',
+        SAVE_CHANGED:'存档已变化，请重新选择文件',
+        PAGE_SUSPENDED:'页面切换期间已取消导入，请重新选择文件',
+        BACKUP_SLOT_CONFLICT:'恢复前备份槽已存在不同内容，请先导出并核对备份',
+        LOCK_BUSY:'其他标签正在保存，请稍后重新选择文件',
+        ALREADY_PRESENT:'所选文件与当前存档完全相同，无需导入'
+      }[result.reason]||'导入预检或恢复未通过，当前存档不得视为已恢复');
+    }catch{pauseUnsafe('RESTORE_UI_FAILED');}
+    finally{importBusy=false;importButton.disabled=false;importFile.value='';}
+  });
+  backupButton.addEventListener('click',()=>{
+    const backupView={getItem:key=>{
+      if(key!==SAVE_KEY||typeof store?.getItem!=='function')throw Error('STORAGE_UNAVAILABLE');
+      return store.getItem(RESTORE_BACKUP_KEY);
+    }};
+    const prepared=prepareLocalSaveExport(backupView);
+    if(!prepared.ok){hint(prepared.reason==='NO_SAVED_DATA'
+      ?'此浏览器尚无恢复前备份':'无法安全读取恢复前备份，请勿清理浏览器数据');return;}
+    const result=requestBrowserSaveDownload({...prepared,
+      filename:prepared.wrapped?'yunyu-before-restore-utf16.json':
+        prepared.verified?'yunyu-before-restore-v3.json':'yunyu-before-restore-original.txt'},{
+      schedule:(fn,ms)=>window.setTimeout(fn,ms)
+    });
+    hint(result.ok?'已请求下载恢复前原始备份，请核实文件确实保存':
+      '恢复前备份下载未启动，请勿清理浏览器数据');
+  });
+}
 
 byId('reset').addEventListener('click',async()=>{
   if(pageSuspended()){hint('页面处于后台，请返回并核验进度后重试');return;}
