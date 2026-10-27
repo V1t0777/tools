@@ -565,9 +565,11 @@ byId('export-abnormal-reset-backup').addEventListener('click', () => {
 // File import is an explicit user gesture; never modify shared story HTML.
 // A detached file chooser is not a restore permission. The exact observed
 // baseline is revalidated after asynchronous reading and every confirmation.
-let importEpoch=0,importBusy=false;
-window.addEventListener('pagehide',()=>{importEpoch++;});
-document.addEventListener('visibilitychange',()=>{if(document.hidden)importEpoch++;});
+let importEpoch=0,importBusy=false,importPicker=null;
+window.addEventListener('pagehide',()=>{importEpoch++;importPicker=null;});
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){importEpoch++;importPicker=null;}
+});
 const saveActions=byId('export-local-save').parentElement;
 if(saveActions){
   const importButton=document.createElement('button');
@@ -592,12 +594,27 @@ if(saveActions){
       hint('存档未就绪或页面处于后台，暂不能导入');return;
     }
     if(!revalidateResumedSave())return;
-    importFile.click();
+    // The chooser is bound to the exact save and page lifecycle at the
+    // initiating user gesture, not to whichever save is current on return.
+    importPicker={epoch:importEpoch,raw:runtime.raw};
+    try{importFile.click();}
+    catch{importPicker=null;hint('当前浏览器无法打开文件选择器');}
+  });
+  importFile.addEventListener('cancel',()=>{
+    importPicker=null;importFile.value='';
   });
   importFile.addEventListener('change',async()=>{
+    const picker=importPicker;
+    importPicker=null;
     const file=importFile.files?.[0];
-    if(!file)return;
-    if(importBusy){hint('已有文件正在核验，请稍后重试');return;}
+    if(!file){importFile.value='';return;}
+    if(!picker||picker.epoch!==importEpoch||picker.raw!==runtime.raw||
+        pageSuspended()||saveIssue||runtime.busy||!revalidateResumedSave()){
+      importFile.value='';
+      hint('文件选择期间页面或存档已变化，请重新点击导入并选择文件');
+      return;
+    }
+    if(importBusy){importFile.value='';hint('已有文件正在核验，请稍后重试');return;}
     importBusy=true;importButton.disabled=true;
     try{
       const result=await performNormalSaveImport({
