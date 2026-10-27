@@ -7,11 +7,43 @@ import {previewNormalSaveImport} from './save-import-preflight.mjs';
 import {MAX_LOCAL_SAVE_BYTES} from './storage.mjs';
 
 export const MAX_NORMAL_IMPORT_FILE_BYTES=2_000_000;
+export const NORMAL_IMPORT_READ_TIMEOUT_MS=45_000;
 const reject=reason=>Object.freeze({ok:false,reason});
+
+// A native file read may never settle after iOS/WebView backgrounding.
+// Expiry only ends this UI attempt; a late File.text() result cannot confirm
+// or restore anything. This function never reads or writes localStorage.
+function readFileWithDeadline(file,schedule,cancelSchedule){
+  return new Promise(resolve=>{
+    let settled=false,timer,hasTimer=false;
+    const finish=result=>{
+      if(settled)return;
+      settled=true;
+      if(hasTimer){try{cancelSchedule(timer);}catch{/* Best effort. */}}
+      resolve(result);
+    };
+    if(typeof schedule!=='function'||typeof cancelSchedule!=='function'){
+      finish(reject('FILE_READ_UNAVAILABLE'));return;
+    }
+    try{
+      timer=schedule(()=>finish(reject('FILE_READ_TIMEOUT')),
+        NORMAL_IMPORT_READ_TIMEOUT_MS);
+      hasTimer=true;
+    }catch{finish(reject('FILE_READ_UNAVAILABLE'));return;}
+    if(settled)return;
+    let pending;
+    try{pending=file.text();}
+    catch{finish(reject('FILE_READ_FAILED'));return;}
+    Promise.resolve(pending).then(
+      value=>finish({ok:true,value}),
+      ()=>finish(reject('FILE_READ_FAILED')));
+  });
+}
 
 export async function performNormalSaveImport({
   file,storage,runtime,confirm,isSuspended=()=>false,
-  revalidate=()=>true,getEpoch=()=>0
+  revalidate=()=>true,getEpoch=()=>0,
+  schedule=globalThis.setTimeout,cancelSchedule=globalThis.clearTimeout
 }={}) {
   if(!file||!Number.isSafeInteger(file.size)||file.size<0)
     return reject('NO_VALID_FILE');
@@ -38,11 +70,11 @@ export async function performNormalSaveImport({
   };
   const initial=inspect();
   if(initial)return reject(initial);
-  let fileText;
-  try{fileText=await file.text();}
-  catch{return reject('FILE_READ_FAILED');}
+  const read=await readFileWithDeadline(file,schedule,cancelSchedule);
   const afterRead=inspect();
   if(afterRead)return reject(afterRead);
+  if(!read.ok)return read;
+  const fileText=read.value;
   if(typeof fileText!=='string'||!fileText.length)
     return reject('EMPTY_OR_NON_TEXT_FILE');
   if(fileText.length>MAX_LOCAL_SAVE_BYTES)return reject('FILE_TOO_LARGE');
