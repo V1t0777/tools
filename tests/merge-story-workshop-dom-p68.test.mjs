@@ -147,7 +147,10 @@ test('P68 disabled storage reset cannot be bypassed by a queued DOM click',()=>{
   const handler=ui.slice(ui.indexOf("$('reset-workshop').addEventListener('click',async()=>{"),
     ui.indexOf('function recheckWorkshopOnResume(){'));
   assert.ok(handler.includes("if(reason==='STORAGE_UNAVAILABLE')return;"));
-  assert.equal((handler.match(/blockWorkshopWithNotice\(/g)??[]).length,3);
+  // P82 adds an explicit exact-byte preflight after native confirmation;
+  // keep all three prior failure paths and require the new one as well.
+  assert.equal((handler.match(/blockWorkshopWithNotice\(/g)??[]).length,4);
+  assert.ok(handler.includes('const preflight=checkStoryResumeSnapshot('));
   assert.ok(handler.includes('expectedRaw,isCurrent:()=>storageEpoch===expectedEpoch'));
   assert.ok(handler.includes('const afterResetRender=verifyStoryWorkshopPublication('));
 });
