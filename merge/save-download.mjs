@@ -8,6 +8,15 @@ export const DOWNLOAD_URL_LIFETIME_MS=120_000;
 export const MAX_PENDING_SAVE_DOWNLOADS=8;
 const MAX_DOWNLOAD_BYTES=2_000_000;
 const pendingByApi=new WeakMap();
+// A wall-clock correction can jump forward while Safari is still consuming
+// a Blob URL. Prefer elapsed monotonic time so a download is never revoked
+// early solely because the device time was changed. Older browsers fall back
+// to Date.now; a present but broken performance clock fails closed.
+const readDownloadClock=()=>{
+  const clock=globalThis.performance;
+  return typeof clock?.now==='function'
+    ?Math.floor(clock.now()):Date.now();
+};
 
 function pendingFor(urlApi){
   let entries=pendingByApi.get(urlApi);
@@ -24,7 +33,7 @@ export function requestBrowserSaveDownload(prepared,{
   urlApi=globalThis.URL,
   BlobCtor=globalThis.Blob,
   schedule=globalThis.setTimeout,
-  now=Date.now,
+  now=readDownloadClock,
   authorizeClick
 }={}) {
   if(prepared?.ok!==true||typeof prepared.content!=='string'||
@@ -51,7 +60,9 @@ export function requestBrowserSaveDownload(prepared,{
   // A mobile WebView may suppress timers indefinitely. Retry expired cleanup
   // on the next explicit download request, but never revoke a young URL.
   for(const entry of pending){
-    if(entry.expiresAt<=timestamp)tryRevoke(urlApi,pending,entry);
+    // A nested/re-entrant download can run while a prior Blob is still being
+    // constructed. Never reclaim its reserved quota before it has a URL.
+    if(entry.url&&entry.expiresAt<=timestamp)tryRevoke(urlApi,pending,entry);
   }
   if(pending.size>=MAX_PENDING_SAVE_DOWNLOADS)
     return reject('DOWNLOAD_LIMIT_REACHED');
@@ -107,8 +118,8 @@ export function requestBrowserSaveDownload(prepared,{
     if(!armed){ranEarly=true;return;}
     let current;
     try{current=now();}catch{return;}
-    // Some WebViews fire a scheduled callback too early, or the wall clock
-    // moves backward. Never revoke a Blob URL before its minimum lifetime.
+    // Some WebViews fire callbacks too early. Do not revoke before the
+    // monotonic deadline, even if the device wall clock jumps forward.
     if(!Number.isFinite(current)||current<entry.expiresAt){
       if(Number.isFinite(current)&&retries-->0){
         try{schedule(cleanup,Math.max(1,Math.min(
