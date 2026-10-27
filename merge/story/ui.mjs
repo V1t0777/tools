@@ -28,6 +28,10 @@ const webLocks=(()=>{try{return window.navigator?.locks??null;}catch{return null
 const loaded=readStorySave(store);
 let progress=loaded.progress,raw=loaded.raw,blocked=loaded.blocked,reason=loaded.reason;
 let saving=false,storageEpoch=0;
+// A hidden or BFCache page cannot authorize queued story writes.
+// A visible pageshow is required after pagehide before resuming.
+let pageGone=false,visibilitySuspended=false,resumePending=false;
+const pageSuspended=()=>pageGone||visibilitySuspended||document.visibilityState==='hidden';
 let pinQueued=false;
 let kind=readStoryHash(window.location.hash).kind;
 let selected=null,selectedChoice=null,selectedIncidentDay=null;
@@ -47,12 +51,13 @@ async function save(next,reset=false,commitGuard=()=>true,pinDay=null){
   // One pending story write per tab. The same lock covers initialization,
   // completion and explicitly confirmed reset; exact-raw CAS stays mandatory.
   if(blocked&&!reset)return false;
-  if(saving)return false;
+  if(saving||pageSuspended())return false;
   const expectedRaw=raw,expectedEpoch=storageEpoch;
   saving=true;render();
   const attempt=await saveStoryDialogueWithLock(webLocks,store,next,{
-    expectedRaw,confirmedReset:reset,commitGuard,
-    isCurrent:()=>storageEpoch===expectedEpoch&&(!blocked||reset)
+    expectedRaw,confirmedReset:reset,
+    commitGuard:()=>!pageSuspended()&&commitGuard(),
+    isCurrent:()=>storageEpoch===expectedEpoch&&!pageSuspended()&&(!blocked||reset)
   });
   saving=false;
   // A midnight rollover can cancel an auto-pin while waiting for the lock.
@@ -76,6 +81,9 @@ async function save(next,reset=false,commitGuard=()=>true,pinDay=null){
       render();return true;
     }
   }
+  if(pageSuspended()){
+    blocked=true;reason='WRITE_CONFLICT';render();return false;
+  }
   if(!attempt.ok||attempt.value!==true||storageEpoch!==expectedEpoch||(!reset&&blocked)){
     blocked=true;reason='WRITE_CONFLICT';render();return false;
   }
@@ -93,7 +101,9 @@ function status(){
       : reason==='STORAGE_UNAVAILABLE'
         ? '浏览器存储不可用：当前只能阅读，无法安全保存剧情。'
         : '存档已被其他标签页改动或写入失败：请重新打开页面核对进度。'
-    : '剧情进度已保存到此浏览器；不与普通模式共享经济，也不提供云存档。';
+    : pageSuspended()
+      ? '剧情页面已暂停：恢复可见后必须核对存档，暂不允许继续阅读提交。'
+      : '剧情进度已保存到此浏览器；不与普通模式共享经济，也不提供云存档。';
 }
 function completed(entry){return !!progress.packs.core?.completed[entry.kind].includes(entry.id);}
 function card(entry,done=false){
@@ -112,7 +122,7 @@ function card(entry,done=false){
   const place=document.createElement('p');place.textContent=entry.chapter+' · '+entry.place;
   const button=document.createElement('button');button.type='button';
   button.textContent=done?'回看剧情':'阅读故事';
-  button.disabled=saving;
+  button.disabled=saving||pageSuspended();
   button.addEventListener('click',()=>open(entry));
   wrapper.append(head,place);
   if(!done&&requirement.required){
@@ -145,9 +155,9 @@ function render(){
     nextCoreStoryJourney(progress,readStoryWorkshop(store));
   const journeyButton=$('journey-read'),journeyLink=$('journey-workshop');
   journeyButton.hidden=journey.kind!=='story';
-  journeyButton.disabled=blocked||saving;
+  journeyButton.disabled=blocked||saving||pageSuspended();
   if(journey.kind==='story')journeyButton.textContent='阅读下一幕 · '+journey.entry.title;
-  journeyLink.hidden=blocked||journey.kind!=='workshop';
+  journeyLink.hidden=blocked||pageSuspended()||journey.kind!=='workshop';
   if(journey.kind==='workshop'){
     journeyLink.href=journey.href;
     journeyLink.textContent=journey.blocked?'前往核对剧情工作台存档 →':'前往完成经营目标 →';
@@ -166,9 +176,9 @@ function render(){
     nextCoreSideJourney(progress,readStoryWorkshop(store));
   const sideButton=$('journey-side-read'),sideLink=$('journey-side-workshop');
   sideButton.hidden=sideJourney.kind!=='story';
-  sideButton.disabled=blocked||saving;
+  sideButton.disabled=blocked||saving||pageSuspended();
   if(sideJourney.kind==='story')sideButton.textContent='阅读人物支线 · '+sideJourney.entry.title;
-  sideLink.hidden=sideJourney.kind!=='workshop';
+  sideLink.hidden=pageSuspended()||sideJourney.kind!=='workshop';
   if(sideJourney.kind==='workshop'){
     sideLink.href=sideJourney.href;
     sideLink.textContent=sideJourney.blocked?'先核对剧情仓库存档 →':
@@ -180,7 +190,7 @@ function render(){
   const dailyPlan=blocked?{kind:'unavailable'}:nextCoreDailyJourney(progress,day);
   const dailyButton=$('journey-daily-read');
   dailyButton.hidden=dailyPlan.kind!=='story';
-  dailyButton.disabled=blocked||saving;
+  dailyButton.disabled=blocked||saving||pageSuspended();
   if(dailyPlan.kind==='story')
     dailyButton.textContent=(dailyPlan.completed?'回看':'阅读')+'今日事件 · '+dailyPlan.entry.title;
   $('journey-daily').textContent=blocked?'今日事件入口已暂停：请先核对剧情存档。':
@@ -218,16 +228,16 @@ function render(){
     empty.textContent=kind==='side'?'暂时没有新支线。继续主线后，居民会带来新的故事。':'故事已全部读完，或者还未满足事件前置条件。';
     list.append(empty);
   }
-  $('reset-story').disabled=saving||reason==='STORAGE_UNAVAILABLE';
-  $('export-corrupt-story').disabled=saving||reason!=='CORRUPT_SAVE'||typeof raw!=='string';
+  $('reset-story').disabled=saving||pageSuspended()||reason==='STORAGE_UNAVAILABLE';
+  $('export-corrupt-story').disabled=saving||pageSuspended()||reason!=='CORRUPT_SAVE'||typeof raw!=='string';
   // Claim the first eligible event even while the mainline tab is selected:
   // later chapter unlocks must not silently reroll today's event.
-  if(!blocked&&!saving&&!pinQueued&&!dayPinned&&
+  if(!blocked&&!saving&&!pageSuspended()&&!pinQueued&&!dayPinned&&
     dailyStoryIncident(progress,CORE_STORY_PACK,day)){
     pinQueued=true;
     queueMicrotask(async()=>{
       try{
-        if(!blocked&&!saving&&localDay()===day&&
+        if(!blocked&&!saving&&!pageSuspended()&&localDay()===day&&
           !pinnedDailyStoryIncident(progress,CORE_STORY_PACK,day)){
           const next=pinDailyStoryIncident(progress,CORE_STORY_PACK,day);
           if(next!==progress)await save(next,false,()=>localDay()===day,day);
@@ -251,7 +261,7 @@ function lineElement(line){
   row.append(name,text);return row;
 }
 function open(entry){
-  if(saving)return;
+  if(saving||pageSuspended())return;
   if(!blocked){
     const snapshot=checkStoryResumeSnapshot(store,{key:STORY_SAVE_KEY,expectedRaw:raw});
     if(!snapshot.ok){
@@ -325,7 +335,7 @@ function open(entry){
       button.textContent=choice.label;
       button.setAttribute('aria-pressed','false');
       button.addEventListener('click',()=>{
-        if(saving||blocked)return;
+        if(saving||blocked||pageSuspended())return;
         const storyAtChoice=checkStoryResumeSnapshot(store,{key:STORY_SAVE_KEY,expectedRaw:raw});
         if(!storyAtChoice.ok){
           storageEpoch++;blocked=true;reason=storyAtChoice.reason;
@@ -362,14 +372,14 @@ function openWorkshopCurrent(){
 }
 $('close-dialog').addEventListener('click',()=>$('story-dialog').close());
 $('journey-read').addEventListener('click',()=>{
-  if(saving||blocked)return;
+  if(saving||blocked||pageSuspended())return;
   const plan=nextCoreStoryJourney(progress,readStoryWorkshop(store));
   if(plan.kind!=='story')return;
   kind='main';render();
   open(plan.entry);
 });
 $('journey-side-read').addEventListener('click',()=>{
-  if(saving||blocked)return;
+  if(saving||blocked||pageSuspended())return;
   const plan=nextCoreSideJourney(progress,readStoryWorkshop(store));
   if(plan.kind!=='story')return;
   kind='side';render();
@@ -380,7 +390,7 @@ $('journey-side-read').addEventListener('click',()=>{
 // A shortcut is only a focus aid: never reuse an old day's pinned candidate
 // or skip the existing exact-raw save and incident-day guards in open().
 $('journey-daily-read').addEventListener('click',()=>{
-  if(saving||blocked)return;
+  if(saving||blocked||pageSuspended())return;
   const day=localDay();
   const plan=nextCoreDailyJourney(progress,day);
   if(plan.kind!=='story')return;
@@ -396,7 +406,7 @@ $('journey-daily-read').addEventListener('click',()=>{
   open(plan.entry);
 });
 $('complete-story').addEventListener('click',async()=>{
-  if(saving||!selected)return;
+  if(saving||!selected||pageSuspended())return;
   // A stale incident must not be completed from an overnight-open dialogue.
   if(!canCommitDailyIncident(selected,selectedIncidentDay,localDay(),progress,CORE_STORY_PACK)){
     selected=null;selectedChoice=null;selectedIncidentDay=null;
@@ -434,7 +444,7 @@ document.querySelectorAll('.tabs [data-kind]').forEach(btn=>btn.addEventListener
   kind=btn.dataset.kind;render();
 }));
 $('export-corrupt-story').addEventListener('click',()=>{
-  if(saving||reason!=='CORRUPT_SAVE'||typeof raw!=='string')return;
+  if(saving||pageSuspended()||reason!=='CORRUPT_SAVE'||typeof raw!=='string')return;
   if(!window.confirm('将异常剧情对白存档保存为本地文本文件？文件可能包含个人游玩信息，不会上传或修改浏览器存档。'))return;
   const evidence=captureStoryWorkshopEvidence(store,{key:STORY_SAVE_KEY,expectedRaw:raw,confirmedByUser:true});
   if(!evidence.ok){
@@ -458,7 +468,7 @@ $('export-corrupt-story').addEventListener('click',()=>{
   }
 });
 $('reset-story').addEventListener('click',async()=>{
-  if(saving)return;
+  if(saving||pageSuspended())return;
   if(reason==='CORRUPT_SAVE'&&!window.confirm('异常剧情对白存档会被重置覆盖。建议先导出并确认备份文件可用。仍要继续重置吗？'))return;
   if(!window.confirm('确认重置此浏览器的剧情进度吗？此操作不影响普通经营存档，但剧情选择与已读记录不可恢复。'))return;
   const current=readStorySave(store);
@@ -478,6 +488,8 @@ $('reset-story').addEventListener('click',async()=>{
   await save(next,true);
 });
 function recheckStoryOnResume(){
+  // A hidden pageshow is not permission to resume a BFCache document.
+  if(document.visibilityState==='hidden'||(pageGone&&!resumePending))return;
   shownDay=localDay();
   selectedIncidentDay=null;
   let snapshotOk=false;
@@ -520,6 +532,7 @@ function recheckStoryOnResume(){
     selected=null;selectedChoice=null;selectedIncidentDay=null;
     if($('story-dialog').open)$('story-dialog').close();
   }
+  pageGone=false;visibilitySuspended=false;resumePending=false;
   render();
 }
 // Background timers are throttled on iPhone: pageshow/visibilitychange above
@@ -539,9 +552,27 @@ function refreshIncidentDay(){
 window.setInterval(()=>{
   if(document.visibilityState==='visible')refreshIncidentDay();
 },30_000);
-window.addEventListener('pageshow',recheckStoryOnResume);
+function suspendStoryPage({gone=false}={}){
+  if(gone){pageGone=true;resumePending=false;}
+  else visibilitySuspended=true;
+  storageEpoch++; // invalidate every pending story Web Lock callback
+  selected=null;selectedChoice=null;selectedIncidentDay=null;
+  if($('story-dialog').open)$('story-dialog').close();
+  render();
+  $('save-state').textContent='剧情页面已暂停；请返回后核对存档，不要重复提交对白或重置。';
+}
+window.addEventListener('pagehide',()=>suspendStoryPage({gone:true}));
+window.addEventListener('pageshow',()=>{
+  if(document.visibilityState==='hidden'){
+    if(pageGone)resumePending=true;
+    return;
+  }
+  resumePending=pageGone;
+  recheckStoryOnResume();
+});
 document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='visible')recheckStoryOnResume();
+  if(document.visibilityState==='hidden')suspendStoryPage();
+  else if(!pageGone||resumePending)recheckStoryOnResume();
 });
 window.addEventListener('storage',event=>{
   if(shouldBlockStoryStorageEvent(event,{key:STORY_SAVE_KEY,storage:store})){
