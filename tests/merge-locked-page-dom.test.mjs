@@ -924,3 +924,55 @@ test('P2.65j unrequested file change and canceled chooser never restore',async()
   assert.equal(h.writes.length,before);
   assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null);
 });
+
+test('P2.65k reset confirmation cannot erase a newer cross-tab save adopted during dialog',async()=>{
+  const h=await mount(),before=h.writes.length;
+  const newer=JSON.stringify({...h.saved(),coins:117,revision:1});
+  let confirmations=0;
+  h.win.confirm=()=>{
+    confirmations++;
+    h.storage.setItem(SAVE_KEY,newer);
+    h.win.dispatch('storage',{storageArea:h.storage,key:SAVE_KEY});
+    return true;
+  };
+  h.id('reset').click();await settle();
+  assert.equal(confirmations,1);
+  assert.equal(h.storage.getItem(SAVE_KEY),newer);
+  assert.equal(h.writes.length,before+1,'only the external write may occur');
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  assert.match(h.id('notice').textContent,/重置已取消/);
+  // A second, fresh confirmation against the newly visible state is allowed.
+  h.win.confirm=()=>true;
+  h.id('reset').click();await settle();
+  assert.equal(h.saved().revision,0);
+  assert.equal(h.writes.length,before+2);
+});
+
+test('P2.65k reset confirmation re-reads an unannounced cross-tab save',async()=>{
+  const h=await mount(),before=h.writes.length;
+  const newer=JSON.stringify({...h.saved(),coins:82,revision:1});
+  h.win.confirm=()=>{h.storage.setItem(SAVE_KEY,newer);return true;};
+  h.id('reset').click();await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),newer);
+  assert.equal(h.writes.length,before+1,'unannounced external update must not be reset');
+  assert.equal(h.storage.getItem(ABNORMAL_RESET_BACKUP_KEY),null);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  assert.match(h.id('notice').textContent,/重置已取消/);
+});
+
+test('P2.65k reset confirmation expires after pagehide and pageshow within dialog',async()=>{
+  const h=await mount(),original=h.storage.getItem(SAVE_KEY),before=h.writes.length;
+  h.win.confirm=()=>{
+    h.win.dispatch('pagehide');
+    h.win.dispatch('pageshow',{persisted:true});
+    return true;
+  };
+  h.id('reset').click();await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),original);
+  assert.equal(h.writes.length,before);
+  assert.match(h.id('notice').textContent,/页面已切换，重置已取消/);
+  h.win.confirm=()=>true;
+  h.id('reset').click();await settle();
+  assert.equal(h.saved().revision,0,'fresh post-BFCache confirmation remains usable');
+  assert.equal(h.writes.length,before+1);
+});

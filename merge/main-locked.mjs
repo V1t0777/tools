@@ -667,14 +667,33 @@ byId('reset').addEventListener('click',async()=>{
   if(saveIssue&&!damaged){
     hint('当前进度存在冲突或锁不可用，请先导出原始存档并重新打开页面核对');return;
   }
+  // Confirmation authorizes only the save visible when the dialog opens.
+  // A storage event can adopt a newer revision DURING window.confirm; never
+  // reset that unseen new baseline under an earlier confirmation.
+  if(!damaged&&!revalidateResumedSave()){
+    hint('存档尚未核验，重置已取消；请在最新棋盘上重新确认');return;
+  }
+  const confirmedRaw=damaged?initialOriginalRaw:runtime.raw;
+  const confirmedEpoch=importEpoch;
   if(!window.confirm(damaged
     ?'存档异常：将先核实并保留原始备份，再重置普通模式。建议先下载原始文件，确定继续吗？'
     :'确定重置本地试玩进度吗？当前棋盘、金币和订单会被清空，且无法恢复。'))return;
-  if(pageSuspended()){hint('页面已切换，重置已取消；请返回并重新确认');return;}
+  if(pageSuspended()||importEpoch!==confirmedEpoch){
+    hint('页面已切换，重置已取消；请返回并重新确认');return;
+  }
+  if(!damaged&&(saveIssue||runtime.phase!=='ready'||
+      runtime.raw!==confirmedRaw||!revalidateResumedSave()||
+      runtime.raw!==confirmedRaw)){
+    hint('确认期间存档已变化，重置已取消；请核对最新进度后重新确认');return;
+  }
+  if(damaged&&saveIssue!=='CORRUPT_SAVE'&&
+      saveIssue!=='UNSUPPORTED_OR_CORRUPT_SAVE'){
+    hint('异常存档状态已变化，重置已取消；请重新打开页面核对');return;
+  }
   cancelStaleGesture();
   try{
     const result=await runtime.reset({confirmed:true,
-      ...(damaged?{expectedRaw:initialOriginalRaw,requireOriginalBackup:true}:{}),
+      expectedRaw:confirmedRaw,requireOriginalBackup:damaged,
       now:Date.now()});
     if(result.ok)hint('已重置试玩进度');
     else handleTransactionResult(result,'reset');
