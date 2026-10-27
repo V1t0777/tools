@@ -264,6 +264,8 @@ $('export-corrupt-workshop').addEventListener('click',()=>{
 });
 $('reset-workshop').addEventListener('click',async()=>{
   if(saving)return;
+  // A queued click must not bypass the disabled reset button on storage failure.
+  if(reason==='STORAGE_UNAVAILABLE')return;
   if(reason==='CORRUPT_SAVE'&&!window.confirm('异常原始记录会被重置覆盖。建议先导出并确认备份文件可用。仍要继续重置吗？'))return;
   if(!window.confirm('确认重置剧情工作台？此处的金币、物品和订单进度将丢失，不影响普通经营或已读剧情。'))return;
   // Only enter the same Web Locks protocol as normal workshop writes AFTER confirmation.
@@ -275,7 +277,11 @@ $('reset-workshop').addEventListener('click',async()=>{
   });
   saving=false;
   if(!attempt.ok||!attempt.value||storageEpoch!==expectedEpoch){
-    blocked=true;reason='WRITE_CONFLICT';render();return;
+    // A failed/rejected lock does not prove whether a reset already committed.
+    // Replace any earlier success notice only after rendering the blocked UI.
+    blockWorkshopWithNotice('WRITE_CONFLICT',
+      '重置操作的最终状态无法确认；请勿重复重置，重新打开页面核对金币、建筑与订单。');
+    return;
   }
   // The reset may have committed, then lost the race to another tab after
   // releasing the shared lock. A stale page must not announce reset success.
@@ -284,10 +290,9 @@ $('reset-workshop').addEventListener('click',async()=>{
     expectedWorkshopRaw,expectedEpoch,currentEpoch:storageEpoch
   });
   if(!publication.ok||blocked){
-    blocked=true;reason=publication.ok?'WRITE_CONFLICT':publication.reason;
-    selected=-1;
-    $('board-notice').textContent='重置后的存档状态无法确认；请勿重复重置，重新打开页面核对。';
-    render();return;
+    blockWorkshopWithNotice(publication.ok?'WRITE_CONFLICT':publication.reason,
+      '重置后的存档状态无法确认；请勿重复重置，重新打开页面核对。');
+    return;
   }
   state=attempt.value;raw=expectedWorkshopRaw;
   blocked=false;reason=null;selected=-1;
@@ -299,10 +304,8 @@ $('reset-workshop').addEventListener('click',async()=>{
     expectedWorkshopRaw,expectedEpoch,currentEpoch:storageEpoch
   });
   if(!afterResetRender.ok||blocked){
-    blocked=true;reason=afterResetRender.ok?'WRITE_CONFLICT':afterResetRender.reason;
-    selected=-1;
-    $('board-notice').textContent='重置后的存档在页面更新期间发生变化；请勿重复重置，重新打开页面核对。';
-    render();
+    blockWorkshopWithNotice(afterResetRender.ok?'WRITE_CONFLICT':afterResetRender.reason,
+      '重置后的存档在页面更新期间发生变化；刚才的重置成功提示已撤回，请勿重复重置，重新打开页面核对。');
   }
 });
 function recheckWorkshopOnResume(){
