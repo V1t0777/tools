@@ -362,6 +362,10 @@ function renderNormalMilestones() {
   container.replaceChildren(fragment);
 }
 function render() {
+  // A full rerender replaces the board's DOM nodes. A pointer captured on
+  // the previous board must not drop onto newly rendered inventory, even if
+  // the current storage bytes are verified and unchanged since publication.
+  cancelStaleGesture();
   renderGeneration++;
   renderResources(); renderBoard(); renderOrders(); renderSystems(); renderSupplies(); renderNormalMilestones();
   byId('guidance-message').textContent = activeGuidance?.message ??
@@ -453,6 +457,9 @@ function completeDrag(event, cancelled = false) {
 }
 board.addEventListener('pointerup', event => completeDrag(event));
 board.addEventListener('pointercancel', event => completeDrag(event, true));
+// Mobile WebViews may drop capture on scroll, DOM replacement or interruption
+// without a pointercancel. Never turn that abandoned drag into a later drop.
+board.addEventListener('lostpointercapture', event => completeDrag(event, true));
 
 // Mobile browsers can suspend a page mid-drag without delivering pointerup.
 // Drop the stale gesture when the page is hidden; never move a board item or
