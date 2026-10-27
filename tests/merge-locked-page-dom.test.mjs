@@ -1387,7 +1387,7 @@ test('P2.65v abnormal and restore backup exports reject changed original bytes',
   ]){
     const h=await mount(),oldGet=h.storage.getItem.bind(h.storage);
     const before=h.writes.length,oldCreate=URL.createObjectURL;
-    const original='backup\\ud800original',changed='backup-updated';
+    const original='backup\ud800original',changed='backup-updated';
     h.map.set(key,original);
     let reads=0,created=0;
     h.storage.getItem=readKey=>{
