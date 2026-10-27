@@ -144,7 +144,8 @@ test('P68 uncontested reset keeps its success notice and both other saves intact
 
 test('P68 disabled storage reset cannot be bypassed by a queued DOM click',()=>{
   const ui=readFileSync(new URL('../merge/story/workshop.mjs',import.meta.url),'utf8');
-  const handler=ui.slice(ui.indexOf("$('reset-workshop').addEventListener('click',async()=>{"));
+  const handler=ui.slice(ui.indexOf("$('reset-workshop').addEventListener('click',async()=>{"),
+    ui.indexOf('function recheckWorkshopOnResume(){'));
   assert.ok(handler.includes("if(reason==='STORAGE_UNAVAILABLE')return;"));
   assert.equal((handler.match(/blockWorkshopWithNotice\(/g)??[]).length,3);
   assert.ok(handler.includes('expectedRaw,isCurrent:()=>storageEpoch===expectedEpoch'));
