@@ -215,3 +215,53 @@ test('P75 confirmed reserve spend remains finite and shows exact next-building s
     assert.equal(f.data.get(STORY_SAVE_KEY),null);
   }finally{f.restore();}
 });
+
+
+// P76: A native confirm dialog can allow another tab to modify localStorage
+// before the original page receives a storage event. These tests exercise the
+// actual workshop module and do not emulate Safari or cross-process atomicity.
+test('P76 stale workshop before tap blocks reserve prompt without writing',async()=>{
+  let prompts=0;
+  const f=await mount(initial({coins:160}),{confirm:()=>{prompts++;return true;}});
+  try{
+    const old=f.button('story-supply-shop','supplyBuy','soda');
+    const outside={...f.saved(),coins:185,revision:f.saved().revision+1};
+    assert.equal(validateSave(outside),true);
+    f.data.set(STORY_WORKSHOP_KEY,JSON.stringify(outside)); // another tab, not our write
+    await old.fire('click');
+    assert.equal(prompts,0,'must not prompt against a stale budget');
+    assert.deepEqual(f.writes,[]);
+    assert.equal(f.saved().coins,185);
+    assert.equal(f.saved().shop.purchases.soda,0);
+    assert.match(f.node('board-notice').textContent,/存档已变化/);
+    assert.match(f.node('workshop-status').textContent,/已停止操作/);
+    assert.equal(f.data.get(SAVE_KEY),'normal-sentinel');
+  }finally{f.restore();}
+});
+
+for(const consent of [false,true]){
+  test('P76 external overwrite during '+(consent?'approved':'cancelled')+
+    ' reserve dialog never publishes stale purchase feedback',async()=>{
+    let prompts=0,f;
+    f=await mount(initial({coins:160}),{confirm:()=>{
+      prompts++;
+      const outside={...f.saved(),coins:185,revision:f.saved().revision+1};
+      assert.equal(validateSave(outside),true);
+      f.data.set(STORY_WORKSHOP_KEY,JSON.stringify(outside)); // another tab during modal
+      return consent;
+    }});
+    try{
+      await f.button('story-supply-shop','supplyBuy','soda').fire('click');
+      assert.equal(prompts,1);
+      assert.deepEqual(f.writes,[],'stale page must not write or auto-retry');
+      assert.equal(f.saved().coins,185);
+      assert.equal(f.saved().shop.purchases.soda,0);
+      assert.match(f.node('board-notice').textContent,/存档已变化/);
+      assert.doesNotMatch(f.node('board-notice').textContent,
+        /已取消补给购买，金币未扣除|购买成功/);
+      assert.match(f.node('workshop-status').textContent,/已停止操作/);
+      assert.equal(f.data.get(SAVE_KEY),'normal-sentinel');
+      assert.equal(f.data.get(STORY_SAVE_KEY),null);
+    }finally{f.restore();}
+  });
+}
