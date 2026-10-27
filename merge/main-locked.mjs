@@ -396,15 +396,18 @@ board.addEventListener('click', event => {
 board.addEventListener('pointerdown', event => {
   // Never start a drag against a board whose saved baseline is untrusted.
   if (saveIssue || runtime.busy) return;
-  if (event.button > 0) return;
+  // A second contact (including a duplicate pointerdown) invalidates the
+  // first drag. Never let pinch/scroll retarget a captured material.
+  if (drag) { cancelStaleGesture(); return; }
+  if (event.isPrimary === false || event.button > 0) return;
   // A storage event may not yet have arrived from another tab. Never capture
   // a pointer against an unverified board; this inspection is read-only.
   if(!revalidateResumedSave())return;
-  // A genuine new pointerdown starts a new gesture. The canceled pointer's
-  // delayed synthetic click has no second pointerdown, so allow this tap.
-  ignoreNextClick = false;
   const cell = event.target.closest('[data-slot]');
-  if (!cell) return;
+  // Detached cells may still have queued events after a complete rerender.
+  // Only a genuine new pointerdown on a current cell clears click suppression.
+  if (!cell || !board.contains(cell)) return;
+  ignoreNextClick = false;
   const index = Number(cell.dataset.slot);
   const item = state.board[index];
   if (!item || item.kind !== 'material') return;
