@@ -51,7 +51,8 @@ async function save(next,reset=false,commitGuard=()=>true,pinDay=null){
   // One pending story write per tab. The same lock covers initialization,
   // completion and explicitly confirmed reset; exact-raw CAS stays mandatory.
   if(blocked&&!reset)return false;
-  if(saving||pageSuspended())return false;
+  if(saving)return false;
+  if(pageSuspended())return false;
   const expectedRaw=raw,expectedEpoch=storageEpoch;
   saving=true;render();
   const attempt=await saveStoryDialogueWithLock(webLocks,store,next,{
@@ -157,7 +158,8 @@ function render(){
   journeyButton.hidden=journey.kind!=='story';
   journeyButton.disabled=blocked||saving||pageSuspended();
   if(journey.kind==='story')journeyButton.textContent='阅读下一幕 · '+journey.entry.title;
-  journeyLink.hidden=blocked||pageSuspended()||journey.kind!=='workshop';
+  journeyLink.hidden=blocked||journey.kind!=='workshop';
+  if(pageSuspended())journeyLink.hidden=true;
   if(journey.kind==='workshop'){
     journeyLink.href=journey.href;
     journeyLink.textContent=journey.blocked?'前往核对剧情工作台存档 →':'前往完成经营目标 →';
@@ -178,7 +180,8 @@ function render(){
   sideButton.hidden=sideJourney.kind!=='story';
   sideButton.disabled=blocked||saving||pageSuspended();
   if(sideJourney.kind==='story')sideButton.textContent='阅读人物支线 · '+sideJourney.entry.title;
-  sideLink.hidden=pageSuspended()||sideJourney.kind!=='workshop';
+  sideLink.hidden=sideJourney.kind!=='workshop';
+  if(pageSuspended())sideLink.hidden=true;
   if(sideJourney.kind==='workshop'){
     sideLink.href=sideJourney.href;
     sideLink.textContent=sideJourney.blocked?'先核对剧情仓库存档 →':
@@ -568,8 +571,8 @@ window.addEventListener('pageshow',()=>{
     return;
   }
   resumePending=pageGone;
-  recheckStoryOnResume();
 });
+window.addEventListener('pageshow',recheckStoryOnResume);
 document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState==='hidden')suspendStoryPage();
   else if(!pageGone||resumePending)recheckStoryOnResume();
