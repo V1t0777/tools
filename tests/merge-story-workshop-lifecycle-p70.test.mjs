@@ -190,3 +190,27 @@ test('P82 corrupt workshop export rejects pagehide during native consent',async(
     assert.equal(h.data.get(SAVE_KEY),'normal-sentinel');
   }finally{h.restore();}
 });
+
+// A visibilityState change can be observable before the browser delivers
+// visibilitychange. This is a Node timing injection, not a mobile device test.
+test('P84 reset committed before a delayed hidden event cannot announce success',async()=>{
+  const h=await mount({makeLocks:()=>({
+    async request(_name,_options,callback){
+      const result=await callback();
+      globalThis.document.visibilityState='hidden';
+      return result;
+    }
+  })});
+  try{
+    await h.reset();
+    assert.equal(h.writes,1,'the write may already have happened');
+    assert.match(h.notice(),/重置后的存档状态无法确认/);
+    assert.doesNotMatch(h.notice(),/^已重置剧情工作台/);
+    assert.match(h.status(),/已停止操作/);
+    assert.equal(h.data.get(STORY_SAVE_KEY),'story-sentinel');
+    assert.equal(h.data.get(SAVE_KEY),'normal-sentinel');
+    h.document.visibilityState='visible';
+    await h.document.emit('visibilitychange');
+    assert.equal(h.writes,1,'resuming must not automatically replay reset');
+  }finally{h.restore();}
+});

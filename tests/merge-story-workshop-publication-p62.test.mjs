@@ -90,3 +90,19 @@ test('P62 workshop UI checks the released-lock snapshot before and after renderi
   for(const unsafe of ['innerHTML','insertAdjacentHTML','fetch(','sendBeacon(','localStorage.setItem','SAVE_KEY'])
     assert.equal(ui.includes(unsafe),false,unsafe);
 });
+
+// P84: a page may become hidden before visibilitychange/pagehide dispatches.
+test('P84 suspended workshop publication fails closed without touching any save',()=>{
+  const f=fixture();
+  assert.deepEqual(verify(f,{suspended:true}),{ok:false,reason:'WRITE_CONFLICT'});
+  assert.deepEqual(verify(f,{buildingChanged:true,suspended:true}),{ok:false,reason:'WRITE_CONFLICT'});
+  assert.deepEqual(verify(f,{suspended:false}),{ok:true,reason:null});
+  let reads=0;
+  const denied={getItem(){reads++;throw Error('must not read hidden-page snapshot');}};
+  assert.deepEqual(verifyStoryWorkshopPublication(denied,{
+    expectedWorkshopRaw:f.workshop,expectedEpoch:1,currentEpoch:1,suspended:true
+  }),{ok:false,reason:'WRITE_CONFLICT'});
+  assert.equal(reads,0);
+  assert.equal(f.writes,0);
+  assert.equal(f.map.get(SAVE_KEY),'normal-unchanged');
+});

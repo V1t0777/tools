@@ -263,7 +263,7 @@ async function commit(result){
   const publication=expectedWorkshopRaw===null
     ? {ok:false,reason:'WRITE_CONFLICT'}
     : verifyStoryWorkshopPublication(storage,{expectedWorkshopRaw,expectedStoryRaw,
-      buildingChanged,expectedEpoch,currentEpoch:storageEpoch});
+      buildingChanged,expectedEpoch,currentEpoch:storageEpoch,suspended:pageSuspended()});
   if(!publication.ok||blocked){
     blockWorkshopWithNotice(publication.ok?'WRITE_CONFLICT':publication.reason,
       '本次操作可能已经写入，但存档结果无法确认；请勿重复操作，重新打开页面核对金币、建筑与订单。');
@@ -275,7 +275,7 @@ async function commit(result){
   // Rendering may invoke synchronous browser/test hooks. Recheck the exact
   // raw bytes and epoch; this remains read-only and is not a cross-tab CAS.
   const afterRender=verifyStoryWorkshopPublication(storage,{expectedWorkshopRaw,
-    expectedStoryRaw,buildingChanged,expectedEpoch,currentEpoch:storageEpoch});
+    expectedStoryRaw,buildingChanged,expectedEpoch,currentEpoch:storageEpoch,suspended:pageSuspended()});
   if(!afterRender.ok||blocked){
     blockWorkshopWithNotice(afterRender.ok?'WRITE_CONFLICT':afterRender.reason,
       '页面更新期间存档发生变化；刚才的成功提示已撤回，请重新打开页面核对进度。');
@@ -381,7 +381,7 @@ $('reset-workshop').addEventListener('click',async()=>{
   // releasing the shared lock. A stale page must not announce reset success.
   const expectedWorkshopRaw=JSON.stringify(attempt.value);
   const publication=verifyStoryWorkshopPublication(storage,{
-    expectedWorkshopRaw,expectedEpoch,currentEpoch:storageEpoch
+    expectedWorkshopRaw,expectedEpoch,currentEpoch:storageEpoch,suspended:pageSuspended()
   });
   if(!publication.ok||blocked){
     blockWorkshopWithNotice(publication.ok?'WRITE_CONFLICT':publication.reason,
@@ -395,7 +395,7 @@ $('reset-workshop').addEventListener('click',async()=>{
   // Rendering or a synchronous storage event can invalidate the first check.
   // This is read-only and cannot make localStorage transactions atomic.
   const afterResetRender=verifyStoryWorkshopPublication(storage,{
-    expectedWorkshopRaw,expectedEpoch,currentEpoch:storageEpoch
+    expectedWorkshopRaw,expectedEpoch,currentEpoch:storageEpoch,suspended:pageSuspended()
   });
   if(!afterResetRender.ok||blocked){
     blockWorkshopWithNotice(afterResetRender.ok?'WRITE_CONFLICT':afterResetRender.reason,

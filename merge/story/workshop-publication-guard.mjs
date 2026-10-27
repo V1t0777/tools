@@ -11,13 +11,16 @@ import {readStorySave} from './local-storage.mjs';
 const reject=reason=>Object.freeze({ok:false,reason});
 export function verifyStoryWorkshopPublication(storage,{
   expectedWorkshopRaw,expectedStoryRaw,buildingChanged=false,
-  expectedEpoch,currentEpoch
+  expectedEpoch,currentEpoch,suspended=false
 }={}){
   if(!Number.isSafeInteger(expectedEpoch)||!Number.isSafeInteger(currentEpoch))
     return reject('INVALID_EPOCH');
   // An intervening StorageEvent is meaningful even if the bytes return to
   // the original value (an ABA replacement).
   if(expectedEpoch!==currentEpoch)return reject('WRITE_CONFLICT');
+  // A visibility transition can precede its event handler on mobile browsers.
+  // Do not publish a successful write from a hidden or BFCache-suspended page.
+  if(suspended)return reject('WRITE_CONFLICT');
   if(typeof expectedWorkshopRaw!=='string')return reject('INVALID_SNAPSHOT');
   const workshop=checkStoryResumeSnapshot(storage,{
     key:STORY_WORKSHOP_KEY,expectedRaw:expectedWorkshopRaw
