@@ -42,8 +42,11 @@ test('P2.65c normal timer removes its entry so capacity recovers immediately',()
   // Timer callbacks must be exercised at their scheduled expiry, not early.
   e.advance(DOWNLOAD_URL_LIFETIME_MS);
   e.timers[0].fn();
+  assert.deepEqual(e.revoked,['blob:save-0'], 'timer reclaims its own expired URL');
   assert.deepEqual(run(e),{ok:true,cleanupDeferred:false});
-  assert.deepEqual(e.revoked,['blob:save-0']);
+  // The next explicit download also sweeps the other seven expired URLs.
+  assert.deepEqual(e.revoked,Array.from({length:MAX_PENDING_SAVE_DOWNLOADS},
+    (_,i)=>'blob:save-'+i));
 });
 test('P2.65c synchronous broken scheduler never prematurely revokes URL',()=>{
   const e=env();
