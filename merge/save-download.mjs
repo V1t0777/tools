@@ -41,7 +41,8 @@ export function requestBrowserSaveDownload(prepared,{
     return reject('DOWNLOAD_UNSUPPORTED');
   let timestamp;
   try {timestamp=now();} catch {return reject('DOWNLOAD_CLOCK_UNAVAILABLE');}
-  if(!Number.isFinite(timestamp)||timestamp<0)
+  if(!Number.isSafeInteger(timestamp)||timestamp<0||
+      timestamp>Number.MAX_SAFE_INTEGER-DOWNLOAD_URL_LIFETIME_MS)
     return reject('DOWNLOAD_CLOCK_UNAVAILABLE');
   const pending=pendingFor(urlApi);
   // A mobile WebView may suppress timers indefinitely. Retry expired cleanup
@@ -52,14 +53,21 @@ export function requestBrowserSaveDownload(prepared,{
   if(pending.size>=MAX_PENDING_SAVE_DOWNLOADS)
     return reject('DOWNLOAD_LIMIT_REACHED');
 
+  // Reserve before creating a Blob or clicking an anchor: nested click handlers
+  // must not bypass the bounded number of outstanding object URLs.
+  const entry={url:null,expiresAt:timestamp+DOWNLOAD_URL_LIFETIME_MS};
+  pending.add(entry);
   let objectUrl=null,link=null,clicked=false;
   try {
     const blob=new BlobCtor([prepared.content],{type:prepared.mime});
-    if(!Number.isFinite(blob.size)||blob.size>MAX_DOWNLOAD_BYTES)
+    if(!Number.isFinite(blob.size)||blob.size>MAX_DOWNLOAD_BYTES){
+      pending.delete(entry);
       return reject('DOWNLOAD_TOO_LARGE');
+    }
     objectUrl=urlApi.createObjectURL(blob);
     if(typeof objectUrl!=='string'||!objectUrl.startsWith('blob:'))
       throw new Error('INVALID_OBJECT_URL');
+    entry.url=objectUrl;
     link=doc.createElement('a');
     link.href=objectUrl;
     link.download=prepared.filename;
@@ -67,23 +75,32 @@ export function requestBrowserSaveDownload(prepared,{
     link.click();
     clicked=true;
   } catch {
+    pending.delete(entry);
     if(objectUrl){try{urlApi.revokeObjectURL(objectUrl);}catch{ /* Best effort. */ }}
     return reject('DOWNLOAD_REQUEST_FAILED');
   } finally {
     try{link?.remove();}catch{ /* Do not undo an already requested download. */ }
   }
-  if(!clicked)return reject('DOWNLOAD_REQUEST_FAILED');
-  const entry={url:objectUrl,expiresAt:timestamp+DOWNLOAD_URL_LIFETIME_MS};
-  pending.add(entry);
-  let armed=false,ranEarly=false;
+  if(!clicked){pending.delete(entry);return reject('DOWNLOAD_REQUEST_FAILED');}
+  let armed=false,ranEarly=false,retries=1;
+  const cleanup=()=>{
+    if(!armed){ranEarly=true;return;}
+    let current;
+    try{current=now();}catch{return;}
+    // Some WebViews fire a scheduled callback too early, or the wall clock
+    // moves backward. Never revoke a Blob URL before its minimum lifetime.
+    if(!Number.isFinite(current)||current<entry.expiresAt){
+      if(Number.isFinite(current)&&retries-->0){
+        try{schedule(cleanup,Math.max(1,Math.min(
+          DOWNLOAD_URL_LIFETIME_MS,entry.expiresAt-current)));}catch{}
+      }
+      return;
+    }
+    tryRevoke(urlApi,pending,entry);
+  };
   try {
     if(typeof schedule!=='function')throw new Error('NO_DOWNLOAD_TIMER');
-    schedule(()=>{
-      // A broken synchronous timer must not revoke before the browser has
-      // processed the anchor click; retry after TTL on a later request.
-      if(!armed){ranEarly=true;return;}
-      tryRevoke(urlApi,pending,entry);
-    },DOWNLOAD_URL_LIFETIME_MS);
+    schedule(cleanup,DOWNLOAD_URL_LIFETIME_MS);
     armed=true;
     return Object.freeze({ok:true,cleanupDeferred:ranEarly});
   } catch {

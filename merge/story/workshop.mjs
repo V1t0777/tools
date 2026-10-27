@@ -3,6 +3,7 @@ import {BUILDINGS} from '../economy.mjs';
 import {readStoryWorkshop,writeStoryWorkshop,STORY_WORKSHOP_KEY} from './workshop-storage.mjs';
 import {readStorySave} from './local-storage.mjs';
 import {captureStoryWorkshopEvidence,prepareStoryEvidenceDownload} from './save-evidence.mjs';
+import {requestBrowserSaveDownload} from '../save-download.mjs';
 import {checkStoryResumeSnapshot} from './resume-guard.mjs';
 import {verifyStoryWorkshopPublication} from './workshop-publication-guard.mjs';
 import {runStoryWriteWithLock} from './write-lock.mjs';
@@ -334,20 +335,27 @@ $('export-corrupt-workshop').addEventListener('click',()=>{
       : '原始记录已变化或无法读取，已拒绝导出；请重新打开页面核对。';
     return;
   }
-  let url;
   try{
     const download=prepareStoryEvidenceDownload(evidence.content,'yunyu-story-workshop-corrupt-save');
-    url=URL.createObjectURL(new Blob([download.content],{type:download.wrapped?'application/json;charset=utf-8':'text/plain;charset=utf-8'}));
-    const a=document.createElement('a');
-    a.href=url;a.download=download.filename;
-    document.body.append(a);a.click();a.remove();
-    window.setTimeout(()=>URL.revokeObjectURL(url),60000);
+    // Share the bounded Blob URL lifecycle with normal-mode exports:
+    // timers may pause in Safari/WebView; a click never proves disk persistence.
+    const receipt=requestBrowserSaveDownload({
+      ok:true,content:download.content,filename:download.filename,
+      mime:download.wrapped?'application/json;charset=utf-8':'text/plain;charset=utf-8'
+    });
+    if(!receipt.ok){
+      $('board-notice').textContent=receipt.reason==='DOWNLOAD_TOO_LARGE'
+        ? '异常记录编码后超过安全下载上限，已拒绝导出；原始存档仍保留，请勿重置。'
+        : receipt.reason==='DOWNLOAD_LIMIT_REACHED'
+          ? '待处理下载过多，请稍后再试并核对已有文件；原始存档仍保留。'
+          : '设备未能触发文件导出；原浏览器存档未修改，请勿重置。';
+      return;
+    }
     $('board-notice').textContent='已尝试下载异常记录'+
       (download.wrapped?'（UTF-16 JSON 证据封装，非可直接导入的存档）':'')+
-      '，请先在设备“文件”中确认备份存在；原浏览器存档未修改。';
+      '。请先在设备“文件”中确认备份存在；原浏览器存档未修改。';
   }catch{
-    if(url)URL.revokeObjectURL(url);
-    $('board-notice').textContent='设备未能触发文件导出。原浏览器存档未修改，请勿重置。';
+    $('board-notice').textContent='证据文件准备失败；原浏览器存档未修改，请勿重置。';
   }
 });
 $('reset-workshop').addEventListener('click',async()=>{

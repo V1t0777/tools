@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {captureStoryWorkshopEvidence,prepareStoryEvidenceDownload,MAX_STORY_EVIDENCE_CHARS} from '../merge/story/save-evidence.mjs';
+import {requestBrowserSaveDownload,DOWNLOAD_URL_LIFETIME_MS} from '../merge/save-download.mjs';
 import {STORY_WORKSHOP_KEY} from '../merge/story/workshop-storage.mjs';
 import {SAVE_KEY} from '../merge/storage.mjs';
 import {STORY_SAVE_KEY} from '../merge/mode-boundaries.mjs';
@@ -35,7 +36,7 @@ test('P9 recovery UI is opt-in, offline and does not claim a successful device d
   assert.ok(html.includes('id="export-corrupt-workshop"'));
   assert.ok(ui.includes("reason!=='CORRUPT_SAVE'||typeof raw!=='string'"));
   assert.ok(ui.includes('captureStoryWorkshopEvidence(storage,{key:STORY_WORKSHOP_KEY,expectedRaw:raw,confirmedByUser:true})'));
-  assert.ok(ui.includes('URL.createObjectURL'));
+  assert.ok(ui.includes('requestBrowserSaveDownload'));
   assert.ok(ui.includes('已尝试下载'));
   assert.ok(ui.includes("if(reason==='CORRUPT_SAVE'&&!window.confirm"));
   for(const dangerous of ['innerHTML','insertAdjacentHTML','fetch(','sendBeacon(','SAVE_KEY','localStorage.setItem'])
@@ -61,7 +62,7 @@ test('P10 narrative export UI is opt-in, offline, and warns before damaged reset
   assert.ok(html.includes('id="export-corrupt-story"'));
   assert.ok(ui.includes("reason!=='CORRUPT_SAVE'||typeof raw!=='string'"));
   assert.ok(ui.includes('captureStoryWorkshopEvidence(store,{key:STORY_SAVE_KEY,expectedRaw:raw,confirmedByUser:true})'));
-  assert.ok(ui.includes('URL.createObjectURL'));
+  assert.ok(ui.includes('requestBrowserSaveDownload'));
   assert.ok(ui.includes('已尝试下载异常对白记录'));
   assert.ok(ui.includes("if(reason==='CORRUPT_SAVE'&&!window.confirm"));
   for(const dangerous of ['innerHTML','insertAdjacentHTML','fetch(','sendBeacon(','localStorage.setItem'])
@@ -133,6 +134,79 @@ test('P85 both story export entry points label reversible evidence without claim
     assert.ok(source.includes('download.filename'),path);
     assert.ok(source.includes('download.wrapped'),path);
     assert.ok(source.includes('非可直接导入的存档'),path);
+    assert.ok(source.includes('已尝试下载'),path);
+  }
+});
+
+test('P86 story evidence uses a bounded shared Blob URL lifecycle without touching either save',async()=>{
+  const store=storage(),normal=store.getItem(SAVE_KEY);
+  const raw='damaged '+String.fromCharCode(0xD800)+' tail';
+  store.setItem(STORY_SAVE_KEY,raw);
+  const evidence=captureStoryWorkshopEvidence(store,{
+    key:STORY_SAVE_KEY,expectedRaw:raw,confirmedByUser:true
+  });
+  const prepared=prepareStoryEvidenceDownload(evidence.content,'yunyu-story-dialogue-corrupt-save');
+  const clicked=[],revoked=[],scheduled=[];
+  let clock=1000;
+  const urlApi={
+    createObjectURL(blob){assert.equal(blob.type,'application/json;charset=utf-8');return 'blob:story-p86';},
+    revokeObjectURL(url){revoked.push(url);}
+  };
+  const doc={
+    body:{append(){}},
+    createElement(){return {
+      set href(value){assert.equal(value,'blob:story-p86');},
+      set download(value){assert.equal(value,prepared.filename);},
+      click(){clicked.push(true);},remove(){}
+    };}
+  };
+  const receipt=requestBrowserSaveDownload({
+    ok:true,content:prepared.content,filename:prepared.filename,
+    mime:'application/json;charset=utf-8'
+  },{doc,urlApi,BlobCtor:Blob,schedule:(fn,ms)=>scheduled.push({fn,ms}),now:()=>clock});
+  assert.equal(receipt.ok,true);
+  assert.equal(clicked.length,1);
+  assert.deepEqual(revoked,[],'URL must outlive the anchor click');
+  assert.equal(scheduled[0].ms,DOWNLOAD_URL_LIFETIME_MS);
+  clock+=DOWNLOAD_URL_LIFETIME_MS;
+  scheduled[0].fn();
+  assert.deepEqual(revoked,['blob:story-p86']);
+  assert.equal(store.getItem(STORY_SAVE_KEY),raw);
+  assert.equal(store.getItem(SAVE_KEY),normal);
+});
+
+test('P86 oversized UTF-16 evidence envelope fails closed before allocating an object URL',()=>{
+  const raw=String.fromCharCode(0xD800).repeat(400_000);
+  const store=storage();
+  store.setItem(STORY_WORKSHOP_KEY,raw);
+  const evidence=captureStoryWorkshopEvidence(store,{
+    key:STORY_WORKSHOP_KEY,expectedRaw:raw,confirmedByUser:true
+  });
+  assert.equal(evidence.ok,true);
+  const prepared=prepareStoryEvidenceDownload(evidence.content,'yunyu-story-workshop-corrupt-save');
+  assert.equal(prepared.wrapped,true);
+  let allocations=0;
+  const result=requestBrowserSaveDownload({
+    ok:true,content:prepared.content,filename:prepared.filename,
+    mime:'application/json;charset=utf-8'
+  },{doc:{body:{append(){}},createElement(){return {};}},
+    urlApi:{createObjectURL(){allocations++;return 'blob:should-not-exist';},revokeObjectURL(){}},
+    BlobCtor:Blob,schedule(){},now:()=>1000});
+  assert.equal(result.ok,false);
+  assert.equal(result.reason,'DOWNLOAD_TOO_LARGE');
+  assert.equal(allocations,0);
+  assert.equal(store.getItem(STORY_WORKSHOP_KEY),raw);
+  assert.equal(store.getItem(SAVE_KEY),'normal save');
+});
+
+test('P86 both story export handlers use the shared bounded download receipt, not raw Blob URLs',()=>{
+  for(const path of ['../merge/story/workshop.mjs','../merge/story/ui.mjs']){
+    const source=readFileSync(new URL(path,import.meta.url),'utf8');
+    assert.ok(source.includes('requestBrowserSaveDownload({'),path);
+    assert.ok(source.includes("receipt.reason==='DOWNLOAD_TOO_LARGE'"),path);
+    assert.ok(source.includes("receipt.reason==='DOWNLOAD_LIMIT_REACHED'"),path);
+    assert.ok(!source.includes('URL.createObjectURL'),path);
+    assert.ok(!source.includes('URL.revokeObjectURL'),path);
     assert.ok(source.includes('已尝试下载'),path);
   }
 });
