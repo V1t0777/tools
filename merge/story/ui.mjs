@@ -76,7 +76,7 @@ async function save(next,reset=false,commitGuard=()=>true,pinDay=null){
   // this tab waited for the story lock. Adopt ONLY byte-exact same-day output.
   // All unrelated changes, malformed saves and lock failures still block.
   if(pinDay!==null&&localDay()===pinDay&&attempt.ok&&attempt.value===false&&
-    (!blocked||reason==='WRITE_CONFLICT')){
+    (!blocked||reason==='WRITE_CONFLICT')&&!pageSuspended()&&storageEpoch===expectedEpoch){
     const current=readStorySave(store);
     if(!current.blocked&&
       isMatchingConcurrentDailyPin({expectedRaw,observedRaw:current.raw,proposed:next,day:pinDay,pack:CORE_STORY_PACK})){
