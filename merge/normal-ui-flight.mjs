@@ -17,7 +17,9 @@ const SAFE_NO_WRITE_REJECTIONS=new Set([
   // An already occupied restore-backup slot is rejected BEFORE any write.
   // Never include BACKUP_OR_SAVE_CHANGED/BACKUP_VERIFY_FAILED here: those
   // outcomes may involve a partial backup write or a changed save baseline.
-  'BACKUP_SLOT_CONFLICT'
+  'BACKUP_SLOT_CONFLICT',
+  // A cancelled restore was rejected under the lock before any backup/write.
+  'RESTORE_CANCELLED_BEFORE_WRITE'
 ]);
 
 export function createNormalUiFlight() {

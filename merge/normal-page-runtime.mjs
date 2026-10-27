@@ -191,7 +191,7 @@ export function createNormalPageRuntime({locks,storage,onVerified}={}) {
 
     // Restore a previously previewed file using the same exclusive Web Lock
     // as all other writers. Never replace the reviewed raw baseline silently.
-    async restore(fileText,{expectedRaw,confirmed=false,allowDowngrade=false}={}) {
+    async restore(fileText,{expectedRaw,confirmed=false,allowDowngrade=false,signal}={}) {
       if(confirmed!==true)return reject('CONFIRMATION_REQUIRED');
       if(phase!=='ready'||flight.blocked)
         return reject(phase==='blocked'?'UI_SAVE_BLOCKED':'STARTUP_REQUIRED');
@@ -205,9 +205,15 @@ export function createNormalPageRuntime({locks,storage,onVerified}={}) {
       }
       if(preview.wouldDecreaseRevision&&allowDowngrade!==true)
         return reject('DOWNGRADE_CONFIRMATION_REQUIRED');
+      if(signal?.aborted)return reject('RESTORE_CANCELLED_BEFORE_WRITE');
+      const restoreEpoch=epoch;
+      // Re-check after lock acquisition: invalidated UI confirmation must
+      // never reserve a backup or write even if the Web Lock arrived late.
+      const canCommit=()=>phase==='ready'&&!flight.blocked&&!resetBusy&&
+        epoch===restoreEpoch&&signal?.aborted!==true;
       return run('restore',async()=>{
         const receipt=await coordinateNormalSaveRestore(fileText,storage,locks,
-          {expectedRaw,confirmed:true,allowDowngrade});
+          {expectedRaw,confirmed:true,allowDowngrade,canCommit});
         if(!receipt.ok)return receipt;
         // A noncooperating tab can write after lock release; verify again
         // before publishing any restored snapshot.

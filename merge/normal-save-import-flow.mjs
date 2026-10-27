@@ -110,6 +110,6 @@ export async function performNormalSaveImport({
   }
   try{
     return await runtime.restore(fileText,{expectedRaw,confirmed:true,
-      allowDowngrade:preview.wouldDecreaseRevision});
+      allowDowngrade:preview.wouldDecreaseRevision,signal});
   }catch{return reject('RESTORE_OUTCOME_UNCERTAIN');}
 }
