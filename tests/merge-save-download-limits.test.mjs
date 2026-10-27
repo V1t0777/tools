@@ -39,6 +39,8 @@ test('P2.65c normal timer removes its entry so capacity recovers immediately',()
   for(let i=0;i<MAX_PENDING_SAVE_DOWNLOADS;i++)run(e);
   assert.equal(e.timers.length,MAX_PENDING_SAVE_DOWNLOADS);
   assert.equal(e.timers.every(t=>t.ms===DOWNLOAD_URL_LIFETIME_MS),true);
+  // Timer callbacks must be exercised at their scheduled expiry, not early.
+  e.advance(DOWNLOAD_URL_LIFETIME_MS);
   e.timers[0].fn();
   assert.deepEqual(run(e),{ok:true,cleanupDeferred:false});
   assert.deepEqual(e.revoked,['blob:save-0']);
