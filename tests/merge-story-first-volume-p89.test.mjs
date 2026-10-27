@@ -131,7 +131,7 @@ test('P89 peer warehouse update invalidates stale chapter completion but permits
   assert.equal(first.ok,true);
   const before=persistMilestone(storage,first.state);
   const storyBefore=readStorySave(storage);
-  const next=completeStoryEntry(storyBefore.progress,CORE_STORY_PACK,'first-order');
+  const next=completeStoryEntry(storyBefore.progress,CORE_STORY_PACK,'first-order','listen');
   const material=before.state.board.findIndex(item=>item?.kind==='material');
   assert.ok(material>=0);
   const peer=storeItem(before.state,material);
