@@ -1165,3 +1165,28 @@ test('P2.65n second file import preserves original backup without blocking gamep
   assert.equal(h.saved().revision,2,'ordinary actions still work after backup conflict');
   assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),original);
 });
+
+test('P2.65p pagehide immediately releases hung import and ignores late file result',async()=>{
+  const h=await mount(),original=h.storage.getItem(SAVE_KEY);
+  const controls=h.id('export-local-save').parentElement.children;
+  const button=controls.find(e=>e.id==='import-normal-save');
+  const input=controls.find(e=>e.id==='import-normal-file');
+  const imported=JSON.stringify({...h.saved(),coins:73,revision:1});
+  let late;
+  button.click();
+  input.files=[{size:imported.length,text:()=>new Promise(resolve=>{late=resolve;})}];
+  input.dispatch('change');await settle();
+  assert.equal(button.disabled,true);
+  h.win.dispatch('pagehide');await settle();
+  h.win.dispatch('pageshow',{persisted:true});await settle();
+  assert.equal(button.disabled,false,'no need to wait for 45-second timer');
+  late(imported);await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),original);
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  button.click();
+  input.files=[{size:imported.length,text:async()=>imported}];
+  input.dispatch('change');await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),imported);
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),original);
+});

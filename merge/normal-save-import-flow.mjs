@@ -13,15 +13,29 @@ const reject=reason=>Object.freeze({ok:false,reason});
 // A native file read may never settle after iOS/WebView backgrounding.
 // Expiry only ends this UI attempt; a late File.text() result cannot confirm
 // or restore anything. This function never reads or writes localStorage.
-function readFileWithDeadline(file,schedule,cancelSchedule){
+function readFileWithDeadline(file,schedule,cancelSchedule,signal){
   return new Promise(resolve=>{
     let settled=false,timer,hasTimer=false;
     const finish=result=>{
       if(settled)return;
       settled=true;
+      if(signal){try{signal.removeEventListener('abort',onAbort);}catch{/* Best effort. */}}
       if(hasTimer){try{cancelSchedule(timer);}catch{/* Best effort. */}}
       resolve(result);
     };
+    const onAbort=()=>finish(reject('FILE_READ_CANCELLED'));
+    // Native File.text cannot be forcibly canceled. End only this attempt:
+    // its late result cannot preflight, confirm or restore anything.
+    if(signal!==undefined){
+      if(!signal||typeof signal.addEventListener!=='function'||
+          typeof signal.removeEventListener!=='function'){
+        finish(reject('FILE_READ_UNAVAILABLE'));return;
+      }
+      try{
+        signal.addEventListener('abort',onAbort,{once:true});
+        if(signal.aborted){onAbort();return;}
+      }catch{finish(reject('FILE_READ_UNAVAILABLE'));return;}
+    }
     if(typeof schedule!=='function'||typeof cancelSchedule!=='function'){
       finish(reject('FILE_READ_UNAVAILABLE'));return;
     }
@@ -42,7 +56,7 @@ function readFileWithDeadline(file,schedule,cancelSchedule){
 
 export async function performNormalSaveImport({
   file,storage,runtime,confirm,isSuspended=()=>false,
-  revalidate=()=>true,getEpoch=()=>0,
+  revalidate=()=>true,getEpoch=()=>0,signal,
   schedule=globalThis.setTimeout,cancelSchedule=globalThis.clearTimeout
 }={}) {
   if(!file||!Number.isSafeInteger(file.size)||file.size<0)
@@ -60,17 +74,17 @@ export async function performNormalSaveImport({
   const expectedRaw=runtime.raw;
   const inspect=()=>{
     try{
-      if(isSuspended()||getEpoch()!==epoch)return 'PAGE_SUSPENDED';
+      if(signal?.aborted||isSuspended()||getEpoch()!==epoch)return 'PAGE_SUSPENDED';
       if(runtime.phase!=='ready'||runtime.blocked||runtime.busy)
         return 'SAVE_NOT_READY';
       if(!revalidate()||runtime.raw!==expectedRaw)return 'SAVE_CHANGED';
-      if(isSuspended()||getEpoch()!==epoch)return 'PAGE_SUSPENDED';
+      if(signal?.aborted||isSuspended()||getEpoch()!==epoch)return 'PAGE_SUSPENDED';
       return null;
     }catch{return 'SAVE_NOT_READY';}
   };
   const initial=inspect();
   if(initial)return reject(initial);
-  const read=await readFileWithDeadline(file,schedule,cancelSchedule);
+  const read=await readFileWithDeadline(file,schedule,cancelSchedule,signal);
   const afterRead=inspect();
   if(afterRead)return reject(afterRead);
   if(!read.ok)return read;

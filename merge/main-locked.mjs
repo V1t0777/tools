@@ -566,8 +566,10 @@ byId('export-abnormal-reset-backup').addEventListener('click', () => {
 // A detached file chooser is not a restore permission. The exact observed
 // baseline is revalidated after asynchronous reading and every confirmation.
 let importEpoch=0,importBusy=false,importPicker=null,queuedHiddenSelection=null;
+let activeImportRead=null;
 let deliverHiddenSelection=()=>{};
 window.addEventListener('pagehide',()=>{
+  activeImportRead?.abort();
   importEpoch++;importPicker=null;queuedHiddenSelection=null;
 });
 document.addEventListener('visibilitychange',()=>{
@@ -584,6 +586,7 @@ document.addEventListener('visibilitychange',()=>{
     }
     return;
   }
+  activeImportRead?.abort();
   // One native chooser hide is tolerated; every other background transition
   // invalidates pending selections and any in-flight restore confirmation.
   importEpoch++;
@@ -671,12 +674,15 @@ if(saveActions){
     }
     if(importBusy){importFile.value='';hint('已有文件正在核验，请稍后重试');return;}
     importBusy=true;importButton.disabled=true;
+    // Abort the UI wait on backgrounding; the native read may still finish.
+    const controller=typeof AbortController==='function'?new AbortController():null;
+    activeImportRead=controller;
     try{
       const result=await performNormalSaveImport({
         file,storage:store,runtime,
         confirm:message=>window.confirm(message),
         isSuspended:pageSuspended,revalidate:revalidateResumedSave,
-        getEpoch:()=>importEpoch
+        getEpoch:()=>importEpoch,signal:controller?.signal
       });
       if(result.ok)hint('普通模式存档已核验并恢复；请核对棋盘，并导出恢复前备份');
       else if(runtime.blocked||['RESTORE_OUTCOME_UNCERTAIN','UI_PUBLISH_FAILED',
@@ -698,7 +704,10 @@ if(saveActions){
         ALREADY_PRESENT:'所选文件与当前存档完全相同，无需导入'
       }[result.reason]||'导入预检或恢复未通过，当前存档不得视为已恢复');
     }catch{pauseUnsafe('RESTORE_UI_FAILED');}
-    finally{importBusy=false;importButton.disabled=false;importFile.value='';}
+    finally{
+      if(activeImportRead===controller)activeImportRead=null;
+      importBusy=false;importButton.disabled=false;importFile.value='';
+    }
   }
   backupButton.addEventListener('click',()=>{
     const backupView={getItem:key=>{
