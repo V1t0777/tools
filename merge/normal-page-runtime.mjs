@@ -116,15 +116,19 @@ export function createNormalPageRuntime({locks,storage,onVerified}={}) {
 
     action(operation) {
       if(typeof operation!=='function')return Promise.resolve(reject('INVALID_ACTION'));
-      const expectedRaw=raw;
+      const expectedRaw=raw,startedAt=epoch;
       return run('action',()=>commitNormalActionWithLock(locks,storage,
-        {expectedRaw,action:operation}));
+        {expectedRaw,action:operation,
+          canCommit:()=>phase==='ready'&&!flight.blocked&&
+            !resetBusy&&epoch===startedAt}));
     },
 
     clock({now=Date.now()}={}) {
-      const expectedRaw=raw;
+      const expectedRaw=raw,startedAt=epoch;
       return run('clock',()=>commitNormalClockWithLock(locks,storage,
-        {expectedRaw,now}));
+        {expectedRaw,now,
+          canCommit:()=>phase==='ready'&&!flight.blocked&&
+            !resetBusy&&epoch===startedAt}));
     },
 
     async reset({confirmed=false,expectedRaw,requireOriginalBackup=false,
@@ -152,7 +156,8 @@ export function createNormalPageRuntime({locks,storage,onVerified}={}) {
       try {
         receipt=await commitNormalResetWithLock(locks,storage,{
           expectedRaw:baseline,confirmedReset:true,
-          requireOriginalBackup:hadConflict||requireOriginalBackup,now});
+          requireOriginalBackup:hadConflict||requireOriginalBackup,now,
+          canCommit:()=>phase==='resetting'&&resetBusy&&epoch===begin});
       } catch {receipt=reject('RESET_OUTCOME_UNCERTAIN');}
       finally {resetBusy=false;}
       if(epoch!==begin||phase==='blocked') {

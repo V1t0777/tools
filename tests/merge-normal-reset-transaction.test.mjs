@@ -151,3 +151,16 @@ test('P2.48 invalid clock and policy fail before any write',async()=>{
     {ok:false,reason:'INVALID_BACKUP_POLICY'});
   assert.deepEqual(db.writes,[]);
 });
+
+
+test('P2.65r invalidated reset confirmation cannot reserve backup or write',async()=>{
+  const raw='{broken',db=memory(raw);
+  for(const canCommit of [()=>false,()=>{throw Error('pagehide');}]){
+    assert.deepEqual(await commitNormalResetWithLock(locks(),db,{
+      expectedRaw:raw,confirmedReset:true,now:at,canCommit}),
+      {ok:false,reason:'RESET_CANCELLED_BEFORE_WRITE'});
+  }
+  assert.deepEqual(db.writes,[]);
+  assert.equal(db.read(SAVE_KEY),raw);
+  assert.equal(db.read(ABNORMAL_RESET_BACKUP_KEY),null);
+});

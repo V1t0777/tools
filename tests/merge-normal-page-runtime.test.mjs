@@ -355,3 +355,38 @@ test('P2.65q aborted file-read permission while awaiting lock can safely retry',
   assert.equal((await r.restore(next,{expectedRaw:old,confirmed:true})).ok,true);
   assert.equal(db.read(SAVE_KEY),next);
 });
+
+
+for(const kind of ['action','clock','reset']){
+  test('P2.65r pagehide while waiting for '+kind+' lock never writes stale progress',async()=>{
+    const original=encoded(createInitialState(now)),db=memory(original),base=locks();
+    let delayed=false,release,entered;
+    const gate=new Promise(resolve=>{release=resolve;});
+    const waiting=new Promise(resolve=>{entered=resolve;});
+    const slow={request(name,opts,callback){
+      if(!delayed)return base.request(name,opts,callback);
+      return base.request(name,opts,async lock=>{
+        entered();await gate;return callback(lock);
+      });
+    }};
+    const events=[];
+    const r=createNormalPageRuntime({storage:db,locks:slow,
+      onVerified:(_s,_raw,event)=>events.push(event)});
+    assert.equal((await r.start({now})).ok,true);
+    delayed=true;
+    const writes=db.writes.length;
+    const pending=kind==='action'?r.action(s=>moveOrMerge(s,0,2)):
+      kind==='clock'?r.clock({now:now+ENERGY_REGEN_MS}):
+        r.reset({confirmed:true,now:now+10});
+    await waiting;
+    r.invalidate(); // pagehide/BFCache lifecycle bridge
+    release();
+    assert.equal((await pending).ok,false);
+    assert.equal(r.blocked,true);
+    assert.equal(db.writes.length,writes,'no write after revoked UI permission');
+    assert.equal(db.read(SAVE_KEY),original);
+    assert.equal(db.read(ABNORMAL_RESET_BACKUP_KEY),null);
+    assert.equal(db.read(STORY_SAVE_KEY),'story-untouched');
+    assert.deepEqual(events,['startup']);
+  });
+}

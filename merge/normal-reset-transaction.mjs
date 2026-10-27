@@ -21,7 +21,8 @@ const reject=reason=>Object.freeze({ok:false,reason});
  * This is not end-to-end atomic until all other writers use the same lock.
  */
 export async function commitNormalResetWithLock(locks,storage,{
-  expectedRaw,confirmedReset=false,requireOriginalBackup=false,now=Date.now()
+  expectedRaw,confirmedReset=false,requireOriginalBackup=false,now=Date.now(),
+  canCommit=()=>true
 }={}) {
   if(confirmedReset!==true)return reject('RESET_NOT_CONFIRMED');
   if(expectedRaw!==null&&typeof expectedRaw!=='string')
@@ -29,8 +30,14 @@ export async function commitNormalResetWithLock(locks,storage,{
   if(typeof requireOriginalBackup!=='boolean')
     return reject('INVALID_BACKUP_POLICY');
   if(!Number.isFinite(now)||now<0)return reject('INVALID_CLOCK');
+  if(typeof canCommit!=='function')return reject('RESET_GUARD_UNAVAILABLE');
 
   return withNormalSaveLock(locks,()=>{
+    // Confirmation becomes stale on pagehide/BFCache while waiting for lock.
+    // Check before any original-backup reservation or reset write.
+    let allowed=false;
+    try{allowed=canCommit()===true;}catch{/* Fail closed. */}
+    if(!allowed)return reject('RESET_CANCELLED_BEFORE_WRITE');
     if(typeof storage?.getItem!=='function'||typeof storage?.setItem!=='function')
       return reject('STORAGE_UNAVAILABLE');
     let current;

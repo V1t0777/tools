@@ -247,3 +247,24 @@ test('P2.61k observes a rejected async action before a cyclic purity check throw
   assert.equal(store.writes,0);
   assert.equal('state' in result,false);
 });
+
+
+test('P2.65r cancelled or throwing action lock guard never evaluates engine or writes',async()=>{
+  const raw=JSON.stringify(initial()),store=memory(raw);let invoked=0;
+  for(const canCommit of [()=>false,()=>{throw Error('page detached');}]){
+    assert.deepEqual(await commitNormalActionWithLock(locks(),store,{
+      expectedRaw:raw,canCommit,action:current=>{
+        invoked++;return moveOrMerge(current,0,2);
+      }}),{ok:false,reason:'ACTION_CANCELLED_BEFORE_WRITE'});
+  }
+  assert.equal(invoked,0);assert.equal(store.writes,0);assert.equal(store.raw,raw);
+});
+
+test('P2.65r cancelled clock guard never publishes or changes a saved baseline',async()=>{
+  const raw=JSON.stringify(initial()),store=memory(raw);
+  const {commitNormalClockWithLock}=await import('../merge/normal-action-transaction.mjs');
+  assert.deepEqual(await commitNormalClockWithLock(locks(),store,{
+    expectedRaw:raw,now:100000,canCommit:()=>false}),
+    {ok:false,reason:'CLOCK_CANCELLED_BEFORE_WRITE'});
+  assert.equal(store.writes,0);assert.equal(store.raw,raw);
+});
