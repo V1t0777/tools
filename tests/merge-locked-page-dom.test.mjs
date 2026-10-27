@@ -765,3 +765,78 @@ test('P2.65f lost pointer capture cancels mobile drag without pointercancel',asy
   await settle();
   assert.equal(h.saved().revision,1,'subsequent genuine tap works');
 });
+
+test('P2.65g second touch cancels a captured material drag without replay',async()=>{
+  const h=await mount(),board=h.id('board'),origin=board.children[0];
+  board.dispatch('pointerdown',{target:origin,pointerId:71,isPrimary:true,clientX:0,clientY:0});
+  board.dispatch('pointermove',{target:origin,pointerId:71,clientX:20,clientY:0});
+  assert.equal(h.doc.body.children.length,1,'first finger created a drag ghost');
+  h.doc.elementFromPoint=()=>board.children[1];
+  const writes=h.writes.length;
+  board.dispatch('pointerdown',{target:board.children[1],pointerId:72,isPrimary:false});
+  assert.equal(h.doc.body.children.length,0,'second finger cancels the original drag');
+  board.dispatch('pointerup',{target:origin,pointerId:71,clientX:25,clientY:0});
+  board.dispatch('pointerup',{target:board.children[1],pointerId:72,clientX:25,clientY:0});
+  board.dispatch('click',{target:board.children[42],detail:1});
+  await settle();
+  assert.equal(h.writes.length,writes,'neither old pointer nor compatibility click can write');
+  assert.equal(h.saved().revision,0);
+  board.dispatch('pointerdown',{target:board.children[42],pointerId:73,isPrimary:true});
+  board.dispatch('click',{target:board.children[42],detail:1});
+  await settle();
+  assert.equal(h.saved().revision,1,'new genuine single-pointer tap still works');
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});
+
+test('P2.65g nonprimary pointer cannot initiate a drag or poison the next primary',async()=>{
+  const h=await mount(),board=h.id('board'),origin=board.children[0];
+  board.dispatch('pointerdown',{target:origin,pointerId:74,isPrimary:false});
+  board.dispatch('pointermove',{target:origin,pointerId:74,clientX:25,clientY:0});
+  assert.equal(h.doc.body.children.length,0);
+  board.dispatch('pointerup',{target:origin,pointerId:74,clientX:25,clientY:0});
+  h.doc.elementFromPoint=()=>board.children[1];
+  board.dispatch('pointerdown',{target:origin,pointerId:75,isPrimary:true,clientX:0,clientY:0});
+  board.dispatch('pointermove',{target:origin,pointerId:75,clientX:20,clientY:0});
+  assert.equal(h.doc.body.children.length,1,'primary drag remains usable');
+  board.dispatch('pointerup',{target:origin,pointerId:75,clientX:25,clientY:0});
+  await settle();
+  assert.equal(h.saved().revision,1);
+  assert.equal(h.saved().board[1].tier,2);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});
+
+test('P2.65g detached old board cell cannot start a drag after rerender',async()=>{
+  const h=await mount(),board=h.id('board'),old=board.children[0];
+  h.id('board-guide').click();
+  // DOM replacement detaches old nodes; emulate that browser behavior.
+  old.parentElement=null;
+  const writes=h.writes.length;
+  board.dispatch('pointerdown',{target:old,pointerId:76,isPrimary:true});
+  board.dispatch('pointermove',{target:old,pointerId:76,clientX:20,clientY:0});
+  board.dispatch('pointerup',{target:old,pointerId:76,clientX:25,clientY:0});
+  assert.equal(h.doc.body.children.length,0,'detached target cannot create a ghost');
+  await settle();
+  assert.equal(h.writes.length,writes);
+  const current=board.children[0];
+  board.dispatch('pointerdown',{target:current,pointerId:77,isPrimary:true});
+  board.dispatch('pointermove',{target:current,pointerId:77,clientX:20,clientY:0});
+  assert.equal(h.doc.body.children.length,1,'current cell still accepts drag');
+  board.dispatch('pointercancel',{target:current,pointerId:77});
+  assert.equal(h.doc.body.children.length,0);
+});
+
+test('P2.65g background pointerdown does not clear canceled drag click guard',async()=>{
+  const h=await mount(),board=h.id('board'),origin=board.children[0];
+  board.dispatch('pointerdown',{target:origin,pointerId:78,isPrimary:true});
+  board.dispatch('pointermove',{target:origin,pointerId:78,clientX:20,clientY:0});
+  board.dispatch('pointercancel',{target:origin,pointerId:78});
+  const writes=h.writes.length;
+  board.dispatch('pointerdown',{target:board,pointerId:79,isPrimary:true});
+  board.dispatch('click',{target:board.children[42],detail:1});
+  await settle();
+  assert.equal(h.writes.length,writes,'stray background contact cannot enable delayed click');
+  board.dispatch('pointerdown',{target:board.children[42],pointerId:80,isPrimary:true});
+  board.dispatch('click',{target:board.children[42],detail:1});
+  await settle();
+  assert.equal(h.saved().revision,1,'fresh cell pointerdown restores normal click');
+});

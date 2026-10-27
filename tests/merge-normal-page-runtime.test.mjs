@@ -5,6 +5,7 @@ import {createInitialState as legacyInitial} from '../merge/legacy-engine.mjs';
 import {SAVE_KEY,LEGACY_BACKUP_KEY,ABNORMAL_RESET_BACKUP_KEY} from '../merge/storage.mjs';
 import {STORY_SAVE_KEY} from '../merge/mode-boundaries.mjs';
 import {NORMAL_SAVE_LOCK_NAME} from '../merge/normal-save-lock.mjs';
+import {RESTORE_BACKUP_KEY} from '../merge/save-restore-backup.mjs';
 import {createNormalPageRuntime} from '../merge/normal-page-runtime.mjs';
 
 const now=1000,encoded=value=>JSON.stringify(value);
@@ -201,4 +202,78 @@ test('P2.61w reset rejects another tab changing the trusted baseline',async()=>{
   assert.deepEqual(await r.reset({confirmed:true,now}),
     error('STALE_BASELINE'));
   assert.equal(r.blocked,true);
+});
+
+
+test('P2.65h confirmed restore uses shared lock, exact bytes and preserved original',async()=>{
+  const original=encoded({...createInitialState(now),revision:4,coins:125});
+  const incoming=encoded(createInitialState(now));
+  const db=memory(original),events=[];
+  const r=createNormalPageRuntime({storage:db,locks:locks(),
+    onVerified:(_s,_raw,kind)=>events.push(kind)});
+  assert.equal((await r.start({now})).ok,true);
+  assert.deepEqual(await r.restore(incoming,{expectedRaw:original,confirmed:true}),
+    error('DOWNGRADE_CONFIRMATION_REQUIRED'));
+  assert.equal(db.read(SAVE_KEY),original);
+  assert.deepEqual(await r.restore(incoming,
+    {expectedRaw:original,confirmed:true,allowDowngrade:true}),
+    {ok:true,status:'UI_PUBLISHED'});
+  assert.equal(db.read(SAVE_KEY),incoming);
+  assert.equal(db.read(RESTORE_BACKUP_KEY),original);
+  assert.equal(db.read(STORY_SAVE_KEY),'story-untouched');
+  assert.equal(r.raw,incoming);
+  assert.equal(r.snapshot().revision,0);
+  assert.deepEqual(events,['startup','restore']);
+});
+
+test('P2.65h unconfirmed, stale and story restores reject without writing',async()=>{
+  const original=encoded(createInitialState(now));
+  const incoming=encoded({...createInitialState(now),revision:3,coins:50});
+  const db=memory(original),r=createNormalPageRuntime({storage:db,locks:locks()});
+  await r.start({now});
+  const count=db.writes.length;
+  assert.deepEqual(await r.restore(incoming,{expectedRaw:original}),
+    error('CONFIRMATION_REQUIRED'));
+  assert.deepEqual(await r.restore(incoming,
+    {expectedRaw:'stale',confirmed:true}),error('STALE_BASELINE'));
+  assert.deepEqual(await r.restore('{"mode":"story"}',
+    {expectedRaw:original,confirmed:true}),error('STORY_MODE_FILE'));
+  assert.equal(db.writes.length,count);
+  assert.equal(r.blocked,false);
+});
+
+test('P2.65h lock contention is a definite no-write and permits retry',async()=>{
+  const original=encoded(createInitialState(now));
+  const incoming=encoded({...createInitialState(now),revision:2,coins:50});
+  const db=memory(original),base=locks();
+  let busy=false;
+  const gate={request(name,opts,callback){
+    return busy?Promise.resolve(callback(null)):base.request(name,opts,callback);
+  }};
+  const r=createNormalPageRuntime({storage:db,locks:gate});
+  await r.start({now});
+  busy=true;
+  assert.deepEqual(await r.restore(incoming,
+    {expectedRaw:original,confirmed:true}),error('LOCK_BUSY'));
+  assert.equal(r.blocked,false);
+  assert.equal(db.read(SAVE_KEY),original);
+  busy=false;
+  assert.equal((await r.restore(incoming,
+    {expectedRaw:original,confirmed:true})).ok,true);
+  assert.equal(db.read(SAVE_KEY),incoming);
+});
+
+test('P2.65h unrelated backup slot blocks overwrite and preserves story',async()=>{
+  const original=encoded(createInitialState(now));
+  const incoming=encoded({...createInitialState(now),revision:2,coins:50});
+  const db=memory(original);
+  db.setItem(RESTORE_BACKUP_KEY,'older-backup');
+  const r=createNormalPageRuntime({storage:db,locks:locks()});
+  await r.start({now});
+  assert.deepEqual(await r.restore(incoming,
+    {expectedRaw:original,confirmed:true}),error('BACKUP_SLOT_CONFLICT'));
+  assert.equal(r.blocked,true);
+  assert.equal(db.read(SAVE_KEY),original);
+  assert.equal(db.read(RESTORE_BACKUP_KEY),'older-backup');
+  assert.equal(db.read(STORY_SAVE_KEY),'story-untouched');
 });
