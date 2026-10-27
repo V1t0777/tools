@@ -4,12 +4,13 @@ import { WIDTH, CELL_COUNT, MAX_ENERGY, ENERGY_REGEN_MS, CHAINS, createInitialSt
   getLevelProgress, getMaxOrderTier, getProducerUpgrade, getWarehouseUpgrade,
   SUPPLY_ITEMS, ACHIEVEMENT_RULES, useSupply, purchaseSupply } from './engine.mjs';
 import { BUILDINGS } from './economy.mjs';
-import { SAVE_KEY } from './storage.mjs';
+import { SAVE_KEY, ABNORMAL_RESET_BACKUP_KEY } from './storage.mjs';
 import { getBoardGuidance } from './board-guidance.mjs';
 import { getSupplyControlSnapshot } from './supply-controls.mjs';
 import { deriveNormalMilestones } from './normal-milestones.mjs';
 import { prepareLocalSaveExport, prepareAbnormalResetBackupExport } from './save-export.mjs';
 import { requestBrowserSaveDownload } from './save-download.mjs';
+import { isPreparedExportUnchanged } from './save-export-snapshot.mjs';
 import { createNormalPageRuntime } from './normal-page-runtime.mjs';
 import { attachNormalPageLifecycle } from './normal-page-lifecycle.mjs';
 import {performNormalSaveImport} from './normal-save-import-flow.mjs';
@@ -46,6 +47,20 @@ function hint(text) {
   notice.textContent = text;
   window.clearTimeout(noticeTimer);
   noticeTimer = window.setTimeout(() => { notice.textContent = ''; }, 2400);
+}
+// Never start a download from a hidden or BFCache-suspended page.
+function allowVisibleExport(){
+  if(!pageSuspended())return true;
+  hint('页面处于后台或尚未恢复核验，请返回页面后重新点击导出');
+  return false;
+}
+// Read-only exact-byte recheck: this rejects known stale exports, but does
+// not pretend localStorage reads and native downloads are cross-tab atomic.
+function allowCurrentExport(prepared,key){
+  if(!allowVisibleExport())return false;
+  if(isPreparedExportUnchanged(prepared,()=>store?.getItem(key)))return true;
+  hint('导出期间原始存档或备份已变化、或无法再次读取；请重新点击导出，勿清理浏览器数据');
+  return false;
 }
 // All four ordinary writers are coordinated by the same exclusive Web Lock.
 function cancelStaleGesture(){
@@ -500,6 +515,7 @@ byId('warehouse-upgrade').addEventListener('click',()=>commit(current=>upgradeWa
 byId('supply-producer').addEventListener('change',()=>refreshSupplyControls());
 
 byId('export-local-save').addEventListener('click', () => {
+  if(!allowVisibleExport())return;
   const result=prepareLocalSaveExport(store);
   if(!result.ok){
     hint(result.reason==='NO_SAVED_DATA'?'此浏览器还没有可导出的存档':
@@ -508,6 +524,7 @@ byId('export-local-save').addEventListener('click', () => {
       '浏览器存储不可访问，无法读取原始存档');
     return;
   }
+  if(!allowCurrentExport(result,SAVE_KEY))return;
   const download=requestBrowserSaveDownload(result,{
     schedule:(fn,ms)=>window.setTimeout(fn,ms)
   });
@@ -533,6 +550,7 @@ byId('export-local-save').addEventListener('click', () => {
 
 
 byId('export-abnormal-reset-backup').addEventListener('click', () => {
+  if(!allowVisibleExport())return;
   const result=prepareAbnormalResetBackupExport(store);
   if(!result.ok) {
     hint(result.reason==='NO_SAVED_DATA'?'此浏览器没有异常重置前备份':
@@ -540,6 +558,7 @@ byId('export-abnormal-reset-backup').addEventListener('click', () => {
       '无法读取或编码重置前备份，请勿清理浏览器数据');
     return;
   }
+  if(!allowCurrentExport(result,ABNORMAL_RESET_BACKUP_KEY))return;
   const download=requestBrowserSaveDownload(result,{
     schedule:(fn,ms)=>window.setTimeout(fn,ms)
   });
@@ -731,6 +750,7 @@ if(saveActions){
     }
   }
   backupButton.addEventListener('click',()=>{
+    if(!allowVisibleExport())return;
     const backupView={getItem:key=>{
       if(key!==SAVE_KEY||typeof store?.getItem!=='function')throw Error('STORAGE_UNAVAILABLE');
       return store.getItem(RESTORE_BACKUP_KEY);
@@ -746,6 +766,7 @@ if(saveActions){
             :'无法读取恢复前备份，请勿清理浏览器数据');
       return;
     }
+    if(!allowCurrentExport(prepared,RESTORE_BACKUP_KEY))return;
     const result=requestBrowserSaveDownload({...prepared,
       filename:prepared.wrapped?'yunyu-before-restore-utf16.json':
         prepared.verified?'yunyu-before-restore-v3.json':'yunyu-before-restore-original.txt'},{

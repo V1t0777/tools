@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {captureStoryWorkshopEvidence,prepareStoryEvidenceDownload,MAX_STORY_EVIDENCE_CHARS} from '../merge/story/save-evidence.mjs';
+import {captureStoryWorkshopEvidence,prepareStoryEvidenceDownload,isPreparedStoryEvidenceCurrent,MAX_STORY_EVIDENCE_CHARS} from '../merge/story/save-evidence.mjs';
 import {requestBrowserSaveDownload,DOWNLOAD_URL_LIFETIME_MS} from '../merge/save-download.mjs';
 import {STORY_WORKSHOP_KEY} from '../merge/story/workshop-storage.mjs';
 import {SAVE_KEY} from '../merge/storage.mjs';
@@ -208,5 +208,74 @@ test('P86 both story export handlers use the shared bounded download receipt, no
     assert.ok(!source.includes('URL.createObjectURL'),path);
     assert.ok(!source.includes('URL.revokeObjectURL'),path);
     assert.ok(source.includes('已尝试下载'),path);
+  }
+});
+
+test('P87 both story evidence keys recheck exact UTF-16 source bytes before download',()=>{
+  const store=storage(),normal=store.getItem(SAVE_KEY);
+  for(const key of [STORY_SAVE_KEY,STORY_WORKSHOP_KEY]){
+    const raw='{"revision":7,"choice":"yes"}';
+    store.setItem(key,raw);
+    const download=prepareStoryEvidenceDownload(raw,'yunyu-story-evidence');
+    const options={key,expectedRaw:raw,download};
+    assert.equal(isPreparedStoryEvidenceCurrent(store,options),true);
+    store.setItem(key,'{"choice":"yes","revision":7}');
+    assert.equal(isPreparedStoryEvidenceCurrent(store,options),false,
+      'same parsed JSON with different raw bytes must be refused');
+    store.setItem(key,raw);
+    assert.equal(isPreparedStoryEvidenceCurrent(store,options),true);
+  }
+  assert.equal(store.getItem(SAVE_KEY),normal,'normal-mode save remains untouched');
+});
+
+test('P87 reversible UTF-16 evidence compares isolated surrogate code units',()=>{
+  const store=storage();
+  const raw='damaged'+String.fromCharCode(0xD800)+'tail';
+  store.setItem(STORY_SAVE_KEY,raw);
+  const download=prepareStoryEvidenceDownload(raw,'yunyu-story-dialogue-corrupt-save');
+  assert.equal(download.wrapped,true);
+  const options={key:STORY_SAVE_KEY,expectedRaw:raw,download};
+  assert.equal(isPreparedStoryEvidenceCurrent(store,options),true);
+  store.setItem(STORY_SAVE_KEY,raw.replace(String.fromCharCode(0xD800),'\uFFFD'));
+  assert.equal(isPreparedStoryEvidenceCurrent(store,options),false);
+  store.setItem(STORY_SAVE_KEY,raw);
+  assert.equal(isPreparedStoryEvidenceCurrent(store,{
+    ...options,download:{...download,content:'{broken-json'}
+  }),false);
+  assert.equal(isPreparedStoryEvidenceCurrent(store,{
+    ...options,download:{...download,content:JSON.stringify({format:'other',raw})}
+  }),false);
+});
+
+test('P87 invalid keys, missing preparation and storage failures refuse without reads or writes',()=>{
+  const raw='damaged',download=prepareStoryEvidenceDownload(raw,'yunyu-story-evidence');
+  let reads=0,writes=0;
+  const guarded={
+    getItem(){reads++;return raw;},
+    setItem(){writes++;}
+  };
+  assert.equal(isPreparedStoryEvidenceCurrent(guarded,{key:SAVE_KEY,expectedRaw:raw,download}),false);
+  assert.equal(isPreparedStoryEvidenceCurrent(guarded,{key:'private',expectedRaw:raw,download}),false);
+  assert.equal(isPreparedStoryEvidenceCurrent(guarded,{key:STORY_SAVE_KEY,expectedRaw:null,download}),false);
+  assert.equal(isPreparedStoryEvidenceCurrent(guarded,{
+    key:STORY_SAVE_KEY,expectedRaw:raw,download:{...download,wrapped:'yes'}
+  }),false);
+  assert.equal(reads,0,'invalid requests must not inspect storage');
+  assert.equal(isPreparedStoryEvidenceCurrent({
+    getItem(){throw Error('storage denied');}
+  },{key:STORY_SAVE_KEY,expectedRaw:raw,download}),false);
+  assert.equal(writes,0);
+});
+
+test('P87 both actual story UI exports recheck snapshot and lifecycle before Blob click',()=>{
+  for(const path of ['../merge/story/workshop.mjs','../merge/story/ui.mjs']){
+    const source=readFileSync(new URL(path,import.meta.url),'utf8');
+    const preflight=source.indexOf('!isPreparedStoryEvidenceCurrent(');
+    const click=source.indexOf('const receipt=requestBrowserSaveDownload({');
+    assert.ok(preflight>0&&click>preflight,path);
+    assert.ok(source.slice(preflight-90,preflight).includes('pageSuspended()'),path);
+    assert.ok(source.includes('expectedRaw:evidence.content,download'),path);
+    assert.ok(source.includes('文件准备期间已变化或页面暂停'),path);
+    assert.equal(source.includes('localStorage.setItem'),false,path);
   }
 });

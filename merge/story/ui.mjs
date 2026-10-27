@@ -12,7 +12,7 @@ import {adoptConcurrentDailyPinStorageEvent} from './daily-pin-reconcile.mjs';
 import {canKeepDialogueAfterDailyPin} from './daily-pin-reconcile.mjs';
 import {adoptConcurrentDailyPinOnResume,canKeepResumedStoryDialogue} from './daily-pin-reconcile.mjs';
 import {saveStoryDialogueWithLock} from './dialogue-write.mjs';
-import {captureStoryWorkshopEvidence,prepareStoryEvidenceDownload} from './save-evidence.mjs';
+import {captureStoryWorkshopEvidence,prepareStoryEvidenceDownload,isPreparedStoryEvidenceCurrent} from './save-evidence.mjs';
 import {requestBrowserSaveDownload} from '../save-download.mjs';
 import {checkStoryResumeSnapshot} from './resume-guard.mjs';
 import {verifyStoryDialoguePublication} from './dialogue-publication-guard.mjs';
@@ -493,6 +493,15 @@ $('export-corrupt-story').addEventListener('click',()=>{
   }
   try{
     const download=prepareStoryEvidenceDownload(evidence.content,'yunyu-story-dialogue-corrupt-save');
+    // A peer may replace the save while the UTF-16 evidence file is prepared.
+    // Recheck the exact bytes and lifecycle immediately before the Blob click.
+    if(saving||pageSuspended()||storageEpoch!==confirmationEpoch||
+      !isPreparedStoryEvidenceCurrent(store,{
+        key:STORY_SAVE_KEY,expectedRaw:evidence.content,download
+      })){
+      $('save-state').textContent='异常对白记录在文件准备期间已变化或页面暂停，已取消下载；请重新打开页面核对原始存档。';
+      return;
+    }
     // Share the bounded Blob URL lifecycle with normal-mode exports:
     // timers may pause in Safari/WebView; a click never proves disk persistence.
     const receipt=requestBrowserSaveDownload({

@@ -49,3 +49,28 @@ export function prepareStoryEvidenceDownload(raw,baseName){
       filename:baseName+'.utf16.json',wrapped:true}
     : {content:raw,filename:baseName+'.txt',wrapped:false};
 }
+
+/**
+ * P87: final read-only exact-byte preflight for a prepared story evidence file.
+ * A native confirmation and UTF-16 encoding do not reserve a storage snapshot.
+ * This is not a cross-tab transaction and never modifies either mode's save.
+ */
+export function isPreparedStoryEvidenceCurrent(storage,{key,expectedRaw,download}={}){
+  if(key!==STORY_SAVE_KEY&&key!==STORY_WORKSHOP_KEY)return false;
+  if(typeof expectedRaw!=='string')return false;
+  try{
+    if(typeof download?.content!=='string'||typeof storage?.getItem!=='function')return false;
+    let represented;
+    if(download.wrapped===true){
+      const envelope=JSON.parse(download.content);
+      if(envelope?.format!=='yunyu-story-evidence-utf16-v1'||
+        typeof envelope.raw!=='string')return false;
+      represented=envelope.raw;
+    }else if(download.wrapped===false){
+      represented=download.content;
+    }else return false;
+    // Check the prepared file itself AND the current storage record, in that
+    // order; no stale or malformed envelope may authorize a browser click.
+    return represented===expectedRaw&&storage.getItem(key)===expectedRaw;
+  }catch{return false;}
+}

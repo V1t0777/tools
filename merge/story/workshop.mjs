@@ -2,7 +2,7 @@ import {WIDTH,MAX_ENERGY,CHAINS,getLevel,moveOrMerge,produce,fulfillOrder,storeI
 import {BUILDINGS} from '../economy.mjs';
 import {readStoryWorkshop,writeStoryWorkshop,STORY_WORKSHOP_KEY} from './workshop-storage.mjs';
 import {readStorySave} from './local-storage.mjs';
-import {captureStoryWorkshopEvidence,prepareStoryEvidenceDownload} from './save-evidence.mjs';
+import {captureStoryWorkshopEvidence,prepareStoryEvidenceDownload,isPreparedStoryEvidenceCurrent} from './save-evidence.mjs';
 import {requestBrowserSaveDownload} from '../save-download.mjs';
 import {checkStoryResumeSnapshot} from './resume-guard.mjs';
 import {verifyStoryWorkshopPublication} from './workshop-publication-guard.mjs';
@@ -337,6 +337,15 @@ $('export-corrupt-workshop').addEventListener('click',()=>{
   }
   try{
     const download=prepareStoryEvidenceDownload(evidence.content,'yunyu-story-workshop-corrupt-save');
+    // A peer may replace the save while the UTF-16 evidence file is prepared.
+    // Recheck the exact bytes and lifecycle immediately before the Blob click.
+    if(saving||pageSuspended()||storageEpoch!==confirmationEpoch||
+      !isPreparedStoryEvidenceCurrent(storage,{
+        key:STORY_WORKSHOP_KEY,expectedRaw:evidence.content,download
+      })){
+      $('board-notice').textContent='异常工作台记录在文件准备期间已变化或页面暂停，已取消下载；请重新打开页面核对原始存档。';
+      return;
+    }
     // Share the bounded Blob URL lifecycle with normal-mode exports:
     // timers may pause in Safari/WebView; a click never proves disk persistence.
     const receipt=requestBrowserSaveDownload({
