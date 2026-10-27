@@ -158,6 +158,7 @@ test('P78 lifecycle contract suspends story writes, daily pin and damaged export
   assert.ok(ui.includes('isCurrent:()=>storageEpoch===expectedEpoch&&(!blocked||reset)'));
   assert.ok(ui.includes('commitGuard=()=>!pageSuspended()&&originalCommitGuard()'));
   assert.ok(ui.includes('if(!blocked&&!saving&&!pageSuspended()&&!pinQueued'));
+  assert.ok(ui.includes("(!blocked||reason==='WRITE_CONFLICT')&&!pageSuspended()&&storageEpoch===expectedEpoch"));
   assert.ok(ui.includes("if(saving||pageSuspended()||reason!=='CORRUPT_SAVE'"));
   assert.ok(ui.includes("if(document.visibilityState==='hidden'||(pageGone&&!resumePending))return;"));
   assert.equal(ui.includes('innerHTML'),false);
