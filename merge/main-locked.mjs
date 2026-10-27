@@ -652,7 +652,11 @@ if(saveActions){
   saveActions.append(importButton,importFile,backupButton);
   releaseOrphanedPickerAfterReturn=()=>{
     const picker=importPicker;
-    if(!picker||document.hidden)return;
+    // Focus without a preceding chooser blur/hide does not prove return.
+    // Never expire a still-open native picker on an unrelated focus event.
+    if(!picker||document.hidden||(!picker.blurred&&!picker.hiddenOnce)||
+        picker.graceArmed)return;
+    picker.graceArmed=true;
     try{
       window.setTimeout(()=>{
         // An old timeout must never cancel a newer chooser, active file read,
@@ -680,7 +684,8 @@ if(saveActions){
     }
     // The chooser is bound to the exact save and page lifecycle at the
     // initiating user gesture, not to whichever save is current on return.
-    importPicker={epoch:importEpoch,raw:runtime.raw,hiddenOnce:false};
+    importPicker={epoch:importEpoch,raw:runtime.raw,hiddenOnce:false,
+      blurred:false,graceArmed:false};
     // Re-selecting the same file after a rejected/aborted chooser must still
     // produce a new change event on mobile browsers.
     importFile.value='';
@@ -875,6 +880,7 @@ byId('close-guide').addEventListener('click', () => dialog.close());
 if(store)lifecycle=attachNormalPageLifecycle({
   runtime,win:window,doc:document,storage:store,
   cancelGesture(){cancelStaleGesture();selected=-1;activeGuidance=null;},
+  onBlur(){if(importPicker)importPicker.blurred=true;},
   onFocus(){releaseOrphanedPickerAfterReturn();},
   onResult(result){
     if(!result.ok)pauseUnsafe(result.reason,

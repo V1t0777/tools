@@ -1490,7 +1490,7 @@ test('P2.65z orphaned native chooser recovers after focus grace without any save
   const deadlines=[];
   h.win.setTimeout=(fn,ms)=>{if(ms===15_000)deadlines.push(fn);return 1;};
   button.click();assert.equal(opens,1);
-  h.win.dispatch('focus');
+  h.win.dispatch('blur');h.win.dispatch('focus');
   assert.equal(deadlines.length,1,'focus return must schedule bounded recovery');
   button.click();assert.equal(opens,1,'do not overlap native choosers before grace');
   deadlines.shift()();
@@ -1507,7 +1507,7 @@ test('P2.65z valid delayed chooser change wins over stale focus recovery timer',
   const input=controls.find(e=>e.id==='import-normal-file');
   const deadlines=[];
   h.win.setTimeout=(fn,ms)=>{if(ms===15_000)deadlines.push(fn);return 1;};
-  button.click();h.win.dispatch('focus');
+  button.click();h.win.dispatch('blur');h.win.dispatch('focus');
   assert.equal(deadlines.length,1);
   const imported=JSON.stringify({...h.saved(),coins:73,revision:1});
   input.files=[{size:imported.length,text:async()=>imported}];
@@ -1527,7 +1527,7 @@ test('P2.65z old picker timeout cannot clear a fresh picker; visible return also
   let opens=0;input.click=()=>{opens++;};
   const deadlines=[];
   h.win.setTimeout=(fn,ms)=>{if(ms===15_000)deadlines.push(fn);return 1;};
-  button.click();h.win.dispatch('focus');
+  button.click();h.win.dispatch('blur');h.win.dispatch('focus');
   assert.equal(deadlines.length,1);
   input.dispatch('cancel');
   button.click();assert.equal(opens,2);
@@ -1540,4 +1540,44 @@ test('P2.65z old picker timeout cannot clear a fresh picker; visible return also
   button.click();assert.equal(opens,3);
   assert.equal(h.writes.length,before);
   assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null);
+});
+
+test('P2.65aa unrelated focus cannot expire an open native file chooser',async()=>{
+  const h=await mount(),before=h.writes.length;
+  const controls=h.id('export-local-save').parentElement.children;
+  const button=controls.find(e=>e.id==='import-normal-save');
+  const input=controls.find(e=>e.id==='import-normal-file');
+  let opens=0;input.click=()=>{opens++;};
+  const deadlines=[];
+  h.win.setTimeout=(fn,ms)=>{if(ms===15_000)deadlines.push(fn);return 1;};
+  button.click();
+  h.win.dispatch('focus');
+  assert.equal(deadlines.length,0,'focus without chooser blur/hide is not a return');
+  h.win.dispatch('blur');h.win.dispatch('focus');h.win.dispatch('focus');
+  assert.equal(deadlines.length,1,'duplicate focus cannot shorten the grace');
+  assert.equal(opens,1);
+  assert.equal(h.writes.length,before);
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null);
+});
+
+test('P2.65aa expired chooser rejects late file, fresh chooser can still import',async()=>{
+  const h=await mount(),original=h.storage.getItem(SAVE_KEY);
+  const controls=h.id('export-local-save').parentElement.children;
+  const button=controls.find(e=>e.id==='import-normal-save');
+  const input=controls.find(e=>e.id==='import-normal-file');
+  const deadlines=[];
+  h.win.setTimeout=(fn,ms)=>{if(ms===15_000)deadlines.push(fn);return 1;};
+  button.click();h.win.dispatch('blur');h.win.dispatch('focus');
+  assert.equal(deadlines.length,1);
+  deadlines.shift()();
+  const imported=JSON.stringify({...h.saved(),revision:1,coins:55});
+  input.files=[{size:imported.length,text:async()=>imported}];
+  input.dispatch('change');await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),original);
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null);
+  button.click();input.files=[{size:imported.length,text:async()=>imported}];
+  input.dispatch('change');await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),imported);
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),original);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
 });
