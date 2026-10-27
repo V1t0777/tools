@@ -30,7 +30,7 @@ export function attachNormalPageLifecycle({
       typeof cancelGesture!=='function'||typeof onResult!=='function')
     throw new TypeError('INVALID_NORMAL_PAGE_LIFECYCLE');
 
-  let detached=false,handling=false;
+  let detached=false,handling=false,pageGone=false,visibilitySuspended=false,resumePending=false;
   const cancel=()=>{
     const result=cancelGesture();
     if(result&&typeof result.then==='function') {
@@ -87,19 +87,48 @@ export function attachNormalPageLifecycle({
   const visibilityChanged=()=>{
     if(detached)return;
     if(doc.hidden) {
+      visibilitySuspended=true;
       try {cancel();} catch {runtime.block('LIFECYCLE_HANDLER_FAILED');}
       runtime.invalidate();
-    } else inspect('visible');
+    } else if(!pageGone||resumePending) {
+      // Safari may deliver BFCache pageshow while still hidden. A subsequent
+      // visibilitychange is the first safe moment to verify the saved bytes.
+      // Never unlock a pagehide merely because visibility became visible.
+      const result=inspect(resumePending?'bfcache-visible':'visible');
+      if(result.ok&&runtime.phase==='ready') {
+        visibilitySuspended=false;
+        if(resumePending){pageGone=false;resumePending=false;}
+      }
+    }
   };
   const pageHidden=()=>{
     if(detached)return;
+    // Safari/BFCache may fire pagehide before document.hidden changes.
+    pageGone=true;
+    resumePending=false;
     try {cancel();} catch {runtime.block('LIFECYCLE_HANDLER_FAILED');}
     runtime.invalidate();
   };
   const pageShown=event=>{
-    if(!detached&&event?.persisted===true&&!doc.hidden)inspect('bfcache');
+    if(detached||(event?.persisted!==true&&!pageGone))return;
+    if(doc.hidden) {
+      // Remember only a real return from pagehide; focus/visibility alone
+      // must not revive a page that never received pageshow.
+      if(pageGone)resumePending=true;
+      return;
+    }
+    const result=inspect('bfcache');
+    if(result.ok&&runtime.phase==='ready') {
+      pageGone=false;
+      visibilitySuspended=false;
+      resumePending=false;
+    }
   };
-  const focused=()=>{if(!detached&&!doc.hidden)inspect('focus');};
+  const focused=()=>{
+    if(detached||doc.hidden||pageGone)return;
+    const result=inspect('focus');
+    if(result.ok&&runtime.phase==='ready')visibilitySuspended=false;
+  };
 
   win.addEventListener('storage',storageChanged);
   win.addEventListener('pagehide',pageHidden);
@@ -108,6 +137,7 @@ export function attachNormalPageLifecycle({
   doc.addEventListener('visibilitychange',visibilityChanged);
 
   return Object.freeze({
+    get suspended(){return pageGone||visibilitySuspended||doc.hidden;},
     inspect,
     detach(){
       if(detached)return;

@@ -201,3 +201,100 @@ test('V3.1 P2.63 detached bridge removes every listener and ignores later events
   assert.deepEqual(h.changes,[]);
   assert.deepEqual(h.cancels,[]);
 });
+
+
+test('P2.65d pagehide suspends writes without document.hidden until verified pageshow',async()=>{
+  const h=harness();
+  await h.runtime.start({now});
+  assert.equal(h.bridge.suspended,false);
+  h.ui.win.emit('pagehide');
+  assert.equal(h.bridge.suspended,true);
+  h.ui.win.emit('focus');
+  assert.equal(h.bridge.suspended,true,'focus cannot revive pagehide session');
+  h.ui.win.emit('pageshow',{persisted:true});
+  assert.equal(h.bridge.suspended,false);
+  assert.equal(h.runtime.blocked,false);
+});
+
+test('P2.65d visibility restoration requires verified reconciliation',async()=>{
+  const h=harness();
+  await h.runtime.start({now});
+  h.ui.doc.hidden=true;
+  h.ui.doc.emit('visibilitychange');
+  assert.equal(h.bridge.suspended,true);
+  h.ui.doc.hidden=false;
+  h.ui.doc.emit('visibilitychange');
+  assert.equal(h.bridge.suspended,false);
+  h.ui.doc.hidden=true;
+  h.ui.doc.emit('visibilitychange');
+  h.db.setItem(SAVE_KEY,'{corrupt');
+  h.ui.doc.hidden=false;
+  h.ui.doc.emit('visibilitychange');
+  assert.equal(h.bridge.suspended,true);
+  assert.equal(h.runtime.blocked,true);
+});
+
+test('P2.65e hidden BFCache pageshow waits for visible event before verified resume',async()=>{
+  const h=harness();
+  await h.runtime.start({now});
+  const originalWrites=h.db.writes.length;
+  h.ui.win.emit('pagehide');
+  h.ui.doc.hidden=true;
+  h.ui.doc.emit('visibilitychange');
+  h.ui.win.emit('pageshow',{persisted:true});
+  assert.equal(h.bridge.suspended,true);
+  h.ui.win.emit('focus');
+  assert.equal(h.bridge.suspended,true);
+  h.ui.doc.hidden=false;
+  h.ui.doc.emit('visibilitychange');
+  assert.equal(h.bridge.suspended,false);
+  assert.equal(h.runtime.phase,'ready');
+  assert.equal(h.db.writes.length,originalWrites,'resume must remain read-only');
+});
+
+test('P2.65e deferred BFCache resume adopts newer save only after visible verification',async()=>{
+  const h=harness(),initial=createInitialState(now);
+  await h.runtime.start({now});
+  h.ui.win.emit('pagehide');
+  h.ui.doc.hidden=true;
+  h.ui.win.emit('pageshow',{persisted:true});
+  const newer={...initial,revision:1,coins:initial.coins+100};
+  h.db.setItem(SAVE_KEY,rawOf(newer));
+  assert.equal(h.runtime.snapshot().coins,initial.coins);
+  h.ui.doc.hidden=false;
+  h.ui.doc.emit('visibilitychange');
+  assert.equal(h.bridge.suspended,false);
+  assert.equal(h.runtime.snapshot().coins,newer.coins);
+  assert.equal(h.changes.at(-1).source,'bfcache-visible');
+  assert.equal(h.db.read(),rawOf(newer));
+});
+
+test('P2.65e deferred BFCache resume never unblocks corrupt save',async()=>{
+  const h=harness();
+  await h.runtime.start({now});
+  h.ui.win.emit('pagehide');
+  h.ui.doc.hidden=true;
+  h.ui.win.emit('pageshow',{persisted:true});
+  h.db.setItem(SAVE_KEY,'{corrupt');
+  h.ui.doc.hidden=false;
+  h.ui.doc.emit('visibilitychange');
+  assert.equal(h.bridge.suspended,true);
+  assert.equal(h.runtime.blocked,true);
+  assert.equal(h.db.read(),'{corrupt');
+  assert.deepEqual(await h.runtime.action(s=>moveOrMerge(s,0,2)),
+    reject('UI_SAVE_BLOCKED'));
+});
+
+test('P2.65e second pagehide clears pending resume token until a new pageshow',async()=>{
+  const h=harness();
+  await h.runtime.start({now});
+  h.ui.win.emit('pagehide');
+  h.ui.doc.hidden=true;
+  h.ui.win.emit('pageshow',{persisted:true});
+  h.ui.win.emit('pagehide');
+  h.ui.doc.hidden=false;
+  h.ui.doc.emit('visibilitychange');
+  assert.equal(h.bridge.suspended,true,'visibility alone cannot revive second pagehide');
+  h.ui.win.emit('pageshow',{persisted:true});
+  assert.equal(h.bridge.suspended,false);
+});

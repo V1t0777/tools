@@ -580,3 +580,130 @@ test('P2.65b failed mobile timer does not immediately revoke pending blob URL',a
     h.win.setTimeout=beforeTimer;
   }
 });
+
+test('P2.65c download capacity protects normal save and explains retry without storage writes',async()=>{
+  const h=await mount(),raw=h.storage.getItem(SAVE_KEY),writes=h.writes.length;
+  const oldCreate=URL.createObjectURL,oldRevoke=URL.revokeObjectURL;
+  let created=0;
+  try {
+    URL.createObjectURL=()=>`blob:p265c-${++created}`;
+    URL.revokeObjectURL=()=>{};
+    // Mobile timers are suspended in the DOM fixture; repeated downloads
+    // must stop before unbounded Blob URLs are allocated.
+    for(let i=0;i<12;i++)h.id('export-local-save').click();
+    assert.match(h.id('notice').textContent,/下载过于频繁/);
+    assert.ok(created<=8,'bounded pending object URLs');
+    assert.equal(h.storage.getItem(SAVE_KEY),raw);
+    assert.equal(h.writes.length,writes);
+    assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  } finally {
+    URL.createObjectURL=oldCreate;
+    URL.revokeObjectURL=oldRevoke;
+  }
+});
+
+test('P2.65c backup download quota never overwrites confirmed reset evidence',async()=>{
+  const original='{broken-original',h=await mount({initialRaw:original});
+  h.id('reset').click();
+  await settle();
+  assert.equal(h.storage.getItem(ABNORMAL_RESET_BACKUP_KEY),original);
+  const active=h.storage.getItem(SAVE_KEY),writes=h.writes.length;
+  const oldCreate=URL.createObjectURL,oldRevoke=URL.revokeObjectURL;
+  try {
+    URL.createObjectURL=()=> 'blob:p265c-backup';
+    URL.revokeObjectURL=()=>{};
+    for(let i=0;i<12;i++)h.id('export-abnormal-reset-backup').click();
+    assert.match(h.id('notice').textContent,/下载过于频繁/);
+    assert.equal(h.storage.getItem(SAVE_KEY),active);
+    assert.equal(h.storage.getItem(ABNORMAL_RESET_BACKUP_KEY),original);
+    assert.equal(h.writes.length,writes);
+    assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  } finally {
+    URL.createObjectURL=oldCreate;
+    URL.revokeObjectURL=oldRevoke;
+  }
+});
+
+
+test('P2.65d pagehide without hidden blocks click, timer and reset until pageshow',async()=>{
+  const h=await mount(),raw=h.storage.getItem(SAVE_KEY),writes=h.writes.length;
+  h.win.dispatch('pagehide');
+  h.id('board').dispatch('click',{target:h.id('board').children[42],detail:1});
+  h.id('reset').click();
+  await h.win.timer();
+  await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),raw);
+  assert.equal(h.writes.length,writes);
+  h.win.dispatch('focus');
+  h.id('board').dispatch('click',{target:h.id('board').children[42],detail:1});
+  await settle();
+  assert.equal(h.writes.length,writes,'focus cannot unsuspend BFCache page');
+  h.win.dispatch('pageshow',{persisted:true});
+  h.id('board').dispatch('click',{target:h.id('board').children[42],detail:1});
+  await settle();
+  assert.equal(h.saved().revision,1);
+});
+
+test('P2.65d reset confirmation interrupted by pagehide never writes',async()=>{
+  const h=await mount(),raw=h.storage.getItem(SAVE_KEY),writes=h.writes.length;
+  h.win.confirm=()=>{h.win.dispatch('pagehide');return true;};
+  h.id('reset').click();
+  await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),raw);
+  assert.equal(h.writes.length,writes);
+  assert.match(h.id('notice').textContent,/重置已取消/);
+  h.win.dispatch('pageshow',{persisted:true});
+  h.win.confirm=()=>true;
+  h.id('reset').click();
+  await settle();
+  assert.equal(h.writes.length,writes+1);
+  assert.equal(h.saved().revision,0);
+});
+
+test('P2.65d hidden visibility prevents queued producer click and reset until visible',async()=>{
+  const h=await mount(),writes=h.writes.length;
+  h.doc.hidden=true;
+  h.doc.dispatch('visibilitychange');
+  h.id('board').dispatch('click',{target:h.id('board').children[42],detail:1});
+  h.id('reset').click();
+  await settle();
+  assert.equal(h.writes.length,writes);
+  h.doc.hidden=false;
+  h.doc.dispatch('visibilitychange');
+  h.id('board').dispatch('click',{target:h.id('board').children[42],detail:1});
+  await settle();
+  assert.equal(h.saved().revision,1);
+});
+
+test('P2.65e live page resumes after hidden BFCache pageshow and visible event',async()=>{
+  const h=await mount(),raw=h.storage.getItem(SAVE_KEY),writes=h.writes.length;
+  h.win.dispatch('pagehide');
+  h.doc.hidden=true;
+  h.doc.dispatch('visibilitychange');
+  h.win.dispatch('pageshow',{persisted:true});
+  h.id('board').dispatch('click',{target:h.id('board').children[42],detail:1});
+  await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),raw,'hidden BFCache must not write');
+  h.doc.hidden=false;
+  h.doc.dispatch('visibilitychange');
+  h.id('board').dispatch('click',{target:h.id('board').children[42],detail:1});
+  await settle();
+  assert.equal(h.saved().revision,1,'verified visible BFCache must restore input');
+  assert.equal(h.writes.length,writes+1);
+});
+
+test('P2.65e live page blocks corrupt external save on deferred BFCache resume',async()=>{
+  const h=await mount();
+  h.win.dispatch('pagehide');
+  h.doc.hidden=true;
+  h.win.dispatch('pageshow',{persisted:true});
+  h.storage.setItem(SAVE_KEY,'{corrupt');
+  const writes=h.writes.length;
+  h.doc.hidden=false;
+  h.doc.dispatch('visibilitychange');
+  h.id('board').dispatch('click',{target:h.id('board').children[42],detail:1});
+  await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),'{corrupt');
+  assert.equal(h.writes.length,writes);
+  assert.match(h.id('save-status').textContent,/暂停|异常|无法/);
+});

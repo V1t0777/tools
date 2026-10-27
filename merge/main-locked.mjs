@@ -38,6 +38,7 @@ const runtime=createNormalPageRuntime({
   }
 });
 let lifecycle=null;
+const pageSuspended=()=>document.hidden||lifecycle?.suspended===true;
 
 function hint(text) {
   notice.textContent = text;
@@ -70,6 +71,7 @@ function handleTransactionResult(result,kind){
     :'操作未确认保存，已暂停写入；请先备份并重新打开页面核对');
 }
 async function commit(operation){
+  if(pageSuspended()){hint('页面处于后台，请返回并核验进度后重试');return;}
   if(saveIssue||runtime.busy){hint('存档尚未就绪或正在安全保存，请稍后重试');return;}
   // A newly adopted cross-tab snapshot invalidates the old UI button's
   // captured target, even if its revision is otherwise safe to adopt.
@@ -458,7 +460,7 @@ board.addEventListener('pointercancel', event => completeDrag(event, true));
 // Both visibility restoration and BFCache pageshow must validate the actual
 // saved bytes before the resumed tab can advance its clock or accept actions.
 function revalidateResumedSave(){
-  if(saveIssue||runtime.busy||runtime.phase!=='ready')return false;
+  if(pageSuspended()||saveIssue||runtime.busy||runtime.phase!=='ready')return false;
   const result=runtime.reconcile();
   if(!result.ok){
     pauseUnsafe(result.reason,
@@ -498,9 +500,13 @@ byId('export-local-save').addEventListener('click', () => {
     schedule:(fn,ms)=>window.setTimeout(fn,ms)
   });
   if(!download.ok){
-    hint(download.reason==='DOWNLOAD_UNSUPPORTED'
-      ?'当前浏览器不支持此下载方式，请勿重置或清理存档'
-      :'浏览器未能启动下载，请勿重置或清理存档');
+    hint(download.reason==='DOWNLOAD_LIMIT_REACHED'
+      ?'下载过于频繁，临时链接尚未清理；请稍后再试，勿重置或清理存档'
+      :download.reason==='DOWNLOAD_TOO_LARGE'
+        ?'备份文件超过浏览器安全下载上限，请勿重置或清理存档'
+        :download.reason==='DOWNLOAD_UNSUPPORTED'
+          ?'当前浏览器不支持此下载方式，请勿重置或清理存档'
+          :'浏览器未能启动下载，请勿重置或清理存档');
     return;
   }
   const message=result.wrapped
@@ -526,9 +532,13 @@ byId('export-abnormal-reset-backup').addEventListener('click', () => {
     schedule:(fn,ms)=>window.setTimeout(fn,ms)
   });
   if(!download.ok){
-    hint(download.reason==='DOWNLOAD_UNSUPPORTED'
-      ?'当前浏览器不支持此下载方式，请勿清理存档'
-      :'浏览器未能启动重置前备份下载，请勿清理存档');
+    hint(download.reason==='DOWNLOAD_LIMIT_REACHED'
+      ?'下载过于频繁，临时链接尚未清理；请稍后再试，勿清理存档'
+      :download.reason==='DOWNLOAD_TOO_LARGE'
+        ?'重置前备份超过浏览器安全下载上限，请勿清理存档'
+        :download.reason==='DOWNLOAD_UNSUPPORTED'
+          ?'当前浏览器不支持此下载方式，请勿清理存档'
+          :'浏览器未能启动重置前备份下载，请勿清理存档');
     return;
   }
   const message=result.wrapped
@@ -540,6 +550,7 @@ byId('export-abnormal-reset-backup').addEventListener('click', () => {
 });
 
 byId('reset').addEventListener('click',async()=>{
+  if(pageSuspended()){hint('页面处于后台，请返回并核验进度后重试');return;}
   if(runtime.busy){hint('正在保存，暂不能重置');return;}
   const damaged=saveIssue==='CORRUPT_SAVE'||saveIssue==='UNSUPPORTED_OR_CORRUPT_SAVE';
   if(saveIssue&&!damaged){
@@ -548,6 +559,7 @@ byId('reset').addEventListener('click',async()=>{
   if(!window.confirm(damaged
     ?'存档异常：将先核实并保留原始备份，再重置普通模式。建议先下载原始文件，确定继续吗？'
     :'确定重置本地试玩进度吗？当前棋盘、金币和订单会被清空，且无法恢复。'))return;
+  if(pageSuspended()){hint('页面已切换，重置已取消；请返回并重新确认');return;}
   cancelStaleGesture();
   try{
     const result=await runtime.reset({confirmed:true,
@@ -572,7 +584,7 @@ if(store)lifecycle=attachNormalPageLifecycle({
 });
 let timerPending=false;
 window.setInterval(async()=>{
-  if(document.hidden||saveIssue||runtime.busy||timerPending)return;
+  if(pageSuspended()||saveIssue||runtime.busy||timerPending)return;
   timerPending=true;
   try{
     if(!revalidateResumedSave())return;
