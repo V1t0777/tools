@@ -22,3 +22,16 @@
 @media(min-width:600px){.workshop-warehouse{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media(prefers-color-scheme:dark){.workshop-warehouse-slot{background:#355046;color:var(--ink);border-color:#597568}}
 @media(prefers-reduced-motion:reduce){.workshop-warehouse-slot{transition:none}}
+
+/* P74: existing offline supplies in the isolated story workshop. */
+.story-supply-heading{font-size:15px;margin:16px 0 8px;font-family:inherit}
+.story-supply-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.story-supply-cooldowns{display:grid;gap:8px}
+.story-supply-row{display:grid;grid-template-columns:minmax(0,1fr) repeat(2,minmax(0,1fr));gap:8px;align-items:center}
+.story-supply-row span{font-size:13px;overflow-wrap:anywhere}
+.story-supply-action{min-width:0;min-height:48px;padding:10px 8px;border:1px solid var(--line);border-radius:12px;background:#e4ede5;color:#314b44;font-size:13px;font-weight:700;line-height:1.4;overflow-wrap:anywhere;touch-action:manipulation}
+.story-supply-action:disabled{opacity:.5;cursor:not-allowed}
+.story-supply-action:focus-visible{outline:3px solid #6587bb;outline-offset:2px}
+@media(max-width:380px){.story-supply-grid{grid-template-columns:1fr}.story-supply-row{grid-template-columns:1fr 1fr}.story-supply-row span{grid-column:1/-1}}
+@media(prefers-color-scheme:dark){.story-supply-action{background:#355046;color:var(--ink);border-color:#597568}}
+@media(prefers-reduced-motion:reduce){.story-supply-action{transition:none}}

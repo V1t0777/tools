@@ -1,4 +1,4 @@
-import {WIDTH,MAX_ENERGY,CHAINS,getLevel,moveOrMerge,produce,fulfillOrder,storeItem,withdrawItem,upgradeBuilding,getItemIcon,getItemName} from '../engine.mjs';
+import {WIDTH,MAX_ENERGY,CHAINS,getLevel,moveOrMerge,produce,fulfillOrder,storeItem,withdrawItem,upgradeBuilding,getItemIcon,getItemName,useSupply,purchaseSupply,SUPPLY_ITEMS} from '../engine.mjs';
 import {BUILDINGS} from '../economy.mjs';
 import {readStoryWorkshop,writeStoryWorkshop,STORY_WORKSHOP_KEY} from './workshop-storage.mjs';
 import {readStorySave} from './local-storage.mjs';
@@ -103,6 +103,54 @@ function render(){
     bankFragment.append(button);
   }
   bank.append(bankFragment);
+
+  // The existing finite offline supply economy is now usable in story mode.
+  // Every action follows the same render-epoch, Web Lock and exact-byte CAS
+  // protocol as board operations; no normal-mode storage keys are accessed.
+  const bag=$('story-supply-bag');bag.replaceChildren();
+  for(const id of ['soda','meal']){
+    const item=SUPPLY_ITEMS[id],button=document.createElement('button');
+    button.type='button';button.className='story-supply-action';
+    button.dataset.supplyUse=id;
+    button.textContent=item.icon+' 使用'+item.name+' · '+item.effect+'（剩余 '+state.bag[id]+'）';
+    button.disabled=disabled||state.bag[id]===0||state.energy>=MAX_ENERGY;
+    button.addEventListener('click',guardRenderedAction(()=>commit(useSupply(state,id))));
+    bag.append(button);
+  }
+  const cooling=state.board.filter(item=>item?.kind==='producer'&&
+    item.charges===0&&item.cooldownUntil>Date.now());
+  const cooldownList=$('story-supply-cooldowns');cooldownList.replaceChildren();
+  $('story-supply-cooldown-hint').textContent=cooling.length
+    ? '请选择正在冷却的工坊使用卡片；卡片只作用于该工坊。'
+    : '当前没有正在冷却的工坊。加速卡与重启卡不会在无冷却时消耗。';
+  for(const producer of cooling){
+    const row=document.createElement('div');row.className='story-supply-row';
+    const label=document.createElement('span');label.textContent=getItemName(producer);
+    row.append(label);
+    for(const id of ['speed','reset']){
+      const item=SUPPLY_ITEMS[id],button=document.createElement('button');
+      button.type='button';button.className='story-supply-action';
+      button.dataset.supplyUse=id;button.dataset.producerId=producer.id;
+      button.textContent=item.icon+' '+item.name+'（'+state.bag[id]+'）';
+      button.disabled=disabled||state.bag[id]===0;
+      button.addEventListener('click',guardRenderedAction(()=>
+        commit(useSupply(state,id,producer.id))));
+      row.append(button);
+    }
+    cooldownList.append(row);
+  }
+  const shop=$('story-supply-shop');shop.replaceChildren();
+  for(const [id,item] of Object.entries(SUPPLY_ITEMS)){
+    const button=document.createElement('button');
+    button.type='button';button.className='story-supply-action';
+    button.dataset.supplyBuy=id;
+    const left=item.limit-state.shop.purchases[id];
+    button.textContent=item.icon+' '+item.name+' · ◈'+item.price+'（剩余限购 '+left+'）';
+    button.disabled=disabled||left===0||state.coins<item.price;
+    button.addEventListener('click',guardRenderedAction(()=>
+      commit(purchaseSupply(state,id))));
+    shop.append(button);
+  }
   const list=$('workshop-orders');list.replaceChildren();
   for(const order of state.orders){
     const row=document.createElement('div');row.className='workshop-order';
