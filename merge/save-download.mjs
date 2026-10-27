@@ -89,14 +89,20 @@ export function requestBrowserSaveDownload(prepared,{
     link.click();
     clicked=true;
   } catch {
-    pending.delete(entry);
-    if(objectUrl){try{urlApi.revokeObjectURL(objectUrl);}catch{ /* Best effort. */ }}
+    // A failed revoke is not a released Blob URL. Keep it in the bounded
+    // registry until a retry succeeds; otherwise repeated blocked clicks
+    // can allocate an unbounded number of untracked URLs on mobile WebViews.
+    if(entry.url){
+      if(!tryRevoke(urlApi,pending,entry)&&typeof schedule==='function'){
+        try{schedule(()=>tryRevoke(urlApi,pending,entry),DOWNLOAD_URL_LIFETIME_MS);}catch{}
+      }
+    }else pending.delete(entry);
     return reject(failedReason);
   } finally {
     try{link?.remove();}catch{ /* Do not undo an already requested download. */ }
   }
   if(!clicked){pending.delete(entry);return reject('DOWNLOAD_REQUEST_FAILED');}
-  let armed=false,ranEarly=false,retries=1;
+  let armed=false,ranEarly=false,retries=1,revokeRetries=1;
   const cleanup=()=>{
     if(!armed){ranEarly=true;return;}
     let current;
@@ -110,12 +116,17 @@ export function requestBrowserSaveDownload(prepared,{
       }
       return;
     }
-    tryRevoke(urlApi,pending,entry);
+    if(!tryRevoke(urlApi,pending,entry)&&revokeRetries-->0){
+      try{schedule(cleanup,DOWNLOAD_URL_LIFETIME_MS);}catch{}
+    }
   };
   try {
     if(typeof schedule!=='function')throw new Error('NO_DOWNLOAD_TIMER');
     schedule(cleanup,DOWNLOAD_URL_LIFETIME_MS);
     armed=true;
+    // A synchronous timer callback ran before arming and was discarded.
+    // Re-arm once without unbounded recursion on broken timer shims.
+    if(ranEarly){try{schedule(cleanup,DOWNLOAD_URL_LIFETIME_MS);}catch{}}
     return Object.freeze({ok:true,cleanupDeferred:ranEarly});
   } catch {
     return Object.freeze({ok:true,cleanupDeferred:true});
