@@ -23,9 +23,10 @@ const usedSlots=state=>state.board.filter(Boolean).length;
 const validSeed=value=>Number.isSafeInteger(value)&&value>=0&&value<=0xffffffff;
 
 /** Return a bounded, deterministic report. Does not expose or persist a save. */
-export function simulateStoryBoard({seed=1,maxActions=20_000,strategy='greedy'}={}){
+export function simulateStoryBoard({seed=1,maxActions=20_000,strategy='greedy',onMilestone=null}={}){
   if(!STRATEGIES.has(strategy)||!validSeed(seed)||!Number.isSafeInteger(maxActions)||
-    maxActions<1||maxActions>50_000)
+    maxActions<1||maxActions>50_000||
+    (onMilestone!==null&&typeof onMilestone!=='function'))
     throw new RangeError('Invalid board simulation options');
 
   let now=START_TIME,state=createInitialState(now),randomState=seed>>>0;
@@ -35,11 +36,16 @@ export function simulateStoryBoard({seed=1,maxActions=20_000,strategy='greedy'}=
   let reason='action-cap';
   const milestones=[];
   const rng=()=>((randomState=(Math.imul(randomState,1664525)+1013904223)>>>0)/2**32);
-  const snapshot=id=>milestones.push(Object.freeze({
-    id,orders,productions,merges,waits,
-    elapsedMinutes:(now-START_TIME)/60_000,
-    coins:state.coins,xp:state.xp,energy:state.energy,boardUsed:usedSlots(state)
-  }));
+  // Audit-only hook: never give observers the live engine state.
+  const snapshot=id=>{
+    const milestone=Object.freeze({
+      id,orders,productions,merges,waits,
+      elapsedMinutes:(now-START_TIME)/60_000,
+      coins:state.coins,xp:state.xp,energy:state.energy,boardUsed:usedSlots(state)
+    });
+    milestones.push(milestone);
+    if(onMilestone)onMilestone(milestone,structuredClone(state));
+  };
 
   for(let step=0;step<maxActions;step++){
     actions=step+1;
