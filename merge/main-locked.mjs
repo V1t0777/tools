@@ -50,14 +50,28 @@ function hint(text) {
 }
 // Never start a download from a hidden or BFCache-suspended page.
 function allowVisibleExport(){
-  if(!pageSuspended())return true;
-  hint('页面处于后台或尚未恢复核验，请返回页面后重新点击导出');
-  return false;
+  if(pageSuspended()){
+    hint('页面处于后台或尚未恢复核验，请返回页面后重新点击导出');
+    return false;
+  }
+  // Never describe a snapshot as current while a locked action, startup,
+  // clock, reset or restore may still be writing its final bytes.
+  if(runtime.busy){
+    hint('正在安全保存或恢复存档，请等待操作结束后重新导出');
+    return false;
+  }
+  return true;
 }
 // Read-only exact-byte recheck: this rejects known stale exports, but does
 // not pretend localStorage reads and native downloads are cross-tab atomic.
 function exportSourceStillCurrent(prepared,key){
-  return !pageSuspended()&&isPreparedExportUnchanged(prepared,()=>store?.getItem(key));
+  if(pageSuspended()||runtime.busy)return false;
+  // A healthy normal-mode export must match the board the player has
+  // actually reviewed. Corrupt/blocked saves remain exportable as evidence.
+  if(key===SAVE_KEY&&runtime.phase==='ready'&&!runtime.blocked&&
+      prepared.verified===true&&prepared.content!==runtime.raw)return false;
+  const same=isPreparedExportUnchanged(prepared,()=>store?.getItem(key));
+  return same&&!pageSuspended()&&!runtime.busy;
 }
 function allowCurrentExport(prepared,key){
   if(!allowVisibleExport())return false;
@@ -527,6 +541,11 @@ byId('supply-producer').addEventListener('change',()=>refreshSupplyControls());
 
 byId('export-local-save').addEventListener('click', () => {
   if(!allowVisibleExport())return;
+  // A delayed storage event must not let an old board silently export the
+  // newly written save as though the user had already reviewed that state.
+  // Keep the abnormal/blocked evidence-export path available unchanged.
+  if(runtime.phase==='ready'&&!runtime.blocked&&!saveIssue&&
+      !revalidateResumedSave())return;
   const result=prepareLocalSaveExport(store);
   if(!result.ok){
     hint(result.reason==='NO_SAVED_DATA'?'此浏览器还没有可导出的存档':

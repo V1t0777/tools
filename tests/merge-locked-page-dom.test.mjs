@@ -1734,3 +1734,33 @@ test('P2.65ah visibility hide during post-confirm reset preflight prevents reset
   assert.equal(h.storage.getItem(ABNORMAL_RESET_BACKUP_KEY),null);
   assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
 });
+
+test('P2.65ak in-flight Web Lock action cannot export a moving normal save',async()=>{
+  const h=await mount(),board=h.id('board');
+  h.win.pauseNextLock=true;
+  board.dispatch('click',{target:board.children[42],detail:1});
+  await settle();
+  assert.equal(typeof h.win.releaseLock,'function');
+  const before=h.writes.length;
+  h.id('export-local-save').click();
+  assert.match(h.id('notice').textContent,/正在安全保存或恢复存档/);
+  assert.equal(h.writes.length,before,'export must not write or mutate either save');
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  h.win.releaseLock();
+  await settle();
+  assert.equal(h.saved().revision,1,'the original locked action still completes');
+});
+
+test('P2.65ak stale normal export first adopts newer cross-tab board without downloading',async()=>{
+  const h=await mount(),old=h.saved();
+  const newer={...old,revision:old.revision+1,coins:old.coins+25};
+  h.storage.setItem(SAVE_KEY,JSON.stringify(newer));
+  const before=h.writes.length;
+  // Deliberately omit storage event: the export button itself must inspect.
+  h.id('export-local-save').click();
+  assert.match(h.id('notice').textContent,/最新棋盘上重新操作/);
+  assert.doesNotMatch(h.id('notice').textContent,/已请求下载/);
+  assert.equal(h.id('coins').textContent,newer.coins.toLocaleString('zh-CN'));
+  assert.equal(h.writes.length,before);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});
