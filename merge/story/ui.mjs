@@ -424,8 +424,31 @@ function open(entry){
   const finish=$('complete-story');
   finish.textContent=done?'已阅读 · 关闭':entry.choices.length?'确认选择并继续':'完成阅读并继续';
   finish.disabled=saving||(!done&&(blocked||!requirement.met||entry.choices.length>0));
-  // Nested browser callbacks can suspend this page during DOM construction.
-  // A stale open must not resurrect a modal after pagehide/visibilitychange.
+  // A peer may change either save while dialogue text/choices are being
+  // constructed, before the corresponding StorageEvent reaches this tab.
+  // Check workshop -> story -> workshop after DOM construction. This is a
+  // read-only best-effort snapshot guard, never a cross-tab transaction.
+  const abortStaleWorkshopOpen=()=>{
+    abortOpen();
+    if(!pageSuspended()){
+      render();
+      $('save-state').textContent='打开对白期间剧情工作台存档已变化或无法核对；旧对白已取消，请重新打开页面核对经营进度。';
+    }
+  };
+  if(!openWorkshopCurrent()){abortStaleWorkshopOpen();return;}
+  if(saving||pageSuspended()||lifecycleEpoch!==openingLifecycleEpoch||
+    storageEpoch!==openingStorageEpoch){abortOpen();return;}
+  if(!blocked){
+    const finalStory=checkStoryResumeSnapshot(store,{key:STORY_SAVE_KEY,expectedRaw:raw});
+    if(!finalStory.ok){
+      storageEpoch++;blocked=true;reason=finalStory.reason;
+      abortOpen();render();return;
+    }
+  }
+  if(saving||pageSuspended()||lifecycleEpoch!==openingLifecycleEpoch||
+    storageEpoch!==openingStorageEpoch){abortOpen();return;}
+  if(!openWorkshopCurrent()){abortStaleWorkshopOpen();return;}
+  // Nested browser callbacks can suspend this page during any final read.
   if(saving||pageSuspended()||lifecycleEpoch!==openingLifecycleEpoch||
     storageEpoch!==openingStorageEpoch){abortOpen();return;}
   $('story-dialog').showModal();

@@ -2134,3 +2134,61 @@ test('P2.65aq chooser opened reentrantly during export preflight blocks download
   controls.find(e=>e.id==='import-normal-file').dispatch('cancel');
   assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
 });
+
+test('P2.65ar pre-chooser export touches cannot download after cancellation',async()=>{
+  const h=await mount(),controls=h.id('export-local-save').parentElement.children;
+  const buttons=[h.id('export-local-save'),h.id('export-abnormal-reset-backup'),
+    controls.find(e=>e.id==='export-restore-backup')];
+  for(let i=0;i<buttons.length;i++)
+    buttons[i].dispatch('pointerdown',{pointerId:110+i});
+  controls.find(e=>e.id==='import-normal-save').click();
+  controls.find(e=>e.id==='cancel-normal-import').click();
+  const oldCreate=URL.createObjectURL;
+  let created=0;
+  try{
+    URL.createObjectURL=()=>{created++;return 'blob:p265ar-stale';};
+    for(const button of buttons){
+      button.dispatch('click',{detail:1});
+      assert.match(h.id('notice').textContent,/页面或导入状态已变化/,
+        'late pointer must not request a backup download');
+    }
+    assert.equal(created,0,'no stale pointer may create a download URL');
+  }finally{URL.createObjectURL=oldCreate;}
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});
+
+test('P2.65ar BFCache rejects a stale import button click, fresh touch still opens picker',async()=>{
+  const h=await mount(),controls=h.id('export-local-save').parentElement.children;
+  const importButton=controls.find(e=>e.id==='import-normal-save');
+  const cancel=controls.find(e=>e.id==='cancel-normal-import');
+  importButton.dispatch('pointerdown',{pointerId:120});
+  h.win.dispatch('pagehide');
+  h.win.dispatch('pageshow',{persisted:true});
+  importButton.dispatch('click',{detail:1});
+  assert.equal(cancel.hidden,true,'old pointer must not reopen native chooser');
+  importButton.dispatch('pointerdown',{pointerId:121});
+  importButton.dispatch('click',{detail:1});
+  assert.equal(cancel.hidden,false,'new touch can open picker after BFCache');
+  cancel.click();
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});
+
+test('P2.65ar delayed cancel touch cannot cancel a newer import chooser',async()=>{
+  const h=await mount(),controls=h.id('export-local-save').parentElement.children;
+  const importButton=controls.find(e=>e.id==='import-normal-save');
+  const cancel=controls.find(e=>e.id==='cancel-normal-import');
+  const input=controls.find(e=>e.id==='import-normal-file');
+  importButton.click();
+  assert.equal(cancel.hidden,false);
+  cancel.dispatch('pointerdown',{pointerId:130});
+  input.dispatch('cancel');
+  assert.equal(cancel.hidden,true);
+  importButton.click();
+  assert.equal(cancel.hidden,false,'second chooser is pending');
+  cancel.dispatch('click',{detail:1});
+  assert.equal(cancel.hidden,false,'old cancel must not revoke second chooser');
+  cancel.dispatch('pointerdown',{pointerId:131});
+  cancel.dispatch('click',{detail:1});
+  assert.equal(cancel.hidden,true,'fresh cancellation still works');
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});

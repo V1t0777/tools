@@ -6,6 +6,7 @@ import {startCoreStory} from '../merge/story/runtime.mjs';
 import {STORY_WORKSHOP_KEY} from '../merge/story/workshop-storage.mjs';
 import {SAVE_KEY} from '../merge/storage.mjs';
 import {readFileSync} from 'node:fs';
+import {createInitialState} from '../merge/engine.mjs';
 
 // Exercises the real story UI and Web Lock callback, not an iPhone emulator.
 let sequence=0;
@@ -324,5 +325,81 @@ test('P106 unchanged workshop read still opens the first story without writing',
     assert.deepEqual(h.writes,[]);
     assert.equal(h.data.get(STORY_SAVE_KEY),h.original);
     assert.equal(h.data.get(SAVE_KEY),'normal-sentinel');
+  }finally{h.restore();}
+});
+
+
+// P109: real narrative DOM entry fault injection. The peer edits below occur
+// after the initial workshop/story preflight, while modal text is assembled.
+// This is NOT a browser/WebView emulator or an atomicity guarantee.
+test('P109 dialogue does not open after workshop save changes during DOM construction',async()=>{
+  const h=await mount();
+  try{
+    const initial=JSON.stringify(createInitialState(20261029));
+    const peer=JSON.stringify(createInitialState(20261030));
+    h.data.set(STORY_WORKSHOP_KEY,initial);
+    const title=h.document.getElementById('dialog-title');
+    let text=title.textContent,changed=false;
+    Object.defineProperty(title,'textContent',{
+      get(){return text;},set(value){
+        text=value;
+        if(!changed){changed=true;h.data.set(STORY_WORKSHOP_KEY,peer);}
+      }
+    });
+    await firstStoryCardButton(h).fire('click');
+    assert.equal(changed,true,'peer edit must happen during dialogue rendering');
+    assert.equal(h.document.getElementById('story-dialog').open,false);
+    assert.deepEqual(h.writes,[]);
+    assert.equal(h.data.get(STORY_WORKSHOP_KEY),peer);
+    assert.equal(h.data.get(STORY_SAVE_KEY),h.original);
+    assert.equal(h.data.get(SAVE_KEY),'normal-sentinel');
+    assert.match(h.status(),/打开对白期间剧情工作台存档已变化/);
+  }finally{h.restore();}
+});
+
+test('P109 dialogue does not open after story save changes during DOM construction',async()=>{
+  const h=await mount();
+  try{
+    const title=h.document.getElementById('dialog-title');
+    let text=title.textContent,changed=false;
+    Object.defineProperty(title,'textContent',{
+      get(){return text;},set(value){
+        text=value;
+        if(!changed){changed=true;h.data.set(STORY_SAVE_KEY,h.original+' ');}
+      }
+    });
+    await firstStoryCardButton(h).fire('click');
+    assert.equal(changed,true);
+    assert.equal(h.document.getElementById('story-dialog').open,false);
+    assert.deepEqual(h.writes,[]);
+    assert.equal(h.data.get(STORY_SAVE_KEY),h.original+' ');
+    assert.equal(h.data.get(SAVE_KEY),'normal-sentinel');
+    assert.match(h.status(),/重新打开页面核对进度/);
+  }finally{h.restore();}
+});
+
+test('P109 peer workshop edit during final story read also cancels old modal',async()=>{
+  const h=await mount();
+  try{
+    const initial=JSON.stringify(createInitialState(20261029));
+    const peer=JSON.stringify(createInitialState(20261030));
+    h.data.set(STORY_WORKSHOP_KEY,initial);
+    const originalGet=h.window.localStorage.getItem.bind(h.window.localStorage);
+    let storyReads=0,changed=false;
+    h.window.localStorage.getItem=key=>{
+      const value=originalGet(key);
+      if(key===STORY_SAVE_KEY&&++storyReads===3){
+        changed=true;h.data.set(STORY_WORKSHOP_KEY,peer);
+      }
+      return value;
+    };
+    await firstStoryCardButton(h).fire('click');
+    assert.equal(changed,true,'third story read must occur after modal DOM construction');
+    assert.equal(h.document.getElementById('story-dialog').open,false);
+    assert.deepEqual(h.writes,[]);
+    assert.equal(h.data.get(STORY_WORKSHOP_KEY),peer);
+    assert.equal(h.data.get(STORY_SAVE_KEY),h.original);
+    assert.equal(h.data.get(SAVE_KEY),'normal-sentinel');
+    assert.match(h.status(),/打开对白期间剧情工作台存档已变化/);
   }finally{h.restore();}
 });
