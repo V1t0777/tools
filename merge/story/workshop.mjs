@@ -46,7 +46,8 @@ function status(){
       : '剧情工作台数据只保存在此浏览器，与普通模式金币及背包完全隔离。';
 }
 function render(){
-  const currentRender=++renderGeneration;
+  renderGeneration++;
+  const currentRender=renderGeneration;
   // Reading a narrative prerequisite can synchronously dispatch pagehide or
   // visibilitychange in a mobile browser. Recompute the suspended state AFTER
   // this read, before constructing any enabled controls or navigation links.

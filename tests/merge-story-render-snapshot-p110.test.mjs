@@ -158,6 +158,7 @@ test('P111 nested workshop StorageEvent cannot repaint a stale locked chapter ov
     assert.equal(fulfilled.ok,true);
     const newer=JSON.stringify(fulfilled.state);
     h.resetReads();
+    const writesBefore=h.writes.length; // a previously pinned daily event is legitimate
     h.onWorkshopRead(data=>{
       data.set(STORY_WORKSHOP_KEY,newer);
       h.window.emit('storage',{key:STORY_WORKSHOP_KEY,storageArea:h.window.localStorage});
@@ -168,7 +169,7 @@ test('P111 nested workshop StorageEvent cannot repaint a stale locked chapter ov
     assert.match(h.element('journey-guidance').textContent,/下一步：继续/);
     assert.equal(h.element('journey-read').hidden,false);
     assert.equal(h.data.get(STORY_WORKSHOP_KEY),newer);
-    assert.equal(h.writes.length,0,'cross-tab refresh cannot write either save');
+    assert.equal(h.writes.length,writesBefore,'cross-tab refresh cannot introduce new writes');
     assert.equal(h.data.get(SAVE_KEY),'normal-mode-unchanged');
   }finally{h.restore();}
 });

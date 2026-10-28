@@ -30,7 +30,8 @@ const store=(()=>{try{return window.localStorage;}catch{return null;}})();
 const webLocks=(()=>{try{return window.navigator?.locks??null;}catch{return null;}})();
 const loaded=readStorySave(store);
 let progress=loaded.progress,raw=loaded.raw,blocked=loaded.blocked,reason=loaded.reason;
-let saving=false,storageEpoch=0,renderGeneration=0;
+let saving=false,storageEpoch=0;
+let renderGeneration=0;
 // A hidden or BFCache page cannot authorize queued story writes.
 // A visible pageshow is required after pagehide before resuming.
 let pageGone=false,visibilitySuspended=false,resumePending=false;
