@@ -2020,3 +2020,52 @@ test('P2.65ao chooser-era pointer cannot open destructive reset confirmation aft
   assert.equal(h.saved().revision,0,'new confirmation may reset normally');
   assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
 });
+
+test('P2.65ap pointer pressed before chooser opens cannot spend coins after chooser cancellation',async()=>{
+  const seed=createInitialState(Date.now());seed.coins=1000;seed.xp=1500;
+  const h=await mount({initialRaw:JSON.stringify(seed)});
+  const upgrade=h.id('warehouse-upgrade');
+  const controls=h.id('export-local-save').parentElement.children;
+  const importButton=controls.find(e=>e.id==='import-normal-save');
+  const cancel=controls.find(e=>e.id==='cancel-normal-import');
+  upgrade.dispatch('pointerdown',{pointerId:91});
+  importButton.click();
+  cancel.click();
+  const original=h.storage.getItem(SAVE_KEY),before=h.writes.length;
+  upgrade.dispatch('click',{detail:1});
+  await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),original,'pre-chooser pointer cannot authorize later upgrade');
+  assert.equal(h.writes.length,before);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  upgrade.dispatch('pointerdown',{pointerId:92});
+  upgrade.dispatch('click',{detail:1});
+  await settle();
+  assert.equal(h.saved().warehouse.capacity,6,'fresh pointer after cancel may upgrade');
+  assert.equal(h.saved().coins,950);
+});
+
+test('P2.65ap BFCache invalidates reset pointer begun before pagehide',async()=>{
+  const h=await mount(),board=h.id('board');
+  board.dispatch('click',{target:board.children[42],detail:1});
+  await settle();
+  assert.equal(h.saved().revision,1);
+  let confirmations=0;
+  h.win.confirm=()=>{confirmations++;return true;};
+  const reset=h.id('reset');
+  reset.dispatch('pointerdown',{pointerId:93});
+  h.win.dispatch('pagehide');
+  h.win.dispatch('pageshow',{persisted:true});
+  await settle();
+  const original=h.storage.getItem(SAVE_KEY),before=h.writes.length;
+  reset.dispatch('click',{detail:1});
+  await settle();
+  assert.equal(confirmations,0,'late BFCache click cannot open reset confirmation');
+  assert.equal(h.storage.getItem(SAVE_KEY),original);
+  assert.equal(h.writes.length,before);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  reset.dispatch('pointerdown',{pointerId:94});
+  reset.dispatch('click',{detail:1});
+  await settle();
+  assert.equal(confirmations,1,'fresh pointer may confirm reset');
+  assert.equal(h.saved().revision,0);
+});
