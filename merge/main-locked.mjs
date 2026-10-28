@@ -212,11 +212,11 @@ function guardRenderedAction(action){
 // Persistent buttons survive board rerenders. A pointer begun while the
 // native import chooser is active must not turn into a delayed compatibility
 // click after cancellation. Dynamic buttons already use render generations.
-function guardPersistentChooserClick(button,action){
+function guardPersistentChooserClick(button,action,{allowDuringImport=false}={}){
   let stalePointer=false,pointerGeneration=null;
   button.addEventListener('pointerdown',()=>{
     pointerGeneration=persistentGestureGeneration;
-    stalePointer=importPending();
+    stalePointer=!allowDuringImport&&importPending();
   });
   button.addEventListener('pointercancel',()=>{stalePointer=true;});
   button.addEventListener('click',event=>{
@@ -583,7 +583,7 @@ guardPersistentChooserClick(byId('store-selected'),()=>{
 guardPersistentChooserClick(byId('warehouse-upgrade'),()=>commit(current=>upgradeWarehouse(current)));
 byId('supply-producer').addEventListener('change',()=>refreshSupplyControls());
 
-byId('export-local-save').addEventListener('click', () => {
+guardPersistentChooserClick(byId('export-local-save'), () => {
   if(!allowVisibleExport())return;
   // A delayed storage event must not let an old board silently export the
   // newly written save as though the user had already reviewed that state.
@@ -627,7 +627,7 @@ byId('export-local-save').addEventListener('click', () => {
 });
 
 
-byId('export-abnormal-reset-backup').addEventListener('click', () => {
+guardPersistentChooserClick(byId('export-abnormal-reset-backup'), () => {
   if(!allowVisibleExport())return;
   const result=prepareAbnormalResetBackupExport(store);
   if(!result.ok) {
@@ -777,7 +777,7 @@ if(saveActions){
   document.addEventListener('visibilitychange',()=>{
     if(!document.hidden)releaseOrphanedPickerAfterReturn();
   });
-  importButton.addEventListener('click',()=>{
+  guardPersistentChooserClick(importButton,()=>{
     if(importBusy||runtime.busy||saveIssue||pageSuspended()){
       hint('存档未就绪或页面处于后台，暂不能导入');return;
     }
@@ -855,7 +855,9 @@ if(saveActions){
     });
   }
   bindImportFileEvents(importFile);
-  cancelImportButton.addEventListener('click',()=>{
+  // Cancellation must remain tappable while the chooser is active; only an
+  // older lifecycle/chooser generation can invalidate its pending click.
+  guardPersistentChooserClick(cancelImportButton,()=>{
     if(!importPicker&&!importBusy&&!queuedHiddenSelection)return;
     cancelPendingImport();
     // Replacing the native input isolates delayed events from the old
@@ -870,7 +872,7 @@ if(saveActions){
     // Cancellation cannot undo a write that finished before this click.
     // Never promise the previous save was untouched after a confirmed restore.
     if(!saveIssue)hint('已请求取消导入；若此前已确认恢复，请核对当前棋盘与恢复前备份');
-  });
+  },{allowDuringImport:true});
   deliverHiddenSelection=({file,picker})=>{
     if(importPicker===picker)void acceptSelectedFile(file,picker);
   };
@@ -941,7 +943,7 @@ if(saveActions){
       refreshImportCancel();
     }
   }
-  backupButton.addEventListener('click',()=>{
+  guardPersistentChooserClick(backupButton,()=>{
     if(!allowVisibleExport())return;
     const backupView={getItem:key=>{
       if(key!==SAVE_KEY||typeof store?.getItem!=='function')throw Error('STORAGE_UNAVAILABLE');
