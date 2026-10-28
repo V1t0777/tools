@@ -20,13 +20,22 @@ export async function commitNormalActionWithLock(locks,storage,{expectedRaw,acti
   if(typeof expectedRaw!=='string')return reject('NO_TRUSTED_BASELINE');
   if(typeof action!=='function')return reject('INVALID_ACTION');
   if(typeof canCommit!=='function')return reject('ACTION_GUARD_UNAVAILABLE');
+  const permitted=()=>{try{return canCommit()===true;}catch{return false;}};
+  // Reads may synchronously dispatch pagehide. The final storage write must
+  // independently check the lifecycle lease, not just the initial lock entry.
+  const guardedStorage={
+    getItem:key=>storage.getItem(key),
+    setItem:(key,value)=>{
+      if(!permitted())throw new Error('ACTION_LIFECYCLE_INVALIDATED');
+      return storage.setItem(key,value);
+    }
+  };
   return withNormalSaveLock(locks,()=>{
     // Pagehide/BFCache may invalidate a gesture while Web Locks is pending.
     // Refuse before even evaluating the engine action or reading a new save.
-    let allowed=false;
-    try{allowed=canCommit()===true;}catch{/* Fail closed. */}
-    if(!allowed)return reject('ACTION_CANCELLED_BEFORE_WRITE');
-    const current=peekLocalV3(storage);
+    if(!permitted())return reject('ACTION_CANCELLED_BEFORE_WRITE');
+    const current=peekLocalV3(guardedStorage);
+    if(!permitted())return reject('ACTION_CANCELLED_BEFORE_WRITE');
     if(!current.ok)return reject(current.reason);
     if(current.raw!==expectedRaw)return reject('STALE_BASELINE');
     // Every successful ordinary gameplay action in the V3 engine creates a
@@ -44,6 +53,7 @@ export async function commitNormalActionWithLock(locks,storage,{expectedRaw,acti
     // as an unhandled Promise after the lock releases.
     const asyncResult=result && typeof result.then==='function';
     if(asyncResult) void Promise.resolve(result).catch(()=>{});
+    if(!permitted())return reject('ACTION_CANCELLED_BEFORE_WRITE');
     // Preserve the existing P2.61h contract for the exact same object.
     if(result?.ok===true && result.state===current.state)
       return reject('ACTION_REVISION_INVALID');
@@ -61,7 +71,8 @@ export async function commitNormalActionWithLock(locks,storage,{expectedRaw,acti
     if(!result.state || result.state===current.state ||
         result.state.revision!==baselineRevision+1)
       return reject('ACTION_REVISION_INVALID');
-    const receipt=commitNormalSnapshot(storage,result.state,{expectedRaw:current.raw});
+    if(!permitted())return reject('ACTION_CANCELLED_BEFORE_WRITE');
+    const receipt=commitNormalSnapshot(guardedStorage,result.state,{expectedRaw:current.raw});
     if(!receipt.ok)return receipt;
     return Object.freeze({...receipt,state:result.state,
       message:typeof result.message==='string'?result.message:''});
@@ -77,27 +88,36 @@ export async function commitNormalClockWithLock(locks,storage,{expectedRaw,now=D
   if(typeof expectedRaw!=='string')return reject('NO_TRUSTED_BASELINE');
   if(!Number.isFinite(now)||now<0)return reject('INVALID_CLOCK');
   if(typeof canCommit!=='function')return reject('CLOCK_GUARD_UNAVAILABLE');
+  const permitted=()=>{try{return canCommit()===true;}catch{return false;}};
+  const guardedStorage={
+    getItem:key=>storage.getItem(key),
+    setItem:(key,value)=>{
+      if(!permitted())throw new Error('CLOCK_LIFECYCLE_INVALIDATED');
+      return storage.setItem(key,value);
+    }
+  };
   return withNormalSaveLock(locks,()=>{
-    let allowed=false;
-    try{allowed=canCommit()===true;}catch{/* Fail closed. */}
-    if(!allowed)return reject('CLOCK_CANCELLED_BEFORE_WRITE');
-    const current=peekLocalV3(storage);
+    if(!permitted())return reject('CLOCK_CANCELLED_BEFORE_WRITE');
+    const current=peekLocalV3(guardedStorage);
+    if(!permitted())return reject('CLOCK_CANCELLED_BEFORE_WRITE');
     if(!current.ok)return reject(current.reason);
     if(current.raw!==expectedRaw)return reject('STALE_BASELINE');
     const next=advanceTime(current.state,now);
+    if(!permitted())return reject('CLOCK_CANCELLED_BEFORE_WRITE');
     if(next===current.state) {
       // A no-op still publishes a trusted baseline to the async UI. An
       // uncoordinated older tab may have replaced the save after our first
       // read, so never call that baseline verified without a final readback.
       // This is not a substitute for every writer using the same Web Lock.
       let observed;
-      try {observed=storage.getItem(SAVE_KEY);}
+      try {observed=guardedStorage.getItem(SAVE_KEY);}
       catch {return reject('STORAGE_UNAVAILABLE');}
+      if(!permitted())return reject('CLOCK_CANCELLED_BEFORE_WRITE');
       if(observed!==current.raw)return reject('STALE_BASELINE');
       return Object.freeze({ok:true,status:'CLOCK_UNCHANGED',changed:false,
         raw:current.raw,state:current.state,verifiedBaseline:true});
     }
-    const receipt=commitNormalSnapshot(storage,next,{expectedRaw:current.raw});
+    const receipt=commitNormalSnapshot(guardedStorage,next,{expectedRaw:current.raw});
     if(!receipt.ok)return receipt;
     return Object.freeze({...receipt,changed:true,state:next});
   });

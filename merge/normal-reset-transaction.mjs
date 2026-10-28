@@ -32,24 +32,32 @@ export async function commitNormalResetWithLock(locks,storage,{
   if(!Number.isFinite(now)||now<0)return reject('INVALID_CLOCK');
   if(typeof canCommit!=='function')return reject('RESET_GUARD_UNAVAILABLE');
 
+  const permitted=()=>{try{return canCommit()===true;}catch{return false;}};
+  const guardedStorage={
+    getItem:key=>storage.getItem(key),
+    setItem:(key,value)=>{
+      if(!permitted())throw new Error('RESET_LIFECYCLE_INVALIDATED');
+      return storage.setItem(key,value);
+    }
+  };
   return withNormalSaveLock(locks,()=>{
     // Confirmation becomes stale on pagehide/BFCache while waiting for lock.
     // Check before any original-backup reservation or reset write.
-    let allowed=false;
-    try{allowed=canCommit()===true;}catch{/* Fail closed. */}
-    if(!allowed)return reject('RESET_CANCELLED_BEFORE_WRITE');
+    if(!permitted())return reject('RESET_CANCELLED_BEFORE_WRITE');
     if(typeof storage?.getItem!=='function'||typeof storage?.setItem!=='function')
       return reject('STORAGE_UNAVAILABLE');
     let current;
-    try {current=storage.getItem(SAVE_KEY);}
+    try {current=guardedStorage.getItem(SAVE_KEY);}
     catch {return reject('STORAGE_UNAVAILABLE');}
+    if(!permitted())return reject('RESET_CANCELLED_BEFORE_WRITE');
     if(current!==expectedRaw)return reject('STALE_BASELINE');
 
     let backupVerified=false,backupCreated=false;
     if(current===null) {
       if(requireOriginalBackup)return reject('NO_ORIGINAL_TO_BACKUP');
     } else {
-      const inspection=peekLocalV3(storage);
+      const inspection=peekLocalV3(guardedStorage);
+      if(!permitted())return reject('RESET_CANCELLED_BEFORE_WRITE');
       if(inspection.ok) {
         if(inspection.raw!==current)return reject('STALE_BASELINE');
       } else if(inspection.reason!=='CORRUPT_SAVE'&&
@@ -57,15 +65,17 @@ export async function commitNormalResetWithLock(locks,storage,{
         return reject(inspection.reason);
       }
       if(requireOriginalBackup||!inspection.ok) {
-        const backup=prepareAbnormalResetBackup(storage,{expectedRaw:current});
+        const backup=prepareAbnormalResetBackup(guardedStorage,{expectedRaw:current});
+        if(!permitted())return reject('RESET_CANCELLED_BEFORE_WRITE');
         if(!backup.ok)return backup;
         backupVerified=backup.verifiedReadback;
         backupCreated=backup.backupCreated;
       }
     }
 
+    if(!permitted())return reject('RESET_CANCELLED_BEFORE_WRITE');
     const state=createInitialState(now);
-    const receipt=commitNormalSnapshot(storage,state,
+    const receipt=commitNormalSnapshot(guardedStorage,state,
       {expectedRaw:current,confirmedReset:true});
     if(!receipt.ok)return receipt;
     return Object.freeze({...receipt,state,backupVerified,backupCreated});
