@@ -14,6 +14,7 @@ import {shouldRefreshWorkshopForStoryEvent} from './storage-event-guard.mjs';
 import {storyGardenBuildAvailable,storyHarborBuildAvailable,storyStorefrontBuildAvailable} from './workshop-gate.mjs';
 import {storyBuildingWriteAllowed} from './building-commit-guard.mjs';
 import {nextStoryConstructionBudget,wouldSpendStoryConstructionReserve} from './supply-budget.mjs';
+import {nextStoryWorkshopAction} from './workshop-next-step.mjs';
 const $=id=>document.getElementById(id);
 const storage=(()=>{try{return window.localStorage;}catch{return null;}})();
 const webLocks=(()=>{try{return window.navigator?.locks??null;}catch{return null;}})();
@@ -191,6 +192,14 @@ function render(){
   }
   const garden=BUILDINGS.garden,level=getLevel(state.xp),built=state.buildings.garden===1;
   const narrative=readStorySave(storage);
+  // Read-only first-volume route; a link is never an unlock or save command.
+  // Always derive it from the current narrative read and this workshop view.
+  const nextAction=nextStoryWorkshopAction(narrative,{state,raw,blocked,reason});
+  $('workshop-next-guidance').textContent=nextAction.message;
+  const nextLink=$('workshop-next-action');
+  nextLink.hidden=disabled||!nextAction.href;
+  if(nextAction.href)nextLink.href=nextAction.href;
+  nextLink.textContent=nextAction.label;
   const gardenStoryReady=!narrative.blocked&&storyGardenBuildAvailable(narrative.progress);
   $('garden-status').textContent=built?'已修复':'未修复';
   $('garden-hint').textContent=built

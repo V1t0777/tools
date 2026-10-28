@@ -1768,3 +1768,58 @@ test('P2.65ak stale normal export first adopts newer cross-tab board without dow
   assert.equal(h.writes.length,before);
   assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
 });
+
+test('P2.65al throwing import abort on pagehide still revokes old file consent',async()=>{
+  const NativeController=globalThis.AbortController;
+  class ThrowingController {
+    constructor(){this.native=new NativeController();this.signal=this.native.signal;}
+    abort(){throw Error('broken WebView abort');}
+  }
+  try{
+    globalThis.AbortController=ThrowingController;
+    const h=await mount(),original=h.storage.getItem(SAVE_KEY),before=h.writes.length;
+    const controls=h.id('export-local-save').parentElement.children;
+    const input=controls.find(e=>e.id==='import-normal-file');
+    controls.find(e=>e.id==='import-normal-save').click();
+    const imported=JSON.stringify({...h.saved(),revision:1,coins:83});
+    let release;
+    input.files=[{size:imported.length,text:()=>new Promise(resolve=>{release=resolve;})}];
+    input.dispatch('change');await settle();
+    assert.equal(typeof release,'function');
+    assert.doesNotThrow(()=>h.win.dispatch('pagehide'));
+    release(imported);await settle();
+    assert.equal(h.storage.getItem(SAVE_KEY),original);
+    assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null);
+    assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+    assert.equal(h.writes.length,before);
+    assert.match(h.id('save-status').textContent,/已暂停/);
+  }finally{globalThis.AbortController=NativeController;}
+});
+
+test('P2.65al no-op import abort on visibility hide cannot restore late file',async()=>{
+  const NativeController=globalThis.AbortController;
+  class NoopController {
+    constructor(){this.native=new NativeController();this.signal=this.native.signal;}
+    abort(){/* Broken WebView polyfill never marks signal aborted. */}
+  }
+  try{
+    globalThis.AbortController=NoopController;
+    const h=await mount(),original=h.storage.getItem(SAVE_KEY),before=h.writes.length;
+    const controls=h.id('export-local-save').parentElement.children;
+    const input=controls.find(e=>e.id==='import-normal-file');
+    controls.find(e=>e.id==='import-normal-save').click();
+    const imported=JSON.stringify({...h.saved(),revision:1,coins:84});
+    let release;
+    input.files=[{size:imported.length,text:()=>new Promise(resolve=>{release=resolve;})}];
+    input.dispatch('change');await settle();
+    assert.equal(typeof release,'function');
+    h.doc.hidden=true;
+    assert.doesNotThrow(()=>h.doc.dispatch('visibilitychange'));
+    release(imported);await settle();
+    assert.equal(h.storage.getItem(SAVE_KEY),original);
+    assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null);
+    assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+    assert.equal(h.writes.length,before);
+    assert.match(h.id('save-status').textContent,/已暂停/);
+  }finally{globalThis.AbortController=NativeController;}
+});

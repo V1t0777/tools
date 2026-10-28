@@ -631,10 +631,24 @@ let activeImportRead=null;
 let deliverHiddenSelection=()=>{};
 let releaseOrphanedPickerAfterReturn=()=>{};
 let refreshImportCancel=()=>{};
+// A broken/no-op AbortController must not interrupt pagehide processing.
+// The epoch still revokes late file reads; an unconfirmed abort also leaves
+// the UI blocked until the user reloads and verifies the original save.
+function abortImportOnLifecycleExit(){
+  if(!activeImportRead)return;
+  try{
+    activeImportRead.abort();
+    if(activeImportRead.signal?.aborted===true)return;
+  }catch{/* Continue with fail-closed lifecycle invalidation. */}
+  pauseUnsafe('IMPORT_CANCEL_UNCERTAIN',
+    '浏览器未能确认导入已取消，已暂停操作；请保留存档并重新打开页面核对');
+}
 window.addEventListener('pagehide',()=>{
-  activeImportRead?.abort();
-  importEpoch++;importPicker=null;queuedHiddenSelection=null;
-  refreshImportCancel();
+  try{abortImportOnLifecycleExit();}
+  finally{
+    importEpoch++;importPicker=null;queuedHiddenSelection=null;
+    refreshImportCancel();
+  }
 });
 document.addEventListener('visibilitychange',()=>{
   if(!document.hidden){
@@ -650,15 +664,17 @@ document.addEventListener('visibilitychange',()=>{
     }
     return;
   }
-  activeImportRead?.abort();
-  // One native chooser hide is tolerated; every other background transition
-  // invalidates pending selections and any in-flight restore confirmation.
-  importEpoch++;
-  if(importPicker){
-    if(importPicker.hiddenOnce){
-      importPicker=null;queuedHiddenSelection=null;
-    }else importPicker.hiddenOnce=true;
-  }else queuedHiddenSelection=null;
+  try{abortImportOnLifecycleExit();}
+  finally{
+    // One native chooser hide is tolerated; every other background transition
+    // invalidates pending selections and any in-flight restore confirmation.
+    importEpoch++;
+    if(importPicker){
+      if(importPicker.hiddenOnce){
+        importPicker=null;queuedHiddenSelection=null;
+      }else importPicker.hiddenOnce=true;
+    }else queuedHiddenSelection=null;
+  }
 });
 const saveActions=byId('export-local-save').parentElement;
 if(saveActions){
