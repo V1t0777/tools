@@ -65,6 +65,15 @@ body{background:radial-gradient(circle at 5% 12%,rgba(221,194,136,.23),transpare
 .normal-milestone-row progress::-moz-progress-bar{background:#5a8c79;border-radius:99px}
 @media(max-width:480px){.normal-milestone-list{grid-template-columns:1fr}}
 
+/* P2.65aw: narrow-screen normal-mode touch usability; no economy changes. */
+.order-button,.small-action,.secondary-action{min-height:44px}
+@media(max-width:480px){
+  .board-section{padding-inline:5px}
+  .board{padding:5px;gap:3px}
+  .orders{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .warehouse{grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+}
+
 /* P2.16: accessible, narrow-screen safe manual raw-save backup action. */
 .board-footer{flex-wrap:wrap;gap:6px 10px}
 .save-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:flex-end}

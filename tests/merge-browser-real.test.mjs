@@ -270,5 +270,71 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   await until(async()=>(await readSave(b)).revision===changedState.revision+1,'fresh gameplay after rejected chooser');
   t.diagnostic('Chromium invalid import, detached chooser, cross-tab chooser baseline and recovery-backup integrity verified');
 
+  // P2.65aw: exercise the actual page under mobile viewport metrics, not
+  // a static stylesheet grep. This is Chromium emulation, NOT iPhone/WeChat.
+  await front(b);
+  await call('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1},b.sessionId);
+  for(const width of [320,375,390,430,768]){
+    await call('Emulation.setDeviceMetricsOverride',{
+      width,height:812,deviceScaleFactor:3,mobile:true,screenWidth:width,screenHeight:812
+    },b.sessionId);
+    await call('Emulation.setEmulatedMedia',{
+      features:[{name:'prefers-reduced-motion',value:'reduce'}]
+    },b.sessionId);
+    await sleep(90);
+    const layout=await evalOn(b,`(()=>{
+      const width=window.innerWidth;
+      const visible=el=>{
+        const s=getComputedStyle(el),r=el.getBoundingClientRect();
+        return s.display!=='none'&&s.visibility!=='hidden'&&r.width>0&&r.height>0;
+      };
+      const bounds=el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right,height:r.height,width:r.width}};
+      const critical=[...document.querySelectorAll('.shell,.board-section,#board,.resource-bar,.save-actions,.supply-section,.orders-section,.management-section,button,select')].filter(visible);
+      const clipped=critical.filter(el=>{const r=bounds(el);return r.left < -1||r.right > width+1;}).map(el=>el.id||el.className).slice(0,12);
+      const targets=[...document.querySelectorAll('.order-button,.small-action,.secondary-action,.guide-action,.save-actions button,#how-to,.back-link,.supply-select')].filter(visible);
+      const tooShort=targets.filter(el=>bounds(el).height<43.5).map(el=>el.id||el.className).slice(0,12);
+      const minSize=selector=>Math.min(...[...document.querySelectorAll(selector)].filter(visible).map(el=>bounds(el).width),999);
+      return {width,scrollWidth:document.documentElement.scrollWidth,clipped,tooShort,
+        boardMin:minSize('#board .cell'),warehouseMin:minSize('#warehouse .warehouse-slot'),
+        warehouseColumns:getComputedStyle(document.querySelector('#warehouse')).gridTemplateColumns.split(' ').length,
+        orderColumns:getComputedStyle(document.querySelector('#orders')).gridTemplateColumns.split(' ').length,
+        reducedMotion:matchMedia('(prefers-reduced-motion: reduce)').matches};
+    })()`);
+    assert.equal(layout.width,width,'mobile viewport width must match CDP device metrics');
+    assert.ok(layout.scrollWidth<=width+1,`horizontal document overflow at ${width}px: ${JSON.stringify(layout)}`);
+    assert.deepEqual(layout.clipped,[],`clipped controls at ${width}px`);
+    assert.deepEqual(layout.tooShort,[],`undersized non-board touch targets at ${width}px`);
+    assert.ok(layout.warehouseMin>=44,`warehouse slots below 44px at ${width}px`);
+    assert.ok(layout.boardMin>=(width>=375?44:35),`board targets too narrow at ${width}px`);
+    assert.equal(layout.warehouseColumns,width<=480?4:8,'warehouse responsive columns');
+    assert.equal(layout.orderColumns,width<=480?2:3,'order responsive columns');
+    assert.equal(layout.reducedMotion,true,'reduced-motion emulation must be active');
+    t.diagnostic(`Chromium mobile viewport ${width}px: no overflow; board min ${layout.boardMin.toFixed(1)}px; warehouse min ${layout.warehouseMin.toFixed(1)}px`);
+  }
+  // Dispatch a native CDP touch sequence on the actual producer and assert
+  // exactly one saved action (not a duplicate synthetic compatibility click).
+  await call('Emulation.setDeviceMetricsOverride',{
+    width:390,height:844,deviceScaleFactor:3,mobile:true,screenWidth:390,screenHeight:844
+  },b.sessionId);
+  await front(b);
+  const beforeTouch=await readSave(b);
+  const center=await evalOn(b,`(()=>{
+    const el=document.querySelector('#board .producer');
+    el.scrollIntoView({block:'center',inline:'nearest'});
+    const r=el.getBoundingClientRect();
+    return {x:r.left+r.width/2,y:r.top+r.height/2};
+  })()`);
+  assert.ok(center.x>0&&center.x<390&&center.y>0&&center.y<844,'producer must be onscreen for native touch');
+  await call('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[
+    {x:center.x,y:center.y,id:1,radiusX:2,radiusY:2,force:1}
+  ]},b.sessionId);
+  await call('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]},b.sessionId);
+  await until(async()=> (await readSave(b)).revision===beforeTouch.revision+1,'native touch producer persisted once');
+  await sleep(250);
+  const afterTouch=await readSave(b);
+  assert.equal(afterTouch.revision,beforeTouch.revision+1,'touch compatibility click must not duplicate production');
+  assert.equal(afterTouch.energy,beforeTouch.energy-1,'touch must consume exactly one energy');
+  t.diagnostic('Chromium mobile-emulated physical touch protocol: exactly one producer write');
+
   t.diagnostic(`Chromium two-tab lock, BFCache persisted=${bfcache}, download=${file}, reset/import/backup verified`);
 });
