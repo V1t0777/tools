@@ -975,8 +975,11 @@ byId('reset').addEventListener('click',async()=>{
     :'确定重置本地试玩进度吗？当前棋盘、金币和订单会被清空，且无法恢复。'))return;
   // A native chooser can start reentrantly during a WebView confirmation
   // without incrementing importEpoch. Never reset over that new intent.
-  if(pageSuspended()||importEpoch!==confirmedEpoch||importPending()){
-    hint('页面或导入状态已变化，重置已取消；请返回并重新确认');return;
+  if(pageSuspended()||importEpoch!==confirmedEpoch){
+    hint('页面已切换，重置已取消；请返回并重新确认');return;
+  }
+  if(importPending()){
+    hint('导入文件选择或读取已开始，重置已取消；请先完成或取消导入');return;
   }
   if(!damaged&&(saveIssue||runtime.phase!=='ready'||
       runtime.raw!==confirmedRaw||!revalidateResumedSave()||
