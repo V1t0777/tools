@@ -5,6 +5,7 @@ import {SAVE_KEY} from '../merge/storage.mjs';
 import {STORY_SAVE_KEY,createEmptyStoryProgress} from '../merge/mode-boundaries.mjs';
 import {STORY_WORKSHOP_KEY} from '../merge/story/workshop-storage.mjs';
 import {prepareNormalStartupWithLock} from '../merge/normal-startup-transaction.mjs';
+import {NORMAL_SAVE_LOCK_NAME} from '../merge/normal-save-lock.mjs';
 
 const NOW=1_000_000;
 function fixture(){
@@ -22,7 +23,7 @@ const immediateLock={
   request:(_name,options,callback)=>{
     assert.equal(options.mode,'exclusive');
     assert.equal(options.ifAvailable,true);
-    return Promise.resolve(callback({name:'normal-startup',mode:'exclusive'}));
+    return Promise.resolve(callback({name:NORMAL_SAVE_LOCK_NAME,mode:'exclusive'}));
   }
 };
 function assertStoryUnchanged(h){
@@ -36,7 +37,7 @@ test('P95 delayed normal startup revoked during lock wait cannot write either st
   const h=fixture();let release;
   const locks={request:(_name,options,callback)=>{
     assert.equal(options.mode,'exclusive');
-    return new Promise(resolve=>{release=()=>resolve(callback({name:'normal-startup',mode:'exclusive'}));});
+    return new Promise(resolve=>{release=()=>resolve(callback({name:NORMAL_SAVE_LOCK_NAME,mode:'exclusive'}));});
   }};
   let visible=true;
   const pending=prepareNormalStartupWithLock(locks,h.storage,{
