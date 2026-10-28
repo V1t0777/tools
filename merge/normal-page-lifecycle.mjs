@@ -95,6 +95,11 @@ export function attachNormalPageLifecycle({
         (event.key!==SAVE_KEY&&event.key!==null))return;
     inspect('storage');
   };
+  // A page that has never started has no trusted UI state to reconcile.
+  // After initial background loading, allow its FIRST locked startup once
+  // visible. Never apply this exception to a started/blocked transaction.
+  const mayResumeCold=()=>runtime.phase==='cold'&&
+    runtime.blocked!==true&&runtime.busy!==true;
   const visibilityChanged=()=>{
     if(detached)return;
     if(doc.hidden) {
@@ -102,6 +107,13 @@ export function attachNormalPageLifecycle({
       visibilitySuspended=true;
       try {cancel();} catch {runtime.block('LIFECYCLE_HANDLER_FAILED');}
       runtime.invalidate();
+    } else if(mayResumeCold()) {
+      // No startup/write has begun: clear only the visibility gate. A prior
+      // pagehide still requires a real pageshow before first startup.
+      if(!pageGone||resumePending){
+        visibilitySuspended=false;
+        if(resumePending){pageGone=false;resumePending=false;}
+      }
     } else if(!pageGone||resumePending) {
       // Safari may deliver BFCache pageshow while still hidden. A subsequent
       // visibilitychange is the first safe moment to verify the saved bytes.
@@ -125,6 +137,13 @@ export function attachNormalPageLifecycle({
   };
   const pageShown=event=>{
     if(detached||(event?.persisted!==true&&!pageGone))return;
+    if(mayResumeCold()){
+      // A never-started page has no snapshot to adopt. Its eventual startup
+      // will read and verify storage under the normal exclusive Web Lock.
+      if(doc.hidden){if(pageGone)resumePending=true;return;}
+      pageGone=false;visibilitySuspended=false;resumePending=false;
+      return;
+    }
     if(doc.hidden) {
       // Remember only a real return from pagehide; focus/visibility alone
       // must not revive a page that never received pageshow.

@@ -960,7 +960,14 @@ window.setInterval(async()=>{
 },1000);
 byId('save-status').textContent='正在核验本地进度 · 暂不可操作';
 render();
-void runtime.start({canStart:()=>!pageSuspended()}).then(result=>{
+// iOS Safari can evaluate a background tab before it becomes visible.
+// Do not consume the one-shot startup while hidden: that would permanently
+// block an untouched save without ever attempting a write.
+let startupAttempted=false;
+function startNormalOnce(){
+  if(startupAttempted||pageSuspended())return;
+  startupAttempted=true;
+  void runtime.start({canStart:()=>!pageSuspended()}).then(result=>{
   if(!result.ok){
     pauseUnsafe(result.reason||'STARTUP_UNCERTAIN',
       '本地存档无法安全恢复或确认写入，原始数据不会自动覆盖');
@@ -968,4 +975,8 @@ void runtime.start({canStart:()=>!pageSuspended()}).then(result=>{
   }
   if(result.migrated)hint('已保留旧版试玩进度，并升级为 P2 存档');
   else if(!result.recovered)hint('欢迎来到云屿百物铺！试试合成两片茶芽。');
-}).catch(()=>pauseUnsafe('STARTUP_UNCERTAIN'));
+  }).catch(()=>pauseUnsafe('STARTUP_UNCERTAIN'));
+}
+document.addEventListener('visibilitychange',startNormalOnce);
+window.addEventListener('pageshow',startNormalOnce);
+startNormalOnce();

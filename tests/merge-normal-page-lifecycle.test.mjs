@@ -313,3 +313,27 @@ test('P2.65aa lifecycle blur callback is synchronous and detached with listeners
   assert.deepEqual(calls,['blur']);
   assert.equal(ui.w.size,0);
 });
+
+
+test('P2.65af never-started hidden page may clear visibility gate without a write',()=>{
+  const h=harness();
+  h.ui.doc.hidden=true;h.ui.doc.emit('visibilitychange');
+  assert.equal(h.bridge.suspended,true);
+  h.ui.doc.hidden=false;h.ui.doc.emit('visibilitychange');
+  assert.equal(h.bridge.suspended,false);
+  assert.equal(h.runtime.phase,'cold');
+  assert.deepEqual(h.db.writes,[]);
+  h.bridge.detach();
+});
+
+test('P2.65af never-started pagehide still requires pageshow to resume',()=>{
+  const h=harness();
+  h.ui.win.emit('pagehide');
+  assert.equal(h.bridge.suspended,true);
+  h.ui.win.emit('focus');
+  assert.equal(h.bridge.suspended,true);
+  h.ui.win.emit('pageshow',{persisted:true});
+  assert.equal(h.bridge.suspended,false);
+  assert.deepEqual(h.db.writes,[]);
+  h.bridge.detach();
+});
