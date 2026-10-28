@@ -603,9 +603,11 @@ let importEpoch=0,importBusy=false,importPicker=null,queuedHiddenSelection=null;
 let activeImportRead=null;
 let deliverHiddenSelection=()=>{};
 let releaseOrphanedPickerAfterReturn=()=>{};
+let refreshImportCancel=()=>{};
 window.addEventListener('pagehide',()=>{
   activeImportRead?.abort();
   importEpoch++;importPicker=null;queuedHiddenSelection=null;
+  refreshImportCancel();
 });
 document.addEventListener('visibilitychange',()=>{
   if(!document.hidden){
@@ -638,18 +640,32 @@ if(saveActions){
   importButton.type='button';
   importButton.className='text-button';
   importButton.textContent='导入普通模式存档';
-  const importFile=document.createElement('input');
-  importFile.id='import-normal-file';
-  importFile.type='file';
-  importFile.accept='.json,application/json';
-  importFile.hidden=true;
-  importFile.setAttribute('aria-label','选择普通模式 V3 JSON 存档文件');
+  const makeImportFile=()=>{
+    const input=document.createElement('input');
+    input.id='import-normal-file';
+    input.type='file';
+    input.accept='.json,application/json';
+    input.hidden=true;
+    input.setAttribute('aria-label','选择普通模式 V3 JSON 存档文件');
+    return input;
+  };
+  let importFile=makeImportFile();
+  const cancelImportButton=document.createElement('button');
+  cancelImportButton.id='cancel-normal-import';
+  cancelImportButton.type='button';
+  cancelImportButton.className='text-button';
+  cancelImportButton.textContent='取消导入等待';
+  cancelImportButton.hidden=true;
+  cancelImportButton.setAttribute('aria-label','取消当前普通存档文件选择或读取');
   const backupButton=document.createElement('button');
   backupButton.id='export-restore-backup';
   backupButton.type='button';
   backupButton.className='text-button';
   backupButton.textContent='导出恢复前备份';
-  saveActions.append(importButton,importFile,backupButton);
+  saveActions.append(importButton,importFile,cancelImportButton,backupButton);
+  refreshImportCancel=()=>{
+    cancelImportButton.hidden=!(importPicker||importBusy||queuedHiddenSelection);
+  };
   releaseOrphanedPickerAfterReturn=()=>{
     const picker=importPicker;
     // Focus without a preceding chooser blur/hide does not prove return.
@@ -663,6 +679,7 @@ if(saveActions){
         // or a legitimate selection delivered after the focus event.
         if(importPicker!==picker||importBusy||pageSuspended())return;
         importPicker=null;queuedHiddenSelection=null;importFile.value='';
+        refreshImportCancel();
         hint('文件选择器未返回结果，已解除等待；请重新点击导入');
       },IMPORT_PICKER_RETURN_GRACE_MS);
     }catch{/* No timer: preserve the fail-closed chooser lease. */}
@@ -686,21 +703,43 @@ if(saveActions){
     // initiating user gesture, not to whichever save is current on return.
     importPicker={epoch:importEpoch,raw:runtime.raw,hiddenOnce:false,
       blurred:false,graceArmed:false};
+    refreshImportCancel();
     // Re-selecting the same file after a rejected/aborted chooser must still
     // produce a new change event on mobile browsers.
     importFile.value='';
     try{importFile.click();}
-    catch{importPicker=null;hint('当前浏览器无法打开文件选择器');}
+    catch{importPicker=null;refreshImportCancel();hint('当前浏览器无法打开文件选择器');}
   });
-  importFile.addEventListener('cancel',()=>{
-    // A late native cancel may arrive AFTER change and while File.text() or
-    // the locked restore is pending. Revoke that gesture, not just the picker.
-    activeImportRead?.abort();
+  const cancelPendingImport=()=>{
+    // Cancellation must also revoke a confirmed restore waiting for Web Lock.
+    // If a broken AbortController cannot signal cancellation, block the
+    // runtime rather than allowing an uncertain write to proceed.
+    const controller=activeImportRead;
+    if(controller){
+      try{
+        controller.abort();
+        if(controller.signal?.aborted!==true)
+          pauseUnsafe('IMPORT_CANCEL_UNCERTAIN',
+            '无法确认文件导入已取消，已暂停操作；请重新打开页面核对');
+      }catch{
+        pauseUnsafe('IMPORT_CANCEL_UNCERTAIN',
+          '无法确认文件导入已取消，已暂停操作；请重新打开页面核对');
+      }
+    }
     importEpoch++;
     importPicker=null;queuedHiddenSelection=null;importFile.value='';
-  });
-  importFile.addEventListener('change',()=>{
-    const picker=importPicker,file=importFile.files?.[0];
+    refreshImportCancel();
+  };
+  function bindImportFileEvents(input){
+    input.addEventListener('cancel',()=>{
+      // A replaced input belongs to a cancelled native chooser. Ignore its
+      // late change/cancel events even if a newer picker is already open.
+      if(input!==importFile)return;
+      cancelPendingImport();
+    });
+    input.addEventListener('change',()=>{
+      if(input!==importFile)return;
+      const picker=importPicker,file=importFile.files?.[0];
     // Some iOS/WebView choosers deliver change before visibility becomes
     // visible. Hold only the File handle, never read, confirm or write hidden.
     if(document.hidden&&picker?.hiddenOnce&&file){
@@ -717,7 +756,25 @@ if(saveActions){
       hint('文件选择事件重复，已取消导入，请重新选择');
       return;
     }
-    void acceptSelectedFile(file,picker);
+      void acceptSelectedFile(file,picker);
+    });
+  }
+  bindImportFileEvents(importFile);
+  cancelImportButton.addEventListener('click',()=>{
+    if(!importPicker&&!importBusy&&!queuedHiddenSelection)return;
+    cancelPendingImport();
+    // Replacing the native input isolates delayed events from the old
+    // chooser; merely clearing its value would not distinguish generations.
+    const previous=importFile;
+    const fresh=makeImportFile();
+    previous.remove();
+    importFile=fresh;
+    bindImportFileEvents(fresh);
+    saveActions.append(fresh);
+    cancelImportButton.hidden=true;
+    // Cancellation cannot undo a write that finished before this click.
+    // Never promise the previous save was untouched after a confirmed restore.
+    if(!saveIssue)hint('已请求取消导入；若此前已确认恢复，请核对当前棋盘与恢复前备份');
   });
   deliverHiddenSelection=({file,picker})=>{
     if(importPicker===picker)void acceptSelectedFile(file,picker);
@@ -725,6 +782,7 @@ if(saveActions){
   async function acceptSelectedFile(file,picker){
     if(importPicker===picker)importPicker=null;
     else picker=null;
+    refreshImportCancel();
     if(!file){importFile.value='';return;}
     // One hide-only native chooser roundtrip is permitted, but never a
     // pagehide/BFCache return, a second hide, or a changed original save.
@@ -750,6 +808,7 @@ if(saveActions){
       hint('当前浏览器无法安全取消文件读取，未开始导入');return;
     }
     importBusy=true;importButton.disabled=true;
+    refreshImportCancel();
     // Abort the UI wait on backgrounding; the native read may still finish.
     activeImportRead=controller;
     try{
@@ -784,6 +843,7 @@ if(saveActions){
     finally{
       if(activeImportRead===controller)activeImportRead=null;
       importBusy=false;importButton.disabled=false;importFile.value='';
+      refreshImportCancel();
     }
   }
   backupButton.addEventListener('click',()=>{

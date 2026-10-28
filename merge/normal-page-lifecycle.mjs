@@ -32,7 +32,7 @@ export function attachNormalPageLifecycle({
       typeof onFocus!=='function'||typeof onBlur!=='function')
     throw new TypeError('INVALID_NORMAL_PAGE_LIFECYCLE');
 
-  let detached=false,handling=false,pageGone=false,visibilitySuspended=false,resumePending=false;
+  let detached=false,handling=false,pageGone=false,visibilitySuspended=false,resumePending=false,lifecycleEpoch=0;
   const cancel=()=>{
     const result=cancelGesture();
     if(result&&typeof result.then==='function') {
@@ -55,17 +55,25 @@ export function attachNormalPageLifecycle({
   };
 
   const inspect=(source='manual')=>{
-    if(detached||doc.hidden||runtime.phase!=='ready')return unchanged;
+    // Storage/focus callbacks must not reconcile a pagehide-suspended DOM.
+    // Only an actual BFCache return may inspect while pageGone is true.
+    const resuming=source==='bfcache'||source==='bfcache-visible';
+    if(detached||doc.hidden||(!resuming&&pageGone)||runtime.phase!=='ready')return unchanged;
     if(handling)return fail('LIFECYCLE_REENTRANT',source);
     handling=true;
+    const inspectedEpoch=lifecycleEpoch;
     try {
       // Read-only preflight. Cancel the gesture BEFORE adopting a changed
       // board; the runtime independently re-reads and validates the save.
       let current;
       try {current=storage.getItem(SAVE_KEY);}
       catch {return fail('STORAGE_UNAVAILABLE',source);}
+      if(lifecycleEpoch!==inspectedEpoch||doc.hidden)
+        return fail('LIFECYCLE_INVALIDATED',source);
       if(current!==runtime.raw)cancel();
       const result=runtime.reconcile();
+      if(lifecycleEpoch!==inspectedEpoch||doc.hidden)
+        return fail('LIFECYCLE_INVALIDATED',source);
       if(!result?.ok) {
         cancel();
         notify(result||reject('LIFECYCLE_RECONCILE_FAILED'),source);
@@ -74,7 +82,8 @@ export function attachNormalPageLifecycle({
       if(result.changed)notify(result,source);
       // The UI callback must not replace the save after reconciliation.
       if(storage.getItem(SAVE_KEY)!==runtime.raw||
-         runtime.phase!=='ready'||runtime.blocked)
+         runtime.phase!=='ready'||runtime.blocked||
+          lifecycleEpoch!==inspectedEpoch||doc.hidden)
         return fail('LIFECYCLE_INVALIDATED',source);
       return result;
     } catch {return fail('LIFECYCLE_HANDLER_FAILED',source);}
@@ -89,6 +98,7 @@ export function attachNormalPageLifecycle({
   const visibilityChanged=()=>{
     if(detached)return;
     if(doc.hidden) {
+      lifecycleEpoch++;
       visibilitySuspended=true;
       try {cancel();} catch {runtime.block('LIFECYCLE_HANDLER_FAILED');}
       runtime.invalidate();
@@ -96,8 +106,9 @@ export function attachNormalPageLifecycle({
       // Safari may deliver BFCache pageshow while still hidden. A subsequent
       // visibilitychange is the first safe moment to verify the saved bytes.
       // Never unlock a pagehide merely because visibility became visible.
+      const before=lifecycleEpoch;
       const result=inspect(resumePending?'bfcache-visible':'visible');
-      if(result.ok&&runtime.phase==='ready') {
+      if(result.ok&&runtime.phase==='ready'&&lifecycleEpoch===before&&!doc.hidden) {
         visibilitySuspended=false;
         if(resumePending){pageGone=false;resumePending=false;}
       }
@@ -106,6 +117,7 @@ export function attachNormalPageLifecycle({
   const pageHidden=()=>{
     if(detached)return;
     // Safari/BFCache may fire pagehide before document.hidden changes.
+    lifecycleEpoch++;
     pageGone=true;
     resumePending=false;
     try {cancel();} catch {runtime.block('LIFECYCLE_HANDLER_FAILED');}
@@ -119,8 +131,9 @@ export function attachNormalPageLifecycle({
       if(pageGone)resumePending=true;
       return;
     }
+    const before=lifecycleEpoch;
     const result=inspect('bfcache');
-    if(result.ok&&runtime.phase==='ready') {
+    if(result.ok&&runtime.phase==='ready'&&lifecycleEpoch===before&&!doc.hidden) {
       pageGone=false;
       visibilitySuspended=false;
       resumePending=false;
@@ -128,8 +141,9 @@ export function attachNormalPageLifecycle({
   };
   const focused=()=>{
     if(detached||doc.hidden||pageGone)return;
+    const before=lifecycleEpoch;
     const result=inspect('focus');
-    if(result.ok&&runtime.phase==='ready'){
+    if(result.ok&&runtime.phase==='ready'&&lifecycleEpoch===before&&!pageGone&&!doc.hidden){
       visibilitySuspended=false;
       // The normal import chooser may omit native cancel. Reuse this
       // verified focus event rather than installing a second window handler.

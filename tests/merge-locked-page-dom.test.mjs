@@ -1581,3 +1581,72 @@ test('P2.65aa expired chooser rejects late file, fresh chooser can still import'
   assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),original);
   assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
 });
+
+test('P2.65ab explicit cancel recovers chooser with no native cancel, blur or visibility event',async()=>{
+  const h=await mount(),original=h.storage.getItem(SAVE_KEY),before=h.writes.length;
+  const controls=h.id('export-local-save').parentElement.children;
+  const button=controls.find(e=>e.id==='import-normal-save');
+  const cancel=controls.find(e=>e.id==='cancel-normal-import');
+  const stale=controls.find(e=>e.id==='import-normal-file');
+  let opened=0;stale.click=()=>{opened++;};
+  assert.equal(cancel.hidden,true);
+  button.click();assert.equal(cancel.hidden,false);
+  cancel.click();assert.equal(cancel.hidden,true);
+  assert.match(h.id('notice').textContent,/已请求取消导入.*核对/);
+  assert.equal(stale.parentElement,null,'old native chooser input is detached');
+  assert.equal(h.writes.length,before);
+  // Element.remove() replaces the fixture's children array; read the live
+  // parent again rather than the pre-removal array snapshot.
+  const fresh=h.id('export-local-save').parentElement.children.find(e=>e.id==='import-normal-file');
+  assert.notEqual(fresh,stale);
+  fresh.click=()=>{opened++;};
+  button.click();assert.equal(opened,2);
+  const imported=JSON.stringify({...h.saved(),revision:1,coins:91});
+  stale.files=[{size:imported.length,text:async()=>imported}];
+  stale.dispatch('change');stale.dispatch('cancel');
+  await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),original,'stale input cannot authorize new chooser');
+  fresh.files=[{size:imported.length,text:async()=>imported}];
+  fresh.dispatch('change');await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),imported);
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),original);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});
+
+test('P2.65ab explicit cancel aborts hung file read without touching either save namespace',async()=>{
+  const h=await mount(),original=h.storage.getItem(SAVE_KEY),before=h.writes.length;
+  const controls=h.id('export-local-save').parentElement.children;
+  const button=controls.find(e=>e.id==='import-normal-save');
+  const cancel=controls.find(e=>e.id==='cancel-normal-import');
+  const input=controls.find(e=>e.id==='import-normal-file');
+  button.click();
+  input.files=[{size:42,text:()=>new Promise(()=>{})}];
+  input.dispatch('change');await settle();
+  assert.equal(button.disabled,true);
+  cancel.click();await settle();
+  assert.equal(button.disabled,false,'abort releases the hung UI read');
+  assert.equal(cancel.hidden,true);
+  assert.equal(h.writes.length,before);
+  assert.equal(h.storage.getItem(SAVE_KEY),original);
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});
+
+test('P2.65ab explicit cancel revokes restore confirmation while Web Lock is pending',async()=>{
+  const h=await mount(),original=h.storage.getItem(SAVE_KEY);
+  const controls=h.id('export-local-save').parentElement.children;
+  const button=controls.find(e=>e.id==='import-normal-save');
+  const cancel=controls.find(e=>e.id==='cancel-normal-import');
+  const input=controls.find(e=>e.id==='import-normal-file');
+  const imported=JSON.stringify({...h.saved(),revision:1,coins:74});
+  h.win.pauseNextLock=true;
+  button.click();input.files=[{size:imported.length,text:async()=>imported}];
+  input.dispatch('change');await settle();
+  assert.equal(typeof h.win.releaseLock,'function');
+  cancel.click();
+  h.win.releaseLock();await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),original);
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  assert.equal(button.disabled,false);
+});
