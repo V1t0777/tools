@@ -18,3 +18,10 @@
 
 ## 发行边界
 CI 真实 Chromium 通过仍不等于 Safari、微信 WebView、触控和文件下载实机通过。若 CI 失败，必须如实报告并修复，不能宣称 P0 已消除。PR #58/#59 保持 Open/Draft；禁止 main 合并和任何正式部署；Cloudflare 后台部署记录若无法核实继续列为风险。
+
+## P2.65au｜真实浏览器组合回归加强（2026-10-29，未发布）
+- BFCache 门禁从仅记录改为 **必须观察到** `pageshow.persisted === true`；如果 Chromium 没有真正使用 BFCache，则本次测试失败，不能把普通历史返回冒充 BFCache 验证。
+- 下载不再只验证 JSON 字段存在，还必须解析并与浏览器实际存档状态完整一致。
+- 在真实 Chromium 两标签环境连续执行「下载存档 → B 标签确认重置 → A 标签采用重置 → B 标签读取刚下载的 File 并恢复 → 验证恢复前备份为重置后的精确原始字节 → A 标签采用恢复结果」。校验恢复数据与下载文件一致，且跨标签页面显示的体力一致。
+- **测试注入边界：** 为避免无头 Chromium OS 文件选择器及模态确认的不稳定性，测试仅用 `DataTransfer/File` 注入文件选择、用 `window.confirm` 确认；实际文件读取、Web Locks、页面运行时、localStorage、备份、双标签事件及下载仍由浏览器执行。此测试不能证明 iPhone Safari/微信 WebView 的原生选择器、系统下载落盘或物理触控。
+- 如果本次新 SHA 的 Node / 安全隔离 / 完整历史密钥扫描任一失败，不得标记为已通过。所有 PR 保持 Draft，不发布、不触碰 main、正式导航、Cloudflare、Supabase。

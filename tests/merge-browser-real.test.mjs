@@ -135,7 +135,7 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   await until(async()=>await evalOn(a,`location.pathname==='/merge/index.html'&&!!document.getElementById('save-status')`),'history restoration');
   await until(async()=>await evalOn(a,`document.querySelector('#save-status').textContent.includes('已保存')||document.querySelector('#save-status').textContent.includes('已同步')`),'verified after history');
   const bfcache=await evalOn(a,`sessionStorage.getItem('merge-bfcache')`);
-  assert.ok(bfcache===null||bfcache==='true'||bfcache==='false');
+  assert.equal(bfcache,'true','This gate requires a genuine pageshow.persisted BFCache restoration');
   assert.equal((await readSave(a)).revision,after.revision+1);
 
   await call('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:temp});
@@ -147,5 +147,43 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   },'real Chromium download');
   const downloaded=await readFile(join(temp,file),'utf8');
   assert.ok(downloaded.includes('schemaVersion')||downloaded.includes('revision'),'downloaded save must contain real state');
-  t.diagnostic(`Chromium two-tab lock + navigation passed; BFCache persisted=${bfcache??'not-observed'}; download=${file}`);
+  const savedSnapshot=await readSave(a);
+  assert.deepEqual(JSON.parse(downloaded),savedSnapshot,'download must match the exact reviewed game state');
+
+  // Real browser storage/lock/UI path: reset from B, adopt it in A, then
+  // restore the downloaded JSON in B and verify its before-restore backup.
+  // Only the OS file chooser and confirmation are test-injected; File.text(),
+  // Web Locks, localStorage, the page runtime and both tabs remain native.
+  await front(b);
+  await evalOn(b,`window.confirm=()=>true;document.getElementById('reset').click();true`);
+  await until(async()=>{
+    const current=await readSave(b);
+    return current.revision===0&&current.energy>savedSnapshot.energy;
+  },'confirmed reset persisted');
+  const resetRaw=await evalOn(b,`localStorage.getItem(${JSON.stringify(key)})`);
+  const resetSnapshot=JSON.parse(resetRaw);
+  assert.notDeepEqual(resetSnapshot,savedSnapshot,'reset must not retain the prior progress');
+  await front(a);
+  await until(async()=>await evalOn(a,`document.querySelector('#energy').textContent.startsWith(${JSON.stringify(String(resetSnapshot.energy)+' /')})`),'other tab adopted reset');
+  await front(b);
+  await evalOn(b,`(()=>{
+    const chooser=document.getElementById('import-normal-file');
+    chooser.click=()=>{}; // suppress OS dialog only; exercise native File read
+    document.getElementById('import-normal-save').click();
+    const transfer=new DataTransfer();
+    transfer.items.add(new File([${JSON.stringify(downloaded)}],'yunyu-normal-save-v3.json',{type:'application/json'}));
+    chooser.files=transfer.files;
+    chooser.dispatchEvent(new Event('change',{bubbles:true}));
+    return true;
+  })()`);
+  await until(async()=>{
+    const current=await readSave(b);
+    return current.revision===savedSnapshot.revision&&current.energy===savedSnapshot.energy;
+  },'downloaded save restored after reset');
+  assert.deepEqual(await readSave(b),savedSnapshot,'restored state must match downloaded JSON');
+  const backup=await evalOn(b,`localStorage.getItem(${JSON.stringify(key+'.restore-backup-v3')})`);
+  assert.equal(backup,resetRaw,'restore must preserve the exact pre-restore reset bytes');
+  await front(a);
+  await until(async()=>await evalOn(a,`document.querySelector('#energy').textContent.startsWith(${JSON.stringify(String(savedSnapshot.energy)+' /')})`),'other tab adopted restored save');
+  t.diagnostic(`Chromium two-tab lock, BFCache persisted=${bfcache}, download=${file}, reset/import/backup verified`);
 });
