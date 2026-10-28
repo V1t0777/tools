@@ -29,6 +29,9 @@ let renderGeneration=0;
 // Persistent controls are not recreated by render(); revoke pointer leases
 // whenever a native chooser starts or the page leaves the foreground.
 let persistentGestureGeneration=0;
+// A board tap may begin before a chooser, BFCache exit or pending write.
+// Its later compatibility click must not become a new gameplay action.
+let boardPointerLease=null;
 let noticeTimer=0,activeGuidance=null,saveIssue='STARTUP_REQUIRED',persistedRaw=null;
 const runtime=createNormalPageRuntime({
   storage:store,locks:window.navigator?.locks??null,
@@ -462,35 +465,57 @@ byId('board-guide').addEventListener('click', () => {
 });
 
 board.addEventListener('click', event => {
+  const cell = event.target.closest('[data-slot]');
+  // A producer/empty-cell tap has no material drag to cancel. Bind its
+  // compatibility click to the pointerdown's page and render generations.
+  // A delayed click after chooser cancellation, BFCache or a locked write
+  // must not be interpreted as a fresh touch on the new board.
+  if (event.detail !== 0) {
+    const lease=boardPointerLease;
+    boardPointerLease=null;
+    if(lease && (lease.blocked||
+        lease.generation!==persistentGestureGeneration||
+        lease.render!==renderGeneration||
+        !cell||Number(cell.dataset.slot)!==lease.slot)) {
+      ignoreNextClick=false;
+      hint('棋盘触控已过期，请在当前棋盘重新触摸');
+      return;
+    }
+  }
   // Keyboard activation has detail === 0 and cannot be a canceled drag's
   // synthetic pointer click. Never swallow it as a stale gesture.
   if (ignoreNextClick && event.detail !== 0) { ignoreNextClick = false; return; }
-  const cell = event.target.closest('[data-slot]');
   if (cell && board.contains(cell)) touchCell(Number(cell.dataset.slot));
 });
+const rejectBoardPointer=()=>{
+  boardPointerLease={blocked:true};
+  ignoreNextClick=true;
+};
 board.addEventListener('pointerdown', event => {
-  // A chooser-era touch must not arm a click that arrives after cancellation.
-  // Only a new pointerdown after import may clear this suppression guard.
-  if(importPending()){ignoreNextClick=true;return;}
-  // Never start a drag against a board whose saved baseline is untrusted.
-  if (saveIssue || runtime.busy) return;
+  // A rejected pointerdown is not permission for a delayed click after
+  // the chooser closes or the in-flight save finishes.
+  if(importPending()||pageSuspended()||saveIssue||runtime.busy){
+    rejectBoardPointer();return;
+  }
   // A second contact (including a duplicate pointerdown) invalidates the
   // first drag. Never let pinch/scroll retarget a captured material.
-  if (drag) { cancelStaleGesture(); return; }
-  if (event.isPrimary === false || event.button > 0) return;
+  if(drag){cancelStaleGesture();rejectBoardPointer();return;}
+  if(event.isPrimary===false||event.button>0){rejectBoardPointer();return;}
   // A storage event may not yet have arrived from another tab. Never capture
   // a pointer against an unverified board; this inspection is read-only.
-  if(!revalidateResumedSave())return;
-  const cell = event.target.closest('[data-slot]');
+  if(!revalidateResumedSave()){rejectBoardPointer();return;}
+  const cell=event.target.closest('[data-slot]');
   // Detached cells may still have queued events after a complete rerender.
-  // Only a genuine new pointerdown on a current cell clears click suppression.
-  if (!cell || !board.contains(cell)) return;
-  ignoreNextClick = false;
-  const index = Number(cell.dataset.slot);
-  const item = state.board[index];
-  if (!item || item.kind !== 'material') return;
+  if(!cell||!board.contains(cell)){rejectBoardPointer();return;}
+  ignoreNextClick=false;
+  const index=Number(cell.dataset.slot);
+  boardPointerLease={generation:persistentGestureGeneration,
+    render:renderGeneration,slot:index};
+  const item=state.board[index];
+  if(!item||item.kind!=='material')return;
   cell.setPointerCapture?.(event.pointerId);
-  drag = { id: event.pointerId, origin: index, startX: event.clientX, startY: event.clientY, moved: false, ghost: null };
+  drag={id:event.pointerId,origin:index,startX:event.clientX,
+    startY:event.clientY,moved:false,ghost:null};
 });
 board.addEventListener('pointermove', event => {
   if (!drag || event.pointerId !== drag.id) return;
@@ -537,10 +562,16 @@ function completeDrag(event, cancelled = false) {
   }
 }
 board.addEventListener('pointerup', event => completeDrag(event));
-board.addEventListener('pointercancel', event => completeDrag(event, true));
+board.addEventListener('pointercancel', event => {
+  rejectBoardPointer();
+  completeDrag(event,true);
+});
 // Mobile WebViews may drop capture on scroll, DOM replacement or interruption
 // without a pointercancel. Never turn that abandoned drag into a later drop.
-board.addEventListener('lostpointercapture', event => completeDrag(event, true));
+board.addEventListener('lostpointercapture', event => {
+  rejectBoardPointer();
+  completeDrag(event,true);
+});
 
 // Mobile browsers can suspend a page mid-drag without delivering pointerup.
 // Drop the stale gesture when the page is hidden; never move a board item or

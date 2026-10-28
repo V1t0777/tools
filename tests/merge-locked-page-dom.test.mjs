@@ -2192,3 +2192,75 @@ test('P2.65ar delayed cancel touch cannot cancel a newer import chooser',async()
   assert.equal(cancel.hidden,true,'fresh cancellation still works');
   assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
 });
+
+test('P2.65as pre-chooser producer touch cannot spend energy after file cancellation',async()=>{
+  const h=await mount(),board=h.id('board');
+  const controls=h.id('export-local-save').parentElement.children;
+  const importer=controls.find(e=>e.id==='import-normal-save');
+  const cancel=controls.find(e=>e.id==='cancel-normal-import');
+  board.dispatch('pointerdown',{target:board.children[42],pointerId:201});
+  importer.click();cancel.click();
+  const before=h.writes.length,raw=h.storage.getItem(SAVE_KEY);
+  board.dispatch('click',{target:board.children[42],detail:1});
+  await settle();
+  assert.equal(h.writes.length,before,'old producer click cannot spend energy');
+  assert.equal(h.storage.getItem(SAVE_KEY),raw);
+  board.dispatch('pointerdown',{target:board.children[42],pointerId:202});
+  board.dispatch('click',{target:board.children[42],detail:1});
+  await settle();
+  assert.equal(h.saved().revision,1,'new touch still produces');
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});
+
+test('P2.65as BFCache return invalidates a pending producer tap',async()=>{
+  const h=await mount(),board=h.id('board');
+  board.dispatch('pointerdown',{target:board.children[42],pointerId:203});
+  h.win.dispatch('pagehide');
+  h.win.dispatch('pageshow',{persisted:true});
+  const before=h.writes.length,raw=h.storage.getItem(SAVE_KEY);
+  board.dispatch('click',{target:board.children[42],detail:1});
+  await settle();
+  assert.equal(h.writes.length,before,'old BFCache click cannot produce');
+  assert.equal(h.storage.getItem(SAVE_KEY),raw);
+  board.dispatch('pointerdown',{target:board.children[42],pointerId:204});
+  board.dispatch('click',{target:board.children[42],detail:1});
+  await settle();
+  assert.equal(h.saved().revision,1,'fresh resumed tap works');
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});
+
+test('P2.65as pointer rejected during locked write cannot replay after it finishes',async()=>{
+  const h=await mount(),board=h.id('board');
+  h.win.pauseNextLock=true;
+  board.dispatch('click',{target:board.children[42],detail:0});
+  await settle();
+  assert.equal(typeof h.win.releaseLock,'function');
+  board.dispatch('pointerdown',{target:board.children[42],pointerId:205});
+  h.win.releaseLock();await settle();
+  assert.equal(h.saved().revision,1);
+  const before=h.writes.length;
+  board.dispatch('click',{target:board.children[42],detail:1});
+  await settle();
+  assert.equal(h.writes.length,before,'busy-era tap cannot cause second write');
+  assert.equal(h.saved().revision,1);
+  board.dispatch('pointerdown',{target:board.children[42],pointerId:206});
+  board.dispatch('click',{target:board.children[42],detail:1});
+  await settle();
+  assert.equal(h.saved().revision,2,'new touch after save can produce');
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});
+
+test('P2.65as canceled producer pointer cannot turn into a compatibility click',async()=>{
+  const h=await mount(),board=h.id('board');
+  board.dispatch('pointerdown',{target:board.children[42],pointerId:207});
+  board.dispatch('pointercancel',{target:board.children[42],pointerId:207});
+  const before=h.writes.length;
+  board.dispatch('click',{target:board.children[42],detail:1});
+  await settle();
+  assert.equal(h.writes.length,before,'canceled producer touch must not write');
+  board.dispatch('pointerdown',{target:board.children[42],pointerId:208});
+  board.dispatch('click',{target:board.children[42],detail:1});
+  await settle();
+  assert.equal(h.saved().revision,1);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});
