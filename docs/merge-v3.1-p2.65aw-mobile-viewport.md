@@ -13,3 +13,9 @@
 
 ## 发行边界
 保持 PR #58/#59 Open/Draft；禁止 main、Pages/Cloudflare/Edge 发布、Supabase 线上操作、正式导航与部署白名单修改。最终三项 CI 必须绑定本轮新 SHA 全部通过才可报告通过；Chromium 模拟不能替代 iPhone Safari、微信内置浏览器原生文件选择/下载/后台恢复及真机触控。Cloudflare 后台真实部署状态不可独立核实则继续列为风险。
+
+## P0 真触控故障与修复证据
+- 首次加入真实 CDP 触摸序列后，自动化发现 `pointerdown → touchstart → pointerup → touchend → lostpointercapture → click` 的原生兼容点击被错误判定为过期；此前 DOM `.click()` 不会产生该序列，因此漏测。
+- 原因：触摸浏览器在正常点按结束后会自动释放**隐式指针捕获**，但 `lostpointercapture` 处理器无条件撤销棋盘点击许可，即使没有进行中的材料拖拽。
+- 修复：只有仍存在且 pointerId 匹配的**未完成拖拽**才在捕获丢失时取消；普通生产器、空格和材料轻触的正常捕获释放不再误撤销点击许可。保留 `pointercancel`、页面隐藏、BFCache、存档基线变更的旧触控拒绝。
+- 最终验收要求：真实 Chromium 390px 移动视口通过 `Input.dispatchTouchEvent` 触摸生产器，恰好一次 revision +1、体力 -1，且短暂等待后无第二次写入。必须核对最终 SHA 的 Actions 日志；不能将本轮诊断中间提交的失败视为通过。

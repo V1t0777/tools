@@ -473,9 +473,6 @@ board.addEventListener('click', event => {
   if (event.detail !== 0) {
     const lease=boardPointerLease;
     boardPointerLease=null;
-    if(window.__mobilePointerDiagnostics&&lease)
-      window.__mobilePointerDiagnostics.push({stage:'click',lease,nowGeneration:persistentGestureGeneration,
-        nowRender:renderGeneration,nowSlot:cell?.dataset.slot});
     if(lease && (lease.blocked||
         lease.generation!==persistentGestureGeneration||
         lease.render!==renderGeneration||
@@ -491,10 +488,6 @@ board.addEventListener('click', event => {
   if (cell && board.contains(cell)) touchCell(Number(cell.dataset.slot));
 });
 const rejectBoardPointer=()=>{
-  if(window.__mobilePointerDiagnostics)window.__mobilePointerDiagnostics.push({
-    stage:'reject',importPending:importPending(),suspended:pageSuspended(),
-    saveIssue,busy:runtime.busy,drag:!!drag,phase:runtime.phase
-  });
   boardPointerLease={blocked:true};
   ignoreNextClick=true;
 };
@@ -518,9 +511,6 @@ board.addEventListener('pointerdown', event => {
   const index=Number(cell.dataset.slot);
   boardPointerLease={generation:persistentGestureGeneration,
     render:renderGeneration,slot:index};
-  if(window.__mobilePointerDiagnostics)window.__mobilePointerDiagnostics.push({
-    stage:'lease',lease:boardPointerLease
-  });
   const item=state.board[index];
   if(!item||item.kind!=='material')return;
   cell.setPointerCapture?.(event.pointerId);
@@ -579,6 +569,11 @@ board.addEventListener('pointercancel', event => {
 // Mobile WebViews may drop capture on scroll, DOM replacement or interruption
 // without a pointercancel. Never turn that abandoned drag into a later drop.
 board.addEventListener('lostpointercapture', event => {
+  // Touch browsers release implicit pointer capture after a normal tap.
+  // That event is NOT a canceled gesture: revoking the lease here would
+  // swallow the native compatibility click for producers and materials.
+  // Only an unfinished, matching material drag needs cancellation.
+  if(!drag||event.pointerId!==drag.id)return;
   rejectBoardPointer();
   completeDrag(event,true);
 });

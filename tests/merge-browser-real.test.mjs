@@ -348,16 +348,11 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   await sleep(150);
   await evalOn(b,`(()=>{
     window.__touchTrace=[];
-    window.__mobilePointerDiagnostics=[];
-    window.__boardMutations=0;
-    new MutationObserver(records=>{window.__boardMutations+=records.length;})
-      .observe(document.getElementById('board'),{childList:true});
     for(const type of ['touchstart','touchend','pointerdown','pointerup','click'])
       document.addEventListener(type,event=>window.__touchTrace.push({
         type,target:event.target?.className,detail:event.detail,
         slot:event.target?.closest?.('[data-slot]')?.dataset.slot,
-        connected:event.target?.isConnected,
-        isPrimary:event.isPrimary,button:event.button,pointerType:event.pointerType,
+        isPrimary:event.isPrimary,pointerType:event.pointerType,
         x:event.clientX,y:event.clientY
       }),true);
     return true;
@@ -365,27 +360,14 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   await call('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[
     {x:center.x,y:center.y,id:1,radiusX:2,radiusY:2,force:1}
   ]},b.sessionId);
-  const afterDown=await evalOn(b,`({
-    notice:document.getElementById('notice').textContent,
-    status:document.getElementById('save-status').textContent,
-    trace:window.__touchTrace,
-    pickerHidden:document.getElementById('cancel-normal-import').hidden,
-    mutations:window.__boardMutations,
-    pointerDiagnostics:window.__mobilePointerDiagnostics,
-    revision:JSON.parse(localStorage.getItem('toolbox.merge-isle.local.v1')).revision
-  })`);
-  t.diagnostic('CDP touch after pointerdown: '+JSON.stringify(afterDown));
   await sleep(75);
   await call('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]},b.sessionId);
   const trace=await evalOn(b,`({
     events:window.__touchTrace,
     hidden:document.hidden,
-    pickerHidden:document.getElementById('cancel-normal-import').hidden,
     hit:document.elementFromPoint(${center.x},${center.y})?.className,
     notice:document.getElementById('notice').textContent,
     status:document.getElementById('save-status').textContent,
-    mutations:window.__boardMutations,
-    revision:JSON.parse(localStorage.getItem('toolbox.merge-isle.local.v1')).revision
   })`);
   t.diagnostic('CDP native touch trace: '+JSON.stringify({beforeRevision:beforeTouch.revision,...trace}));
   await until(async()=> (await readSave(b)).revision===beforeTouch.revision+1,'native touch producer persisted once');
