@@ -960,7 +960,7 @@ window.setInterval(async()=>{
 },1000);
 byId('save-status').textContent='正在核验本地进度 · 暂不可操作';
 render();
-void runtime.start().then(result=>{
+void runtime.start({canStart:()=>!pageSuspended()}).then(result=>{
   if(!result.ok){
     pauseUnsafe(result.reason||'STARTUP_UNCERTAIN',
       '本地存档无法安全恢复或确认写入，原始数据不会自动覆盖');

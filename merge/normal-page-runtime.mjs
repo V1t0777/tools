@@ -88,13 +88,18 @@ export function createNormalPageRuntime({locks,storage,onVerified}={}) {
     get raw(){return raw;},
     snapshot(){return state===null?null:clone(state);},
 
-    async start({now=Date.now()}={}) {
+    async start({now=Date.now(),canStart=()=>true}={}) {
       if(phase!=='cold')return reject('STARTUP_ALREADY_ATTEMPTED');
+      if(typeof canStart!=='function')return reject('STARTUP_INVALIDATED');
       phase='starting';
+      const startedAt=epoch;
       let receipt;
       const result=await flight.run(
         async()=>{
-          receipt=await prepareNormalStartupWithLock(locks,storage,{now});
+          receipt=await prepareNormalStartupWithLock(locks,storage,{
+            now,canStart:()=>phase==='starting'&&!flight.blocked&&
+              epoch===startedAt&&canStart()===true
+          });
           return receipt;
         },
         (next,bytes,verified)=>{

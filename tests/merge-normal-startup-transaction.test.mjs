@@ -149,3 +149,29 @@ test('P2.49 invalid clock is rejected without lock or storage reads',async()=>{
   assert.deepEqual(result,{ok:false,blocked:true,reason:'INVALID_CLOCK',attempted:false});
   assert.equal(touched,false);
 });
+
+test('P2.65ad revoked startup permission before lock callback makes no reads or writes',async()=>{
+  const store=memory(),before=store.writes.length;
+  const result=await prepareNormalStartupWithLock(locks(),store,{
+    now:at,canStart:()=>false
+  });
+  assert.deepEqual(result,{ok:false,blocked:true,
+    reason:'STARTUP_INVALIDATED',attempted:false});
+  assert.equal(store.writes.length,before);
+  assert.equal(store.read(SAVE_KEY),null);
+});
+
+test('P2.65ad synchronous pagehide during startup read cannot create a save',async()=>{
+  const store=memory();let allowed=true,reads=0;
+  const guarded={
+    getItem(key){reads++;const value=store.getItem(key);allowed=false;return value;},
+    setItem:(key,value)=>store.setItem(key,value)
+  };
+  const result=await prepareNormalStartupWithLock(locks(),guarded,{
+    now:at,canStart:()=>allowed
+  });
+  assert.equal(result.ok,false);
+  assert.equal(result.reason,'STARTUP_INVALIDATED');
+  assert.equal(reads,1);
+  assert.deepEqual(store.writes,[]);
+});
