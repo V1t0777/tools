@@ -1692,3 +1692,45 @@ test('P2.65af hidden BFCache return defers first startup until visible',async()=
   assert.equal(h.saved().revision,0);
   assert.deepEqual(h.writes,[SAVE_KEY]);
 });
+
+test('P2.65ah pagehide during unchanged-save preflight cancels a selected-item write',async()=>{
+  const h=await mount(),board=h.id('board');
+  board.dispatch('click',{target:board.children[0],detail:1});
+  assert.equal(h.id('store-selected').disabled,false);
+  const before=h.writes.length,raw=h.storage.getItem(SAVE_KEY);
+  const original=h.storage.getItem;
+  let fired=false;
+  h.storage.getItem=key=>{
+    const value=original(key);
+    if(key===SAVE_KEY&&!fired){fired=true;h.win.dispatch('pagehide');}
+    return value;
+  };
+  h.id('store-selected').click();
+  await settle();
+  assert.equal(fired,true,'pagehide was injected inside exact-byte read');
+  assert.equal(h.writes.length,before,'no save may be written after pagehide');
+  assert.equal(h.storage.getItem(SAVE_KEY),raw);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});
+
+test('P2.65ah visibility hide during post-confirm reset preflight prevents reset',async()=>{
+  const h=await mount(),before=h.writes.length,raw=h.storage.getItem(SAVE_KEY);
+  const original=h.storage.getItem;
+  let armed=false,fired=false;
+  h.win.confirm=()=>{armed=true;return true;};
+  h.storage.getItem=key=>{
+    const value=original(key);
+    if(armed&&key===SAVE_KEY&&!fired){
+      fired=true;h.doc.hidden=true;h.doc.dispatch('visibilitychange');
+    }
+    return value;
+  };
+  h.id('reset').click();
+  await settle();
+  assert.equal(armed,true,'reset confirmation was shown first');
+  assert.equal(fired,true,'visibility hide occurred in post-confirm preflight');
+  assert.equal(h.writes.length,before,'reset cannot use stale confirmation');
+  assert.equal(h.storage.getItem(SAVE_KEY),raw);
+  assert.equal(h.storage.getItem(ABNORMAL_RESET_BACKUP_KEY),null);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});

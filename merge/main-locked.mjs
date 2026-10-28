@@ -497,6 +497,14 @@ function revalidateResumedSave(){
       '检测到跨标签或后台存档变化，已暂停操作；请备份并重新打开页面核对');
     return false;
   }
+  // A synchronous storage read can itself dispatch pagehide or hide the
+  // document. An unchanged save is NOT permission to run a gesture that
+  // was invalidated during reconciliation. The next BFCache/visible return
+  // must revalidate before any new action or destructive confirmation.
+  if(pageSuspended()||saveIssue||runtime.phase!=='ready'||runtime.blocked){
+    hint('页面在核验期间离开或状态失效，请返回页面重新操作');
+    return false;
+  }
   if(result.changed){
     // A verified external update is safe to DISPLAY, but the input event
     // that discovered it was created against an older DOM/board. Do not
