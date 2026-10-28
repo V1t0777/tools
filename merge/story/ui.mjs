@@ -30,7 +30,7 @@ const store=(()=>{try{return window.localStorage;}catch{return null;}})();
 const webLocks=(()=>{try{return window.navigator?.locks??null;}catch{return null;}})();
 const loaded=readStorySave(store);
 let progress=loaded.progress,raw=loaded.raw,blocked=loaded.blocked,reason=loaded.reason;
-let saving=false,storageEpoch=0;
+let saving=false,storageEpoch=0,renderGeneration=0;
 // A hidden or BFCache page cannot authorize queued story writes.
 // A visible pageshow is required after pagehide before resuming.
 let pageGone=false,visibilitySuspended=false,resumePending=false;
@@ -176,6 +176,7 @@ function card(entry,done=false,workshopRead=null){
   return wrapper;
 }
 function render(){
+  const currentRender=++renderGeneration;
   status();
   const day=localDay();
   const count=progress.packs.core?.completed.main.length??0;
@@ -190,6 +191,10 @@ function render(){
   // must not display mutually contradictory milestones if another tab writes
   // between independent getItem() calls. Click/commit paths still revalidate.
   const workshopForRender=blocked?null:readStoryWorkshop(store);
+  // A synchronous dependency StorageEvent can start a newer render while
+  // this snapshot is being read. Never let the older frame repaint stale
+  // chapter gates, even when the event arrives before getItem() returns.
+  if(currentRender!==renderGeneration)return;
   const journey=blocked?{kind:'unavailable',sideCount:0}:
     nextCoreStoryJourney(progress,workshopForRender);
   const journeyButton=$('journey-read'),journeyLink=$('journey-workshop');

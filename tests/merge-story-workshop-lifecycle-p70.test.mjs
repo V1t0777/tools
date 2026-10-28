@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {STORY_WORKSHOP_KEY} from '../merge/story/workshop-storage.mjs';
 import {STORY_SAVE_KEY,createEmptyStoryProgress} from '../merge/mode-boundaries.mjs';
 import {CORE_STORY_PACK} from '../merge/story/core-pack.mjs';
-import {startCoreStory} from '../merge/story/runtime.mjs';
+import {startCoreStory,completeStoryEntry} from '../merge/story/runtime.mjs';
 import {SAVE_KEY} from '../merge/storage.mjs';
 
 // Runs the actual story workshop entry module with an event-capable DOM.
@@ -471,3 +471,37 @@ for(const corrupt of [false,true]){
     }finally{h.restore();}
   });
 }
+
+
+test('P111 nested narrative StorageEvent during workshop render cannot restore stale garden lock',async()=>{
+  const h=await mount();
+  try{
+    const initial=startCoreStory(createEmptyStoryProgress(),CORE_STORY_PACK);
+    let unlocked=initial;
+    for(const entry of CORE_STORY_PACK.entries.filter(e=>e.kind==='main')){
+      unlocked=completeStoryEntry(unlocked,CORE_STORY_PACK,entry.id,entry.choices[0]?.id??null);
+      if(entry.id==='seed')break;
+    }
+    h.data.set(STORY_SAVE_KEY,JSON.stringify(initial));
+    await h.window.emit('storage',{key:STORY_SAVE_KEY,storageArea:h.window.localStorage});
+    assert.match(h.document.getElementById('garden-hint').textContent,/先在剧情页完成/);
+    const original=h.window.localStorage.getItem.bind(h.window.localStorage);
+    let injected=false;
+    h.window.localStorage.getItem=key=>{
+      const previous=original(key);
+      if(key===STORY_SAVE_KEY&&!injected){
+        injected=true;
+        h.data.set(STORY_SAVE_KEY,JSON.stringify(unlocked));
+        void h.window.emit('storage',{key:STORY_SAVE_KEY,storageArea:h.window.localStorage});
+      }
+      return previous;
+    };
+    await h.window.emit('storage',{key:STORY_SAVE_KEY,storageArea:h.window.localStorage});
+    assert.equal(injected,true);
+    assert.match(h.document.getElementById('garden-hint').textContent,/需要/);
+    assert.doesNotMatch(h.document.getElementById('garden-hint').textContent,/先在剧情页完成/);
+    assert.equal(h.writes,0,'dependency refresh must remain read-only');
+    assert.equal(h.data.get(SAVE_KEY),'normal-sentinel');
+    assert.equal(h.data.has(STORY_WORKSHOP_KEY),false);
+  }finally{h.restore();}
+});

@@ -46,11 +46,15 @@ function status(){
       : '剧情工作台数据只保存在此浏览器，与普通模式金币及背包完全隔离。';
 }
 function render(){
-  renderGeneration++;
+  const currentRender=++renderGeneration;
   // Reading a narrative prerequisite can synchronously dispatch pagehide or
   // visibilitychange in a mobile browser. Recompute the suspended state AFTER
   // this read, before constructing any enabled controls or navigation links.
   const narrative=readStorySave(storage);
+  // A synchronous dependency StorageEvent can reenter render() while the
+  // story save is being read. The newer render owns the DOM; the old one
+  // must not paint outdated building eligibility over it.
+  if(currentRender!==renderGeneration)return;
   const disabled=blocked||saving||pageSuspended();
   status();
   $('energy').textContent=state.energy+' / '+MAX_ENERGY;

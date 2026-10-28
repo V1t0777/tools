@@ -149,3 +149,26 @@ test('P110 corrupt workshop cannot yield a completed chapter in any render surfa
     assert.equal(h.writes.includes(STORY_WORKSHOP_KEY),false);
   }finally{h.restore();}
 });
+
+
+test('P111 nested workshop StorageEvent cannot repaint a stale locked chapter over a newer render',async()=>{
+  const h=await mount();
+  try{
+    const fulfilled=fulfillOrder(h.workshop,h.workshop.orders[0].id);
+    assert.equal(fulfilled.ok,true);
+    const newer=JSON.stringify(fulfilled.state);
+    h.resetReads();
+    h.onWorkshopRead(data=>{
+      data.set(STORY_WORKSHOP_KEY,newer);
+      h.window.emit('storage',{key:STORY_WORKSHOP_KEY,storageArea:h.window.localStorage});
+    });
+    h.redraw();
+    assert.equal(h.reads,2,'one nested render must replace the interrupted frame');
+    assert.equal(cardStatus(h),'经营已达标');
+    assert.match(h.element('journey-guidance').textContent,/下一步：继续/);
+    assert.equal(h.element('journey-read').hidden,false);
+    assert.equal(h.data.get(STORY_WORKSHOP_KEY),newer);
+    assert.equal(h.writes.length,0,'cross-tab refresh cannot write either save');
+    assert.equal(h.data.get(SAVE_KEY),'normal-mode-unchanged');
+  }finally{h.restore();}
+});
