@@ -1592,6 +1592,7 @@ test('P2.65ab explicit cancel recovers chooser with no native cancel, blur or vi
   assert.equal(cancel.hidden,true);
   button.click();assert.equal(cancel.hidden,false);
   cancel.click();assert.equal(cancel.hidden,true);
+  assert.match(h.id('notice').textContent,/已请求取消导入.*核对/);
   assert.equal(stale.parentElement,null,'old native chooser input is detached');
   assert.equal(h.writes.length,before);
   // Element.remove() replaces the fixture's children array; read the live

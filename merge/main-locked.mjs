@@ -772,7 +772,9 @@ if(saveActions){
     bindImportFileEvents(fresh);
     saveActions.append(fresh);
     cancelImportButton.hidden=true;
-    hint('已取消当前导入等待，未覆盖存档；请重新点击导入');
+    // Cancellation cannot undo a write that finished before this click.
+    // Never promise the previous save was untouched after a confirmed restore.
+    if(!saveIssue)hint('已请求取消导入；若此前已确认恢复，请核对当前棋盘与恢复前备份');
   });
   deliverHiddenSelection=({file,picker})=>{
     if(importPicker===picker)void acceptSelectedFile(file,picker);
