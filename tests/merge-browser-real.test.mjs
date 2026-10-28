@@ -164,7 +164,12 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   const resetSnapshot=JSON.parse(resetRaw);
   assert.notDeepEqual(resetSnapshot,savedSnapshot,'reset must not retain the prior progress');
   await front(a);
-  await until(async()=>await evalOn(a,`document.querySelector('#energy').textContent.startsWith(${JSON.stringify(String(resetSnapshot.energy)+' /')})`),'other tab adopted reset');
+  // A reset lowers revision. A tab holding the older higher revision MUST
+  // block rather than silently adopting a rollback or resurrecting old data.
+  await until(async()=>await evalOn(a,`document.getElementById('save-status').textContent.includes('已暂停')`),'stale tab blocked after cross-tab reset');
+  await evalOn(a,`document.querySelector('#board .producer').click();true`);
+  assert.equal(await evalOn(a,`localStorage.getItem(${JSON.stringify(key)})`),resetRaw,
+    'blocked old tab must not resurrect progress after another tab resets');
   await front(b);
   await evalOn(b,`(()=>{
     const chooser=document.getElementById('import-normal-file');
@@ -184,6 +189,11 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   const backup=await evalOn(b,`localStorage.getItem(${JSON.stringify(key+'.restore-backup-v3')})`);
   assert.equal(backup,resetRaw,'restore must preserve the exact pre-restore reset bytes');
   await front(a);
-  await until(async()=>await evalOn(a,`document.querySelector('#energy').textContent.startsWith(${JSON.stringify(String(savedSnapshot.energy)+' /')})`),'other tab adopted restored save');
+  // Once blocked by a cross-tab reset, an old tab must reload to regain a
+  // verified baseline; merely receiving a later storage event is not enough.
+  await call('Page.reload',{ignoreCache:true},a.sessionId);
+  await until(async()=>await evalOn(a,`document.readyState==='complete'&&
+    document.getElementById('save-status')?.textContent.includes('已保存于此浏览器')&&
+    document.querySelector('#energy')?.textContent.startsWith(${JSON.stringify(String(savedSnapshot.energy)+' /')})`),'reloaded tab verified restored save');
   t.diagnostic(`Chromium two-tab lock, BFCache persisted=${bfcache}, download=${file}, reset/import/backup verified`);
 });
