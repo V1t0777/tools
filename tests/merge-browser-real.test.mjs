@@ -331,6 +331,7 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   await sleep(150);
   await evalOn(b,`(()=>{
     window.__touchTrace=[];
+    window.__mobilePointerDiagnostics=[];
     window.__boardMutations=0;
     new MutationObserver(records=>{window.__boardMutations+=records.length;})
       .observe(document.getElementById('board'),{childList:true});
@@ -353,6 +354,7 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     trace:window.__touchTrace,
     pickerHidden:document.getElementById('cancel-normal-import').hidden,
     mutations:window.__boardMutations,
+    pointerDiagnostics:window.__mobilePointerDiagnostics,
     revision:JSON.parse(localStorage.getItem('toolbox.merge-isle.local.v1')).revision
   })`);
   t.diagnostic('CDP touch after pointerdown: '+JSON.stringify(afterDown));
