@@ -57,6 +57,13 @@ function allowVisibleExport(){
     hint('页面处于后台或尚未恢复核验，请返回页面后重新点击导出');
     return false;
   }
+  // A native chooser, pending file read or restore confirmation may
+  // replace the save after this export is prepared. Wait for that intent
+  // to finish instead of downloading a soon-to-be-obsolete snapshot.
+  if(importPending()){
+    hint('正在选择或核验导入文件，请完成或取消后重新点击导出');
+    return false;
+  }
   // Never describe a snapshot as current while a locked action, startup,
   // clock, reset or restore may still be writing its final bytes.
   if(runtime.busy){
@@ -68,13 +75,13 @@ function allowVisibleExport(){
 // Read-only exact-byte recheck: this rejects known stale exports, but does
 // not pretend localStorage reads and native downloads are cross-tab atomic.
 function exportSourceStillCurrent(prepared,key){
-  if(pageSuspended()||runtime.busy)return false;
+  if(pageSuspended()||runtime.busy||importPending())return false;
   // A healthy normal-mode export must match the board the player has
   // actually reviewed. Corrupt/blocked saves remain exportable as evidence.
   if(key===SAVE_KEY&&runtime.phase==='ready'&&!runtime.blocked&&
       prepared.verified===true&&prepared.content!==runtime.raw)return false;
   const same=isPreparedExportUnchanged(prepared,()=>store?.getItem(key));
-  return same&&!pageSuspended()&&!runtime.busy;
+  return same&&!pageSuspended()&&!runtime.busy&&!importPending();
 }
 function allowCurrentExport(prepared,key){
   if(!allowVisibleExport())return false;
