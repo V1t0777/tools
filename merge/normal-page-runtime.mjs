@@ -259,9 +259,33 @@ export function createNormalPageRuntime({locks,storage,onVerified}={}) {
     // Storage, focus and BFCache hooks are read-only. No event writes back.
     reconcile() {
       if(phase!=='ready')return reject('STARTUP_REQUIRED');
+      // Capture the lifecycle generation BEFORE the first storage read.
+      // A synchronous storage shim may dispatch pagehide while returning
+      // unchanged bytes; that is never a fresh authorization for old buttons.
+      const inspectionEpoch=epoch;
       const fresh=peekLocalV3(storage);
+      if(epoch!==inspectionEpoch||phase!=='ready'||flight.blocked) {
+        block('RECONCILE_INVALIDATED');
+        return reject('RECONCILE_INVALIDATED');
+      }
       if(!fresh.ok){block(fresh.reason);return reject(fresh.reason);}
-      if(fresh.raw===raw)return Object.freeze({ok:true,changed:false});
+      if(fresh.raw===raw){
+        // The first getItem can return the old bytes while another tab
+        // replaces storage immediately afterwards. Unlike the changed-save
+        // path below, the unchanged fast path previously skipped readback.
+        let verifiedRaw;
+        try {verifiedRaw=storage.getItem(SAVE_KEY);}
+        catch {block('STORAGE_UNAVAILABLE');return reject('STORAGE_UNAVAILABLE');}
+        if(epoch!==inspectionEpoch||phase!=='ready'||flight.blocked) {
+          block('RECONCILE_INVALIDATED');
+          return reject('RECONCILE_INVALIDATED');
+        }
+        if(verifiedRaw!==raw){
+          block('CURRENT_SAVE_CHANGED');
+          return reject('CURRENT_SAVE_CHANGED');
+        }
+        return Object.freeze({ok:true,changed:false});
+      }
       if(flight.busy||resetBusy){
         block('CURRENT_SAVE_CHANGED');return reject('CURRENT_SAVE_CHANGED');
       }
