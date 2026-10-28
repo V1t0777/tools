@@ -377,5 +377,106 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   assert.equal(afterTouch.energy,beforeTouch.energy-1,'touch must consume exactly one energy');
   t.diagnostic('Chromium mobile-emulated physical touch protocol: exactly one producer write');
 
+
+  // P2.65ax: native touch drag, OS cancellation and fresh-touch recovery.
+  // Dispatch real CDP touch sequences, never synthetic DOM pointer events.
+  const dragGeometry=await evalOn(b,`(()=>{
+    const save=JSON.parse(localStorage.getItem("toolbox.merge-isle.local.v1"));
+    const from=save.board.findIndex(item=>item?.kind==='material');
+    if(from<0)throw Error('No material to drag');
+    const candidates=save.board.map((item,i)=>item?null:i).filter(i=>i!==null);
+    if(!candidates.length)throw Error('No empty destination');
+    const distance=i=>Math.hypot((i%7)-(from%7),Math.floor(i/7)-Math.floor(from/7));
+    const to=candidates.sort((x,y)=>distance(x)-distance(y))[0];
+    document.getElementById('board').scrollIntoView({block:'center'});
+    const center=i=>{
+      const r=document.querySelector('#board [data-slot="'+i+'"]').getBoundingClientRect();
+      return {x:r.left+r.width/2,y:r.top+r.height/2};
+    };
+    return {from,to,start:center(from),end:center(to)};
+  })()`);
+  for(const point of [dragGeometry.start,dragGeometry.end])
+    assert.ok(point.x>0&&point.x<390&&point.y>0&&point.y<844,'drag targets must be onscreen');
+  await sleep(160);
+  const beforeDrag=await readSave(b);
+  const movedItem=beforeDrag.board[dragGeometry.from];
+  assert.ok(movedItem?.kind==='material','native drag must start on material');
+  await call('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[
+    {...dragGeometry.start,id:2,radiusX:2,radiusY:2,force:1}
+  ]},b.sessionId);
+  await sleep(65);
+  await call('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[
+    {x:(dragGeometry.start.x+dragGeometry.end.x)/2,
+     y:(dragGeometry.start.y+dragGeometry.end.y)/2,id:2,radiusX:2,radiusY:2,force:1}
+  ]},b.sessionId);
+  await sleep(65);
+  await call('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[
+    {...dragGeometry.end,id:2,radiusX:2,radiusY:2,force:1}
+  ]},b.sessionId);
+  await sleep(65);
+  await call('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]},b.sessionId);
+  await until(async()=>(await readSave(b)).revision===beforeDrag.revision+1,
+    'native material drag persisted exactly once');
+  await sleep(250);
+  const afterDrag=await readSave(b);
+  assert.equal(afterDrag.revision,beforeDrag.revision+1,'native drag must not double-write');
+  assert.equal(afterDrag.board[dragGeometry.from],null,'drag source must be empty');
+  assert.deepEqual(afterDrag.board[dragGeometry.to],movedItem,'destination must retain material');
+  assert.equal(afterDrag.energy,beforeDrag.energy,'dragging must not spend energy');
+  assert.equal(await evalOn(b,`document.querySelectorAll('.drag-ghost').length`),0,
+    'drag ghost must be removed after pointerup');
+
+  // OS touch cancellation must never commit a half-finished move.
+  const cancelGeometry=await evalOn(b,`(()=>{
+    const save=JSON.parse(localStorage.getItem("toolbox.merge-isle.local.v1"));
+    const from=${dragGeometry.to};
+    const to=save.board.findIndex((item,i)=>!item&&i!==from);
+    if(to<0)throw Error('No empty cancellation target');
+    document.getElementById('board').scrollIntoView({block:'center'});
+    const center=i=>{
+      const r=document.querySelector('#board [data-slot="'+i+'"]').getBoundingClientRect();
+      return {x:r.left+r.width/2,y:r.top+r.height/2};
+    };
+    return {start:center(from),end:center(to)};
+  })()`);
+  for(const point of [cancelGeometry.start,cancelGeometry.end])
+    assert.ok(point.x>0&&point.x<390&&point.y>0&&point.y<844,'cancel targets must be onscreen');
+  await sleep(120);
+  await call('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[
+    {...cancelGeometry.start,id:3,radiusX:2,radiusY:2,force:1}
+  ]},b.sessionId);
+  await sleep(65);
+  await call('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[
+    {...cancelGeometry.end,id:3,radiusX:2,radiusY:2,force:1}
+  ]},b.sessionId);
+  await sleep(65);
+  await call('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]},b.sessionId);
+  await sleep(300);
+  const afterCancel=await readSave(b);
+  assert.deepEqual(afterCancel,afterDrag,'OS touch cancellation must preserve save');
+  assert.equal(await evalOn(b,`document.querySelectorAll('.drag-ghost').length`),0,
+    'cancelled touch must remove the ghost');
+  const newProducer=await evalOn(b,`(()=>{
+    const el=document.querySelector('#board .producer');
+    el.scrollIntoView({block:'center'});
+    const r=el.getBoundingClientRect();
+    return {x:r.left+r.width/2,y:r.top+r.height/2};
+  })()`);
+  await sleep(140);
+  await call('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[
+    {...newProducer,id:4,radiusX:2,radiusY:2,force:1}
+  ]},b.sessionId);
+  await sleep(65);
+  await call('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]},b.sessionId);
+  await until(async()=>(await readSave(b)).revision===afterCancel.revision+1,
+    'fresh producer touch after cancellation');
+  await sleep(250);
+  const afterRecovery=await readSave(b);
+  assert.equal(afterRecovery.revision,afterCancel.revision+1,
+    'fresh touch after cancellation must commit only once');
+  assert.equal(afterRecovery.energy,afterCancel.energy-1,
+    'fresh touch after cancellation must consume exactly one energy');
+  t.diagnostic('Chromium native touch drag, touchCancel and fresh-touch recovery passed');
+
   t.diagnostic(`Chromium two-tab lock, BFCache persisted=${bfcache}, download=${file}, reset/import/backup verified`);
 });

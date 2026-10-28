@@ -19,3 +19,8 @@
 - 原因：触摸浏览器在正常点按结束后会自动释放**隐式指针捕获**，但 `lostpointercapture` 处理器无条件撤销棋盘点击许可，即使没有进行中的材料拖拽。
 - 修复：只有仍存在且 pointerId 匹配的**未完成拖拽**才在捕获丢失时取消；普通生产器、空格和材料轻触的正常捕获释放不再误撤销点击许可。保留 `pointercancel`、页面隐藏、BFCache、存档基线变更的旧触控拒绝。
 - 最终验收要求：真实 Chromium 390px 移动视口通过 `Input.dispatchTouchEvent` 触摸生产器，恰好一次 revision +1、体力 -1，且短暂等待后无第二次写入。必须核对最终 SHA 的 Actions 日志；不能将本轮诊断中间提交的失败视为通过。
+
+## P2.65ax｜触摸拖拽与取消专项回归（2026-10-29）
+- 在真实 Chromium 移动视口下，使用 CDP `Input.dispatchTouchEvent` 执行材料拖至空格，验证仅一次 revision 写入、源格清空、目标材料等价、体力不变、拖拽浮层清理。
+- 模拟 OS 中断触发 `touchCancel`，验证中断前后存档状态一致、无浮层残留；随后再次真实触摸生产器，验证仅一次写入与一次体力扣除。
+- 属于 Chromium 触摸事件自动化，不等同于 iPhone Safari/微信 WebView 物理触控；仍需真机验收。最终 HEAD 三项 CI 均成功后才可报告通过。
