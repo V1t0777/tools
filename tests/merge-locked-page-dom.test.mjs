@@ -2069,3 +2069,68 @@ test('P2.65ap BFCache invalidates reset pointer begun before pagehide',async()=>
   assert.equal(confirmations,1,'fresh pointer may confirm reset');
   assert.equal(h.saved().revision,0);
 });
+
+
+test('P2.65aq chooser lease blocks all three save exports until explicit cancellation',async()=>{
+  const h=await mount(),before=h.writes.length,original=h.storage.getItem(SAVE_KEY);
+  const controls=h.id('export-local-save').parentElement.children;
+  controls.find(e=>e.id==='import-normal-save').click();
+  for(const id of ['export-local-save','export-abnormal-reset-backup','export-restore-backup']){
+    h.id(id).click();
+    assert.match(h.id('notice').textContent,/正在选择或核验导入文件/,id);
+  }
+  assert.equal(h.writes.length,before,'read-only export refusal cannot write');
+  assert.equal(h.storage.getItem(SAVE_KEY),original);
+  controls.find(e=>e.id==='import-normal-file').dispatch('cancel');
+  h.id('export-local-save').click();
+  assert.doesNotMatch(h.id('notice').textContent,/正在选择或核验导入文件/);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});
+
+test('P2.65aq pending file read blocks export; cancellation and late data cannot write',async()=>{
+  const h=await mount(),original=h.storage.getItem(SAVE_KEY);
+  const controls=h.id('export-local-save').parentElement.children;
+  const input=controls.find(e=>e.id==='import-normal-file');
+  const imported=JSON.stringify({...h.saved(),coins:127,revision:1});
+  let resolveRead;
+  controls.find(e=>e.id==='import-normal-save').click();
+  input.files=[{size:imported.length,text:()=>new Promise(resolve=>{resolveRead=resolve;})}];
+  input.dispatch('change');await settle();
+  assert.equal(typeof resolveRead,'function');
+  const before=h.writes.length;
+  for(const id of ['export-local-save','export-abnormal-reset-backup','export-restore-backup']){
+    h.id(id).click();
+    assert.match(h.id('notice').textContent,/正在选择或核验导入文件/,id);
+  }
+  controls.find(e=>e.id==='cancel-normal-import').click();
+  resolveRead(imported);await settle();
+  assert.equal(h.writes.length,before,'late read and refused exports must not write');
+  assert.equal(h.storage.getItem(SAVE_KEY),original);
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null);
+  h.id('export-local-save').click();
+  assert.doesNotMatch(h.id('notice').textContent,/正在选择或核验导入文件/);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});
+
+test('P2.65aq chooser opened reentrantly during export preflight blocks download',async()=>{
+  const h=await mount(),original=h.storage.getItem(SAVE_KEY);
+  const controls=h.id('export-local-save').parentElement.children;
+  const read=h.storage.getItem.bind(h.storage);
+  let injected=false;
+  h.storage.getItem=key=>{
+    const value=read(key);
+    if(key===SAVE_KEY&&!injected){
+      injected=true;
+      controls.find(e=>e.id==='import-normal-save').click();
+    }
+    return value;
+  };
+  const before=h.writes.length;
+  h.id('export-local-save').click();
+  assert.equal(injected,true,'chooser opened after the first export authorization');
+  assert.match(h.id('notice').textContent,/正在选择或核验导入文件/);
+  assert.equal(h.writes.length,before);
+  assert.equal(h.storage.getItem(SAVE_KEY),original);
+  controls.find(e=>e.id==='import-normal-file').dispatch('cancel');
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});

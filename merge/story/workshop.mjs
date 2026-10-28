@@ -323,7 +323,12 @@ $('workshop-next-action').addEventListener('click',event=>{
   }
   const story=readStorySave(storage);
   const workshop=readStoryWorkshop(storage);
-  if(pageSuspended()||!isStoryWorkshopRouteCurrent(snapshot,story,workshop)){
+  // A peer tab may replace the narrative while the workshop read is in
+  // progress, before its storage event arrives. Re-read the first snapshot
+  // after the second read so an obsolete chapter link cannot be followed.
+  const storyAfterWorkshop=readStorySave(storage);
+  if(pageSuspended()||storyAfterWorkshop.raw!==story.raw||
+    !isStoryWorkshopRouteCurrent(snapshot,storyAfterWorkshop,workshop)){
     event.preventDefault();
     if(pageSuspended())return;
     if(workshop.blocked||workshop.raw!==raw){

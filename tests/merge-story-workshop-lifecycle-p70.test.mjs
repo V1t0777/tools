@@ -431,3 +431,43 @@ test('P107 a story-save refresh invalidates a held persistent reset pointer',asy
     assert.equal(h.data.get(SAVE_KEY),'normal-sentinel');
   }finally{h.restore();}
 });
+
+
+// P108: the narrative may change synchronously while the second save is read.
+// This fault injection uses the real workshop DOM click handler; it is not
+// a real Safari/WebView or cross-tab atomicity test.
+for(const corrupt of [false,true]){
+  test('P108 route rejects a peer narrative replacement during workshop preflight ('+
+    (corrupt?'corrupt':'valid raw revision')+')',async()=>{
+    const h=await mount();
+    try{
+      const progress=startCoreStory(createEmptyStoryProgress(),CORE_STORY_PACK);
+      const initial=JSON.stringify(progress);
+      h.data.set(STORY_SAVE_KEY,initial);
+      await h.window.emit('storage',{key:STORY_SAVE_KEY,storageArea:h.window.localStorage});
+      const link=h.document.getElementById('workshop-next-action');
+      assert.equal(link.hidden,false,'valid first-volume route should be visible');
+      const original=h.window.localStorage.getItem.bind(h.window.localStorage);
+      const replacement=corrupt?'{broken-peer-story':initial+' ';
+      let injected=false;
+      h.window.localStorage.getItem=key=>{
+        const value=original(key);
+        if(key===STORY_WORKSHOP_KEY&&!injected){
+          injected=true;
+          h.data.set(STORY_SAVE_KEY,replacement);
+        }
+        return value;
+      };
+      const click=await link.fire('click');
+      assert.equal(injected,true);
+      assert.equal(click.defaultPrevented,true,
+        'a route derived before a peer edit must not navigate');
+      assert.equal(h.writes,0);
+      assert.equal(h.data.get(STORY_SAVE_KEY),replacement);
+      assert.equal(h.data.get(SAVE_KEY),'normal-sentinel');
+      assert.match(h.notice(),/旧链接已取消/);
+      if(corrupt)assert.equal(link.hidden,true,
+        'corrupt story must not advertise a chapter route');
+    }finally{h.restore();}
+  });
+}
