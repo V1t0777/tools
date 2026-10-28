@@ -214,3 +214,32 @@ test('P84 reset committed before a delayed hidden event cannot announce success'
     assert.equal(h.writes,1,'resuming must not automatically replay reset');
   }finally{h.restore();}
 });
+
+test('P99 workshop BFCache resume rejects pagehide during an unchanged storage read',async()=>{
+  const h=await mount();
+  try{
+    await h.window.emit('pagehide');
+    const original=h.window.localStorage.getItem.bind(h.window.localStorage);
+    let injected=false;
+    h.window.localStorage.getItem=key=>{
+      const value=original(key);
+      if(key===STORY_WORKSHOP_KEY&&!injected){
+        injected=true;
+        h.window.emit('pagehide');
+      }
+      return value;
+    };
+    await h.window.emit('pageshow',{persisted:true});
+    assert.equal(injected,true);
+    assert.equal(h.document.getElementById('reset-workshop').disabled,true);
+    await h.reset();
+    assert.equal(h.writes,0);
+    assert.equal(h.data.has(STORY_WORKSHOP_KEY),false);
+    h.window.localStorage.getItem=original;
+    await h.window.emit('pageshow',{persisted:true});
+    await h.reset();
+    assert.equal(h.writes,1);
+    assert.equal(h.data.get(SAVE_KEY),'normal-sentinel');
+    assert.equal(h.data.get(STORY_SAVE_KEY),'story-sentinel');
+  }finally{h.restore();}
+});

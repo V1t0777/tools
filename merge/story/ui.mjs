@@ -34,6 +34,7 @@ let saving=false,storageEpoch=0;
 // A hidden or BFCache page cannot authorize queued story writes.
 // A visible pageshow is required after pagehide before resuming.
 let pageGone=false,visibilitySuspended=false,resumePending=false;
+let lifecycleEpoch=0; // only pagehide/hidden increments; daily-pin adoption may advance storageEpoch
 const pageSuspended=()=>pageGone||visibilitySuspended||document.visibilityState==='hidden';
 let pinQueued=false;
 let kind=readStoryHash(window.location.hash).kind;
@@ -570,6 +571,7 @@ $('reset-story').addEventListener('click',async()=>{
 function recheckStoryOnResume(){
   // A hidden pageshow is not permission to resume a BFCache document.
   if(document.visibilityState==='hidden'||(pageGone&&!resumePending))return;
+  const resumeLifecycleEpoch=lifecycleEpoch;
   shownDay=localDay();
   selectedIncidentDay=null;
   let snapshotOk=false;
@@ -612,6 +614,10 @@ function recheckStoryOnResume(){
     selected=null;selectedChoice=null;selectedIncidentDay=null;
     if($('story-dialog').open)$('story-dialog').close();
   }
+  // A synchronous storage read can dispatch pagehide/visibilitychange.
+  // An unchanged snapshot never licenses the old BFCache return to resume.
+  if(lifecycleEpoch!==resumeLifecycleEpoch||document.visibilityState==='hidden'||
+    (pageGone&&!resumePending))return;
   pageGone=false;visibilitySuspended=false;resumePending=false;
   render();
 }
@@ -633,6 +639,7 @@ window.setInterval(()=>{
   if(document.visibilityState==='visible')refreshIncidentDay();
 },30_000);
 function suspendStoryPage({gone=false}={}){
+  lifecycleEpoch++;
   if(gone){pageGone=true;resumePending=false;}
   else visibilitySuspended=true;
   storageEpoch++; // invalidate every pending story Web Lock callback

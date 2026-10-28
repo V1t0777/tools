@@ -25,6 +25,7 @@ let renderGeneration=0;
 // Pagehide/hidden must suspend queued DOM actions until a visible, read-only
 // save recheck. A hidden BFCache pageshow alone never resumes writes.
 let pageGone=false,visibilitySuspended=false,resumePending=false;
+let lifecycleEpoch=0; // do not clear a new suspension triggered during a save read
 const pageSuspended=()=>pageGone||visibilitySuspended||document.visibilityState==='hidden';
 const guardRenderedAction=createWorkshopRenderedActionGuard(
   ()=>renderGeneration,
@@ -436,6 +437,7 @@ function recheckWorkshopOnResume(){
   // A pagehide requires an actual pageshow; visibility/focus alone is not a
   // trusted BFCache return. Never inspect hidden pages to enable controls.
   if(document.visibilityState==='hidden'||(pageGone&&!resumePending))return;
+  const resumeLifecycleEpoch=lifecycleEpoch;
   if(!blocked){
     const check=checkStoryResumeSnapshot(storage,{key:STORY_WORKSHOP_KEY,expectedRaw:raw});
     if(!check.ok){
@@ -445,10 +447,15 @@ function recheckWorkshopOnResume(){
       return;
     }
   }
+  // Storage getItem() may synchronously fire pagehide or hidden visibility.
+  // Keep controls suspended until a NEW visible return verifies the snapshot.
+  if(lifecycleEpoch!==resumeLifecycleEpoch||document.visibilityState==='hidden'||
+    (pageGone&&!resumePending))return;
   pageGone=false;visibilitySuspended=false;resumePending=false;
   render();
 }
 function suspendWorkshopPage({gone=false}={}){
+  lifecycleEpoch++;
   if(gone){pageGone=true;resumePending=false;}
   else visibilitySuspended=true;
   // An in-flight Web Lock must not publish a success after page suspension.

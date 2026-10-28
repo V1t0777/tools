@@ -163,3 +163,63 @@ test('P78 lifecycle contract suspends story writes, daily pin and damaged export
   assert.ok(ui.includes("if(document.visibilityState==='hidden'||(pageGone&&!resumePending))return;"));
   assert.equal(ui.includes('innerHTML'),false);
 });
+
+test('P99 story BFCache resume rejects pagehide during an unchanged storage read',async()=>{
+  const h=await mount();
+  try{
+    await h.window.emit('pagehide');
+    const original=h.window.localStorage.getItem.bind(h.window.localStorage);
+    let injected=false;
+    h.window.localStorage.getItem=key=>{
+      const value=original(key);
+      if(key===STORY_SAVE_KEY&&!injected){
+        injected=true;
+        h.window.emit('pagehide');
+      }
+      return value;
+    };
+    await h.window.emit('pageshow',{persisted:true});
+    assert.equal(injected,true);
+    assert.equal(h.document.getElementById('reset-story').disabled,true);
+    await h.reset();
+    assert.deepEqual(h.writes,[]);
+    assert.equal(h.data.get(STORY_SAVE_KEY),h.original);
+    h.window.localStorage.getItem=original;
+    await h.window.emit('pageshow',{persisted:true});
+    await h.reset();
+    assert.deepEqual(h.writes,[STORY_SAVE_KEY]);
+    assert.equal(h.data.get(SAVE_KEY),'normal-sentinel');
+    assert.equal(h.data.get(STORY_WORKSHOP_KEY),'workshop-sentinel');
+  }finally{h.restore();}
+});
+
+test('P99 story visible return rejects hidden event during unchanged storage read',async()=>{
+  const h=await mount();
+  try{
+    h.document.visibilityState='hidden';
+    await h.document.emit('visibilitychange');
+    h.document.visibilityState='visible';
+    const original=h.window.localStorage.getItem.bind(h.window.localStorage);
+    let injected=false;
+    h.window.localStorage.getItem=key=>{
+      const value=original(key);
+      if(key===STORY_SAVE_KEY&&!injected){
+        injected=true;
+        h.document.visibilityState='hidden';
+        h.document.emit('visibilitychange');
+      }
+      return value;
+    };
+    await h.document.emit('visibilitychange');
+    assert.equal(injected,true);
+    assert.equal(h.document.getElementById('reset-story').disabled,true);
+    await h.reset();
+    assert.deepEqual(h.writes,[]);
+    h.window.localStorage.getItem=original;
+    h.document.visibilityState='visible';
+    await h.document.emit('visibilitychange');
+    await h.reset();
+    assert.deepEqual(h.writes,[STORY_SAVE_KEY]);
+    assert.equal(h.data.get(SAVE_KEY),'normal-sentinel');
+  }finally{h.restore();}
+});
