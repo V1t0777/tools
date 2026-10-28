@@ -5,7 +5,7 @@ import {SAVE_KEY,ABNORMAL_RESET_BACKUP_KEY} from '../merge/storage.mjs';
 import {RESTORE_BACKUP_KEY} from '../merge/save-restore-backup.mjs';
 import {STORY_SAVE_KEY} from '../merge/mode-boundaries.mjs';
 import {NORMAL_SAVE_LOCK_NAME} from '../merge/normal-save-lock.mjs';
-import {createInitialState,storeItem} from '../merge/engine.mjs';
+import {createInitialState,storeItem,MAX_ENERGY,ENERGY_REGEN_MS} from '../merge/engine.mjs';
 
 class Element {
   constructor(tag='div') {
@@ -1822,4 +1822,84 @@ test('P2.65al no-op import abort on visibility hide cannot restore late file',as
     assert.equal(h.writes.length,before);
     assert.match(h.id('save-status').textContent,/已暂停/);
   }finally{globalThis.AbortController=NativeController;}
+});
+
+test('P2.65am pending native import chooser blocks reset and ordinary action until cancelled',async()=>{
+  const h=await mount();
+  const controls=h.id('export-local-save').parentElement.children;
+  const importButton=controls.find(e=>e.id==='import-normal-save');
+  const cancel=controls.find(e=>e.id==='cancel-normal-import');
+  const original=h.storage.getItem(SAVE_KEY),before=h.writes.length;
+  let confirmations=0;
+  h.win.confirm=()=>{confirmations++;return true;};
+  importButton.click();
+  assert.equal(cancel.hidden,false);
+  h.id('reset').click();
+  h.id('board').dispatch('click',{target:h.id('board').children[42],detail:1});
+  await settle();
+  assert.equal(confirmations,0,'reset must not confirm over a native chooser');
+  assert.equal(h.storage.getItem(SAVE_KEY),original);
+  assert.equal(h.writes.length,before,'no ordinary writer may race a chooser');
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  cancel.click();
+  assert.equal(cancel.hidden,true);
+  h.id('board').dispatch('click',{target:h.id('board').children[42],detail:1});
+  await settle();
+  assert.equal(h.saved().revision,1,'fresh action is allowed after explicit cancel');
+});
+
+test('P2.65am pending file read blocks clock, reset and player write without losing restore',async()=>{
+  const seed=createInitialState(Date.now()-1_000_000);
+  seed.energy=MAX_ENERGY-1;
+  seed.energyAt=Date.now()-ENERGY_REGEN_MS*2;
+  const h=await mount({initialRaw:JSON.stringify(seed)});
+  const controls=h.id('export-local-save').parentElement.children;
+  const button=controls.find(e=>e.id==='import-normal-save');
+  const input=controls.find(e=>e.id==='import-normal-file');
+  const target=JSON.stringify({...h.saved(),coins:87,revision:1});
+  let release,confirmations=0;
+  h.win.confirm=()=>{confirmations++;return true;};
+  button.click();
+  input.files=[{size:target.length,text:()=>new Promise(resolve=>{release=resolve;})}];
+  input.dispatch('change');
+  await settle();
+  assert.equal(typeof release,'function');
+  const before=h.writes.length,original=h.storage.getItem(SAVE_KEY);
+  await h.win.timer();
+  h.id('reset').click();
+  h.id('board').dispatch('click',{target:h.id('board').children[42],detail:1});
+  await settle();
+  assert.equal(confirmations,0,'only the later restore confirmation may appear');
+  assert.equal(h.storage.getItem(SAVE_KEY),original);
+  assert.equal(h.writes.length,before,'timer and gestures cannot alter an in-flight import baseline');
+  release(target);
+  await settle();
+  assert.equal(confirmations,1,'the import receives exactly its own confirmation');
+  assert.equal(h.storage.getItem(SAVE_KEY),target,'the original file remains restorable');
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});
+
+test('P2.65am explicit import cancel releases single-flight gate without replaying late file',async()=>{
+  const h=await mount();
+  const controls=h.id('export-local-save').parentElement.children;
+  const button=controls.find(e=>e.id==='import-normal-save');
+  const input=controls.find(e=>e.id==='import-normal-file');
+  const cancel=controls.find(e=>e.id==='cancel-normal-import');
+  const original=h.storage.getItem(SAVE_KEY),before=h.writes.length;
+  const target=JSON.stringify({...h.saved(),coins:99,revision:1});
+  let release;
+  button.click();
+  input.files=[{size:target.length,text:()=>new Promise(resolve=>{release=resolve;})}];
+  input.dispatch('change');
+  await settle();
+  assert.equal(typeof release,'function');
+  cancel.click();
+  release(target);
+  await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),original);
+  assert.equal(h.writes.length,before,'cancelled file cannot restore later');
+  h.id('board').dispatch('click',{target:h.id('board').children[42],detail:1});
+  await settle();
+  assert.equal(h.saved().revision,1,'a fresh ordinary action can proceed after cancellation');
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
 });

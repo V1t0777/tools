@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {STORY_WORKSHOP_KEY} from '../merge/story/workshop-storage.mjs';
-import {STORY_SAVE_KEY} from '../merge/mode-boundaries.mjs';
+import {STORY_SAVE_KEY,createEmptyStoryProgress} from '../merge/mode-boundaries.mjs';
+import {CORE_STORY_PACK} from '../merge/story/core-pack.mjs';
+import {startCoreStory} from '../merge/story/runtime.mjs';
 import {SAVE_KEY} from '../merge/storage.mjs';
 
 // Runs the actual story workshop entry module with an event-capable DOM.
@@ -278,4 +280,59 @@ test('P100 workshop reset preserves an independent peer narrative update',async(
     assert.equal(h.data.get(SAVE_KEY),'normal-sentinel');
     assert.equal(typeof h.data.get(STORY_WORKSHOP_KEY),'string');
   }finally{h.restore();}
+});
+
+// A browser may deliver pagehide/visibilitychange synchronously while a
+// prerequisite localStorage.getItem() runs. The real DOM must not re-enable
+// stale board controls after the nested suspension render has completed.
+async function checkNarrativeReadSuspension(kind){
+  const h=await mount();
+  try{
+    const progress=startCoreStory(createEmptyStoryProgress(),CORE_STORY_PACK);
+    h.data.set(STORY_SAVE_KEY,JSON.stringify(progress));
+    await h.window.emit('storage',{key:STORY_SAVE_KEY,storageArea:h.window.localStorage});
+    const link=h.document.getElementById('workshop-next-action');
+    assert.equal(link.hidden,false,'valid story should initially offer a route');
+    const original=h.window.localStorage.getItem.bind(h.window.localStorage);
+    let injected=false;
+    h.window.localStorage.getItem=key=>{
+      const value=original(key);
+      if(key===STORY_SAVE_KEY&&!injected){
+        injected=true;
+        if(kind==='pagehide')void h.window.emit('pagehide');
+        else{
+          h.document.visibilityState='hidden';
+          void h.document.emit('visibilitychange');
+        }
+      }
+      return value;
+    };
+    await h.window.emit('storage',{key:STORY_SAVE_KEY,storageArea:h.window.localStorage});
+    assert.equal(injected,true,'fault must run inside narrative getItem');
+    assert.equal(link.hidden,true,'suspended page cannot advertise navigation');
+    assert.equal(h.document.getElementById('reset-workshop').disabled,true);
+    const board=h.document.getElementById('workshop-board').children[0];
+    assert.equal(board.children.length,56);
+    assert.equal(board.children.every(cell=>cell.disabled),true,
+      'all rendered board cells must remain disabled after nested page suspension');
+    assert.equal(h.writes,0);
+    assert.equal(h.data.get(SAVE_KEY),'normal-sentinel');
+    h.window.localStorage.getItem=original;
+    if(kind==='pagehide')await h.window.emit('pageshow',{persisted:true});
+    else{
+      h.document.visibilityState='visible';
+      await h.document.emit('visibilitychange');
+    }
+    assert.equal(link.hidden,false,'visible, rechecked return restores read-only route');
+    assert.equal(h.document.getElementById('reset-workshop').disabled,false);
+    assert.equal(h.writes,0,'resuming must never write a save automatically');
+  }finally{h.restore();}
+}
+
+test('P104 workshop route and board remain suspended if story read triggers pagehide',async()=>{
+  await checkNarrativeReadSuspension('pagehide');
+});
+
+test('P104 workshop route and board remain suspended if story read hides page',async()=>{
+  await checkNarrativeReadSuspension('hidden');
 });

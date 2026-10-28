@@ -45,6 +45,10 @@ function status(){
 }
 function render(){
   renderGeneration++;
+  // Reading a narrative prerequisite can synchronously dispatch pagehide or
+  // visibilitychange in a mobile browser. Recompute the suspended state AFTER
+  // this read, before constructing any enabled controls or navigation links.
+  const narrative=readStorySave(storage);
   const disabled=blocked||saving||pageSuspended();
   status();
   $('energy').textContent=state.energy+' / '+MAX_ENERGY;
@@ -191,7 +195,6 @@ function render(){
     row.append(mark,btn);list.append(row);
   }
   const garden=BUILDINGS.garden,level=getLevel(state.xp),built=state.buildings.garden===1;
-  const narrative=readStorySave(storage);
   // Read-only first-volume route; a link is never an unlock or save command.
   // Always derive it from the current narrative read and this workshop view.
   const nextAction=nextStoryWorkshopAction(narrative,{state,raw,blocked,reason});

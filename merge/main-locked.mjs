@@ -106,6 +106,9 @@ function handleTransactionResult(result,kind){
 }
 async function commit(operation){
   if(pageSuspended()){hint('页面处于后台，请返回并核验进度后重试');return;}
+  // A native chooser or file preflight is an active destructive intent.
+  // Do not let an ordinary action change the baseline before confirmation.
+  if(importPending()){hint('正在选择或核验导入文件，请先完成或取消导入后再经营');return;}
   if(saveIssue||runtime.busy){hint('存档尚未就绪或正在安全保存，请稍后重试');return;}
   // A newly adopted cross-tab snapshot invalidates the old UI button's
   // captured target, even if its revision is otherwise safe to adopt.
@@ -627,6 +630,7 @@ byId('export-abnormal-reset-backup').addEventListener('click', () => {
 // a generous grace period for delayed 'change'; never authorize a stale file.
 const IMPORT_PICKER_RETURN_GRACE_MS=15_000;
 let importEpoch=0,importBusy=false,importPicker=null,queuedHiddenSelection=null;
+const importPending=()=>importBusy||importPicker!==null||queuedHiddenSelection!==null;
 let activeImportRead=null;
 let deliverHiddenSelection=()=>{};
 let releaseOrphanedPickerAfterReturn=()=>{};
@@ -939,6 +943,9 @@ if(saveActions){
 
 byId('reset').addEventListener('click',async()=>{
   if(pageSuspended()){hint('页面处于后台，请返回并核验进度后重试');return;}
+  // Do not show a destructive reset confirmation over a native file chooser
+  // or while a selected save is being read/confirmed for restoration.
+  if(importPending()){hint('导入文件尚未处理完毕，请先完成或取消导入再重置');return;}
   if(runtime.busy){hint('正在保存，暂不能重置');return;}
   const damaged=saveIssue==='CORRUPT_SAVE'||saveIssue==='UNSUPPORTED_OR_CORRUPT_SAVE';
   if(saveIssue&&!damaged){
@@ -994,7 +1001,7 @@ if(store)lifecycle=attachNormalPageLifecycle({
 });
 let timerPending=false;
 window.setInterval(async()=>{
-  if(pageSuspended()||saveIssue||runtime.busy||timerPending)return;
+  if(pageSuspended()||saveIssue||runtime.busy||importPending()||timerPending)return;
   timerPending=true;
   try{
     if(!revalidateResumedSave())return;
