@@ -94,6 +94,12 @@ export async function performNormalSaveImport({
   if(fileText.length>MAX_LOCAL_SAVE_BYTES)return reject('FILE_TOO_LARGE');
   const preview=previewNormalSaveImport(fileText,storage,{expectedRaw});
   if(!preview.ok)return preview;
+  // The read-only preflight can synchronously trigger a storage shim,
+  // pagehide, or another tab's replacement. Never show a destructive
+  // confirmation based on a snapshot that was invalidated DURING preview.
+  // The locked restore still rechecks the baseline after confirmation.
+  const afterPreview=inspect();
+  if(afterPreview)return reject(afterPreview);
   // Explicitly describe destructive replacement and preserved backup.
   const message=`即将用所选普通模式存档（修订 ${preview.sourceRevision}）替换当前进度（修订 ${preview.currentRevision}）。\n恢复前原始存档将保留在独立备份槽；若备份槽存在不同内容则拒绝恢复。\n请先确认已导出当前原始存档，是否继续？`;
   try{if(confirm(message)!==true)return reject('USER_CANCELLED');}

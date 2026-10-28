@@ -170,3 +170,54 @@ test('P2.65p backgrounding during confirmation cannot restore',async()=>{
   assert.equal(f.calls.length,0);
   assert.equal(f.map.get(SAVE_KEY),f.current);
 });
+
+test('P2.65ag preview-time pagehide invalidates import before any confirmation',async()=>{
+  const f=fixture();let epoch=0,confirms=0;
+  f.config.getEpoch=()=>epoch;
+  f.config.confirm=()=>{confirms++;return true;};
+  const original=f.config.storage.getItem;
+  f.config.storage.getItem=key=>{
+    const value=original(key);
+    if(key===SAVE_KEY)epoch++;
+    return value;
+  };
+  assert.equal((await performNormalSaveImport(f.config)).reason,'PAGE_SUSPENDED');
+  assert.equal(confirms,0,'stale preview must not open a native confirm');
+  assert.equal(f.calls.length,0,'restore must not be authorized');
+  assert.equal(f.map.get(SAVE_KEY),f.current);
+  assert.equal(f.map.get(STORY_SAVE_KEY),'story-untouched');
+});
+
+test('P2.65ag preview-time cross-tab replacement never opens stale confirmation',async()=>{
+  const f=fixture();let confirms=0;
+  const newer=JSON.stringify({...createInitialState(1),revision:9,coins:99});
+  f.config.confirm=()=>{confirms++;return true;};
+  f.config.revalidate=()=>f.map.get(SAVE_KEY)===f.config.runtime.raw;
+  const original=f.config.storage.getItem;
+  f.config.storage.getItem=key=>{
+    const value=original(key);
+    if(key===SAVE_KEY)f.map.set(SAVE_KEY,newer);
+    return value;
+  };
+  assert.equal((await performNormalSaveImport(f.config)).reason,'SAVE_CHANGED');
+  assert.equal(confirms,0,'changed raw save must not be presented as reviewed');
+  assert.equal(f.calls.length,0);
+  assert.equal(f.map.get(SAVE_KEY),newer,'do not overwrite the other tab');
+  assert.equal(f.map.get(STORY_SAVE_KEY),'story-untouched');
+});
+
+test('P2.65ag preview-time abort cannot proceed to confirmation or restore',async()=>{
+  const f=fixture(),controller=new AbortController();let confirms=0;
+  f.config.signal=controller.signal;
+  f.config.confirm=()=>{confirms++;return true;};
+  const original=f.config.storage.getItem;
+  f.config.storage.getItem=key=>{
+    const value=original(key);
+    if(key===SAVE_KEY)controller.abort();
+    return value;
+  };
+  assert.equal((await performNormalSaveImport(f.config)).reason,'PAGE_SUSPENDED');
+  assert.equal(confirms,0);
+  assert.equal(f.calls.length,0);
+  assert.equal(f.map.get(SAVE_KEY),f.current);
+});
