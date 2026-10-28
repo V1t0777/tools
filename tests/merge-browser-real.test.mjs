@@ -155,6 +155,10 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   // Only the OS file chooser and confirmation are test-injected; File.text(),
   // Web Locks, localStorage, the page runtime and both tabs remain native.
   await front(b);
+  // A just committed another producer action. A reset confirmation must be
+  // made against the latest reviewed B-tab board, not a stale UI that will
+  // correctly reject its first destructive click during reconciliation.
+  await until(async()=>await evalOn(b,`document.querySelector('#energy').textContent.startsWith(${JSON.stringify(String(savedSnapshot.energy)+' /')})`),'reset tab adopted latest progress');
   await evalOn(b,`window.confirm=()=>true;document.getElementById('reset').click();true`);
   await until(async()=>{
     const current=await readSave(b);
