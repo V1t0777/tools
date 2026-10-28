@@ -183,5 +183,47 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     assert.equal(await readRaw(b,storyKey),storyRaw,'story progress must survive corruption');
     assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel',
       'normal mode must remain untouched');
-    t.diagnostic('Real Chromium: 2 main scenes, first-order lock, 56-cell board, two-tab fail-closed, corrupt .txt saved; no mobile claim');
+
+    // P113: independent narrative evidence in a real browser; the damaged
+    // workshop record must survive every narrative operation below.
+    await navigate(b,'/merge/story.html','#journey-read');
+    await until(async()=>evalOn(b,"document.getElementById('save-state').textContent.includes('已保存')"),
+      'narrative loaded before deliberate corruption');
+    const damagedStory='{broken-dialogue-save';
+    await evalOn(b,'localStorage.setItem('+JSON.stringify(storyKey)+','+JSON.stringify(damagedStory)+');true');
+    await call('Page.reload',{ignoreCache:true},b.sessionId);
+    await until(async()=>evalOn(b,"document.getElementById('save-state')?.textContent.includes('异常剧情存档')"),
+      'corrupt narrative detected');
+    assert.equal(await evalOn(b,"document.getElementById('export-corrupt-story').disabled"),false);
+    assert.equal(await evalOn(b,"document.getElementById('journey-read').hidden"),true,
+      'corrupt narrative must not expose next-scene reading');
+
+    await evalOn(b,"window.confirm=()=>false;document.getElementById('export-corrupt-story').click();true");
+    assert.equal((await readdir(temp)).some(name=>name.startsWith('yunyu-story-dialogue-corrupt-save')),false,
+      'declined export must not create a file');
+    assert.equal(await readRaw(b,storyKey),damagedStory);
+
+    // Mutation during native confirmation invalidates the previously shown
+    // raw snapshot, even if a storage event has not arrived yet.
+    const changedStory='{peer-replaced-broken-dialogue';
+    await evalOn(b,'window.confirm=()=>{localStorage.setItem('+
+      JSON.stringify(storyKey)+','+JSON.stringify(changedStory)+');return true;};'+
+      "document.getElementById('export-corrupt-story').click();true");
+    assert.equal(await readRaw(b,storyKey),changedStory);
+    assert.equal((await readdir(temp)).some(name=>name.startsWith('yunyu-story-dialogue-corrupt-save')),false,
+      'stale confirmation must not create a narrative evidence file');
+
+    await call('Page.reload',{ignoreCache:true},b.sessionId);
+    await until(async()=>evalOn(b,"document.getElementById('export-corrupt-story')?.disabled===false"),
+      'fresh corrupt narrative export available');
+    await evalOn(b,"window.confirm=()=>true;document.getElementById('export-corrupt-story').click();true");
+    const narrativeFile=await until(async()=>(
+      await readdir(temp)).find(name=>name.startsWith('yunyu-story-dialogue-corrupt-save')&&name.endsWith('.txt')),
+      'real Chromium narrative evidence download');
+    assert.equal(await readFile(join(temp,narrativeFile),'utf8'),changedStory,
+      'narrative evidence must match the current damaged bytes');
+    assert.equal(await readRaw(b,storyKey),changedStory,'export cannot repair the narrative');
+    assert.equal(await readRaw(b,workshopKey),corrupt,'independent workshop damage must remain untouched');
+    assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel','normal-mode save must remain untouched');
+    t.diagnostic('Real Chromium: first-order gate, two-tab protection, two independent corrupt downloads and stale-consent refusal; no mobile claim');
   });

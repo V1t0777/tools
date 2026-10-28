@@ -155,6 +155,10 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   // Only the OS file chooser and confirmation are test-injected; File.text(),
   // Web Locks, localStorage, the page runtime and both tabs remain native.
   await front(b);
+  // A just committed another producer action. A reset confirmation must be
+  // made against the latest reviewed B-tab board, not a stale UI that will
+  // correctly reject its first destructive click during reconciliation.
+  await until(async()=>await evalOn(b,`document.querySelector('#energy').textContent.startsWith(${JSON.stringify(String(savedSnapshot.energy)+' /')})`),'reset tab adopted latest progress');
   await evalOn(b,`window.confirm=()=>true;document.getElementById('reset').click();true`);
   await until(async()=>{
     const current=await readSave(b);
@@ -195,5 +199,76 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   await until(async()=>await evalOn(a,`document.readyState==='complete'&&
     document.getElementById('save-status')?.textContent.includes('已保存于此浏览器')&&
     document.querySelector('#energy')?.textContent.startsWith(${JSON.stringify(String(savedSnapshot.energy)+' /')})`),'reloaded tab verified restored save');
+
+  // Real-browser negative recovery chain: invalid input, canceled native
+  // chooser, then a second tab changing the save during file selection.
+  // All failures must leave the original bytes and recovery backup intact.
+  await front(b);
+  const originalRaw=await evalOn(b,`localStorage.getItem(${JSON.stringify(key)})`);
+  const originalBackup=await evalOn(b,`localStorage.getItem(${JSON.stringify(key+'.restore-backup-v3')})`);
+  await evalOn(b,`(()=>{
+    window.__importConfirmCount=0;
+    window.confirm=()=>{window.__importConfirmCount++;return true;};
+    const input=document.getElementById('import-normal-file');
+    input.click=()=>{};
+    document.getElementById('import-normal-save').click();
+    const transfer=new DataTransfer();
+    transfer.items.add(new File(['{"broken":'],'invalid-normal.json',{type:'application/json'}));
+    input.files=transfer.files;
+    input.dispatchEvent(new Event('change',{bubbles:true}));
+    return true;
+  })()`);
+  await until(async()=>await evalOn(b,`document.getElementById('notice').textContent.includes('导入预检或恢复未通过')`),'invalid JSON rejected');
+  assert.equal(await evalOn(b,`localStorage.getItem(${JSON.stringify(key)})`),originalRaw,'invalid import must preserve exact save bytes');
+  assert.equal(await evalOn(b,`localStorage.getItem(${JSON.stringify(key+'.restore-backup-v3')})`),originalBackup,'invalid import must not overwrite recovery backup');
+  assert.equal(await evalOn(b,'window.__importConfirmCount'),0,'invalid JSON must not ask for destructive confirmation');
+
+  const detached=await evalOn(b,`(()=>{
+    const input=document.getElementById('import-normal-file');
+    input.click=()=>{};
+    document.getElementById('import-normal-save').click();
+    document.getElementById('cancel-normal-import').click();
+    const replacement=document.getElementById('import-normal-file');
+    const transfer=new DataTransfer();
+    transfer.items.add(new File([${JSON.stringify(downloaded)}],'stale-chooser.json',{type:'application/json'}));
+    input.files=transfer.files;
+    input.dispatchEvent(new Event('change',{bubbles:true}));
+    return {replaced:input!==replacement,cancelHidden:document.getElementById('cancel-normal-import').hidden};
+  })()`);
+  assert.deepEqual(detached,{replaced:true,cancelHidden:true},'canceled chooser must replace the input and dismiss its waiting UI');
+  assert.equal(await evalOn(b,`localStorage.getItem(${JSON.stringify(key)})`),originalRaw,'late event from detached input must not restore');
+  assert.equal(await evalOn(b,'window.__importConfirmCount'),0,'late canceled input must not request confirmation');
+
+  const pickerStarted=await evalOn(b,`(()=>{
+    const input=document.getElementById('import-normal-file');
+    input.click=()=>{};
+    document.getElementById('import-normal-save').click();
+    return !document.getElementById('cancel-normal-import').hidden;
+  })()`);
+  assert.equal(pickerStarted,true,'cross-tab race must start with a live pending chooser');
+  const beforeConcurrent=await readSave(b);
+  await front(a);
+  await evalOn(a,`document.querySelector('#board .producer').click();true`);
+  await until(async()=>(await readSave(a)).revision===beforeConcurrent.revision+1,'other tab saved during chooser');
+  const changedRaw=await evalOn(a,`localStorage.getItem(${JSON.stringify(key)})`);
+  const changedState=JSON.parse(changedRaw);
+  await front(b);
+  await until(async()=>await evalOn(b,`document.querySelector('#energy').textContent.startsWith(${JSON.stringify(String(changedState.energy)+' /')})`),'chooser tab reconciled external progress');
+  await evalOn(b,`(()=>{
+    const input=document.getElementById('import-normal-file');
+    const transfer=new DataTransfer();
+    transfer.items.add(new File([${JSON.stringify(downloaded)}],'stale-baseline.json',{type:'application/json'}));
+    input.files=transfer.files;
+    input.dispatchEvent(new Event('change',{bubbles:true}));
+    return true;
+  })()`);
+  await until(async()=>await evalOn(b,`document.getElementById('notice').textContent.includes('文件选择期间页面或存档已变化')`),'stale chooser rejected after cross-tab update');
+  assert.equal(await evalOn(b,`localStorage.getItem(${JSON.stringify(key)})`),changedRaw,'stale chooser must not roll back newer tab progress');
+  assert.equal(await evalOn(b,`localStorage.getItem(${JSON.stringify(key+'.restore-backup-v3')})`),originalBackup,'stale chooser must not replace recovery backup');
+  assert.equal(await evalOn(b,'window.__importConfirmCount'),0,'stale chooser must not show destructive confirmation');
+  await evalOn(b,`document.querySelector('#board .producer').click();true`);
+  await until(async()=>(await readSave(b)).revision===changedState.revision+1,'fresh gameplay after rejected chooser');
+  t.diagnostic('Chromium invalid import, detached chooser, cross-tab chooser baseline and recovery-backup integrity verified');
+
   t.diagnostic(`Chromium two-tab lock, BFCache persisted=${bfcache}, download=${file}, reset/import/backup verified`);
 });
