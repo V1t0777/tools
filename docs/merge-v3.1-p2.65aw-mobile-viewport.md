@@ -24,3 +24,9 @@
 - 在真实 Chromium 移动视口下，使用 CDP `Input.dispatchTouchEvent` 执行材料拖至空格，验证仅一次 revision 写入、源格清空、目标材料等价、体力不变、拖拽浮层清理。
 - 模拟 OS 中断触发 `touchCancel`，验证中断前后存档状态一致、无浮层残留；随后再次真实触摸生产器，验证仅一次写入与一次体力扣除。
 - 属于 Chromium 触摸事件自动化，不等同于 iPhone Safari/微信 WebView 物理触控；仍需真机验收。最终 HEAD 三项 CI 均成功后才可报告通过。
+
+## P2.65ay｜Chromium 后台中断拖拽与跨标签恢复（2026-10-29）
+- 390px 视口以 CDP touchStart/touchMove 启动未完成的材料拖拽，验证拖拽浮层出现；切换真实标签页并确认触摸标签 document.hidden。
+- 另一标签在后台期间生产并写入新 revision；返回原标签后必须采用最新进度，旧拖拽不能覆盖新存档，浮层必须清除。
+- 新一轮 CDP 触摸生产须恰好增加一次 revision、消耗一次体力。
+- 此测试覆盖真实 Chromium 标签可见性、Web Locks/localStorage 与 CDP 触控，不代表 iPhone Safari/微信 WebView 实机；BFCache 仍由独立导航测试验证。

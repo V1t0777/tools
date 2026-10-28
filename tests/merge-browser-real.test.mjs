@@ -478,5 +478,73 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     'fresh touch after cancellation must consume exactly one energy');
   t.diagnostic('Chromium native touch drag, touchCancel and fresh-touch recovery passed');
 
+
+  // P2.65ay: background a native material drag, then update the save from
+  // another tab. A stale touch must never overwrite the newer save.
+  const hiddenDrag=await evalOn(b,`(()=>{
+    const save=JSON.parse(localStorage.getItem("toolbox.merge-isle.local.v1"));
+    const from=save.board.findIndex(item=>item?.kind==='material');
+    const to=save.board.findIndex((item,i)=>!item&&i!==from);
+    if(from<0||to<0)throw Error('No material/empty cell');
+    document.getElementById('board').scrollIntoView({block:'center'});
+    const center=i=>{
+      const r=document.querySelector('#board [data-slot="'+i+'"]').getBoundingClientRect();
+      return {x:r.left+r.width/2,y:r.top+r.height/2};
+    };
+    return {start:center(from),end:center(to)};
+  })()`);
+  for(const p of [hiddenDrag.start,hiddenDrag.end])
+    assert.ok(p.x>0&&p.x<390&&p.y>0&&p.y<844,'background drag target onscreen');
+  await sleep(120);
+  const beforeHide=await readSave(b);
+  await call('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[
+    {...hiddenDrag.start,id:5,radiusX:2,radiusY:2,force:1}
+  ]},b.sessionId);
+  await sleep(65);
+  await call('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[
+    {...hiddenDrag.end,id:5,radiusX:2,radiusY:2,force:1}
+  ]},b.sessionId);
+  await until(async()=>await evalOn(b,`document.querySelectorAll('.drag-ghost').length===1`),
+    'drag ghost visible before tab background');
+  await front(a);
+  await until(async()=>await evalOn(b,'document.hidden'),'touch owner hidden');
+  assert.deepEqual(await readSave(a),beforeHide,'unfinished drag must not write');
+  await until(async()=>await evalOn(a,`document.querySelector('#energy').textContent.startsWith(${JSON.stringify(String(beforeHide.energy)+' /')})`),
+    'other tab adopted save before writing');
+  await evalOn(a,`document.querySelector('#board .producer').click();true`);
+  await until(async()=>(await readSave(a)).revision===beforeHide.revision+1,
+    'other tab saved while touch owner hidden');
+  const newerRaw=await evalOn(a,`localStorage.getItem(${JSON.stringify(key)})`);
+  const newerState=JSON.parse(newerRaw);
+  await front(b);
+  await until(async()=>!await evalOn(b,'document.hidden'),'touch owner visible');
+  await until(async()=>await evalOn(b,`document.querySelector('#energy').textContent.startsWith(${JSON.stringify(String(newerState.energy)+' /')})`),
+    'foreground tab adopted concurrent save');
+  await call('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]},b.sessionId);
+  await sleep(200);
+  assert.equal(await evalOn(b,`localStorage.getItem(${JSON.stringify(key)})`),newerRaw,
+    'stale background drag must not overwrite newer save');
+  assert.equal(await evalOn(b,`document.querySelectorAll('.drag-ghost').length`),0,
+    'background drag ghost must be removed');
+  const fresh=await evalOn(b,`(()=>{
+    const el=document.querySelector('#board .producer');
+    el.scrollIntoView({block:'center'});
+    const r=el.getBoundingClientRect();
+    return {x:r.left+r.width/2,y:r.top+r.height/2};
+  })()`);
+  await sleep(140);
+  await call('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[
+    {...fresh,id:6,radiusX:2,radiusY:2,force:1}
+  ]},b.sessionId);
+  await sleep(65);
+  await call('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]},b.sessionId);
+  await until(async()=>(await readSave(b)).revision===newerState.revision+1,
+    'fresh touch after background');
+  await sleep(200);
+  const recovered=await readSave(b);
+  assert.equal(recovered.revision,newerState.revision+1,'fresh touch writes exactly once');
+  assert.equal(recovered.energy,newerState.energy-1,'fresh touch spends one energy');
+  t.diagnostic('Chromium background mid-drag, concurrent tab write and fresh touch recovery passed');
+
   t.diagnostic(`Chromium two-tab lock, BFCache persisted=${bfcache}, download=${file}, reset/import/backup verified`);
 });
