@@ -279,8 +279,10 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
       'stale consent cannot overwrite a newly changed narrative');
     assert.equal(await readRaw(b,workshopKey),corrupt);
     await call('Page.reload',{ignoreCache:true},b.sessionId);
-    await until(async()=>evalOn(b,"document.getElementById('reset-story')?.disabled===false"),
-      'fresh damaged story reset available');
+    await until(async()=>evalOn(b,
+      "document.getElementById('save-state')?.textContent.includes('异常剧情存档')&&"+
+      "document.getElementById('reset-story')?.disabled===false"),
+      'fresh damaged story reset handler initialized');
     await evalOn(b,"window.confirm=()=>true;document.getElementById('reset-story').click();true");
     await until(async()=>{
       try{return (await readJSON(b,storyKey)).packs.core.completed.main.length===0;}
