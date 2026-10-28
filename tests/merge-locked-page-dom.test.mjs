@@ -1594,7 +1594,9 @@ test('P2.65ab explicit cancel recovers chooser with no native cancel, blur or vi
   cancel.click();assert.equal(cancel.hidden,true);
   assert.equal(stale.parentElement,null,'old native chooser input is detached');
   assert.equal(h.writes.length,before);
-  const fresh=controls.find(e=>e.id==='import-normal-file');
+  // Element.remove() replaces the fixture's children array; read the live
+  // parent again rather than the pre-removal array snapshot.
+  const fresh=h.id('export-local-save').parentElement.children.find(e=>e.id==='import-normal-file');
   assert.notEqual(fresh,stale);
   fresh.click=()=>{opened++;};
   button.click();assert.equal(opened,2);
