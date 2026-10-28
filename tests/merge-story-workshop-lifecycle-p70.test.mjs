@@ -35,8 +35,11 @@ async function mount({makeLocks,corruptWorkshop=false}={}){
         preventDefault(){this.defaultPrevented=true;},
         stopImmediatePropagation(){this.immediateStopped=true;},...event};
       for(const callback of this.listeners.get(type)??[]){
-        await callback(dispatched);
+        // Synchronous capture listeners must not insert a microtask gap
+        // before the original async click handler begins acquiring its lock.
+        const result=callback(dispatched);
         if(dispatched.immediateStopped)break;
+        if(result&&typeof result.then==='function')await result;
       }
       return dispatched;
     }
