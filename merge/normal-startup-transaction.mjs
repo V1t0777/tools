@@ -16,14 +16,34 @@ const reject = (reason, attempted=false) =>
  * On uncertainty, NEVER expose a candidate state for UI publication.
  * The lock alone cannot protect against older uncoordinated page writers.
  */
-export async function prepareNormalStartupWithLock(locks,storage,{now=Date.now()}={}) {
+export async function prepareNormalStartupWithLock(locks,storage,{
+  now=Date.now(),canStart=()=>true
+}={}) {
   if(!Number.isFinite(now)||now<0)return reject('INVALID_CLOCK');
+  if(typeof canStart!=='function')return reject('STARTUP_INVALIDATED');
+  const permitted=()=>{try{return canStart()===true;}catch{return false;}};
   return withNormalSaveLock(locks,()=>{
+    // Pagehide can invalidate startup while Web Locks is still pending.
+    // Check only after acquiring the lock; a stale page must not migrate,
+    // create, or advance a save when the delayed callback finally runs.
+    if(!permitted())return reject('STARTUP_INVALIDATED');
     if(typeof storage?.getItem!=='function'||typeof storage?.setItem!=='function')
       return reject('STORAGE_UNAVAILABLE');
-    const loaded=loadLocal(storage,now);
+    // Browser/storage callbacks may synchronously dispatch pagehide during
+    // a read. Guard EVERY startup write, including legacy backup migration.
+    const guardedStorage={
+      getItem:key=>storage.getItem(key),
+      setItem:(key,value)=>{
+        if(!permitted())throw new Error('STARTUP_INVALIDATED');
+        return storage.setItem(key,value);
+      }
+    };
+    const loaded=loadLocal(guardedStorage,now);
+    if(!permitted())return reject('STARTUP_INVALIDATED',!!loaded.migrated);
     if(loaded.blocked)return reject(loaded.reason||'STARTUP_BLOCKED',!!loaded.migrated);
-    const startup=prepareNormalStartup(loaded,storage,now);
+    const startup=prepareNormalStartup(loaded,guardedStorage,now);
+    if(!permitted())return reject('STARTUP_INVALIDATED',
+      !!loaded.migrated||!!startup.attempted);
     if(startup.blocked)
       return reject(startup.reason||'STARTUP_SAVE_UNCERTAIN',
         !!loaded.migrated||!!startup.attempted);
@@ -37,6 +57,8 @@ export async function prepareNormalStartupWithLock(locks,storage,{now=Date.now()
       return reject('STARTUP_READBACK_UNAVAILABLE',
         !!loaded.migrated||!!startup.attempted);
     }
+    if(!permitted())return reject('STARTUP_INVALIDATED',
+      !!loaded.migrated||!!startup.attempted);
     return Object.freeze({ok:true,blocked:false,state:startup.state,
       raw:startup.raw,recovered:loaded.recovered,migrated:!!loaded.migrated,
       attempted:!!loaded.migrated||!!startup.attempted,

@@ -390,3 +390,47 @@ for(const kind of ['action','clock','reset']){
     assert.deepEqual(events,['startup']);
   });
 }
+
+test('P2.65ad pagehide while startup awaits Web Lock cannot create or publish save',async()=>{
+  const db=memory(),events=[];
+  let release;
+  const gate={request(name,options,callback){
+    assert.equal(name,NORMAL_SAVE_LOCK_NAME);
+    assert.deepEqual(options,{mode:'exclusive',ifAvailable:true});
+    return new Promise(resolve=>{
+      release=()=>resolve(callback({name,mode:'exclusive'}));
+    });
+  }};
+  const r=createNormalPageRuntime({locks:gate,storage:db,
+    onVerified:(_s,_raw,kind)=>events.push(kind)});
+  const pending=r.start({now});
+  assert.equal(r.busy,true);
+  r.invalidate(); // pagehide before lock acquisition
+  release();
+  const result=await pending;
+  assert.equal(result.ok,false);
+  assert.equal(r.blocked,true);
+  assert.equal(r.snapshot(),null);
+  assert.deepEqual(db.writes,[]);
+  assert.equal(db.read(SAVE_KEY),null);
+  assert.deepEqual(events,[]);
+});
+
+test('P2.65ad reentrant pagehide during initial storage read blocks regeneration',async()=>{
+  const base=memory();let runtime,first=true;
+  const db={
+    getItem(key){
+      const value=base.getItem(key);
+      if(key===SAVE_KEY&&first){first=false;runtime.invalidate();}
+      return value;
+    },
+    setItem:(key,value)=>base.setItem(key,value)
+  };
+  runtime=createNormalPageRuntime({locks:locks(),storage:db});
+  const result=await runtime.start({now});
+  assert.equal(result.ok,false);
+  assert.equal(runtime.blocked,true);
+  assert.equal(runtime.snapshot(),null);
+  assert.deepEqual(base.writes,[]);
+  assert.equal(base.read(SAVE_KEY),null);
+});
