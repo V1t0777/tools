@@ -35,3 +35,11 @@ export function nextStoryWorkshopAction(storyRead,workshopRead){
       href:'./story.html',label:'查看首卷剧情 →'});
   return unavailable('当前主线进度无法安全判断。请返回剧情页核对存档和前置故事。');
 }
+
+/** Read-only link validity, bound to both exact rendered save strings. */
+export function isStoryWorkshopRouteCurrent(snapshot,storyRead,workshopRead){
+  if(!snapshot||typeof snapshot.href!=='string'||!snapshot.href)return false;
+  if(storyRead?.blocked!==false||workshopRead?.blocked!==false)return false;
+  if(storyRead.raw!==snapshot.storyRaw||workshopRead.raw!==snapshot.workshopRaw)return false;
+  return nextStoryWorkshopAction(storyRead,workshopRead).href===snapshot.href;
+}

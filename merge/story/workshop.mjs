@@ -14,7 +14,7 @@ import {shouldRefreshWorkshopForStoryEvent} from './storage-event-guard.mjs';
 import {storyGardenBuildAvailable,storyHarborBuildAvailable,storyStorefrontBuildAvailable} from './workshop-gate.mjs';
 import {storyBuildingWriteAllowed} from './building-commit-guard.mjs';
 import {nextStoryConstructionBudget,wouldSpendStoryConstructionReserve} from './supply-budget.mjs';
-import {nextStoryWorkshopAction} from './workshop-next-step.mjs';
+import {nextStoryWorkshopAction,isStoryWorkshopRouteCurrent} from './workshop-next-step.mjs';
 const $=id=>document.getElementById(id);
 const storage=(()=>{try{return window.localStorage;}catch{return null;}})();
 const webLocks=(()=>{try{return window.navigator?.locks??null;}catch{return null;}})();
@@ -27,6 +27,7 @@ let renderGeneration=0;
 // save recheck. A hidden BFCache pageshow alone never resumes writes.
 let pageGone=false,visibilitySuspended=false,resumePending=false;
 let lifecycleEpoch=0; // do not clear a new suspension triggered during a save read
+let renderedNextRoute=null;
 const pageSuspended=()=>pageGone||visibilitySuspended||document.visibilityState==='hidden';
 const guardRenderedAction=createWorkshopRenderedActionGuard(
   ()=>renderGeneration,
@@ -198,6 +199,7 @@ function render(){
   // Read-only first-volume route; a link is never an unlock or save command.
   // Always derive it from the current narrative read and this workshop view.
   const nextAction=nextStoryWorkshopAction(narrative,{state,raw,blocked,reason});
+  renderedNextRoute=nextAction.href?{storyRaw:narrative.raw,workshopRaw:raw,href:nextAction.href}:null;
   $('workshop-next-guidance').textContent=nextAction.message;
   const nextLink=$('workshop-next-action');
   nextLink.hidden=disabled||!nextAction.href;
@@ -303,6 +305,24 @@ function touch(index){
   if(selected===index){selected=-1;render();return;}
   commit(moveOrMerge(state,selected,index));
 }
+// Recheck both saves before following a link rendered before a peer-tab edit.
+$('workshop-next-action').addEventListener('click',event=>{
+  const snapshot=renderedNextRoute;
+  if(!snapshot||blocked||saving||pageSuspended()){
+    event.preventDefault();return;
+  }
+  const story=readStorySave(storage);
+  const workshop=readStoryWorkshop(storage);
+  if(pageSuspended()||!isStoryWorkshopRouteCurrent(snapshot,story,workshop)){
+    event.preventDefault();
+    if(pageSuspended())return;
+    if(workshop.blocked||workshop.raw!==raw){
+      storageEpoch++;blocked=true;reason=workshop.reason??'WRITE_CONFLICT';selected=-1;
+    }
+    render();
+    $('board-notice').textContent='导航前发现剧情或工作台存档已变化；旧链接已取消，请核对更新后的首卷下一步。';
+  }
+});
 $('store-selected').addEventListener('click',()=>{
   if(blocked||saving)return;
   if(selected<0||state.board[selected]?.kind!=='material'){
