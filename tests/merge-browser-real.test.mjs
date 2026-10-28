@@ -317,6 +317,9 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     width:390,height:844,deviceScaleFactor:3,mobile:true,screenWidth:390,screenHeight:844
   },b.sessionId);
   await front(b);
+  // CDP device-metrics changes dispatch asynchronous resize/layout events.
+  // Allow the final viewport and page lifecycle to settle before pointerdown.
+  await sleep(350);
   const beforeTouch=await readSave(b);
   const center=await evalOn(b,`(()=>{
     const el=document.querySelector('#board .producer');
@@ -325,11 +328,14 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     return {x:r.left+r.width/2,y:r.top+r.height/2};
   })()`);
   assert.ok(center.x>0&&center.x<390&&center.y>0&&center.y<844,'producer must be onscreen for native touch');
+  await sleep(150);
   await evalOn(b,`(()=>{
     window.__touchTrace=[];
     for(const type of ['touchstart','touchend','pointerdown','pointerup','click'])
       document.addEventListener(type,event=>window.__touchTrace.push({
         type,target:event.target?.className,detail:event.detail,
+        slot:event.target?.closest?.('[data-slot]')?.dataset.slot,
+        connected:event.target?.isConnected,
         x:event.clientX,y:event.clientY
       }),true);
     return true;
@@ -342,6 +348,7 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   const trace=await evalOn(b,`({
     events:window.__touchTrace,
     hidden:document.hidden,
+    pickerHidden:document.getElementById('cancel-normal-import').hidden,
     hit:document.elementFromPoint(${center.x},${center.y})?.className,
     notice:document.getElementById('notice').textContent,
     status:document.getElementById('save-status').textContent
