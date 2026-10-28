@@ -229,18 +229,19 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     transfer.items.add(new File([${JSON.stringify(downloaded)}],'stale-chooser.json',{type:'application/json'}));
     input.files=transfer.files;
     input.dispatchEvent(new Event('change',{bubbles:true}));
-    return input!==replacement && !document.getElementById('cancel-normal-import').hidden;
+    return {replaced:input!==replacement,cancelHidden:document.getElementById('cancel-normal-import').hidden};
   })()`);
-  assert.equal(detached,false,'canceled chooser must be detached and its waiting UI dismissed');
+  assert.deepEqual(detached,{replaced:true,cancelHidden:true},'canceled chooser must replace the input and dismiss its waiting UI');
   assert.equal(await evalOn(b,`localStorage.getItem(${JSON.stringify(key)})`),originalRaw,'late event from detached input must not restore');
   assert.equal(await evalOn(b,'window.__importConfirmCount'),0,'late canceled input must not request confirmation');
 
-  await evalOn(b,`(()=>{
+  const pickerStarted=await evalOn(b,`(()=>{
     const input=document.getElementById('import-normal-file');
     input.click=()=>{};
     document.getElementById('import-normal-save').click();
     return !document.getElementById('cancel-normal-import').hidden;
   })()`);
+  assert.equal(pickerStarted,true,'cross-tab race must start with a live pending chooser');
   const beforeConcurrent=await readSave(b);
   await front(a);
   await evalOn(a,`document.querySelector('#board .producer').click();true`);
