@@ -331,6 +331,9 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   await sleep(150);
   await evalOn(b,`(()=>{
     window.__touchTrace=[];
+    window.__boardMutations=0;
+    new MutationObserver(records=>{window.__boardMutations+=records.length;})
+      .observe(document.getElementById('board'),{childList:true});
     for(const type of ['touchstart','touchend','pointerdown','pointerup','click'])
       document.addEventListener(type,event=>window.__touchTrace.push({
         type,target:event.target?.className,detail:event.detail,
@@ -348,7 +351,9 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     notice:document.getElementById('notice').textContent,
     status:document.getElementById('save-status').textContent,
     trace:window.__touchTrace,
-    pickerHidden:document.getElementById('cancel-normal-import').hidden
+    pickerHidden:document.getElementById('cancel-normal-import').hidden,
+    mutations:window.__boardMutations,
+    revision:JSON.parse(localStorage.getItem('toolbox.merge-isle.local.v1')).revision
   })`);
   t.diagnostic('CDP touch after pointerdown: '+JSON.stringify(afterDown));
   await sleep(75);
@@ -359,9 +364,11 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     pickerHidden:document.getElementById('cancel-normal-import').hidden,
     hit:document.elementFromPoint(${center.x},${center.y})?.className,
     notice:document.getElementById('notice').textContent,
-    status:document.getElementById('save-status').textContent
+    status:document.getElementById('save-status').textContent,
+    mutations:window.__boardMutations,
+    revision:JSON.parse(localStorage.getItem('toolbox.merge-isle.local.v1')).revision
   })`);
-  t.diagnostic('CDP native touch trace: '+JSON.stringify(trace));
+  t.diagnostic('CDP native touch trace: '+JSON.stringify({beforeRevision:beforeTouch.revision,...trace}));
   await until(async()=> (await readSave(b)).revision===beforeTouch.revision+1,'native touch producer persisted once');
   await sleep(250);
   const afterTouch=await readSave(b);
