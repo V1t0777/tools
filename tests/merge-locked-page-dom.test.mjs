@@ -1903,3 +1903,68 @@ test('P2.65am explicit import cancel releases single-flight gate without replayi
   assert.equal(h.saved().revision,1,'a fresh ordinary action can proceed after cancellation');
   assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
 });
+
+test('P2.65an reset confirmation cannot erase a save when a native chooser starts reentrantly',async()=>{
+  const h=await mount(),controls=h.id('export-local-save').parentElement.children;
+  const importButton=controls.find(e=>e.id==='import-normal-save');
+  const cancel=controls.find(e=>e.id==='cancel-normal-import');
+  const board=h.id('board');
+  board.dispatch('click',{target:board.children[42],detail:1});
+  await settle();
+  assert.equal(h.saved().revision,1);
+  const raw=h.storage.getItem(SAVE_KEY),before=h.writes.length;
+  h.win.confirm=()=>{importButton.click();return true;};
+  h.id('reset').click();
+  await settle();
+  assert.equal(cancel.hidden,false,'the nested chooser is still pending');
+  assert.equal(h.storage.getItem(SAVE_KEY),raw,'reset cannot overtake a new import intent');
+  assert.equal(h.writes.length,before);
+  cancel.click();
+  h.win.confirm=()=>true;
+  h.id('reset').click();
+  await settle();
+  assert.equal(h.saved().revision,0,'fresh reset confirmation is permitted');
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});
+
+test('P2.65an opening import cancels a captured mobile drag and its delayed click',async()=>{
+  const h=await mount(),board=h.id('board');
+  const controls=h.id('export-local-save').parentElement.children;
+  const importButton=controls.find(e=>e.id==='import-normal-save');
+  const cancel=controls.find(e=>e.id==='cancel-normal-import');
+  const first=board.children[0];
+  board.dispatch('pointerdown',{target:first,pointerId:51,clientX:0,clientY:0});
+  board.dispatch('pointermove',{target:first,pointerId:51,clientX:20,clientY:0});
+  assert.equal(h.doc.body.children.length,1);
+  importButton.click();
+  assert.equal(h.doc.body.children.length,0,'native chooser removes old drag ghost');
+  const before=h.writes.length,raw=h.storage.getItem(SAVE_KEY);
+  cancel.click();
+  board.dispatch('pointerup',{target:first,pointerId:51,clientX:20,clientY:0});
+  board.dispatch('click',{target:board.children[42],detail:1});
+  await settle();
+  assert.equal(h.writes.length,before,'late compatibility click cannot produce');
+  assert.equal(h.storage.getItem(SAVE_KEY),raw);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});
+
+test('P2.65an chooser-era pointerdown cannot arm a late click after cancel',async()=>{
+  const h=await mount(),board=h.id('board');
+  const controls=h.id('export-local-save').parentElement.children;
+  const importButton=controls.find(e=>e.id==='import-normal-save');
+  const cancel=controls.find(e=>e.id==='cancel-normal-import');
+  importButton.click();
+  const producer=board.children[42],raw=h.storage.getItem(SAVE_KEY);
+  const before=h.writes.length;
+  board.dispatch('pointerdown',{target:producer,pointerId:52});
+  cancel.click();
+  board.dispatch('click',{target:producer,detail:1});
+  await settle();
+  assert.equal(h.writes.length,before);
+  assert.equal(h.storage.getItem(SAVE_KEY),raw);
+  board.dispatch('pointerdown',{target:board.children[42],pointerId:53});
+  board.dispatch('click',{target:board.children[42],detail:1});
+  await settle();
+  assert.equal(h.saved().revision,1,'fresh touch after cancel remains playable');
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});

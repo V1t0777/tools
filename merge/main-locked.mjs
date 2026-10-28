@@ -120,6 +120,10 @@ function maybeProduce(slot) {
   commit(current=>produce(current, slot));
 }
 function touchCell(slot) {
+  // A late compatibility click from a chooser-era touch is not a new intent.
+  if(importPending()){
+    hint('正在选择或核验导入文件，请先完成或取消导入后再操作棋盘');return;
+  }
   // Storage events can be delayed: verify actual bytes before accepting a
   // tap or keyboard selection, even if the page never lost focus.
   if (!revalidateResumedSave()) {
@@ -431,6 +435,9 @@ board.addEventListener('click', event => {
   if (cell && board.contains(cell)) touchCell(Number(cell.dataset.slot));
 });
 board.addEventListener('pointerdown', event => {
+  // A chooser-era touch must not arm a click that arrives after cancellation.
+  // Only a new pointerdown after import may clear this suppression guard.
+  if(importPending()){ignoreNextClick=true;return;}
   // Never start a drag against a board whose saved baseline is untrusted.
   if (saveIssue || runtime.busy) return;
   // A second contact (including a duplicate pointerdown) invalidates the
@@ -746,6 +753,10 @@ if(saveActions){
     if(typeof AbortController!=='function'){
       hint('当前浏览器缺少安全取消能力，暂不能导入存档');return;
     }
+    // Opening a native chooser invalidates selected cells, captured drags
+    // and detached action buttons. Late pointer events cannot become new
+    // gameplay intent after the chooser is cancelled.
+    cancelStaleGesture();selected=-1;activeGuidance=null;render();
     // The chooser is bound to the exact save and page lifecycle at the
     // initiating user gesture, not to whichever save is current on return.
     importPicker={epoch:importEpoch,raw:runtime.raw,hiddenOnce:false,
@@ -962,8 +973,10 @@ byId('reset').addEventListener('click',async()=>{
   if(!window.confirm(damaged
     ?'存档异常：将先核实并保留原始备份，再重置普通模式。建议先下载原始文件，确定继续吗？'
     :'确定重置本地试玩进度吗？当前棋盘、金币和订单会被清空，且无法恢复。'))return;
-  if(pageSuspended()||importEpoch!==confirmedEpoch){
-    hint('页面已切换，重置已取消；请返回并重新确认');return;
+  // A native chooser can start reentrantly during a WebView confirmation
+  // without incrementing importEpoch. Never reset over that new intent.
+  if(pageSuspended()||importEpoch!==confirmedEpoch||importPending()){
+    hint('页面或导入状态已变化，重置已取消；请返回并重新确认');return;
   }
   if(!damaged&&(saveIssue||runtime.phase!=='ready'||
       runtime.raw!==confirmedRaw||!revalidateResumedSave()||
