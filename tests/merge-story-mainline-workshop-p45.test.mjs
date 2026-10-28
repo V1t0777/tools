@@ -115,7 +115,8 @@ test('P45 mobile dialogue appends read-only goal feedback only for persisted val
   assert.ok(ui.includes('if(chapterEcho)lines.push(chapterEcho);'));
   assert.ok(ui.includes("if(!workshop.blocked&&workshop.raw!==null)"));
   assert.ok(ui.includes('text.textContent=line.text;'));
-  assert.ok(ui.includes('const requirement=inspectStoryWorkshopRequirement(entry.id,store);'));
+  assert.ok(ui.includes('const requirement=inspectStoryWorkshopRequirementFromRead(entry.id,workshopRead);'));
+  assert.ok(ui.includes('const workshopForRender=blocked?null:readStoryWorkshop(store);'));
   for(const unsafe of ['innerHTML','insertAdjacentHTML','fetch(','sendBeacon('])
     assert.equal(ui.includes(unsafe),false,unsafe);
 });

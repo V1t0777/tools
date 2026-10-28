@@ -91,6 +91,7 @@ test('P41 UI displays mainline echoes without unsafe markup or affecting complet
   assert.ok(ui.includes('const mainlineEcho=mainlineChoiceEcho(entry,progress);'));
   assert.ok(ui.includes('if(mainlineEcho)lines.push(mainlineEcho);'));
   assert.ok(ui.includes('text.textContent=line.text;'));
-  assert.ok(ui.includes('const requirement=inspectStoryWorkshopRequirement(entry.id,store);'));
+  assert.ok(ui.includes('const requirement=inspectStoryWorkshopRequirementFromRead(entry.id,workshopRead);'));
+  assert.ok(ui.includes('const workshopForRender=blocked?null:readStoryWorkshop(store);'));
   assert.equal(ui.includes('innerHTML'),false);
 });

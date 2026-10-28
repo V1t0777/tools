@@ -38,7 +38,8 @@ test('P61 damaged pin and DLC lookalike fail closed',()=>{
 test('P61 incident UI cannot expose a provisional card even in blocked state',()=>{
   const ui=readFileSync(new URL('../merge/story/ui.mjs',import.meta.url),'utf8');
   const guard=readFileSync(new URL('../merge/story/daily-incident-guard.mjs',import.meta.url),'utf8');
-  assert.ok(ui.includes('if(todays&&dayPinned&&!blocked)list.append(card(todays,completed(todays)));'));
+  assert.ok(ui.includes('if(todays&&dayPinned&&!blocked)list.append(card(todays,completed(todays),workshopForRender));'));
+  assert.ok(ui.includes('const workshopForRender=blocked?null:readStoryWorkshop(store);'));
   assert.ok(ui.includes('今日事件入口已暂停；不会展示未固定的临时事件'));
   assert.ok(guard.includes('pinnedDailyStoryIncident(progress,pack,currentDay)&&'));
   assert.ok(ui.includes('if(entry.kind===\'incident\'&&!canCommitDailyIncident('));
