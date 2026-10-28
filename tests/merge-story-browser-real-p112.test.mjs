@@ -260,5 +260,66 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     assert.equal(await readRaw(b,storyKey),changedStory,'export cannot repair the narrative');
     assert.equal(await readRaw(b,workshopKey),corrupt,'independent workshop damage must remain untouched');
     assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel','normal-mode save must remain untouched');
+    // P115: both damaged saves have been exported. Explicit reset must be
+    // independently confirmed and may only replace its own damaged key.
+    // Declining either confirmation must preserve every raw byte.
+    await evalOn(b,"window.confirm=()=>false;document.getElementById('reset-story').click();true");
+    assert.equal(await readRaw(b,storyKey),changedStory,'declined story reset preserves damage');
+    await evalOn(b,"window.__confirmCount=0;window.confirm=()=>++window.__confirmCount===1;"+
+      "document.getElementById('reset-story').click();true");
+    assert.equal(await readRaw(b,storyKey),changedStory,'second-stage refusal preserves damage');
+
+    // A same-tab replacement during native confirmation simulates a peer
+    // changing the raw record before StorageEvent delivery.
+    const newerDamagedStory='{peer-replaced-during-story-reset';
+    await evalOn(b,'window.confirm=()=>{localStorage.setItem('+
+      JSON.stringify(storyKey)+','+JSON.stringify(newerDamagedStory)+');return true;};'+
+      "document.getElementById('reset-story').click();true");
+    assert.equal(await readRaw(b,storyKey),newerDamagedStory,
+      'stale consent cannot overwrite a newly changed narrative');
+    assert.equal(await readRaw(b,workshopKey),corrupt);
+    await call('Page.reload',{ignoreCache:true},b.sessionId);
+    await until(async()=>evalOn(b,"document.getElementById('reset-story')?.disabled===false"),
+      'fresh damaged story reset available');
+    await evalOn(b,"window.confirm=()=>true;document.getElementById('reset-story').click();true");
+    await until(async()=>{
+      try{return (await readJSON(b,storyKey)).packs.core.completed.main.length===0;}
+      catch{return false;}
+    },'confirmed narrative reset persisted');
+    const resetStoryRaw=await readRaw(b,storyKey);
+    assert.notEqual(resetStoryRaw,newerDamagedStory);
+    assert.equal(await readRaw(b,workshopKey),corrupt,
+      'narrative reset must not repair independent workshop corruption');
+    assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
+
+    // Workshop reset has a separate double confirmation, Web Lock and CAS.
+    // A replacement during confirmation must not be silently overwritten.
+    await navigate(b,'/merge/story-workshop.html','#workshop-board');
+    await until(async()=>evalOn(b,
+      "document.getElementById('workshop-status')?.textContent.includes('存档损坏')"),
+      'damaged workshop remains blocked after narrative recovery');
+    await evalOn(b,"window.confirm=()=>false;document.getElementById('reset-workshop').click();true");
+    assert.equal(await readRaw(b,workshopKey),corrupt,'declined workshop reset preserves damage');
+    const newerDamagedWorkshop='{peer-replaced-during-workshop-reset';
+    await evalOn(b,'window.confirm=()=>{localStorage.setItem('+
+      JSON.stringify(workshopKey)+','+JSON.stringify(newerDamagedWorkshop)+');return true;};'+
+      "document.getElementById('reset-workshop').click();true");
+    assert.equal(await readRaw(b,workshopKey),newerDamagedWorkshop,
+      'stale workshop consent cannot overwrite changed evidence');
+    await call('Page.reload',{ignoreCache:true},b.sessionId);
+    await until(async()=>evalOn(b,
+      "document.getElementById('workshop-status')?.textContent.includes('存档损坏')"),
+      'fresh damaged workshop reset available');
+    await evalOn(b,"window.confirm=()=>true;document.getElementById('reset-workshop').click();true");
+    await until(async()=>{
+      try{return (await readJSON(b,workshopKey)).board.length===56;}
+      catch{return false;}
+    },'confirmed workshop reset persisted');
+    assert.equal(await readRaw(b,storyKey),resetStoryRaw,
+      'workshop reset cannot rewind recovered narrative');
+    assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
+    assert.equal(await evalOn(b,
+      "document.querySelectorAll('#workshop-board button').length"),56);
+    t.diagnostic('P115 real Chromium: independent corrupt resets, two-stage refusals, stale-consent CAS and mode isolation; no mobile claim');
     t.diagnostic('Real Chromium: first-order gate, two-tab protection, two independent corrupt downloads and stale-consent refusal; no mobile claim');
   });
