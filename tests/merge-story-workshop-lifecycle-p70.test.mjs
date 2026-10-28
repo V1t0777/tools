@@ -243,3 +243,39 @@ test('P99 workshop BFCache resume rejects pagehide during an unchanged storage r
     assert.equal(h.data.get(STORY_SAVE_KEY),'story-sentinel');
   }finally{h.restore();}
 });
+
+
+test('P100 workshop reset refuses a peer replacement during native confirmation',async()=>{
+  const h=await mount();
+  try{
+    let confirms=0;
+    h.window.confirm=()=>{
+      confirms++;
+      h.data.set(STORY_WORKSHOP_KEY,'{"peer":"new-workshop-save"}');
+      return true;
+    };
+    await h.reset();
+    assert.equal(confirms,1);
+    assert.equal(h.writes,0);
+    assert.equal(h.data.get(STORY_WORKSHOP_KEY),'{"peer":"new-workshop-save"}');
+    assert.equal(h.data.get(STORY_SAVE_KEY),'story-sentinel');
+    assert.equal(h.data.get(SAVE_KEY),'normal-sentinel');
+    assert.match(h.notice(),/确认期间工作台存档发生变化/);
+  }finally{h.restore();}
+});
+
+test('P100 workshop reset preserves an independent peer narrative update',async()=>{
+  const h=await mount();
+  try{
+    h.window.confirm=()=>{
+      h.data.set(STORY_SAVE_KEY,'peer-story-updated');
+      return true;
+    };
+    await h.reset();
+    assert.equal(h.writes,1);
+    assert.match(h.notice(),/^已重置剧情工作台/);
+    assert.equal(h.data.get(STORY_SAVE_KEY),'peer-story-updated');
+    assert.equal(h.data.get(SAVE_KEY),'normal-sentinel');
+    assert.equal(typeof h.data.get(STORY_WORKSHOP_KEY),'string');
+  }finally{h.restore();}
+});

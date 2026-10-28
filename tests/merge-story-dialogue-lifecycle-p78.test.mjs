@@ -223,3 +223,38 @@ test('P99 story visible return rejects hidden event during unchanged storage rea
     assert.equal(h.data.get(SAVE_KEY),'normal-sentinel');
   }finally{h.restore();}
 });
+
+
+test('P100 story reset refuses a peer replacement during native confirmation without overwriting either mode',async()=>{
+  const h=await mount();
+  try{
+    let confirms=0;
+    h.window.confirm=()=>{
+      confirms++;
+      h.data.set(STORY_SAVE_KEY,'{"peer":"new-story-save"}');
+      return true;
+    };
+    await h.reset();
+    assert.equal(confirms,1);
+    assert.deepEqual(h.writes,[]);
+    assert.equal(h.data.get(STORY_SAVE_KEY),'{"peer":"new-story-save"}');
+    assert.equal(h.data.get(STORY_WORKSHOP_KEY),'workshop-sentinel');
+    assert.equal(h.data.get(SAVE_KEY),'normal-sentinel');
+    assert.match(h.status(),/重新打开页面核对进度/);
+  }finally{h.restore();}
+});
+
+test('P100 story reset does not erase a peer workshop update during confirmation',async()=>{
+  const h=await mount();
+  try{
+    h.window.confirm=()=>{
+      h.data.set(STORY_WORKSHOP_KEY,'peer-workshop-updated');
+      return true;
+    };
+    await h.reset();
+    assert.deepEqual(h.writes,[STORY_SAVE_KEY]);
+    assert.equal(h.data.get(STORY_WORKSHOP_KEY),'peer-workshop-updated');
+    assert.equal(h.data.get(SAVE_KEY),'normal-sentinel');
+    assert.notEqual(h.data.get(STORY_SAVE_KEY),h.original);
+  }finally{h.restore();}
+});
