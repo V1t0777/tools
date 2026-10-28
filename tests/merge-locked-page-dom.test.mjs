@@ -291,7 +291,10 @@ test('P2.64d active lock cancels old drag ghost before a second pointer move',as
   board.dispatch('pointermove',{target:board.children[0],pointerId:5,clientX:15});
   assert.equal(h.doc.body.children.length,1);
   h.win.pauseNextLock=true;
-  board.dispatch('click',{target:board.children[42],detail:1});
+  // A keyboard activation is a valid concurrent action while a pointer is
+  // held. A pointer click on a DIFFERENT cell without its own pointerdown
+  // is now correctly rejected as a stale/retargeted compatibility click.
+  board.dispatch('click',{target:board.children[42],detail:0});
   await settle();
   assert.equal(typeof h.win.releaseLock,'function');
   board.dispatch('pointermove',{target:board.children[0],pointerId:5,clientX:30});
