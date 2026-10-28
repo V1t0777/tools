@@ -160,7 +160,24 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   // correctly reject its first destructive click during reconciliation.
   await until(async()=>await evalOn(b,`document.querySelector('#energy').textContent.startsWith(${JSON.stringify(String(savedSnapshot.energy)+' /')})`),'reset tab adopted latest progress');
   await evalOn(b,`window.confirm=()=>true;document.getElementById('reset').click();true`);
-  await until(async()=>{
+  // A background clock or a cross-tab reconciliation can legitimately hold
+  // the same lock during the first click. Retry only if the exact reviewed
+  // snapshot is still unchanged; never confirm against unseen new progress.
+  let resetCompleted=false;
+  try{
+    await until(async()=>{
+      const current=await readSave(b);
+      return current.revision===0&&current.energy>savedSnapshot.energy;
+    },'first reset attempt',3000);
+    resetCompleted=true;
+  }catch{
+    const still=await readSave(b);
+    assert.deepEqual(still,savedSnapshot,'reset retry requires unchanged reviewed baseline');
+    t.diagnostic('First reset click was rejected while save remained unchanged; retrying after lock settles');
+    await sleep(250);
+    await evalOn(b,`document.getElementById('reset').click();true`);
+  }
+  if(!resetCompleted)await until(async()=>{
     const current=await readSave(b);
     return current.revision===0&&current.energy>savedSnapshot.energy;
   },'confirmed reset persisted');
