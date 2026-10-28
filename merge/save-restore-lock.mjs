@@ -25,6 +25,16 @@ export async function coordinateNormalSaveRestore(fileText,storage,lockManager,
   if(typeof lockManager?.request!=='function')return rejected('LOCKS_UNAVAILABLE');
   let entered=false,attempted=false,callbackRepeated=false,requestSettled=false;
   let expectedResult;
+  const permitted=()=>{try{return canCommit()===true;}catch{return false;}};
+  // A pagehide can occur during preflight reads or backup reservation.
+  // Recheck the lease at each write, including the final save replacement.
+  const guardedStorage={
+    getItem:key=>storage.getItem(key),
+    setItem:(key,value)=>{
+      if(!permitted())throw new Error('RESTORE_LIFECYCLE_INVALIDATED');
+      return storage.setItem(key,value);
+    }
+  };
   try {
     const result=await lockManager.request(RESTORE_LOCK_NAME,
       {mode:'exclusive',ifAvailable:true},lock=>{
@@ -42,13 +52,14 @@ export async function coordinateNormalSaveRestore(fileText,storage,lockManager,
         // A pagehide, BFCache transition or cancelled file read may happen
         // while a lock request is pending. Re-check inside the acquired lock
         // BEFORE reserving the original backup or writing the normal save.
-        let allowed=false;
-        try {allowed=canCommit()===true;}catch{/* Fail closed. */}
-        if(!allowed)return (expectedResult=rejected('RESTORE_CANCELLED_BEFORE_WRITE'));
+        if(!permitted())return (expectedResult=rejected('RESTORE_CANCELLED_BEFORE_WRITE'));
         // The restore checks expectedRaw, reserves a backup and verifies
         // the write while the participating Web Lock is held.
-        return (expectedResult=commitNormalSaveRestore(fileText,storage,
-          {expectedRaw,confirmed,allowDowngrade}));
+        const receipt=commitNormalSaveRestore(fileText,guardedStorage,
+          {expectedRaw,confirmed,allowDowngrade});
+        // Even a verified write must not be acknowledged after pagehide.
+        if(!permitted())return (expectedResult=rejected('RESTORE_OUTCOME_UNCERTAIN'));
+        return (expectedResult=receipt);
       });
     requestSettled=true;
     // The browser's Web Locks request resolves to the exact callback result.
