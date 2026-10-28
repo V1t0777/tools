@@ -105,3 +105,16 @@ test('P2.65ae restore backup write pagehide cannot replace current save',async()
   assert.equal(db.read(RESTORE_BACKUP_KEY),raw);
   assert.deepEqual(db.writes.map(([key])=>key),[RESTORE_BACKUP_KEY]);
 });
+
+test('P2.65ae invalidated async action still observes rejected thenable',async()=>{
+  const raw=initial();let allowed=true,observed=false;
+  const db=storage(raw);
+  const result=await commitNormalActionWithLock(locks,db,{expectedRaw:raw,
+    action:()=>{
+      allowed=false;
+      return {then(_resolve,reject){observed=true;reject(Error('late async rejection'));}};
+    },canCommit:()=>allowed});
+  assert.equal(result.ok,false);
+  assert.equal(observed,true);
+  assert.deepEqual(db.writes,[]);
+});

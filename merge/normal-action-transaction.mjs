@@ -48,12 +48,12 @@ export async function commitNormalActionWithLock(locks,storage,{expectedRaw,acti
     // persisting an aliased result; the trusted raw save remains untouched.
     const baselineSnapshot=JSON.stringify(current.state);
     const result=action(current.state);
-    if(!permitted())return reject('ACTION_CANCELLED_BEFORE_WRITE');
     // Observe a rejected thenable immediately. Later purity checks may fail
     // (or JSON serialization may throw), but its rejection must not escape
     // as an unhandled Promise after the lock releases.
     const asyncResult=result && typeof result.then==='function';
     if(asyncResult) void Promise.resolve(result).catch(()=>{});
+    if(!permitted())return reject('ACTION_CANCELLED_BEFORE_WRITE');
     // Preserve the existing P2.61h contract for the exact same object.
     if(result?.ok===true && result.state===current.state)
       return reject('ACTION_REVISION_INVALID');

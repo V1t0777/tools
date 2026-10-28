@@ -9,7 +9,7 @@
 - 导入恢复：同一 Web Lock 内的备份预留与最终存档替换均受许可保护；若许可失效，拒绝宣称恢复成功，不回滚已发生的写入。
 
 ## 验证
-新增 `tests/merge-normal-lifecycle-write-guard.test.mjs` 八项 Node 故障注入：基线读取、动作回调、最终 CAS 读取、时钟、重置、备份预留及恢复阶段的同步失效。最终全仓库 Node、`bash scripts/security-check.sh`、部署隔离及完整历史密钥扫描必须以本次新 SHA 的 GitHub Actions 结果为准，未通过不得标记完成。
+新增 `tests/merge-normal-lifecycle-write-guard.test.mjs` 九项 Node 故障注入：基线读取、动作回调、最终 CAS 读取、时钟、重置、备份预留及恢复阶段的同步失效，并确保失效的异步动作拒绝不会成为未处理 Promise。最终全仓库 Node、`bash scripts/security-check.sh`、部署隔离及完整历史密钥扫描必须以本次新 SHA 的 GitHub Actions 结果为准，未通过不得标记完成。
 
 ## 发行与残余风险
 Web Locks 仅保护协作标签；不合作的旧页面仍可在检查后写入。localStorage 不是跨标签原子事务；浏览器掉电、文件真实落盘、iPhone Safari、微信 WebView 和 BFCache 真实双标签测试尚未完成。PR #58/#59 继续 Open/Draft；不合并 main、不改正式导航或部署白名单、不发布 Pages/Cloudflare/Edge、不执行线上 Supabase SQL/迁移、不做作弊后门。
