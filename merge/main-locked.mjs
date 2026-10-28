@@ -199,6 +199,23 @@ function guardRenderedAction(action){
     action();
   };
 }
+// Persistent buttons survive board rerenders. A pointer begun while the
+// native import chooser is active must not turn into a delayed compatibility
+// click after cancellation. Dynamic buttons already use render generations.
+function guardPersistentChooserClick(button,action){
+  let stalePointer=false;
+  button.addEventListener('pointerdown',()=>{stalePointer=importPending();});
+  button.addEventListener('pointercancel',()=>{stalePointer=true;});
+  button.addEventListener('click',event=>{
+    if(stalePointer&&event.detail!==0){
+      stalePointer=false;
+      hint('导入期间的旧触控已取消，请重新点击当前按钮');
+      return;
+    }
+    if(event.detail===0)stalePointer=false; // Keyboard is a new intent.
+    action();
+  });
+}
 function renderOrders() {
   orders.replaceChildren();
   const fragment = document.createDocumentFragment();
@@ -541,12 +558,12 @@ function revalidateResumedSave(){
   }
   return true;
 }
-byId('store-selected').addEventListener('click',()=>{
+guardPersistentChooserClick(byId('store-selected'),()=>{
   if(selected < 0){hint('先点击选择一个原料');return;}
   const slot=selected;
   commit(current=>storeItem(current,slot));
 });
-byId('warehouse-upgrade').addEventListener('click',()=>commit(current=>upgradeWarehouse(current)));
+guardPersistentChooserClick(byId('warehouse-upgrade'),()=>commit(current=>upgradeWarehouse(current)));
 byId('supply-producer').addEventListener('change',()=>refreshSupplyControls());
 
 byId('export-local-save').addEventListener('click', () => {
@@ -952,7 +969,7 @@ if(saveActions){
   });
 }
 
-byId('reset').addEventListener('click',async()=>{
+guardPersistentChooserClick(byId('reset'),async()=>{
   if(pageSuspended()){hint('页面处于后台，请返回并核验进度后重试');return;}
   // Do not show a destructive reset confirmation over a native file chooser
   // or while a selected save is being read/confirmed for restoration.

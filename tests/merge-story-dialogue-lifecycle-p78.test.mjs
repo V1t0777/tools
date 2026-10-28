@@ -258,3 +258,71 @@ test('P100 story reset does not erase a peer workshop update during confirmation
     assert.notEqual(h.data.get(STORY_SAVE_KEY),h.original);
   }finally{h.restore();}
 });
+
+
+function firstStoryCardButton(h){
+  const cards=h.document.getElementById('story-list').children;
+  const button=cards.flatMap(card=>card.children??[])
+    .find(node=>node.listeners?.has('click'));
+  assert.ok(button,'expected a clickable first-volume story card');
+  return button;
+}
+
+test('P106 opening dialogue cannot resurrect modal after workshop read triggers pagehide',async()=>{
+  const h=await mount();
+  try{
+    const button=firstStoryCardButton(h);
+    const originalGet=h.window.localStorage.getItem.bind(h.window.localStorage);
+    let injected=false;
+    h.window.localStorage.getItem=key=>{
+      const value=originalGet(key);
+      if(key===STORY_WORKSHOP_KEY&&!injected){
+        injected=true;
+        void h.window.emit('pagehide');
+      }
+      return value;
+    };
+    await button.fire('click');
+    assert.equal(injected,true);
+    assert.equal(h.document.getElementById('story-dialog').open,false);
+    assert.deepEqual(h.writes,[]);
+    assert.equal(h.data.get(STORY_SAVE_KEY),h.original);
+    assert.equal(h.data.get(SAVE_KEY),'normal-sentinel');
+    assert.match(h.status(),/暂停/);
+  }finally{h.restore();}
+});
+
+test('P106 opening dialogue rejects missed peer story replacement during workshop read',async()=>{
+  const h=await mount();
+  try{
+    const button=firstStoryCardButton(h);
+    const originalGet=h.window.localStorage.getItem.bind(h.window.localStorage);
+    let injected=false;
+    h.window.localStorage.getItem=key=>{
+      const value=originalGet(key);
+      if(key===STORY_WORKSHOP_KEY&&!injected){
+        injected=true;
+        h.data.set(STORY_SAVE_KEY,'{"peer":"newer-story-save"}');
+      }
+      return value;
+    };
+    await button.fire('click');
+    assert.equal(injected,true);
+    assert.equal(h.document.getElementById('story-dialog').open,false);
+    assert.deepEqual(h.writes,[]);
+    assert.equal(h.data.get(STORY_SAVE_KEY),'{"peer":"newer-story-save"}');
+    assert.equal(h.data.get(SAVE_KEY),'normal-sentinel');
+    assert.match(h.status(),/重新打开页面核对进度/);
+  }finally{h.restore();}
+});
+
+test('P106 unchanged workshop read still opens the first story without writing',async()=>{
+  const h=await mount();
+  try{
+    await firstStoryCardButton(h).fire('click');
+    assert.equal(h.document.getElementById('story-dialog').open,true);
+    assert.deepEqual(h.writes,[]);
+    assert.equal(h.data.get(STORY_SAVE_KEY),h.original);
+    assert.equal(h.data.get(SAVE_KEY),'normal-sentinel');
+  }finally{h.restore();}
+});

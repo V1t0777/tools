@@ -1968,3 +1968,55 @@ test('P2.65an chooser-era pointerdown cannot arm a late click after cancel',asyn
   assert.equal(h.saved().revision,1,'fresh touch after cancel remains playable');
   assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
 });
+
+test('P2.65ao chooser-era pointer cannot spend coins through persistent warehouse upgrade',async()=>{
+  const seed=createInitialState(Date.now());seed.coins=1000;seed.xp=1500;
+  const h=await mount({initialRaw:JSON.stringify(seed)});
+  const controls=h.id('export-local-save').parentElement.children;
+  const importButton=controls.find(e=>e.id==='import-normal-save');
+  const cancel=controls.find(e=>e.id==='cancel-normal-import');
+  const upgrade=h.id('warehouse-upgrade');
+  assert.equal(upgrade.disabled,false);
+  importButton.click();
+  const raw=h.storage.getItem(SAVE_KEY),before=h.writes.length;
+  upgrade.dispatch('pointerdown',{pointerId:81});
+  cancel.click();
+  upgrade.dispatch('click',{detail:1});
+  await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),raw,'old chooser-era upgrade must not spend coins');
+  assert.equal(h.writes.length,before);
+  upgrade.dispatch('pointerdown',{pointerId:82});
+  upgrade.dispatch('click',{detail:1});
+  await settle();
+  assert.equal(h.saved().warehouse.capacity,6,'fresh pointer after cancellation can upgrade');
+  assert.equal(h.saved().coins,950);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});
+
+test('P2.65ao chooser-era pointer cannot open destructive reset confirmation after cancel',async()=>{
+  const h=await mount(),board=h.id('board');
+  board.dispatch('click',{target:board.children[42],detail:1});
+  await settle();
+  assert.equal(h.saved().revision,1);
+  const controls=h.id('export-local-save').parentElement.children;
+  const importButton=controls.find(e=>e.id==='import-normal-save');
+  const cancel=controls.find(e=>e.id==='cancel-normal-import');
+  const reset=h.id('reset');
+  let confirmations=0;
+  h.win.confirm=()=>{confirmations++;return true;};
+  importButton.click();
+  const raw=h.storage.getItem(SAVE_KEY),before=h.writes.length;
+  reset.dispatch('pointerdown',{pointerId:83});
+  cancel.click();
+  reset.dispatch('click',{detail:1});
+  await settle();
+  assert.equal(confirmations,0,'stale reset click must not even request confirmation');
+  assert.equal(h.storage.getItem(SAVE_KEY),raw);
+  assert.equal(h.writes.length,before);
+  reset.dispatch('pointerdown',{pointerId:84});
+  reset.dispatch('click',{detail:1});
+  await settle();
+  assert.equal(confirmations,1);
+  assert.equal(h.saved().revision,0,'new confirmation may reset normally');
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});

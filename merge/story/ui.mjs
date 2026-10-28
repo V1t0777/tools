@@ -302,6 +302,13 @@ function lineElement(line){
 const recheckUnreadableWorkshop=()=>readStoryWorkshop(store);
 function open(entry){
   if(saving||pageSuspended())return;
+  // Opening a dialogue is also a lifecycle-sensitive read operation: a
+  // workshop getItem() can synchronously dispatch pagehide or a StorageEvent.
+  const openingLifecycleEpoch=lifecycleEpoch,openingStorageEpoch=storageEpoch;
+  const abortOpen=()=>{
+    selected=null;selectedChoice=null;selectedIncidentDay=null;
+    selectedWorkshopRaw=null;selectedWorkshopReadable=false;selectedWorkshopReason=null;
+  };
   if(!blocked){
     const snapshot=checkStoryResumeSnapshot(store,{key:STORY_SAVE_KEY,expectedRaw:raw});
     if(!snapshot.ok){
@@ -318,6 +325,21 @@ function open(entry){
   }
   selected=entry;selectedChoice=null;
   const workshopAtOpen=readStoryWorkshop(store);
+  if(saving||pageSuspended()||lifecycleEpoch!==openingLifecycleEpoch||
+    storageEpoch!==openingStorageEpoch){abortOpen();return;}
+  // The story save may change without a StorageEvent while the independent
+  // workshop read is in progress. Never show an old scene as still unlocked.
+  if(!blocked){
+    const storyAfterWorkshop=checkStoryResumeSnapshot(store,{
+      key:STORY_SAVE_KEY,expectedRaw:raw
+    });
+    if(!storyAfterWorkshop.ok){
+      storageEpoch++;blocked=true;reason=storyAfterWorkshop.reason;
+      abortOpen();render();return;
+    }
+    if(pageSuspended()||lifecycleEpoch!==openingLifecycleEpoch||
+      storageEpoch!==openingStorageEpoch){abortOpen();return;}
+  }
   selectedWorkshopRaw=workshopAtOpen.raw;
   selectedWorkshopReadable=!workshopAtOpen.blocked;
   selectedWorkshopReason=workshopAtOpen.reason;
@@ -402,6 +424,10 @@ function open(entry){
   const finish=$('complete-story');
   finish.textContent=done?'已阅读 · 关闭':entry.choices.length?'确认选择并继续':'完成阅读并继续';
   finish.disabled=saving||(!done&&(blocked||!requirement.met||entry.choices.length>0));
+  // Nested browser callbacks can suspend this page during DOM construction.
+  // A stale open must not resurrect a modal after pagehide/visibilitychange.
+  if(saving||pageSuspended()||lifecycleEpoch!==openingLifecycleEpoch||
+    storageEpoch!==openingStorageEpoch){abortOpen();return;}
   $('story-dialog').showModal();
 }
 // Preserve the exact workshop evidence that this dialogue actually rendered.
