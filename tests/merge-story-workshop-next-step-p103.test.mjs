@@ -72,6 +72,11 @@ test('P103 workshop navigation remains a read-only accessible link, not a save s
   const ui=readFileSync(new URL('../merge/story/workshop.mjs',import.meta.url),'utf8');
   assert.match(html,/<p id="workshop-next-guidance" role="status" aria-live="polite">/);
   assert.match(html,/<a id="workshop-next-action"[^>]* hidden>/);
+  // Author CSS sets .journey-primary to display:flex; the existing
+  // .journey-actions [hidden] override must actually cover this new link.
+  assert.match(html,/<div class="journey-actions">\s*<a id="workshop-next-action"[^>]* hidden>/);
+  const css=readFileSync(new URL('../merge/story/story.css',import.meta.url),'utf8');
+  assert.match(css,/\.journey-actions \[hidden\]\{display:none!important\}/);
   assert.ok(ui.includes('nextStoryWorkshopAction(narrative,{state,raw,blocked,reason})'));
   assert.ok(ui.includes("nextLink.hidden=disabled||!nextAction.href"));
   assert.ok(ui.includes("nextLink.href=nextAction.href"));
