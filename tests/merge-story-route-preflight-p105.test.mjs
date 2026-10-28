@@ -35,6 +35,8 @@ test('P105 workshop anchor preflight checks both saves and page suspension',()=>
   assert.ok(ui.includes('storyRaw:narrative.raw,workshopRaw:raw,href:nextAction.href'));
   assert.ok(ui.includes("$('workshop-next-action').addEventListener('click',event=>"));
   assert.ok(ui.includes('const story=readStorySave(storage);\n  const workshop=readStoryWorkshop(storage);'));
-  assert.ok(ui.includes('pageSuspended()||!isStoryWorkshopRouteCurrent(snapshot,story,workshop)'));
+  assert.ok(ui.includes('const storyAfterWorkshop=readStorySave(storage);'));
+  assert.ok(ui.includes('storyAfterWorkshop.raw!==story.raw'));
+  assert.ok(ui.includes('!isStoryWorkshopRouteCurrent(snapshot,storyAfterWorkshop,workshop)'));
   assert.ok(ui.includes('event.preventDefault()'));
 });
