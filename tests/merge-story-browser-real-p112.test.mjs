@@ -115,18 +115,18 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     await navigate(a,'/merge/story.html','#journey-read');
     await until(async()=>evalOn(a,"document.getElementById('save-state').textContent.includes('已保存')"),'story initialized');
     await evalOn(a,'localStorage.setItem('+JSON.stringify(normalKey)+',"normal-mode-sentinel");true');
-    async function finishScene(id){
-      await until(async()=>evalOn(a,"!document.getElementById('journey-read').hidden&&!document.getElementById('journey-read').disabled"),'readable '+id);
-      await evalOn(a,"document.getElementById('journey-read').click();true");
-      await until(async()=>evalOn(a,"document.getElementById('story-dialog').open"),'dialog '+id);
-      assert.equal(await evalOn(a,"document.getElementById('story-dialog').open"),true);
-      await evalOn(a,"document.querySelector('#dialog-choices button')?.click();true");
-      await evalOn(a,"document.getElementById('complete-story').click();true");
+    async function finishScene(id,p=a){
+      await until(async()=>evalOn(p,"!document.getElementById('journey-read').hidden&&!document.getElementById('journey-read').disabled"),'readable '+id);
+      await evalOn(p,"document.getElementById('journey-read').click();true");
+      await until(async()=>evalOn(p,"document.getElementById('story-dialog').open"),'dialog '+id);
+      assert.equal(await evalOn(p,"document.getElementById('story-dialog').open"),true);
+      await evalOn(p,"document.querySelector('#dialog-choices button')?.click();true");
+      await evalOn(p,"document.getElementById('complete-story').click();true");
       await until(async()=>{
-        const data=await readJSON(a,storyKey);
+        const data=await readJSON(p,storyKey);
         return data.packs.core.completed.main.includes(id);
       },'persist '+id);
-      await until(async()=>evalOn(a,"!document.getElementById('story-dialog').open"),'dialog closed '+id);
+      await until(async()=>evalOn(p,"!document.getElementById('story-dialog').open"),'dialog closed '+id);
     }
     await finishScene('arrival');
     await finishScene('signboard');
@@ -322,6 +322,57 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
     assert.equal(await evalOn(b,
       "document.querySelectorAll('#workshop-board button').length"),56);
+    // P116: a REAL first order is fulfilled through the rendered workshop
+    // button after independent damaged-save recovery, never by editing
+    // localStorage or calling engine functions directly from the test.
+    await navigate(b,'/merge/story.html','#journey-read');
+    await until(async()=>evalOn(b,
+      "document.getElementById('save-state')?.textContent.includes('已保存')"),
+      'recovered narrative ready for real first order');
+    await finishScene('arrival',b);
+    await finishScene('signboard',b);
+    await navigate(b,'/merge/story-workshop.html','#workshop-board');
+    await until(async()=>evalOn(b,
+      "document.querySelectorAll('#workshop-board button').length===56"),
+      'recovered board ready for real order');
+    const initialOrderState=await readJSON(b,workshopKey);
+    assert.equal(initialOrderState.progress.orders,0,'recovery starts with zero orders');
+    const readyOrderIndex=initialOrderState.orders.findIndex(order=>
+      initialOrderState.board.some(item=>item?.kind==='material'&&
+        item.chain===order.chain&&item.tier===order.tier));
+    assert.ok(readyOrderIndex>=0,'starting board must contain a deliverable real order');
+    assert.equal(await evalOn(b,
+      "document.querySelectorAll('#workshop-orders .workshop-order button')["+
+      readyOrderIndex+"].disabled"),false);
+    await evalOn(b,
+      "document.querySelectorAll('#workshop-orders .workshop-order button')["+
+      readyOrderIndex+"].click();true");
+    await until(async()=>{
+      try{return (await readJSON(b,workshopKey)).progress.orders===1;}
+      catch{return false;}
+    },'real first-order delivery persisted');
+    const delivered=await readJSON(b,workshopKey);
+    assert.ok(delivered.coins>0,'real order grants story-only coins');
+    assert.equal(delivered.revision,initialOrderState.revision+1,
+      'first delivery is one transaction, not an auto-replayed order');
+    const deliveredRaw=await readRaw(b,workshopKey);
+    assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
+    await navigate(b,'/merge/story.html','#journey-read');
+    await until(async()=>evalOn(b,
+      "!document.getElementById('journey-read').hidden&&"+
+      "document.getElementById('progress-count').textContent.includes('2 / 12')"),
+      'real first-order unlock reflected in narrative UI');
+    assert.equal(await evalOn(b,
+      "document.getElementById('journey-workshop').hidden"),true,
+      'after delivery, story should offer the next scene instead of another order');
+    await finishScene('first-order',b);
+    assert.deepEqual((await readJSON(b,storyKey)).packs.core.completed.main,
+      ['arrival','signboard','first-order'],
+      'real order must unlock exactly the next narrative scene');
+    assert.equal(await readRaw(b,workshopKey),deliveredRaw,
+      'reading the unlocked scene cannot replay the order or spend coins');
+    assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
+    t.diagnostic('P116 real Chromium: damaged-save recovery → real order button → first-order scene unlock, no normal-mode writes');
     t.diagnostic('P115 real Chromium: independent corrupt resets, two-stage refusals, stale-consent CAS and mode isolation; no mobile claim');
     t.diagnostic('Real Chromium: first-order gate, two-tab protection, two independent corrupt downloads and stale-consent refusal; no mobile claim');
   });
