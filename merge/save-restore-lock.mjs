@@ -32,7 +32,7 @@ export async function coordinateNormalSaveRestore(fileText,storage,lockManager,
     getItem:key=>storage.getItem(key),
     setItem:(key,value)=>{
       if(!permitted())throw new Error('RESTORE_LIFECYCLE_INVALIDATED');
-      return storage.setItem(key,value);
+      return storage['setItem'](key,value);
     }
   };
   try {

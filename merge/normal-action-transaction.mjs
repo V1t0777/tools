@@ -88,6 +88,14 @@ export async function commitNormalClockWithLock(locks,storage,{expectedRaw,now=D
   if(typeof expectedRaw!=='string')return reject('NO_TRUSTED_BASELINE');
   if(!Number.isFinite(now)||now<0)return reject('INVALID_CLOCK');
   if(typeof canCommit!=='function')return reject('CLOCK_GUARD_UNAVAILABLE');
+  const permitted=()=>{try{return canCommit()===true;}catch{return false;}};
+  const guardedStorage={
+    getItem:key=>storage.getItem(key),
+    setItem:(key,value)=>{
+      if(!permitted())throw new Error('CLOCK_LIFECYCLE_INVALIDATED');
+      return storage.setItem(key,value);
+    }
+  };
   return withNormalSaveLock(locks,()=>{
     if(!permitted())return reject('CLOCK_CANCELLED_BEFORE_WRITE');
     const current=peekLocalV3(guardedStorage);
