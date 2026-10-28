@@ -20,7 +20,7 @@ import {verifyStoryDialoguePublication} from './dialogue-publication-guard.mjs';
 import {shouldBlockStoryStorageEvent} from './storage-event-guard.mjs';
 import {shouldRefreshStoryDependencyEvent} from './storage-event-guard.mjs';
 import {STORY_WORKSHOP_KEY,readStoryWorkshop} from './workshop-storage.mjs';
-import {inspectStoryWorkshopRequirement,inspectStoryWorkshopRequirementFromRead,storyWorkshopRequirement,storyWorkshopGoalHref} from './workshop-gate.mjs';
+import {inspectStoryWorkshopRequirementFromRead,storyWorkshopRequirement,storyWorkshopGoalHref} from './workshop-gate.mjs';
 import {storyDialogueCommitAllowed} from './dialogue-commit-guard.mjs';
 import {nextCoreStoryJourney,nextCoreSideJourney,nextCoreDailyJourney} from './journey-guide.mjs';
 import {createEmptyStoryProgress,STORY_SAVE_KEY} from '../mode-boundaries.mjs';
@@ -140,14 +140,14 @@ function status(){
       : '剧情进度已保存到此浏览器；不与普通模式共享经济，也不提供云存档。';
 }
 function completed(entry){return !!progress.packs.core?.completed[entry.kind].includes(entry.id);}
-function card(entry,done=false){
+function card(entry,done=false,workshopRead=null){
   const wrapper=document.createElement('article');wrapper.className='story-card';
   wrapper.id='story-'+entry.id;
   wrapper.tabIndex=-1;
   const head=document.createElement('div');head.className='story-head';
   const title=document.createElement('h3');title.textContent=entry.title;
   const state=document.createElement('span');state.className='status';
-  const requirement=inspectStoryWorkshopRequirement(entry.id,store);
+  const requirement=inspectStoryWorkshopRequirementFromRead(entry.id,workshopRead);
   state.textContent=done?'已阅读':blocked?'存档需核对'
     :requirement.required&&requirement.blocked?'工作台需核对'
       :requirement.required&&!requirement.met?'待完成经营目标'
@@ -186,8 +186,12 @@ function render(){
   $('chapter-hint').textContent=next?'下一段 · '+next.chapter+' · '+next.title:'第一卷完结：灯火重新亮起，但远方仍有未讲完的故事。';
   // Read-only first-volume guide: take the same real prerequisite path as
   // story cards; a locked scene never becomes a shortcut or a reward grant.
+  // One validated workshop read per render: main/side hints and story cards
+  // must not display mutually contradictory milestones if another tab writes
+  // between independent getItem() calls. Click/commit paths still revalidate.
+  const workshopForRender=blocked?null:readStoryWorkshop(store);
   const journey=blocked?{kind:'unavailable',sideCount:0}:
-    nextCoreStoryJourney(progress,readStoryWorkshop(store));
+    nextCoreStoryJourney(progress,workshopForRender);
   const journeyButton=$('journey-read'),journeyLink=$('journey-workshop');
   journeyButton.hidden=journey.kind!=='story';
   journeyButton.disabled=blocked||saving||pageSuspended();
@@ -209,7 +213,7 @@ function render(){
   // A side scene with an unmet real warehouse goal must never be advertised
   // as directly readable. Prefer other genuinely available side scenes.
   const sideJourney=blocked?{kind:'unavailable'}:
-    nextCoreSideJourney(progress,readStoryWorkshop(store));
+    nextCoreSideJourney(progress,workshopForRender);
   const sideButton=$('journey-side-read'),sideLink=$('journey-side-workshop');
   sideButton.hidden=sideJourney.kind!=='story';
   sideButton.disabled=blocked||saving||pageSuspended();
@@ -244,7 +248,7 @@ function render(){
     const todays=dailyStoryIncident(progress,CORE_STORY_PACK,day);
     // Never display a provisional event that may change while its durable
     // same-day marker is still being committed under the story Web Lock.
-    if(todays&&dayPinned&&!blocked)list.append(card(todays,completed(todays)));
+    if(todays&&dayPinned&&!blocked)list.append(card(todays,completed(todays),workshopForRender));
     const note=document.createElement('p');note.className='muted';
     note.textContent=blocked
       ? '剧情存档需核对，今日事件入口已暂停；不会展示未固定的临时事件。'
@@ -257,8 +261,8 @@ function render(){
   }else{
     const unlocked=availableStoryEntries(progress,CORE_STORY_PACK,kind);
     const finished=completedStoryEntries(progress,CORE_STORY_PACK,kind);
-    for(const item of unlocked)list.append(card(item));
-    for(const item of finished.slice().reverse())list.append(card(item,true));
+    for(const item of unlocked)list.append(card(item,false,workshopForRender));
+    for(const item of finished.slice().reverse())list.append(card(item,true,workshopForRender));
   }
   if(!list.querySelector('.story-card')){
     const empty=document.createElement('div');empty.className='empty';
