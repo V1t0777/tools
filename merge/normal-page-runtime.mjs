@@ -208,15 +208,32 @@ export function createNormalPageRuntime({locks,storage,onVerified}={}) {
       if(flight.busy||resetBusy)return reject('UI_TRANSACTION_BUSY');
       if(typeof expectedRaw!=='string'||expectedRaw!==raw)
         return reject('STALE_BASELINE');
+      // The native confirmation was given for this lifecycle generation.
+      // A synchronous preflight read can dispatch pagehide/storage events:
+      // never capture a NEW epoch after that read and reuse old consent.
+      const restoreEpoch=epoch;
+      const stillAuthorized=()=>phase==='ready'&&!flight.blocked&&
+        !flight.busy&&!resetBusy&&epoch===restoreEpoch&&
+        raw===expectedRaw&&signal?.aborted!==true;
       const preview=previewNormalSaveImport(fileText,storage,{expectedRaw});
       if(!preview.ok){
         if(preview.reason==='CURRENT_SAVE_CHANGED')block(preview.reason);
         return reject(preview.reason);
       }
+      if(!stillAuthorized())return reject('RESTORE_CANCELLED_BEFORE_WRITE');
+      // A noncooperating tab may replace localStorage during preview while
+      // its getItem() still returns the earlier bytes. Re-read before even
+      // requesting a Web Lock; the locked commit also rechecks this baseline.
+      let currentRaw;
+      try{currentRaw=storage.getItem(SAVE_KEY);}
+      catch{block('STORAGE_UNAVAILABLE');return reject('STORAGE_UNAVAILABLE');}
+      if(!stillAuthorized())return reject('RESTORE_CANCELLED_BEFORE_WRITE');
+      if(currentRaw!==expectedRaw){
+        block('CURRENT_SAVE_CHANGED');
+        return reject('CURRENT_SAVE_CHANGED');
+      }
       if(preview.wouldDecreaseRevision&&allowDowngrade!==true)
         return reject('DOWNGRADE_CONFIRMATION_REQUIRED');
-      if(signal?.aborted)return reject('RESTORE_CANCELLED_BEFORE_WRITE');
-      const restoreEpoch=epoch;
       // Re-check after lock acquisition: invalidated UI confirmation must
       // never reserve a backup or write even if the Web Lock arrived late.
       const canCommit=()=>phase==='ready'&&!flight.blocked&&!resetBusy&&
