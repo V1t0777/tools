@@ -325,10 +325,28 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     return {x:r.left+r.width/2,y:r.top+r.height/2};
   })()`);
   assert.ok(center.x>0&&center.x<390&&center.y>0&&center.y<844,'producer must be onscreen for native touch');
+  await evalOn(b,`(()=>{
+    window.__touchTrace=[];
+    for(const type of ['touchstart','touchend','pointerdown','pointerup','click'])
+      document.addEventListener(type,event=>window.__touchTrace.push({
+        type,target:event.target?.className,detail:event.detail,
+        x:event.clientX,y:event.clientY
+      }),true);
+    return true;
+  })()`);
   await call('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[
     {x:center.x,y:center.y,id:1,radiusX:2,radiusY:2,force:1}
   ]},b.sessionId);
+  await sleep(75);
   await call('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]},b.sessionId);
+  const trace=await evalOn(b,`({
+    events:window.__touchTrace,
+    hidden:document.hidden,
+    hit:document.elementFromPoint(${center.x},${center.y})?.className,
+    notice:document.getElementById('notice').textContent,
+    status:document.getElementById('save-status').textContent
+  })`);
+  t.diagnostic('CDP native touch trace: '+JSON.stringify(trace));
   await until(async()=> (await readSave(b)).revision===beforeTouch.revision+1,'native touch producer persisted once');
   await sleep(250);
   const afterTouch=await readSave(b);
