@@ -19,7 +19,7 @@ const unchanged=Object.freeze({ok:true,changed:false,skipped:true});
  */
 export function attachNormalPageLifecycle({
   runtime,win,doc,storage,cancelGesture=()=>{},onResult=()=>{},
-  onFocus=()=>{},onBlur=()=>{}
+  onFocus=()=>{},onBlur=()=>{},onReadyForStartup=()=>{}
 }={}) {
   if(!runtime||typeof runtime.reconcile!=='function'||
       typeof runtime.invalidate!=='function'||typeof runtime.block!=='function'||
@@ -29,7 +29,8 @@ export function attachNormalPageLifecycle({
       typeof doc.removeEventListener!=='function'||
       typeof storage?.getItem!=='function'||
       typeof cancelGesture!=='function'||typeof onResult!=='function'||
-      typeof onFocus!=='function'||typeof onBlur!=='function')
+      typeof onFocus!=='function'||typeof onBlur!=='function'||
+      typeof onReadyForStartup!=='function')
     throw new TypeError('INVALID_NORMAL_PAGE_LIFECYCLE');
 
   let detached=false,handling=false,pageGone=false,visibilitySuspended=false,resumePending=false,lifecycleEpoch=0;
@@ -100,6 +101,16 @@ export function attachNormalPageLifecycle({
   // visible. Never apply this exception to a started/blocked transaction.
   const mayResumeCold=()=>runtime.phase==='cold'&&
     runtime.blocked!==true&&runtime.busy!==true;
+  const notifyColdStartup=()=>{
+    if(!mayResumeCold()||doc.hidden||pageGone||visibilitySuspended)return;
+    try{
+      const result=onReadyForStartup();
+      if(result&&typeof result.then==='function'){
+        void Promise.resolve(result).catch(()=>{});
+        throw new Error('ASYNC_COLD_STARTUP');
+      }
+    }catch{fail('LIFECYCLE_HANDLER_FAILED','cold-start');}
+  };
   const visibilityChanged=()=>{
     if(detached)return;
     if(doc.hidden) {
@@ -113,6 +124,7 @@ export function attachNormalPageLifecycle({
       if(!pageGone||resumePending){
         visibilitySuspended=false;
         if(resumePending){pageGone=false;resumePending=false;}
+        notifyColdStartup();
       }
     } else if(!pageGone||resumePending) {
       // Safari may deliver BFCache pageshow while still hidden. A subsequent
@@ -142,6 +154,7 @@ export function attachNormalPageLifecycle({
       // will read and verify storage under the normal exclusive Web Lock.
       if(doc.hidden){if(pageGone)resumePending=true;return;}
       pageGone=false;visibilitySuspended=false;resumePending=false;
+      notifyColdStartup();
       return;
     }
     if(doc.hidden) {

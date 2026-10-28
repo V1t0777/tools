@@ -942,6 +942,7 @@ if(store)lifecycle=attachNormalPageLifecycle({
   cancelGesture(){cancelStaleGesture();selected=-1;activeGuidance=null;},
   onBlur(){if(importPicker)importPicker.blurred=true;},
   onFocus(){releaseOrphanedPickerAfterReturn();},
+  onReadyForStartup(){startNormalOnce();},
   onResult(result){
     if(!result.ok)pauseUnsafe(result.reason,
       '跨标签或后台存档状态异常，已暂停操作；请备份并重新打开页面核对');
@@ -977,6 +978,6 @@ function startNormalOnce(){
   else if(!result.recovered)hint('欢迎来到云屿百物铺！试试合成两片茶芽。');
   }).catch(()=>pauseUnsafe('STARTUP_UNCERTAIN'));
 }
-document.addEventListener('visibilitychange',startNormalOnce);
-window.addEventListener('pageshow',startNormalOnce);
+// Lifecycle bridge owns the sole BFCache/visibility listeners and notifies
+// this one-shot starter only after the cold page is safe to begin.
 startNormalOnce();

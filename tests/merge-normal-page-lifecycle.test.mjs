@@ -337,3 +337,19 @@ test('P2.65af never-started pagehide still requires pageshow to resume',()=>{
   assert.deepEqual(h.db.writes,[]);
   h.bridge.detach();
 });
+
+
+test('P2.65af cold startup callback only fires after safe visible return',()=>{
+  const db=storage(),ui=events(),calls=[];
+  const runtime=createNormalPageRuntime({storage:db,locks:locks()});
+  const bridge=attachNormalPageLifecycle({runtime,win:ui.win,doc:ui.doc,
+    storage:db,onReadyForStartup:()=>calls.push('ready')});
+  ui.doc.hidden=true;ui.doc.emit('visibilitychange');
+  ui.win.emit('pagehide');
+  ui.doc.hidden=false;ui.doc.emit('visibilitychange');
+  assert.deepEqual(calls,[],'visibility without pageshow cannot start');
+  ui.win.emit('pageshow',{persisted:true});
+  assert.deepEqual(calls,['ready']);
+  assert.deepEqual(db.writes,[],'bridge must not write by itself');
+  bridge.detach();
+});

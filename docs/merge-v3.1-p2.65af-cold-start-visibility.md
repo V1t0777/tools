@@ -19,3 +19,7 @@
 - 启动事务一旦已经尝试、在等待 Web Lock 期间发生页面离开，仍保持 fail-closed；不自动重试可能已经部分写入的事务。
 - 不支持 Web Locks 的环境继续拒绝写入。跨标签非协作写入及 localStorage 非原子性仍需真实浏览器验证。
 - 不修改剧情源文件、main、正式导航、部署白名单、Cloudflare、Supabase 或云同步。保持 PR #58/#59 Draft/Open，不发布；必须核对新 SHA 的三项 Actions 检查与部署隔离。
+
+## CI 兼容补充
+
+首次提交的全仓库测试发现旧版静态约束禁止普通页面重复注册 `window.pageshow` 监听器。现将冷启动通知接入既有 `attachNormalPageLifecycle` 桥接器的同步 `onReadyForStartup` 回调，不再由普通页面额外注册 `pageshow` 或 `visibilitychange` 启动监听器；新增桥接回调回归。失败的既有测试保留，不降低断言。
