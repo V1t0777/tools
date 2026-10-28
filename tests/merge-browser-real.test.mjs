@@ -336,6 +336,7 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
         type,target:event.target?.className,detail:event.detail,
         slot:event.target?.closest?.('[data-slot]')?.dataset.slot,
         connected:event.target?.isConnected,
+        isPrimary:event.isPrimary,button:event.button,pointerType:event.pointerType,
         x:event.clientX,y:event.clientY
       }),true);
     return true;
@@ -343,6 +344,13 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   await call('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[
     {x:center.x,y:center.y,id:1,radiusX:2,radiusY:2,force:1}
   ]},b.sessionId);
+  const afterDown=await evalOn(b,`({
+    notice:document.getElementById('notice').textContent,
+    status:document.getElementById('save-status').textContent,
+    trace:window.__touchTrace,
+    pickerHidden:document.getElementById('cancel-normal-import').hidden
+  })`);
+  t.diagnostic('CDP touch after pointerdown: '+JSON.stringify(afterDown));
   await sleep(75);
   await call('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]},b.sessionId);
   const trace=await evalOn(b,`({
