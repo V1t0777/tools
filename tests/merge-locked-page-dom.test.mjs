@@ -84,7 +84,7 @@ let fixtureId=0;
 const settle=async()=>{
   for(let i=0;i<8;i++)await new Promise(resolve=>setImmediate(resolve));
 };
-async function mount({initialRaw=null,locksAvailable=true}={}) {
+async function mount({initialRaw=null,locksAvailable=true,initialHidden=false}={}) {
   const map=new Map(),writes=[];
   if(initialRaw!==null)map.set(SAVE_KEY,initialRaw);
   map.set(STORY_SAVE_KEY,'story-not-touched');
@@ -108,7 +108,7 @@ async function mount({initialRaw=null,locksAvailable=true}={}) {
   }};
   const ids=new Map();
   const doc=new Element('document');
-  doc.hidden=false;
+  doc.hidden=initialHidden;
   doc.body=new Element('body');
   doc.getElementById=id=>{
     if(!ids.has(id))ids.set(id,new Element(id==='supply-producer'?'select':'div'));
@@ -1649,4 +1649,46 @@ test('P2.65ab explicit cancel revokes restore confirmation while Web Lock is pen
   assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null);
   assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
   assert.equal(button.disabled,false);
+});
+
+
+test('P2.65af hidden first load defers startup without creating or blocking a save',async()=>{
+  const h=await mount({initialHidden:true});
+  assert.equal(h.storage.getItem(SAVE_KEY),null);
+  assert.deepEqual(h.writes,[]);
+  assert.match(h.id('save-status').textContent,/正在核验/);
+  h.doc.hidden=false;
+  h.doc.dispatch('visibilitychange');
+  await settle();
+  assert.equal(h.saved().revision,0);
+  assert.deepEqual(h.writes,[SAVE_KEY]);
+  assert.match(h.id('save-status').textContent,/已保存于此浏览器/);
+  h.win.dispatch('pageshow',{persisted:true});
+  await settle();
+  assert.deepEqual(h.writes,[SAVE_KEY],'resumed pageshow must not replay startup');
+});
+
+test('P2.65af pagehide before first startup requires pageshow before any write',async()=>{
+  const h=await mount({initialHidden:true});
+  h.win.dispatch('pagehide');
+  h.doc.hidden=false;
+  h.doc.dispatch('visibilitychange');
+  await settle();
+  assert.deepEqual(h.writes,[],'visibility alone must not revive pagehide');
+  h.win.dispatch('pageshow',{persisted:true});
+  await settle();
+  assert.equal(h.saved().revision,0);
+  assert.deepEqual(h.writes,[SAVE_KEY]);
+});
+
+test('P2.65af hidden BFCache return defers first startup until visible',async()=>{
+  const h=await mount({initialHidden:true});
+  h.win.dispatch('pagehide');
+  h.win.dispatch('pageshow',{persisted:true});
+  assert.deepEqual(h.writes,[]);
+  h.doc.hidden=false;
+  h.doc.dispatch('visibilitychange');
+  await settle();
+  assert.equal(h.saved().revision,0);
+  assert.deepEqual(h.writes,[SAVE_KEY]);
 });

@@ -942,6 +942,7 @@ if(store)lifecycle=attachNormalPageLifecycle({
   cancelGesture(){cancelStaleGesture();selected=-1;activeGuidance=null;},
   onBlur(){if(importPicker)importPicker.blurred=true;},
   onFocus(){releaseOrphanedPickerAfterReturn();},
+  onReadyForStartup(){startNormalOnce();},
   onResult(result){
     if(!result.ok)pauseUnsafe(result.reason,
       '跨标签或后台存档状态异常，已暂停操作；请备份并重新打开页面核对');
@@ -960,7 +961,14 @@ window.setInterval(async()=>{
 },1000);
 byId('save-status').textContent='正在核验本地进度 · 暂不可操作';
 render();
-void runtime.start({canStart:()=>!pageSuspended()}).then(result=>{
+// iOS Safari can evaluate a background tab before it becomes visible.
+// Do not consume the one-shot startup while hidden: that would permanently
+// block an untouched save without ever attempting a write.
+let startupAttempted=false;
+function startNormalOnce(){
+  if(startupAttempted||pageSuspended())return;
+  startupAttempted=true;
+  void runtime.start({canStart:()=>!pageSuspended()}).then(result=>{
   if(!result.ok){
     pauseUnsafe(result.reason||'STARTUP_UNCERTAIN',
       '本地存档无法安全恢复或确认写入，原始数据不会自动覆盖');
@@ -968,4 +976,8 @@ void runtime.start({canStart:()=>!pageSuspended()}).then(result=>{
   }
   if(result.migrated)hint('已保留旧版试玩进度，并升级为 P2 存档');
   else if(!result.recovered)hint('欢迎来到云屿百物铺！试试合成两片茶芽。');
-}).catch(()=>pauseUnsafe('STARTUP_UNCERTAIN'));
+  }).catch(()=>pauseUnsafe('STARTUP_UNCERTAIN'));
+}
+// Lifecycle bridge owns the sole BFCache/visibility listeners and notifies
+// this one-shot starter only after the cold page is safe to begin.
+startNormalOnce();
