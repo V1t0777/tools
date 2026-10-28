@@ -31,8 +31,14 @@ async function mount({makeLocks,corruptWorkshop=false}={}){
       callbacks.push(callback);this.listeners.set(type,callbacks);
     }
     async fire(type,event={}){
-      for(const callback of this.listeners.get(type)??[])
-        await callback({type,target:this,...event});
+      const dispatched={type,target:this,defaultPrevented:false,
+        preventDefault(){this.defaultPrevented=true;},
+        stopImmediatePropagation(){this.immediateStopped=true;},...event};
+      for(const callback of this.listeners.get(type)??[]){
+        await callback(dispatched);
+        if(dispatched.immediateStopped)break;
+      }
+      return dispatched;
     }
   }
   const elements=new Map();
@@ -335,4 +341,90 @@ test('P104 workshop route and board remain suspended if story read triggers page
 
 test('P104 workshop route and board remain suspended if story read hides page',async()=>{
   await checkNarrativeReadSuspension('hidden');
+});
+
+
+test('P107 BFCache cancels reset pointer pressed before pagehide; fresh pointer still works',async()=>{
+  const h=await mount();
+  try{
+    const reset=h.document.getElementById('reset-workshop');
+    let confirmations=0;
+    h.window.confirm=()=>{confirmations++;return true;};
+    await reset.fire('pointerdown',{pointerId:107});
+    await h.window.emit('pagehide');
+    await h.window.emit('pageshow',{persisted:true});
+    const oldClick=await reset.fire('click',{detail:1});
+    assert.equal(oldClick.defaultPrevented,true);
+    assert.equal(confirmations,0,'old gesture must not open native destructive confirmation');
+    assert.equal(h.writes,0);
+    assert.match(h.notice(),/旧触控已取消/);
+    await reset.fire('pointerdown',{pointerId:108});
+    await reset.fire('click',{detail:1});
+    assert.equal(confirmations,1);
+    assert.equal(h.writes,1,'fresh gesture may reset with confirmation');
+    assert.equal(h.data.get(STORY_SAVE_KEY),'story-sentinel');
+    assert.equal(h.data.get(SAVE_KEY),'normal-sentinel');
+  }finally{h.restore();}
+});
+
+test('P107 pointercancel cannot trigger a delayed reset; fresh keyboard activation is independent',async()=>{
+  const h=await mount();
+  try{
+    const reset=h.document.getElementById('reset-workshop');
+    let confirmations=0;
+    h.window.confirm=()=>{confirmations++;return true;};
+    await reset.fire('pointerdown',{pointerId:109});
+    await reset.fire('pointercancel',{pointerId:109});
+    const cancelled=await reset.fire('click',{detail:1});
+    assert.equal(cancelled.defaultPrevented,true);
+    assert.equal(confirmations,0);
+    assert.equal(h.writes,0);
+    await reset.fire('click',{detail:0});
+    assert.equal(confirmations,1,'keyboard click is a new deliberate action');
+    assert.equal(h.writes,1);
+    assert.equal(h.data.get(SAVE_KEY),'normal-sentinel');
+  }finally{h.restore();}
+});
+
+test('P107 expired BFCache pointer cannot launch corrupt-save export or old story navigation',async()=>{
+  const h=await mount({corruptWorkshop:true});
+  try{
+    let confirmations=0;
+    h.window.confirm=()=>{confirmations++;return true;};
+    const exportButton=h.document.getElementById('export-corrupt-workshop');
+    const route=h.document.getElementById('workshop-next-action');
+    await exportButton.fire('pointerdown',{pointerId:110});
+    await route.fire('pointerdown',{pointerId:111});
+    await h.window.emit('pagehide');
+    await h.window.emit('pageshow',{persisted:true});
+    const oldExport=await exportButton.fire('click',{detail:1});
+    const oldRoute=await route.fire('click',{detail:1});
+    assert.equal(oldExport.defaultPrevented,true);
+    assert.equal(oldRoute.defaultPrevented,true);
+    assert.equal(confirmations,0);
+    assert.equal(h.writes,0);
+    assert.equal(h.data.get(STORY_WORKSHOP_KEY),'{broken');
+    assert.equal(h.data.get(STORY_SAVE_KEY),'story-sentinel');
+    assert.equal(h.data.get(SAVE_KEY),'normal-sentinel');
+  }finally{h.restore();}
+});
+
+test('P107 a story-save refresh invalidates a held persistent reset pointer',async()=>{
+  const h=await mount();
+  try{
+    const reset=h.document.getElementById('reset-workshop');
+    let confirmations=0;
+    h.window.confirm=()=>{confirmations++;return true;};
+    await reset.fire('pointerdown',{pointerId:112});
+    await h.window.emit('storage',{key:STORY_SAVE_KEY,storageArea:h.window.localStorage});
+    const stale=await reset.fire('click',{detail:1});
+    assert.equal(stale.defaultPrevented,true);
+    assert.equal(confirmations,0);
+    assert.equal(h.writes,0);
+    await reset.fire('pointerdown',{pointerId:113});
+    await reset.fire('click',{detail:1});
+    assert.equal(confirmations,1);
+    assert.equal(h.writes,1);
+    assert.equal(h.data.get(SAVE_KEY),'normal-sentinel');
+  }finally{h.restore();}
 });

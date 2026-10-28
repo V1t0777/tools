@@ -26,6 +26,9 @@ const store = (() => { try { return window.localStorage; } catch { return null; 
 const initialOriginalRaw=(()=>{try{return store?.getItem(SAVE_KEY)??null;}catch{return null;}})();
 let state=createInitialState(),selected=-1,drag=null,ignoreNextClick=false;
 let renderGeneration=0;
+// Persistent controls are not recreated by render(); revoke pointer leases
+// whenever a native chooser starts or the page leaves the foreground.
+let persistentGestureGeneration=0;
 let noticeTimer=0,activeGuidance=null,saveIssue='STARTUP_REQUIRED',persistedRaw=null;
 const runtime=createNormalPageRuntime({
   storage:store,locks:window.navigator?.locks??null,
@@ -203,16 +206,23 @@ function guardRenderedAction(action){
 // native import chooser is active must not turn into a delayed compatibility
 // click after cancellation. Dynamic buttons already use render generations.
 function guardPersistentChooserClick(button,action){
-  let stalePointer=false;
-  button.addEventListener('pointerdown',()=>{stalePointer=importPending();});
+  let stalePointer=false,pointerGeneration=null;
+  button.addEventListener('pointerdown',()=>{
+    pointerGeneration=persistentGestureGeneration;
+    stalePointer=importPending();
+  });
   button.addEventListener('pointercancel',()=>{stalePointer=true;});
   button.addEventListener('click',event=>{
-    if(stalePointer&&event.detail!==0){
-      stalePointer=false;
-      hint('导入期间的旧触控已取消，请重新点击当前按钮');
+    // The pointer may have started BEFORE the chooser opened or before a
+    // BFCache transition. Its later compatibility click is still obsolete.
+    const expired=stalePointer||(pointerGeneration!==null&&
+      pointerGeneration!==persistentGestureGeneration);
+    stalePointer=false;pointerGeneration=null;
+    if(expired&&event.detail!==0){
+      hint('页面或导入状态已变化，请重新点击当前按钮');
       return;
     }
-    if(event.detail===0)stalePointer=false; // Keyboard is a new intent.
+    // detail===0 is a fresh keyboard activation, not a pointer replay.
     action();
   });
 }
@@ -672,6 +682,7 @@ function abortImportOnLifecycleExit(){
     '浏览器未能确认导入已取消，已暂停操作；请保留存档并重新打开页面核对');
 }
 window.addEventListener('pagehide',()=>{
+  persistentGestureGeneration++;
   try{abortImportOnLifecycleExit();}
   finally{
     importEpoch++;importPicker=null;queuedHiddenSelection=null;
@@ -679,6 +690,7 @@ window.addEventListener('pagehide',()=>{
   }
 });
 document.addEventListener('visibilitychange',()=>{
+  if(document.hidden)persistentGestureGeneration++;
   if(!document.hidden){
     if(queuedHiddenSelection){
       const queued=queuedHiddenSelection;
@@ -773,6 +785,7 @@ if(saveActions){
     // Opening a native chooser invalidates selected cells, captured drags
     // and detached action buttons. Late pointer events cannot become new
     // gameplay intent after the chooser is cancelled.
+    persistentGestureGeneration++;
     cancelStaleGesture();selected=-1;activeGuidance=null;render();
     // The chooser is bound to the exact save and page lifecycle at the
     // initiating user gesture, not to whichever save is current on return.

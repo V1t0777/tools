@@ -15,6 +15,7 @@ import {storyGardenBuildAvailable,storyHarborBuildAvailable,storyStorefrontBuild
 import {storyBuildingWriteAllowed} from './building-commit-guard.mjs';
 import {nextStoryConstructionBudget,wouldSpendStoryConstructionReserve} from './supply-budget.mjs';
 import {nextStoryWorkshopAction,isStoryWorkshopRouteCurrent} from './workshop-next-step.mjs';
+import {guardStoryPersistentGesture} from './persistent-gesture-guard.mjs';
 const $=id=>document.getElementById(id);
 const storage=(()=>{try{return window.localStorage;}catch{return null;}})();
 const webLocks=(()=>{try{return window.navigator?.locks??null;}catch{return null;}})();
@@ -304,6 +305,15 @@ function touch(index){
   if(selected===-1){if(item){selected=index;render();}return;}
   if(selected===index){selected=-1;render();return;}
   commit(moveOrMerge(state,selected,index));
+}
+// Persistent buttons/links survive render(). A pointer started before a
+// BFCache transition or another render cannot authorize a delayed click.
+// This only revokes stale gestures; every write still uses the original CAS.
+for(const id of ['workshop-next-action','store-selected','build-garden',
+  'build-harbor','build-storefront','export-corrupt-workshop','reset-workshop']){
+  guardStoryPersistentGesture($(id),
+    ()=>lifecycleEpoch+':'+storageEpoch+':'+renderGeneration,
+    ()=>$('board-notice').textContent='页面或存档状态已变化，旧触控已取消；请重新按下当前按钮。');
 }
 // Recheck both saves before following a link rendered before a peer-tab edit.
 $('workshop-next-action').addEventListener('click',event=>{
