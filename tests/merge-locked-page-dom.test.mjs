@@ -1372,7 +1372,11 @@ test('P2.65v normal export refuses a save changed by another tab during preparat
   try{
     URL.createObjectURL=()=>{created++;return 'blob:p265v-stale';};
     h.id('export-local-save').click();
-    assert.match(h.id('notice').textContent,/导出期间.*变化/);
+    // The new pre-export reconciliation detects the fork earlier than
+    // download preparation, and blocks the stale board rather than merely
+    // reporting a failed download. Keep the zero-download assertion below.
+    assert.match(h.id('notice').textContent,/检测到跨标签或后台存档变化/);
+    assert.match(h.id('save-status').textContent,/已暂停/);
     assert.equal(created,0);
     assert.equal(oldGet(SAVE_KEY),changed);
     assert.equal(h.writes.length,before);
