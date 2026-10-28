@@ -148,6 +148,41 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
       return raw!==null&&JSON.parse(raw).revision>=1;
     },'story workshop production persisted');
     const before=await readJSON(a,workshopKey);
+    // P114: real story → workshop → story → reload → workshop round-trip.
+    // A produced material is not a fulfilled order; re-entry must not unlock
+    // chapter two or any later construction and must not rewrite either save.
+    const workshopBeforeReturn=await readRaw(a,workshopKey);
+    await navigate(a,'/merge/story.html','#journey-read');
+    await until(async()=>evalOn(a,
+      "document.getElementById('progress-count').textContent.includes('2 / 12')"),
+      'first chapter progress restored after workshop');
+    assert.equal(await evalOn(a,"document.getElementById('journey-read').hidden"),true,
+      'production alone must not bypass the first delivered-order gate');
+    assert.equal(await evalOn(a,"document.getElementById('journey-workshop').hidden"),false);
+    await call('Page.reload',{ignoreCache:true},a.sessionId);
+    await until(async()=>evalOn(a,
+      "document.getElementById('save-state')?.textContent.includes('已保存')"),
+      'narrative reloaded with durable progress');
+    assert.equal(await evalOn(a,"document.getElementById('journey-read').hidden"),true);
+    assert.equal(await evalOn(a,"document.getElementById('journey-workshop').hidden"),false);
+    assert.deepEqual((await readJSON(a,storyKey)).packs.core.completed.main,
+      ['arrival','signboard'],'no extra story scenes may be committed on return');
+    assert.equal(await readRaw(a,workshopKey),workshopBeforeReturn,
+      'story return/reload must not rewrite workshop production');
+    assert.equal(await readRaw(a,normalKey),'normal-mode-sentinel');
+
+    await navigate(a,'/merge/story-workshop.html','#workshop-board');
+    await until(async()=>evalOn(a,
+      "document.querySelectorAll('#workshop-board button').length===56"),
+      'real workshop board restored after narrative reload');
+    for(const id of ['build-garden','build-harbor','build-storefront']){
+      assert.equal(await evalOn(a,
+        "document.getElementById("+JSON.stringify(id)+").disabled"),true,
+        id+' must stay gated until its real chapter and economy prerequisites');
+    }
+    assert.equal(await readRaw(a,workshopKey),workshopBeforeReturn,
+      'returning to workshop must not replay production');
+    assert.equal(await readRaw(a,normalKey),'normal-mode-sentinel');
     const b=await page();await front(b);
     await navigate(b,'/merge/story-workshop.html','#workshop-board');
     await until(async()=>evalOn(b,"document.querySelectorAll('#workshop-board button').length===56"),'second tab loaded');
