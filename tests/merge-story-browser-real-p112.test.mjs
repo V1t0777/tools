@@ -511,6 +511,13 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
       'narrative reload must not rewrite the three-order workshop save');
     assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
 
+    // Return to the workshop after the P118 narrative reload. The order
+    // buttons exist only on the workshop page; never inject engine actions.
+    await navigate(b,'/merge/story-workshop.html','#workshop-board');
+    await until(async()=>evalOn(b,
+      "document.querySelectorAll('#workshop-board button').length===56"),
+      'P119 real workshop ready after narrative reload');
+    assert.equal((await readJSON(b,workshopKey)).progress.orders,3);
     // P119: the real order generator rotates back to tea and bakery after
     // three deliveries. Use only the existing tier-1 pieces and rendered
     // 56-cell buttons to complete two more genuine tier-2 requests.
