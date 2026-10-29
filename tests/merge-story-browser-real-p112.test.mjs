@@ -9,55 +9,7 @@ import {join,resolve,extname,sep} from 'node:path';
 import {setTimeout as sleep} from 'node:timers/promises';
 import {BUILDINGS,getLevel} from '../merge/economy.mjs';
 import {simulateStoryBoard} from '../merge/story/board-simulation.mjs';
-import {createInitialState,fulfillOrder,moveOrMerge,produce,validateSave} from '../merge/engine.mjs';
-
-// P122: build a genuine engine-earned PRE-construction fixture. The browser
-// will click the real construction button; orders after the first five are
-// simulated through engine APIs, NOT falsely reported as browser UI deliveries.
-function earnGardenReadyFixture(){
-  let now=1_800_000_000_000,state=createInitialState(now),delivered=0;
-  for(let step=0;step<1000;step++){
-    if(getLevel(state.xp)>=BUILDINGS.garden.minLevel&&
-      state.coins>=BUILDINGS.garden.coins)break;
-    const ready=state.orders.find(order=>state.board.some(item=>
-      item?.kind==='material'&&item.chain===order.chain&&item.tier===order.tier));
-    let result;
-    if(ready){
-      result=fulfillOrder(state,ready.id);
-      delivered++;
-    }else{
-      let pair=null;
-      for(const order of state.orders){
-        for(let tier=order.tier-1;tier>=1&&!pair;tier--){
-          const slots=state.board.flatMap((item,index)=>
-            item?.kind==='material'&&item.chain===order.chain&&item.tier===tier
-              ?[index]:[]);
-          if(slots.length>=2)pair=[slots[0],slots[1]];
-        }
-        if(pair)break;
-      }
-      if(pair)result=moveOrMerge(state,pair[0],pair[1]);
-      else{
-        const target=state.orders[0];
-        const slot=state.board.findIndex(item=>
-          item?.kind==='producer'&&item.chain===target.chain);
-        assert.ok(slot>=0,'garden fixture must retain its real producer');
-        now+=180_000;
-        result=produce(state,slot,now,()=>0);
-      }
-    }
-    assert.equal(result.ok,true,'fixture action must use the real engine');
-    assert.equal(result.state.revision,state.revision+1,
-      'each fixture action commits one real engine revision');
-    assert.equal(validateSave(result.state),true);
-    state=result.state;
-  }
-  assert.ok(delivered>=10,'garden requires sustained genuine orders');
-  assert.ok(getLevel(state.xp)>=BUILDINGS.garden.minLevel);
-  assert.ok(state.coins>=BUILDINGS.garden.coins);
-  assert.equal(state.buildings.garden,0,'fixture must not prebuild the garden');
-  return state;
-}
+import {validateSave} from '../merge/engine.mjs';
 
 // Actual Chromium + page modules; no DOM mocks, injected saves, or remote API.
 const root=resolve(new URL('..',import.meta.url).pathname);
@@ -642,12 +594,32 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     assert.equal(await readRaw(b,workshopKey),fiveOrdersRaw,
       'story re-entry cannot replay fourth or fifth order');
     assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
-    // P122: keep the first five orders above as actual UI evidence. For the
-    // remaining economic grind, load a separate PRE-build fixture earned by
-    // genuine engine production/merges/orders (no fabricated rewards). This
-    // proves the actual Chromium construction button and narrative handoff,
-    // NOT continuous browser-UI order grinding or a physical device test.
-    const earnedFixture=earnGardenReadyFixture();
+    // P124: use ONE deterministic, engine-earned economic lineage for all
+    // three PRE-build snapshots and their POST-build audit checkpoints.
+    // The first five orders above are real UI actions; later progress is
+    // loaded as test fixtures, NOT continuous UI grinding or device testing.
+    const preBuild={},postBuild={};
+    const economicReplay=simulateStoryBoard({seed:42,
+      onConstructionReady:(id,snapshot)=>{preBuild[id]=snapshot;},
+      onMilestone:(milestone,snapshot)=>{
+        if(['garden','harbor','storefront'].includes(milestone.id))
+          postBuild[milestone.id]=snapshot;
+      }
+    });
+    assert.equal(economicReplay.complete,true,economicReplay.reason);
+    for(const id of ['garden','harbor','storefront']){
+      assert.equal(validateSave(preBuild[id]),true);
+      assert.equal(validateSave(postBuild[id]),true);
+      assert.equal(preBuild[id].buildings[id],0);
+      assert.equal(postBuild[id].buildings[id],1);
+      assert.ok(getLevel(preBuild[id].xp)>=BUILDINGS[id].minLevel);
+      assert.ok(preBuild[id].coins>=BUILDINGS[id].coins);
+      assert.equal(postBuild[id].coins,preBuild[id].coins-BUILDINGS[id].coins);
+      assert.equal(postBuild[id].revision,preBuild[id].revision+1);
+    }
+    assert.equal(preBuild.harbor.buildings.garden,1);
+    assert.equal(preBuild.storefront.buildings.harbor,1);
+    const earnedFixture=preBuild.garden;
     assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
     await evalOn(b,'localStorage.setItem('+
       JSON.stringify(workshopKey)+','+
@@ -678,6 +650,11 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     assert.equal(builtGarden.xp,earnedFixture.xp,
       'building must not fabricate experience');
     assert.equal(validateSave(builtGarden),true);
+    assert.equal(builtGarden.revision,postBuild.garden.revision,
+      'browser garden transaction matches the same economic replay');
+    assert.equal(builtGarden.coins,postBuild.garden.coins);
+    assert.equal(builtGarden.xp,postBuild.garden.xp);
+    assert.deepEqual(builtGarden.buildings,postBuild.garden.buildings);
     await until(async()=>evalOn(b,
       "document.getElementById('build-garden').disabled===true&&"+
       "document.getElementById('garden-status').textContent.includes('已修复')"),
@@ -704,22 +681,9 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     assert.equal(await readRaw(b,workshopKey),builtGardenRaw,
       'returning to workshop cannot duplicate the garden transaction');
     assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
-    // P123: exercise the remaining two building buttons and chapter gates in
-    // actual Chromium. Pre-build snapshots come from a separate deterministic
-    // real-engine playthrough; they are NOT continuous browser UI grinding.
-    const preBuild={};
-    const economicReplay=simulateStoryBoard({seed:42,
-      onConstructionReady:(id,snapshot)=>{preBuild[id]=snapshot;}
-    });
-    assert.equal(economicReplay.complete,true,economicReplay.reason);
-    for(const id of ['harbor','storefront']){
-      assert.equal(validateSave(preBuild[id]),true);
-      assert.equal(preBuild[id].buildings[id],0);
-      assert.ok(getLevel(preBuild[id].xp)>=BUILDINGS[id].minLevel);
-      assert.ok(preBuild[id].coins>=BUILDINGS[id].coins);
-    }
-    assert.equal(preBuild.harbor.buildings.garden,1);
-    assert.equal(preBuild.storefront.buildings.harbor,1);
+    // P124: the harbor and storefront pre-build snapshots above came from
+    // the SAME replay as garden, but each is loaded separately into Chromium.
+    // Compare each real UI build to its corresponding post-build checkpoint.
 
     await navigate(b,'/merge/story.html','#journey-read');
     await finishScene('old-pier',b);
@@ -750,6 +714,10 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     assert.equal(builtHarbor.coins,preBuild.harbor.coins-BUILDINGS.harbor.coins);
     assert.equal(builtHarbor.xp,preBuild.harbor.xp);
     assert.equal(validateSave(builtHarbor),true);
+    assert.equal(builtHarbor.revision,postBuild.harbor.revision);
+    assert.equal(builtHarbor.coins,postBuild.harbor.coins);
+    assert.equal(builtHarbor.xp,postBuild.harbor.xp);
+    assert.deepEqual(builtHarbor.buildings,postBuild.harbor.buildings);
     const builtHarborRaw=await readRaw(b,workshopKey);
     await evalOn(b,"document.getElementById('build-harbor').click();true");
     assert.equal(await readRaw(b,workshopKey),builtHarborRaw,
@@ -783,6 +751,10 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
       preBuild.storefront.coins-BUILDINGS.storefront.coins);
     assert.equal(builtStorefront.xp,preBuild.storefront.xp);
     assert.equal(validateSave(builtStorefront),true);
+    assert.equal(builtStorefront.revision,postBuild.storefront.revision);
+    assert.equal(builtStorefront.coins,postBuild.storefront.coins);
+    assert.equal(builtStorefront.xp,postBuild.storefront.xp);
+    assert.deepEqual(builtStorefront.buildings,postBuild.storefront.buildings);
     const builtStorefrontRaw=await readRaw(b,workshopKey);
     await evalOn(b,"document.getElementById('build-storefront').click();true");
     assert.equal(await readRaw(b,workshopKey),builtStorefrontRaw,
