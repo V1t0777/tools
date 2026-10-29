@@ -933,6 +933,10 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   // installed-PWA test; it proves the already-loaded runtime has no network
   // dependency for a normal action or a local Blob download.
   await front(b);
+  // Isolate each download in its own directory: headless Chromium may reuse
+  // the same filename for repeated exports instead of creating a new name.
+  const offlineDownloadDir=await mkdtemp(join(temp,'offline-download-'));
+  await call('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:offlineDownloadDir});
   await call('Network.enable',{},b.sessionId);
   await call('Network.emulateNetworkConditions',{
     offline:true,latency:0,downloadThroughput:0,uploadThroughput:0
@@ -956,7 +960,7 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     await sleep(180);
     assert.equal((await readSave(b)).revision,offlineBefore.revision+1,
       'offline action must not duplicate its write');
-    const existingDownloads=new Set((await readdir(temp)).filter(
+    const existingDownloads=new Set((await readdir(offlineDownloadDir)).filter(
       name=>name.endsWith('.json')||name.endsWith('.txt')));
     await evalOn(b,"document.getElementById('export-local-save').click();true");
     const offlineExportFeedback=await evalOn(b,"({notice:document.getElementById('notice').textContent,status:document.getElementById('save-status').textContent,hidden:document.hidden,online:navigator.onLine})");
@@ -967,7 +971,7 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     let offlineFile=null;
     try {
       offlineFile=await until(async()=>{
-        const names=(await readdir(temp)).filter(
+        const names=(await readdir(offlineDownloadDir)).filter(
           name=>name.endsWith('.json')||name.endsWith('.txt'));
         return names.find(name=>!existingDownloads.has(name));
       },'offline Blob download reached disk',1800);
@@ -977,7 +981,7 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
       t.diagnostic('OFFLINE DOWNLOAD UNVERIFIED: Chromium requested Blob download but no new file landed; keep mobile offline-export P0 open');
     }
     if(offlineFile){
-      const offlineDownloaded=await readFile(join(temp,offlineFile),'utf8');
+      const offlineDownloaded=await readFile(join(offlineDownloadDir,offlineFile),'utf8');
       assert.deepEqual(JSON.parse(offlineDownloaded),offlineAfter,
         'offline landed file must equal the reviewed snapshot');
       t.diagnostic('Chromium offline Blob download actually landed and matched saved bytes');
@@ -994,15 +998,17 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   // Once online again, the user must still be able to obtain a real file.
   // Never treat the earlier offline click/notice as proof of a saved backup.
   const onlineBaseline=await readSave(b);
-  const beforeOnlineDownload=new Set((await readdir(temp)).filter(
+  const onlineDownloadDir=await mkdtemp(join(temp,'online-download-'));
+  await call('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:onlineDownloadDir});
+  const beforeOnlineDownload=new Set((await readdir(onlineDownloadDir)).filter(
     name=>name.endsWith('.json')||name.endsWith('.txt')));
   await evalOn(b,"document.getElementById('export-local-save').click();true");
   const onlineFile=await until(async()=>{
-    const names=(await readdir(temp)).filter(
+    const names=(await readdir(onlineDownloadDir)).filter(
       name=>name.endsWith('.json')||name.endsWith('.txt'));
     return names.find(name=>!beforeOnlineDownload.has(name));
   },'real local export after reconnect');
-  assert.deepEqual(JSON.parse(await readFile(join(temp,onlineFile),'utf8')),onlineBaseline,
+  assert.deepEqual(JSON.parse(await readFile(join(onlineDownloadDir,onlineFile),'utf8')),onlineBaseline,
     'reconnected download must match the persisted snapshot exactly');
   assert.deepEqual(await readSave(b),onlineBaseline,
     'reconnected export must not change progress');
