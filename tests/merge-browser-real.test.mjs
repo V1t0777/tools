@@ -916,12 +916,20 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     const offlineAfter=await readSave(b);
     assert.equal(offlineAfter.energy,offlineBefore.energy-1,
       'offline production consumes exactly one energy');
+    // Storage readback can precede the async onVerified UI publication.
+    // Export only after the player actually sees the new persisted state.
+    await waitWithSnapshot(async()=>await evalOn(b,
+      "document.getElementById('save-status').textContent.includes('已保存于此浏览器') && "+
+      "document.querySelector('#energy').textContent.startsWith('"+offlineAfter.energy+" /')"),
+      'offline UI published before export',b);
     await sleep(180);
     assert.equal((await readSave(b)).revision,offlineBefore.revision+1,
       'offline action must not duplicate its write');
     const existingDownloads=new Set((await readdir(temp)).filter(
       name=>name.endsWith('.json')||name.endsWith('.txt')));
     await evalOn(b,"document.getElementById('export-local-save').click();true");
+    const offlineExportFeedback=await evalOn(b,"({notice:document.getElementById('notice').textContent,status:document.getElementById('save-status').textContent,hidden:document.hidden,online:navigator.onLine})");
+    t.diagnostic('Chromium offline export feedback: '+JSON.stringify(offlineExportFeedback));
     const offlineFile=await until(async()=>{
       const names=(await readdir(temp)).filter(
         name=>name.endsWith('.json')||name.endsWith('.txt'));
