@@ -553,6 +553,71 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     'compatibility click must not duplicate move');
   t.diagnostic('Chromium 320px native touch pan and cross-scroll two-tap move verified');
 
+  // P2.65bh: verify vertical page scrolling is not trapped by the narrow
+  // board's horizontal scroller. Also prove save controls remain reachable
+  // after a real gesture; this is Chromium emulation, not physical iOS.
+  const verticalPoint=await evalOn(b,`(()=>{
+    const cell=document.querySelector('#board .cell[data-slot="3"]');
+    cell.scrollIntoView({block:'center',inline:'nearest'});
+    const r=cell.getBoundingClientRect();
+    return {x:r.left+r.width/2,y:r.top+r.height/2};
+  })()`);
+  assert.ok(verticalPoint.x>0&&verticalPoint.x<320&&verticalPoint.y>170&&verticalPoint.y<812,
+    'vertical gesture must begin on a visible board cell with travel room');
+  await sleep(120);
+  const verticalBefore=await evalOn(b,`({
+    y:window.scrollY,x:document.querySelector('.board-section').scrollLeft
+  })`);
+  const verticalSave=await readSave(b);
+  await call('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[
+    {...verticalPoint,id:23,radiusX:2,radiusY:2,force:1}
+  ]},b.sessionId);
+  for(const delta of [40,85,135]){
+    await call('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[
+      {x:verticalPoint.x,y:verticalPoint.y-delta,id:23,radiusX:2,radiusY:2,force:1}
+    ]},b.sessionId);
+    await sleep(65);
+  }
+  await call('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]},b.sessionId);
+  await until(async()=>await evalOn(b,`window.scrollY>${verticalBefore.y}+8`),
+    '320px vertical swipe must scroll the document');
+  await sleep(160);
+  const verticalAfter=await evalOn(b,`({
+    y:window.scrollY,x:document.querySelector('.board-section').scrollLeft,
+    ghosts:document.querySelectorAll('.drag-ghost').length
+  })`);
+  assert.ok(Math.abs(verticalAfter.x-verticalBefore.x)<5,
+    'vertical swipe must not unexpectedly pan the board sideways');
+  assert.equal(verticalAfter.ghosts,0,'vertical swipe must leave no drag ghost');
+  assert.deepEqual(await readSave(b),verticalSave,'vertical swipe must not change save');
+
+  // Native scrollIntoView and elementFromPoint must locate each control even
+  // if the board was horizontally panned and the page vertically scrolled.
+  for(const id of ['export-local-save','export-abnormal-reset-backup','reset','import-normal-save']){
+    const point=await evalOn(b,`(()=>{
+      const el=document.getElementById(${JSON.stringify(id)});
+      if(!el)return null;
+      el.scrollIntoView({block:'center',inline:'nearest'});
+      const r=el.getBoundingClientRect();
+      return {x:r.left+r.width/2,y:r.top+r.height/2,disabled:el.disabled};
+    })()`);
+    assert.ok(point&&!point.disabled&&point.x>0&&point.x<320&&point.y>0&&point.y<812,
+      '320px save control must be enabled and onscreen: '+id);
+    await until(async()=>await evalOn(b,`document.elementFromPoint(${point.x},${point.y})?.closest('button')?.id===${JSON.stringify(id)}`),
+      '320px save control hit test: '+id);
+  }
+  await evalOn(b,`(()=>{
+    document.getElementById('notice').textContent='';
+    document.getElementById('export-local-save').click();
+    return true;
+  })()`);
+  await until(async()=>await evalOn(b,`/下载|导出/.test(document.getElementById('notice').textContent)`),
+    '320px export control must handle click after panning');
+  assert.deepEqual(await readSave(b),verticalSave,
+    'export after vertical/horizontal panning must not write game state');
+  t.diagnostic('Chromium 320px vertical page pan, save-control hit testing and export click verified');
+
+
   // Dispatch a native CDP touch sequence on the actual producer and assert
   // exactly one saved action (not a duplicate synthetic compatibility click).
   await call('Emulation.setDeviceMetricsOverride',{
