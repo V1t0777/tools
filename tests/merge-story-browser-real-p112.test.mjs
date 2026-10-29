@@ -420,6 +420,97 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     assert.equal(await readRaw(b,workshopKey),beforeGardenVisit,
       'chapter-two round-trip must not auto-build the garden');
     assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
+    // P118: the next two real orders must come from the actual starting board.
+    // A bakery tier-2 material is already present; floral tier-2 requires
+    // merging the two genuine floral tier-1 materials through the 56-cell UI.
+    // Neither order should bypass the garden's level/coin requirements.
+    await navigate(b,'/merge/story-workshop.html','#workshop-board');
+    await until(async()=>evalOn(b,
+      "document.querySelectorAll('#workshop-board button').length===56"),
+      'chapter-two workshop ready for subsequent real orders');
+    const beforeSecondOrder=await readJSON(b,workshopKey);
+    assert.equal(beforeSecondOrder.progress.orders,1);
+    const bakeryOrderIndex=beforeSecondOrder.orders.findIndex(order=>
+      order.chain==='bakery'&&order.tier===2);
+    assert.ok(bakeryOrderIndex>=0,'a real bakery tier-2 order must exist');
+    assert.ok(beforeSecondOrder.board.some(item=>item?.kind==='material'&&
+      item.chain==='bakery'&&item.tier===2),
+      'initial board must still contain an actual bakery tier-2 material');
+    assert.equal(await evalOn(b,
+      "document.querySelectorAll('#workshop-orders .workshop-order button')["+
+      bakeryOrderIndex+"].disabled"),false);
+    await evalOn(b,
+      "document.querySelectorAll('#workshop-orders .workshop-order button')["+
+      bakeryOrderIndex+"].click();true");
+    await until(async()=>{
+      try{return (await readJSON(b,workshopKey)).progress.orders===2;}
+      catch{return false;}
+    },'second real order persisted');
+    const afterSecondOrder=await readJSON(b,workshopKey);
+    assert.equal(afterSecondOrder.revision,beforeSecondOrder.revision+1,
+      'second order must be one real transaction');
+    assert.ok(afterSecondOrder.coins>beforeSecondOrder.coins);
+    assert.ok(afterSecondOrder.xp>beforeSecondOrder.xp);
+    assert.equal(afterSecondOrder.buildings.garden,0);
+
+    const floralSlots=afterSecondOrder.board.flatMap((item,index)=>
+      item?.kind==='material'&&item.chain==='floral'&&item.tier===1?[index]:[]);
+    assert.ok(floralSlots.length>=2,'two real floral tier-1 materials must remain');
+    await evalOn(b,
+      "document.querySelectorAll('#workshop-board button')["+floralSlots[0]+"].click();true");
+    await evalOn(b,
+      "document.querySelectorAll('#workshop-board button')["+floralSlots[1]+"].click();true");
+    await until(async()=>{
+      try{return (await readJSON(b,workshopKey)).revision===afterSecondOrder.revision+1;}
+      catch{return false;}
+    },'real floral merge persisted');
+    const afterMerge=await readJSON(b,workshopKey);
+    assert.ok(afterMerge.board.some(item=>item?.kind==='material'&&
+      item.chain==='floral'&&item.tier===2),
+      'real UI merge must create a floral tier-2 material');
+    assert.equal(afterMerge.progress.orders,2,'merging cannot grant an order reward');
+    const floralOrderIndex=afterMerge.orders.findIndex(order=>
+      order.chain==='floral'&&order.tier===2);
+    assert.ok(floralOrderIndex>=0,'a real floral tier-2 order must exist');
+    assert.equal(await evalOn(b,
+      "document.querySelectorAll('#workshop-orders .workshop-order button')["+
+      floralOrderIndex+"].disabled"),false);
+    await evalOn(b,
+      "document.querySelectorAll('#workshop-orders .workshop-order button')["+
+      floralOrderIndex+"].click();true");
+    await until(async()=>{
+      try{return (await readJSON(b,workshopKey)).progress.orders===3;}
+      catch{return false;}
+    },'third real order persisted');
+    const afterThirdOrder=await readJSON(b,workshopKey);
+    assert.equal(afterThirdOrder.revision,afterMerge.revision+1,
+      'third order must be exactly one transaction');
+    assert.ok(afterThirdOrder.coins>afterMerge.coins);
+    assert.ok(afterThirdOrder.xp>afterMerge.xp);
+    assert.equal(afterThirdOrder.buildings.garden,0);
+    assert.equal(await evalOn(b,"document.getElementById('build-garden').disabled"),true,
+      'three real orders must not bypass garden level/coin requirements');
+    assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
+
+    const threeOrdersRaw=await readRaw(b,workshopKey);
+    await navigate(b,'/merge/story.html','#journey-read');
+    await until(async()=>evalOn(b,
+      "document.getElementById('progress-count').textContent.includes('6 / 12')"),
+      'chapter-two story unchanged after two more real orders');
+    assert.equal(await evalOn(b,"document.getElementById('journey-read').hidden"),true,
+      'garden construction, not order count alone, unlocks the tea-table scene');
+    assert.equal(await evalOn(b,"document.getElementById('journey-workshop').hidden"),false);
+    assert.equal(await readRaw(b,workshopKey),threeOrdersRaw,
+      'returning to narrative must not replay a delivered order');
+    await call('Page.reload',{ignoreCache:true},b.sessionId);
+    await until(async()=>evalOn(b,
+      "document.getElementById('progress-count')?.textContent.includes('6 / 12')"),
+      'chapter-two story reload after three real orders');
+    assert.equal(await evalOn(b,"document.getElementById('journey-read').hidden"),true);
+    assert.equal(await readRaw(b,workshopKey),threeOrdersRaw,
+      'narrative reload must not rewrite the three-order workshop save');
+    assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
+    t.diagnostic('P118 real Chromium: second bakery order + floral UI merge + third order; garden remains gated, save survives narrative reload');
     t.diagnostic('P117 real Chromium: first six scenes → garden economic gate → round-trip, no premature build or normal-mode writes');
     t.diagnostic('P116 real Chromium: damaged-save recovery → real order button → first-order scene unlock, no normal-mode writes');
     t.diagnostic('P115 real Chromium: independent corrupt resets, two-stage refusals, stale-consent CAS and mode isolation; no mobile claim');
