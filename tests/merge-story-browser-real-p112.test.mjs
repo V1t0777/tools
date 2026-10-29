@@ -7,6 +7,56 @@ import {spawn,spawnSync} from 'node:child_process';
 import {tmpdir} from 'node:os';
 import {join,resolve,extname,sep} from 'node:path';
 import {setTimeout as sleep} from 'node:timers/promises';
+import {BUILDINGS,getLevel} from '../merge/economy.mjs';
+import {createInitialState,fulfillOrder,moveOrMerge,produce,validateSave} from '../merge/engine.mjs';
+
+// P122: build a genuine engine-earned PRE-construction fixture. The browser
+// will click the real construction button; orders after the first five are
+// simulated through engine APIs, NOT falsely reported as browser UI deliveries.
+function earnGardenReadyFixture(){
+  let now=1_800_000_000_000,state=createInitialState(now),delivered=0;
+  for(let step=0;step<1000;step++){
+    if(getLevel(state.xp)>=BUILDINGS.garden.minLevel&&
+      state.coins>=BUILDINGS.garden.coins)break;
+    const ready=state.orders.find(order=>state.board.some(item=>
+      item?.kind==='material'&&item.chain===order.chain&&item.tier===order.tier));
+    let result;
+    if(ready){
+      result=fulfillOrder(state,ready.id);
+      delivered++;
+    }else{
+      let pair=null;
+      for(const order of state.orders){
+        for(let tier=order.tier-1;tier>=1&&!pair;tier--){
+          const slots=state.board.flatMap((item,index)=>
+            item?.kind==='material'&&item.chain===order.chain&&item.tier===tier
+              ?[index]:[]);
+          if(slots.length>=2)pair=[slots[0],slots[1]];
+        }
+        if(pair)break;
+      }
+      if(pair)result=moveOrMerge(state,pair[0],pair[1]);
+      else{
+        const target=state.orders[0];
+        const slot=state.board.findIndex(item=>
+          item?.kind==='producer'&&item.chain===target.chain);
+        assert.ok(slot>=0,'garden fixture must retain its real producer');
+        now+=180_000;
+        result=produce(state,slot,now,()=>0);
+      }
+    }
+    assert.equal(result.ok,true,'fixture action must use the real engine');
+    assert.equal(result.state.revision,state.revision+1,
+      'each fixture action commits one real engine revision');
+    assert.equal(validateSave(result.state),true);
+    state=result.state;
+  }
+  assert.ok(delivered>=10,'garden requires sustained genuine orders');
+  assert.ok(getLevel(state.xp)>=BUILDINGS.garden.minLevel);
+  assert.ok(state.coins>=BUILDINGS.garden.coins);
+  assert.equal(state.buildings.garden,0,'fixture must not prebuild the garden');
+  return state;
+}
 
 // Actual Chromium + page modules; no DOM mocks, injected saves, or remote API.
 const root=resolve(new URL('..',import.meta.url).pathname);
@@ -591,6 +641,69 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     assert.equal(await readRaw(b,workshopKey),fiveOrdersRaw,
       'story re-entry cannot replay fourth or fifth order');
     assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
+    // P122: keep the first five orders above as actual UI evidence. For the
+    // remaining economic grind, load a separate PRE-build fixture earned by
+    // genuine engine production/merges/orders (no fabricated rewards). This
+    // proves the actual Chromium construction button and narrative handoff,
+    // NOT continuous browser-UI order grinding or a physical device test.
+    const earnedFixture=earnGardenReadyFixture();
+    assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
+    await evalOn(b,'localStorage.setItem('+
+      JSON.stringify(workshopKey)+','+
+      JSON.stringify(JSON.stringify(earnedFixture))+');true');
+    await navigate(b,'/merge/story-workshop.html','#workshop-board');
+    await until(async()=>evalOn(b,
+      "document.querySelectorAll('#workshop-board button').length===56&&"+
+      "document.getElementById('build-garden').disabled===false"),
+      'P122 genuine earned garden resources enable browser construction');
+    assert.match(await evalOn(b,
+      "document.getElementById('garden-hint').textContent"),
+      /等级与金币均已达标/);
+    assert.equal(await evalOn(b,"document.getElementById('build-harbor').disabled"),true,
+      'later harbor cannot unlock from garden resources alone');
+    assert.equal(await evalOn(b,"document.getElementById('build-storefront').disabled"),true);
+    const prebuildRaw=await readRaw(b,workshopKey);
+    assert.deepEqual(JSON.parse(prebuildRaw),earnedFixture);
+    await evalOn(b,"document.getElementById('build-garden').click();true");
+    await until(async()=>{
+      try{return (await readJSON(b,workshopKey)).buildings.garden===1;}
+      catch{return false;}
+    },'P122 actual browser garden construction persisted');
+    const builtGarden=await readJSON(b,workshopKey);
+    assert.equal(builtGarden.revision,earnedFixture.revision+1,
+      'real garden click must commit exactly one revision');
+    assert.equal(builtGarden.coins,earnedFixture.coins-BUILDINGS.garden.coins,
+      'real garden click must deduct the configured 160 coins once');
+    assert.equal(builtGarden.xp,earnedFixture.xp,
+      'building must not fabricate experience');
+    assert.equal(validateSave(builtGarden),true);
+    await until(async()=>evalOn(b,
+      "document.getElementById('build-garden').disabled===true&&"+
+      "document.getElementById('garden-status').textContent.includes('已修复')"),
+      'P122 browser UI reflects completed garden');
+    const builtGardenRaw=await readRaw(b,workshopKey);
+    await evalOn(b,"document.getElementById('build-garden').click();true");
+    assert.equal(await readRaw(b,workshopKey),builtGardenRaw,
+      'disabled garden button cannot double-charge');
+    assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
+    await navigate(b,'/merge/story.html','#journey-read');
+    await until(async()=>evalOn(b,
+      "document.getElementById('progress-count').textContent.includes('6 / 12')&&"+
+      "!document.getElementById('journey-read').hidden"),
+      'P122 completed garden unlocks the next narrative scene');
+    await finishScene('tea-table',b);
+    assert.deepEqual((await readJSON(b,storyKey)).packs.core.completed.main,
+      ['arrival','signboard','first-order','ledger','garden-path','seed','tea-table']);
+    assert.equal(await readRaw(b,workshopKey),builtGardenRaw,
+      'reading tea-table cannot replay the building payment');
+    await navigate(b,'/merge/story-workshop.html','#workshop-board');
+    await until(async()=>evalOn(b,
+      "document.getElementById('garden-status').textContent.includes('已修复')"),
+      'P122 garden remains built after page round-trip');
+    assert.equal(await readRaw(b,workshopKey),builtGardenRaw,
+      'returning to workshop cannot duplicate the garden transaction');
+    assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
+    t.diagnostic('P122 Chromium: real garden button deducts once and unlocks tea-table; post-five-order economy uses an engine-earned fixture, not continuous UI grinding');
     t.diagnostic('P119 real Chromium: tea and bakery tier-1 UI merges → fourth and fifth real deliveries; garden remains locked, normal mode isolated');
     t.diagnostic('P118 real Chromium: second bakery order + floral UI merge + third order; garden remains gated, save survives narrative reload');
     t.diagnostic('P117 real Chromium: first six scenes → garden economic gate → round-trip, no premature build or normal-mode writes');
