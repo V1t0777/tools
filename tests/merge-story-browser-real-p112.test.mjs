@@ -57,7 +57,7 @@ function connectCDP(url){
   }};
 }
 test('P112 real Chromium: story first-order gate, two-tab workshop conflict and corrupt evidence download',
-  {timeout:270000},async t=>{
+  {timeout:360000},async t=>{
     const chrome=chromePath();
     assert.ok(chrome,'A real Chrome/Chromium binary is required; no mock fallback');
     const temp=await mkdtemp(join(tmpdir(),'yunyu-story-real-'));
@@ -933,17 +933,54 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     assert.equal(await readRaw(b,workshopKey),thirtySixRaw,
       '36 genuine orders survive the second story/workshop round-trip');
     assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
-    // Harbor and storefront below STILL use detached engine-earned fixtures.
-    await evalOn(b,'localStorage.setItem('+
-      JSON.stringify(workshopKey)+','+JSON.stringify(JSON.stringify(preBuild.harbor))+');true');
+    // P136: continue from the SAME browser-earned garden and 36-order save.
+    // No detached fixture, engine action, time override or RNG stub for 37–42.
+    // A real harbor build is attempted only when BOTH economy gates are earned.
+    const thirtySixCheckpoint=await readJSON(b,workshopKey);
+    await deliverOrdersThrough(37,42,1);
+    const fortyTwoOrders=await readJSON(b,workshopKey);
+    assert.equal(fortyTwoOrders.progress.orders,42);
+    assert.equal(validateSave(fortyTwoOrders),true);
+    assert.equal(fortyTwoOrders.buildings.garden,1);
+    assert.equal(fortyTwoOrders.buildings.harbor,0);
+    assert.ok(fortyTwoOrders.coins>thirtySixCheckpoint.coins);
+    assert.ok(fortyTwoOrders.xp>thirtySixCheckpoint.xp);
+    assert.ok(fortyTwoOrders.revision>thirtySixCheckpoint.revision);
+    assert.equal(fortyTwoOrders.achievements.orders20,1);
+    assert.equal(fortyTwoOrders.bag.reset,thirtySixCheckpoint.bag.reset);
+    const harborFromUI=getLevel(fortyTwoOrders.xp)>=BUILDINGS.harbor.minLevel&&
+      fortyTwoOrders.coins>=BUILDINGS.harbor.coins;
+    assert.equal(await evalOn(b,"document.getElementById('build-harbor').disabled"),
+      !harborFromUI,'P136 harbor availability must reflect earned resources');
+    const fortyTwoRaw=await readRaw(b,workshopKey);
+    await navigate(b,'/merge/story.html','#journey-read');
+    await until(async()=>evalOn(b,
+      "document.getElementById('progress-count').textContent.includes('9 / 12')"),
+      'P136 42-order story still awaits real harbor construction');
+    assert.equal(await evalOn(b,"document.getElementById('journey-read').hidden"),true);
+    assert.equal(await readRaw(b,storyKey),storyBeforeMoreOrders);
+    assert.equal(await readRaw(b,workshopKey),fortyTwoRaw);
     await navigate(b,'/merge/story-workshop.html','#workshop-board');
+    await until(async()=>evalOn(b,
+      "document.querySelectorAll('#workshop-board button').length===56"),
+      'P136 42-order workshop restored');
+    assert.equal(await readRaw(b,workshopKey),fortyTwoRaw);
+    assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
+    // If the genuine UI trajectory is not yet harbor-ready, keep the older
+    // detached engine-earned harbor fixture test explicitly distinguished.
+    if(!harborFromUI){
+      await evalOn(b,'localStorage.setItem('+
+        JSON.stringify(workshopKey)+','+JSON.stringify(JSON.stringify(preBuild.harbor))+');true');
+      await navigate(b,'/merge/story-workshop.html','#workshop-board');
+    }
     await until(async()=>evalOn(b,
       "document.querySelectorAll('#workshop-board button').length===56&&"+
       "document.getElementById('build-harbor').disabled===false"),
       'P123 real harbor button enabled by earned engine snapshot');
     assert.equal(await evalOn(b,"document.getElementById('build-storefront').disabled"),true,
       'storefront must remain story-gated before harbor-light');
-    assert.deepEqual(await readJSON(b,workshopKey),preBuild.harbor);
+    const harborBeforeBuild=await readJSON(b,workshopKey);
+    assert.deepEqual(harborBeforeBuild,harborFromUI?fortyTwoOrders:preBuild.harbor);
     // P126: a peer tab loaded BEFORE payment must not keep an actionable
     // harbor button or charge the same 330 coins after the first tab builds.
     const staleHarborTab=await page();await front(staleHarborTab);
@@ -956,14 +993,16 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     await until(async()=>(await readJSON(b,workshopKey)).buildings.harbor===1,
       'P123 harbor click persisted');
     const builtHarbor=await readJSON(b,workshopKey);
-    assert.equal(builtHarbor.revision,preBuild.harbor.revision+1);
-    assert.equal(builtHarbor.coins,preBuild.harbor.coins-BUILDINGS.harbor.coins);
-    assert.equal(builtHarbor.xp,preBuild.harbor.xp);
+    assert.equal(builtHarbor.revision,harborBeforeBuild.revision+1);
+    assert.equal(builtHarbor.coins,harborBeforeBuild.coins-BUILDINGS.harbor.coins);
+    assert.equal(builtHarbor.xp,harborBeforeBuild.xp);
     assert.equal(validateSave(builtHarbor),true);
-    assert.equal(builtHarbor.revision,postBuild.harbor.revision);
-    assert.equal(builtHarbor.coins,postBuild.harbor.coins);
-    assert.equal(builtHarbor.xp,postBuild.harbor.xp);
-    assert.deepEqual(builtHarbor.buildings,postBuild.harbor.buildings);
+    if(!harborFromUI){
+      assert.equal(builtHarbor.revision,postBuild.harbor.revision);
+      assert.equal(builtHarbor.coins,postBuild.harbor.coins);
+      assert.equal(builtHarbor.xp,postBuild.harbor.xp);
+      assert.deepEqual(builtHarbor.buildings,postBuild.harbor.buildings);
+    }
     const builtHarborRaw=await readRaw(b,workshopKey);
     await front(staleHarborTab);
     await until(async()=>evalOn(staleHarborTab,
@@ -1046,6 +1085,9 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     assert.equal(await evalOn(b,"document.getElementById('journey-workshop').hidden"),true);
     assert.equal(await readRaw(b,workshopKey),builtStorefrontRaw);
     assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
+    t.diagnostic('P136 real Chromium: 42 genuine consecutive UI orders; harbor build source='+
+      (harborFromUI?'continuous browser economy':'detached engine-earned fixture')+
+      '; level='+getLevel(fortyTwoOrders.xp)+'; coins='+fortyTwoOrders.coins);
     t.diagnostic('P133 real Chromium: 24 genuine consecutive UI orders including four after paying for garden; harbor/storefront still use detached fixtures, not full UI completion');
     t.diagnostic('P132 real Chromium: twenty consecutive UI orders earn and pay for the actual garden, unlock tea-table, and resist peer-tab double-charge; harbor/storefront still use detached engine-earned fixtures, not full UI completion');
     t.diagnostic('P126 real Chromium: stale peer tabs cannot double-charge garden, harbor or storefront; not iPhone/WeChat device testing');
