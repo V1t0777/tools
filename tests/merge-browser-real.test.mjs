@@ -1267,5 +1267,72 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   t.diagnostic('Chromium post-reset reload and confirmed native import lock contention verified without backup write or deferred replay');
 
 
+
+  // P2.65br: genuine backgrounding aborts a pending File.text() read;
+  // its late completion cannot restore over a newer cross-tab save.
+  {
+    await front(b);
+    const before=await readSave(b);
+    const beforeRaw=await evalOn(b,'localStorage.getItem('+JSON.stringify(key)+')');
+    const backup=await evalOn(b,'localStorage.getItem('+JSON.stringify(key+'.restore-backup-v3')+')');
+    const story=await evalOn(b,"localStorage.getItem('toolbox.merge-isle.story.local.v1')");
+    await evalOn(b,`(()=>{
+      window.__brConfirms=0;
+      window.confirm=()=>{window.__brConfirms++;return true;};
+      const original=File.prototype.text;
+      window.__brOriginalText=original;
+      File.prototype.text=function(){
+        return new Promise(resolve=>{window.__brRelease=()=>resolve(original.call(this));});
+      };
+      const input=document.getElementById('import-normal-file');
+      input.click=()=>{};
+      document.getElementById('import-normal-save').click();
+      const transfer=new DataTransfer();
+      transfer.items.add(new File([${JSON.stringify(downloaded)}],'slow-import.json',{type:'application/json'}));
+      input.files=transfer.files;
+      input.dispatchEvent(new Event('change',{bubbles:true}));
+      return true;
+    })()`);
+    await waitWithSnapshot(async()=>await evalOn(b,
+      "typeof window.__brRelease==='function' && document.getElementById('import-normal-save').disabled"),
+      'native import read pending',b);
+    assert.equal(await evalOn(b,'window.__brConfirms'),0);
+    assert.equal(await evalOn(b,'localStorage.getItem('+JSON.stringify(key)+')'),beforeRaw);
+    await front(a);
+    await until(async()=>await evalOn(b,'document.hidden===true'),'real import tab backgrounding');
+    await waitWithSnapshot(async()=>await evalOn(a,
+      "document.querySelector('#energy').textContent.startsWith("+
+      JSON.stringify(String(before.energy)+' /')+") && "+
+      "document.getElementById('save-status').textContent.includes('已同步')"),
+      'foreground writer adopted latest baseline',a);
+    await evalOn(a,"document.querySelector('#board .producer').click();true");
+    await waitWithSnapshot(async()=>(await readSave(a)).revision===before.revision+1,
+      'legal cross-tab action while import suspended',a);
+    const newRaw=await evalOn(a,'localStorage.getItem('+JSON.stringify(key)+')');
+    const updated=JSON.parse(newRaw);
+    assert.equal(updated.energy,before.energy-1);
+    await evalOn(b,'window.__brRelease();true');
+    await front(b);
+    await waitWithSnapshot(async()=>await evalOn(b,
+      "!document.hidden && !document.getElementById('import-normal-save').disabled && "+
+      "document.getElementById('cancel-normal-import').hidden"),
+      'aborted import released UI',b);
+    await waitWithSnapshot(async()=>await evalOn(b,
+      "document.querySelector('#energy').textContent.startsWith("+
+      JSON.stringify(String(updated.energy)+' /')+")"),
+      'returned tab adopted latest save',b);
+    assert.equal(await evalOn(b,'window.__brConfirms'),0,'late file cannot confirm');
+    assert.equal(await evalOn(b,'localStorage.getItem('+JSON.stringify(key)+')'),newRaw);
+    assert.equal(await evalOn(b,'localStorage.getItem('+JSON.stringify(key+'.restore-backup-v3')+')'),backup);
+    assert.equal(await evalOn(b,"localStorage.getItem('toolbox.merge-isle.story.local.v1')"),story);
+    await evalOn(b,'File.prototype.text=window.__brOriginalText;true');
+    await evalOn(b,"document.querySelector('#board .producer').click();true");
+    await waitWithSnapshot(async()=>(await readSave(b)).revision===updated.revision+1,
+      'fresh gameplay after import abort',b);
+    assert.equal((await readSave(b)).energy,updated.energy-1);
+    assert.equal(await evalOn(b,'localStorage.getItem('+JSON.stringify(key+'.restore-backup-v3')+')'),backup);
+    t.diagnostic('Chromium background native import abort, late file result and cross-tab recovery verified');
+  }
+
   t.diagnostic(`Chromium two-tab lock, BFCache persisted=${bfcache}, download=${file}, reset/import/backup verified`);
 });
