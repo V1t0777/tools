@@ -848,13 +848,48 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     visible:!document.hidden,
     recentEvents:window.__touchTrace?.slice(-6).map(e=>e.type)
   })`);
+  // A foreground reconciliation may discover a newer cross-tab snapshot
+  // only when the first touch arrives. That touch MUST be rejected (not
+  // replayed) and the user must make a distinct, fresh gesture. Do not turn
+  // an arbitrary timeout into success: permit only the exact safe rejection,
+  // unchanged bytes, and then require one verified new write.
+  let firstBackgroundTouchSaved=false;
   try{
+    await until(async()=>(await readSave(b)).revision===newerState.revision+1,
+      'first fresh touch after background',2200);
+    firstBackgroundTouchSaved=true;
+  }catch{
+    const rejectedRaw=await evalOn(b,`localStorage.getItem(${JSON.stringify(key)})`);
+    assert.equal(rejectedRaw,newerRaw,
+      'rejected first foreground touch must preserve the exact newer save bytes');
+    assert.equal(immediateAfterBackgroundTouch.visible,true,
+      'only a visible-page safe rejection may be retried');
+    assert.match(immediateAfterBackgroundTouch.notice,
+      /存档已更新或正在保存，请在最新棋盘上重新操作/,
+      'retry requires the explicit stale-board safety notice');
+    t.diagnostic('First foreground tap safely rejected against stale board; requiring a new physical touch');
+    const retryPoint=await evalOn(b,`(()=>{
+      const el=document.querySelector('#board .producer');
+      el.scrollIntoView({block:'center',inline:'nearest'});
+      const r=el.getBoundingClientRect();
+      return {x:r.left+r.width/2,y:r.top+r.height/2};
+    })()`);
+    await until(async()=>await evalOn(b,`(()=>{
+      const hit=document.elementFromPoint(${retryPoint.x},${retryPoint.y});
+      return !document.hidden&&!!hit?.closest?.('.producer')&&
+        document.querySelectorAll('.drag-ghost').length===0;
+    })()`),'retry producer hit target after safe rejection');
+    await sleep(160);
+    await call('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[
+      {...retryPoint,id:7,radiusX:2,radiusY:2,force:1}
+    ]},b.sessionId);
+    await sleep(75);
+    await call('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]},b.sessionId);
     await waitWithSnapshot(async()=>(await readSave(b)).revision===newerState.revision+1,
-      'fresh touch after background',b);
-  }catch(error){
-    t.diagnostic('Immediate post-background touch state: '+JSON.stringify(immediateAfterBackgroundTouch));
-    throw error;
+      'new physical touch after safe foreground rejection',b);
   }
+  if(firstBackgroundTouchSaved)
+    t.diagnostic('First foreground touch committed against verified latest save');
   await sleep(200);
   const recovered=await readSave(b);
   assert.equal(recovered.revision,newerState.revision+1,'fresh touch writes exactly once');
