@@ -93,6 +93,36 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     if(result.exceptionDetails)throw Error('Browser JS: '+JSON.stringify(result.exceptionDetails));
     return result.result.value;
   }
+  // Failure-only diagnostics preserve the original timeout. Never print raw
+  // save or backup bytes, and never convert a retry into a passing assertion.
+  async function waitWithSnapshot(check,label,p,limit=12000){
+    try{return await until(check,label,limit);}
+    catch(error){
+      try{
+        const snapshot=await evalOn(p,`(()=>{
+          const raw=localStorage.getItem("toolbox.merge-isle.local.v1");
+          let save=null;
+          try{save=raw?JSON.parse(raw):null;}catch{}
+          const backup=localStorage.getItem("toolbox.merge-isle.local.v1.restore-backup-v3");
+          return {
+            revision:save?.revision,energy:save?.energy,rawLength:raw?.length,
+            backupLength:backup?.length,hidden:document.hidden,
+            status:document.getElementById('save-status')?.textContent,
+            notice:document.getElementById('notice')?.textContent,
+            displayedEnergy:document.getElementById('energy')?.textContent,
+            importDisabled:document.getElementById('import-normal-save')?.disabled,
+            cancelHidden:document.getElementById('cancel-normal-import')?.hidden,
+            ghosts:document.querySelectorAll('.drag-ghost').length,
+            lastTouchEvents:window.__touchTrace?.slice(-12)
+          };
+        })()`);
+        t.diagnostic('Chromium failure snapshot ['+label+']: '+JSON.stringify(snapshot));
+      }catch(snapshotError){
+        t.diagnostic('Chromium failure snapshot unavailable ['+label+']: '+String(snapshotError));
+      }
+      throw error;
+    }
+  }
   const front=async p=>{await call('Target.activateTarget',{targetId:p.targetId});await call('Page.bringToFront',{},p.sessionId);};
   async function navigate(p,url){
     await call('Page.navigate',{url},p.sessionId);
@@ -184,6 +214,12 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   const resetRaw=await evalOn(b,`localStorage.getItem(${JSON.stringify(key)})`);
   const resetSnapshot=JSON.parse(resetRaw);
   assert.notDeepEqual(resetSnapshot,savedSnapshot,'reset must not retain the prior progress');
+  // Storage persistence can precede the async UI publication. Do not start a
+  // destructive import against a reset not yet displayed to the player.
+  await until(async()=>await evalOn(b,`document.getElementById('save-status').textContent.includes('已保存于此浏览器')&&
+    document.querySelector('#energy').textContent.startsWith(${JSON.stringify(String(resetSnapshot.energy)+' /')})&&
+    !document.getElementById('import-normal-save').disabled`),
+    'reset UI published before import');
   await front(a);
   // A reset lowers revision. A tab holding the older higher revision MUST
   // block rather than silently adopting a rollback or resurrecting old data.
@@ -202,10 +238,10 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     chooser.dispatchEvent(new Event('change',{bubbles:true}));
     return true;
   })()`);
-  await until(async()=>{
+  await waitWithSnapshot(async()=>{
     const current=await readSave(b);
     return current.revision===savedSnapshot.revision&&current.energy===savedSnapshot.energy;
-  },'downloaded save restored after reset');
+  },'downloaded save restored after reset',b);
   assert.deepEqual(await readSave(b),savedSnapshot,'restored state must match downloaded JSON');
   const backup=await evalOn(b,`localStorage.getItem(${JSON.stringify(key+'.restore-backup-v3')})`);
   assert.equal(backup,resetRaw,'restore must preserve the exact pre-restore reset bytes');
@@ -348,7 +384,7 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   await sleep(150);
   await evalOn(b,`(()=>{
     window.__touchTrace=[];
-    for(const type of ['touchstart','touchend','pointerdown','pointerup','click'])
+    for(const type of ['touchstart','touchend','touchcancel','pointerdown','pointerup','pointercancel','lostpointercapture','click'])
       document.addEventListener(type,event=>window.__touchTrace.push({
         type,target:event.target?.className,detail:event.detail,
         slot:event.target?.closest?.('[data-slot]')?.dataset.slot,
@@ -462,14 +498,20 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     const r=el.getBoundingClientRect();
     return {x:r.left+r.width/2,y:r.top+r.height/2};
   })()`);
-  await sleep(140);
+  // Wait for hit-testing after scroll and touchCancel. A fixed sleep can
+  // dispatch the next gesture onto an old compositor target.
+  await until(async()=>await evalOn(b,`(()=>{
+    const hit=document.elementFromPoint(${newProducer.x},${newProducer.y});
+    return !document.hidden&&!!hit?.closest?.('.producer')&&
+      document.querySelectorAll('.drag-ghost').length===0;
+  })()`),'fresh producer hit target after cancel');
   await call('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[
     {...newProducer,id:4,radiusX:2,radiusY:2,force:1}
   ]},b.sessionId);
   await sleep(65);
   await call('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]},b.sessionId);
-  await until(async()=>(await readSave(b)).revision===afterCancel.revision+1,
-    'fresh producer touch after cancellation');
+  await waitWithSnapshot(async()=>(await readSave(b)).revision===afterCancel.revision+1,
+    'fresh producer touch after cancellation',b);
   await sleep(250);
   const afterRecovery=await readSave(b);
   assert.equal(afterRecovery.revision,afterCancel.revision+1,
