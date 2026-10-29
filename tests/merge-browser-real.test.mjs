@@ -1334,5 +1334,76 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     t.diagnostic('Chromium background native import abort, late file result and cross-tab recovery verified');
   }
 
+
+  // P2.65bs: native file-picker cancellation and same-file re-selection.
+  // iOS/WeChat can send a cancel event or choose the identical file again;
+  // neither a canceled chooser nor a declined restore can mutate progress.
+  {
+    await front(b);
+    await waitWithSnapshot(async()=>await evalOn(b,
+      "document.getElementById('save-status').textContent.includes('已保存于此浏览器') && !document.getElementById('import-normal-save').disabled"),
+      'import UI ready for native cancel and re-selection',b);
+    const stableRaw=await evalOn(b,'localStorage.getItem('+JSON.stringify(key)+')');
+    const stable=JSON.parse(stableRaw);
+    const stableBackup=await evalOn(b,
+      'localStorage.getItem('+JSON.stringify(key+'.restore-backup-v3')+')');
+    const stableStory=await evalOn(b,
+      "localStorage.getItem('toolbox.merge-isle.story.local.v1')");
+    await evalOn(b,`(()=>{
+      window.__bsConfirmCount=0;
+      window.confirm=()=>{window.__bsConfirmCount++;return false;};
+      const input=document.getElementById('import-normal-file');
+      input.click=()=>{};
+      document.getElementById('import-normal-save').click();
+      input.dispatchEvent(new Event('cancel'));
+      return true;
+    })()`);
+    await waitWithSnapshot(async()=>await evalOn(b,
+      "document.getElementById('cancel-normal-import').hidden && !document.getElementById('import-normal-save').disabled"),
+      'native chooser cancel event released UI',b);
+    assert.equal(await evalOn(b,'window.__bsConfirmCount'),0,
+      'native chooser cancel must never ask for destructive confirmation');
+    assert.equal(await evalOn(b,'localStorage.getItem('+JSON.stringify(key)+')'),stableRaw,
+      'native chooser cancellation must not mutate save bytes');
+
+    // Two independent selections of the same named file must each reach a
+    // fresh confirmation. Both are declined; no backup may be reserved.
+    for(let attempt=1;attempt<=2;attempt++){
+      await evalOn(b,`(()=>{
+        const input=document.getElementById('import-normal-file');
+        input.click=()=>{};
+        document.getElementById('import-normal-save').click();
+        const transfer=new DataTransfer();
+        transfer.items.add(new File([${JSON.stringify(downloaded)}],
+          'same-file-reselected.json',{type:'application/json'}));
+        input.files=transfer.files;
+        input.dispatchEvent(new Event('change',{bubbles:true}));
+        return true;
+      })()`);
+      await waitWithSnapshot(async()=>await evalOn(b,
+        "window.__bsConfirmCount==="+attempt+
+        " && document.getElementById('cancel-normal-import').hidden && "+
+        "!document.getElementById('import-normal-save').disabled"),
+        'same file fresh declined confirmation '+attempt,b);
+      assert.equal(await evalOn(b,'localStorage.getItem('+JSON.stringify(key)+')'),stableRaw,
+        'declined same-file import must preserve exact normal save');
+      assert.equal(await evalOn(b,
+        'localStorage.getItem('+JSON.stringify(key+'.restore-backup-v3')+')'),
+        stableBackup,'declined same-file import must preserve recovery backup');
+      assert.equal(await evalOn(b,
+        "localStorage.getItem('toolbox.merge-isle.story.local.v1')"),
+        stableStory,'ordinary import cancellation must preserve story save');
+    }
+    await evalOn(b,"document.querySelector('#board .producer').click();true");
+    await waitWithSnapshot(async()=>(await readSave(b)).revision===stable.revision+1,
+      'fresh normal action after repeated native import cancellations',b);
+    assert.equal((await readSave(b)).energy,stable.energy-1,
+      'fresh action after canceled import consumes one energy');
+    assert.equal(await evalOn(b,
+      'localStorage.getItem('+JSON.stringify(key+'.restore-backup-v3')+')'),
+      stableBackup,'normal action after canceled imports must preserve backup');
+    t.diagnostic('Chromium native chooser cancel, same-file re-selection twice, declined restore and fresh gameplay verified');
+  }
+
   t.diagnostic(`Chromium two-tab lock, BFCache persisted=${bfcache}, download=${file}, reset/import/backup verified`);
 });
