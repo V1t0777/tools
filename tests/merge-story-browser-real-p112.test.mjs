@@ -7,7 +7,7 @@ import {spawn,spawnSync} from 'node:child_process';
 import {tmpdir} from 'node:os';
 import {join,resolve,extname,sep} from 'node:path';
 import {setTimeout as sleep} from 'node:timers/promises';
-import {BUILDINGS,getLevel} from '../merge/economy.mjs';
+import {BUILDINGS,getLevel,getMaxOrderTier} from '../merge/economy.mjs';
 import {simulateStoryBoard} from '../merge/story/board-simulation.mjs';
 import {validateSave} from '../merge/engine.mjs';
 
@@ -594,6 +594,86 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     assert.equal(await readRaw(b,workshopKey),fiveOrdersRaw,
       'story re-entry cannot replay fourth or fifth order');
     assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
+
+    // P125: continue the SAME browser save through three more genuine orders.
+    // No snapshot injection, direct engine call, clock override or RNG stub:
+    // every production, merge and delivery uses the rendered 56-cell UI.
+    await navigate(b,'/merge/story-workshop.html','#workshop-board');
+    await until(async()=>evalOn(b,
+      "document.querySelectorAll('#workshop-board button').length===56"),
+      'P125 continuous browser economy ready');
+    for(let goal=6;goal<=8;goal++){
+      const baseline=await readJSON(b,workshopKey);
+      assert.equal(baseline.progress.orders,goal-1);
+      for(let step=0;step<48;step++){
+        const current=await readJSON(b,workshopKey);
+        if(current.progress.orders===goal)break;
+        const readyIndex=current.orders.findIndex(order=>
+          current.board.some(item=>item?.kind==='material'&&
+            item.chain===order.chain&&item.tier===order.tier));
+        let click;
+        if(readyIndex>=0){
+          click="document.querySelectorAll('#workshop-orders .workshop-order button')["+
+            readyIndex+"].click();true";
+        }else{
+          const tierLimit=getMaxOrderTier(current.xp);
+          let pair=null;
+          for(let i=0;i<current.board.length&&!pair;i++){
+            const item=current.board[i];
+            if(item?.kind!=='material'||item.tier>=tierLimit)continue;
+            const j=current.board.findIndex((other,k)=>k>i&&
+              other?.kind==='material'&&other.chain===item.chain&&other.tier===item.tier);
+            if(j>=0)pair=[i,j];
+          }
+          if(pair){
+            await evalOn(b,"document.querySelectorAll('#workshop-board button')["+
+              pair[0]+"].click();true");
+            click="document.querySelectorAll('#workshop-board button')["+
+              pair[1]+"].click();true";
+          }else{
+            const target=current.orders.slice().sort((a,b)=>
+              a.tier-b.tier||Number(a.id.slice(1))-Number(b.id.slice(1)))[0];
+            const slot=current.board.findIndex(item=>item?.kind==='producer'&&
+              item.chain===target.chain);
+            assert.ok(slot>=0,'P125 real producer exists for '+target.chain);
+            assert.ok(current.energy>0&&current.board[slot].charges>0,
+              'P125 needs genuine available energy/charges; never grant free resources');
+            click="document.querySelectorAll('#workshop-board button')["+
+              slot+"].click();true";
+          }
+        }
+        await evalOn(b,click);
+        await until(async()=>{
+          try{return (await readJSON(b,workshopKey)).revision===current.revision+1;}
+          catch{return false;}
+        },'P125 persisted genuine UI action toward order '+goal);
+        const updated=await readJSON(b,workshopKey);
+        assert.equal(validateSave(updated),true,'every UI action retains strict save schema');
+        assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
+      }
+      const delivered=await readJSON(b,workshopKey);
+      assert.equal(delivered.progress.orders,goal,
+        'P125 must finish each genuine order without a test fixture');
+      assert.ok(delivered.coins>baseline.coins&&delivered.xp>baseline.xp,
+        'genuine UI delivery must earn coins and experience');
+      assert.equal(delivered.buildings.garden,0,
+        'orders cannot silently bypass garden construction');
+    }
+    const eightOrdersRaw=await readRaw(b,workshopKey);
+    await navigate(b,'/merge/story.html','#journey-read');
+    await until(async()=>evalOn(b,
+      "document.getElementById('progress-count').textContent.includes('6 / 12')"),
+      'P125 narrative remains garden-gated after eight real UI orders');
+    assert.equal(await evalOn(b,"document.getElementById('journey-read').hidden"),true);
+    assert.equal(await readRaw(b,workshopKey),eightOrdersRaw,
+      'narrative navigation cannot replay the sixth to eighth UI deliveries');
+    await navigate(b,'/merge/story-workshop.html','#workshop-board');
+    await until(async()=>evalOn(b,
+      "document.querySelectorAll('#workshop-board button').length===56"),
+      'P125 workshop reload after eight real UI orders');
+    assert.equal(await readRaw(b,workshopKey),eightOrdersRaw,
+      'all eight genuine orders survive a story/workshop round trip');
+    assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
     // P124: use ONE deterministic, engine-earned economic lineage for all
     // three PRE-build snapshots and their POST-build audit checkpoints.
     // The first five orders above are real UI actions; later progress is
@@ -637,6 +717,14 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     assert.equal(await evalOn(b,"document.getElementById('build-storefront').disabled"),true);
     const prebuildRaw=await readRaw(b,workshopKey);
     assert.deepEqual(JSON.parse(prebuildRaw),earnedFixture);
+    // P125: a second real tab observes the same build-ready save BEFORE the
+    // first tab spends 160 coins. It must never double-charge a stale view.
+    const staleGardenTab=await page();await front(staleGardenTab);
+    await navigate(staleGardenTab,'/merge/story-workshop.html','#workshop-board');
+    await until(async()=>evalOn(staleGardenTab,
+      "document.getElementById('build-garden')?.disabled===false"),
+      'P125 peer tab sees garden build-ready state');
+    await front(b);
     await evalOn(b,"document.getElementById('build-garden').click();true");
     await until(async()=>{
       try{return (await readJSON(b,workshopKey)).buildings.garden===1;}
@@ -660,6 +748,15 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
       "document.getElementById('garden-status').textContent.includes('已修复')"),
       'P122 browser UI reflects completed garden');
     const builtGardenRaw=await readRaw(b,workshopKey);
+    await front(staleGardenTab);
+    await until(async()=>evalOn(staleGardenTab,
+      "document.getElementById('build-garden')?.disabled===true"),
+      'P125 stale garden tab cannot retain an enabled build action');
+    await evalOn(staleGardenTab,"document.getElementById('build-garden').click();true");
+    assert.equal(await readRaw(staleGardenTab,workshopKey),builtGardenRaw,
+      'stale tab cannot spend garden cost a second time');
+    await call('Target.closeTarget',{targetId:staleGardenTab.targetId});
+    await front(b);
     await evalOn(b,"document.getElementById('build-garden').click();true");
     assert.equal(await readRaw(b,workshopKey),builtGardenRaw,
       'disabled garden button cannot double-charge');
