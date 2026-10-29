@@ -1077,7 +1077,7 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
       'offline observer needs a material and empty slot for a legal move');
     await waitWithSnapshot(async()=>await evalOn(a,
       `document.getElementById('save-status').textContent.includes('已保存于此浏览器') &&
-        document.querySelectorAll('#board .cell').length===49`),
+        document.querySelectorAll('#board .cell').length===56`),
       'offline observer verified fresh board before moving',a);
     await evalOn(a,`document.querySelector('#board .cell[data-slot="${offlineMovePair.from}"]').click();true`);
     await until(async()=>await evalOn(a,
