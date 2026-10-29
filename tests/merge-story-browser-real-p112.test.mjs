@@ -57,7 +57,7 @@ function connectCDP(url){
   }};
 }
 test('P112 real Chromium: story first-order gate, two-tab workshop conflict and corrupt evidence download',
-  {timeout:105000},async t=>{
+  {timeout:145000},async t=>{
     const chrome=chromePath();
     assert.ok(chrome,'A real Chrome/Chromium binary is required; no mock fallback');
     const temp=await mkdtemp(join(tmpdir(),'yunyu-story-real-'));
@@ -595,17 +595,17 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
       'story re-entry cannot replay fourth or fifth order');
     assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
 
-    // P125: continue the SAME browser save through three more genuine orders.
+    // P125/P128: continue the SAME browser save through five more genuine orders.
     // No snapshot injection, direct engine call, clock override or RNG stub:
     // every production, merge and delivery uses the rendered 56-cell UI.
     await navigate(b,'/merge/story-workshop.html','#workshop-board');
     await until(async()=>evalOn(b,
       "document.querySelectorAll('#workshop-board button').length===56"),
       'P125 continuous browser economy ready');
-    for(let goal=6;goal<=8;goal++){
+    for(let goal=6;goal<=10;goal++){
       const baseline=await readJSON(b,workshopKey);
       assert.equal(baseline.progress.orders,goal-1);
-      for(let step=0;step<48;step++){
+      for(let step=0;step<72;step++){
         const current=await readJSON(b,workshopKey);
         if(current.progress.orders===goal)break;
         const readyIndex=current.orders.findIndex(order=>
@@ -659,24 +659,29 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
       assert.equal(delivered.buildings.garden,0,
         'orders cannot silently bypass garden construction');
     }
-    const eightOrdersRaw=await readRaw(b,workshopKey);
+    const tenOrders=await readJSON(b,workshopKey);
+    assert.equal(tenOrders.progress.orders,10,'ten consecutive orders must be genuinely delivered');
+    assert.equal(validateSave(tenOrders),true,'ten-order UI save remains strictly valid');
+    assert.ok(tenOrders.energy>=0&&tenOrders.energy<=120,
+      'continuous UI production must not invent or underflow energy');
+    const tenOrdersRaw=await readRaw(b,workshopKey);
     await navigate(b,'/merge/story.html','#journey-read');
     await until(async()=>evalOn(b,
       "document.getElementById('progress-count').textContent.includes('6 / 12')"),
-      'P125 narrative remains garden-gated after eight real UI orders');
+      'P128 narrative remains garden-gated after ten real UI orders');
     assert.equal(await evalOn(b,"document.getElementById('journey-read').hidden"),true);
-    assert.equal(await readRaw(b,workshopKey),eightOrdersRaw,
-      'narrative navigation cannot replay the sixth to eighth UI deliveries');
+    assert.equal(await readRaw(b,workshopKey),tenOrdersRaw,
+      'narrative navigation cannot replay the sixth to tenth UI deliveries');
     await navigate(b,'/merge/story-workshop.html','#workshop-board');
     await until(async()=>evalOn(b,
       "document.querySelectorAll('#workshop-board button').length===56"),
-      'P125 workshop reload after eight real UI orders');
-    assert.equal(await readRaw(b,workshopKey),eightOrdersRaw,
-      'all eight genuine orders survive a story/workshop round trip');
+      'P128 workshop reload after ten real UI orders');
+    assert.equal(await readRaw(b,workshopKey),tenOrdersRaw,
+      'all ten genuine orders survive a story/workshop round trip');
     assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
     // P124: use ONE deterministic, engine-earned economic lineage for all
     // three PRE-build snapshots and their POST-build audit checkpoints.
-    // The first five orders above are real UI actions; later progress is
+    // The first ten orders above are real UI actions; later progress is
     // loaded as test fixtures, NOT continuous UI grinding or device testing.
     const preBuild={},postBuild={};
     const economicReplay=simulateStoryBoard({seed:42,

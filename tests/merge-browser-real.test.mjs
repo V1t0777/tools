@@ -660,7 +660,38 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     status:document.getElementById('save-status').textContent,
   })`);
   t.diagnostic('CDP native touch trace: '+JSON.stringify({beforeRevision:beforeTouch.revision,...trace}));
-  await until(async()=> (await readSave(b)).revision===beforeTouch.revision+1,'native touch producer persisted once');
+  // A resize/foreground reconciliation may reject the first tap against
+  // an obsolete rendered board. Permit a second physical gesture ONLY when
+  // the first was explicitly refused and left the exact save unchanged.
+  // Unknown touch failures, duplicate writes or silent retries remain errors.
+  try {
+    await until(async()=>(await readSave(b)).revision===beforeTouch.revision+1,
+      'first native touch producer persisted',2200);
+  } catch {
+    assert.deepEqual(await readSave(b),beforeTouch,
+      'first safely rejected touch must preserve the complete original save');
+    assert.equal(trace.hidden,false,'retry requires a visible page');
+    assert.match(trace.notice,/存档已更新或正在保存，请在最新棋盘上重新操作/,
+      'only the explicit stale-board refusal authorizes a new gesture');
+    const freshCenter=await evalOn(b,`(()=>{
+      const el=document.querySelector('#board .producer');
+      el.scrollIntoView({block:'center',inline:'nearest'});
+      const r=el.getBoundingClientRect();
+      return {x:r.left+r.width/2,y:r.top+r.height/2};
+    })()`);
+    await until(async()=>await evalOn(b,
+      "document.elementFromPoint("+freshCenter.x+","+freshCenter.y+")?.closest('.producer')!==null"),
+      'retry producer is the actual hit target');
+    await sleep(160);
+    await call('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[
+      {...freshCenter,id:24,radiusX:2,radiusY:2,force:1}
+    ]},b.sessionId);
+    await sleep(75);
+    await call('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]},b.sessionId);
+    await waitWithSnapshot(async()=>(await readSave(b)).revision===beforeTouch.revision+1,
+      'new physical touch after explicit stale-board refusal',b);
+    t.diagnostic('First native producer touch safely rejected stale board; second distinct gesture saved');
+  }
   await sleep(250);
   const afterTouch=await readSave(b);
   assert.equal(afterTouch.revision,beforeTouch.revision+1,'touch compatibility click must not duplicate production');
@@ -895,6 +926,93 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   assert.equal(recovered.revision,newerState.revision+1,'fresh touch writes exactly once');
   assert.equal(recovered.energy,newerState.energy-1,'fresh touch spends one energy');
   t.diagnostic('Chromium background mid-drag, concurrent tab write and fresh touch recovery passed');
+
+
+  // P2.65bi: loaded normal mode must remain playable and export its exact
+  // snapshot when the browser goes offline. This is NOT an offline reload or
+  // installed-PWA test; it proves the already-loaded runtime has no network
+  // dependency for a normal action or a local Blob download.
+  await front(b);
+  // Isolate each download in its own directory: headless Chromium may reuse
+  // the same filename for repeated exports instead of creating a new name.
+  const offlineDownloadDir=await mkdtemp(join(temp,'offline-download-'));
+  await call('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:offlineDownloadDir});
+  await call('Network.enable',{},b.sessionId);
+  await call('Network.emulateNetworkConditions',{
+    offline:true,latency:0,downloadThroughput:0,uploadThroughput:0
+  },b.sessionId);
+  try {
+    await until(async()=>await evalOn(b,'navigator.onLine===false'),
+      'browser reports offline after network emulation');
+    const offlineBefore=await readSave(b);
+    await evalOn(b,"document.querySelector('#board .producer').click();true");
+    await waitWithSnapshot(async()=>(await readSave(b)).revision===offlineBefore.revision+1,
+      'offline normal-mode producer saved once',b);
+    const offlineAfter=await readSave(b);
+    assert.equal(offlineAfter.energy,offlineBefore.energy-1,
+      'offline production consumes exactly one energy');
+    // Storage readback can precede the async onVerified UI publication.
+    // Export only after the player actually sees the new persisted state.
+    await waitWithSnapshot(async()=>await evalOn(b,
+      "document.getElementById('save-status').textContent.includes('已保存于此浏览器') && "+
+      "document.querySelector('#energy').textContent.startsWith('"+offlineAfter.energy+" /')"),
+      'offline UI published before export',b);
+    await sleep(180);
+    assert.equal((await readSave(b)).revision,offlineBefore.revision+1,
+      'offline action must not duplicate its write');
+    const existingDownloads=new Set((await readdir(offlineDownloadDir)).filter(
+      name=>name.endsWith('.json')||name.endsWith('.txt')));
+    await evalOn(b,"document.getElementById('export-local-save').click();true");
+    const offlineExportFeedback=await evalOn(b,"({notice:document.getElementById('notice').textContent,status:document.getElementById('save-status').textContent,hidden:document.hidden,online:navigator.onLine})");
+    t.diagnostic('Chromium offline export feedback: '+JSON.stringify(offlineExportFeedback));
+    // Chromium may suppress even a local Blob download while CDP network
+    // emulation is offline. A successful anchor click is NOT file evidence.
+    // Record that limitation explicitly and verify the bytes after reconnect.
+    let offlineFile=null;
+    try {
+      offlineFile=await until(async()=>{
+        const names=(await readdir(offlineDownloadDir)).filter(
+          name=>name.endsWith('.json')||name.endsWith('.txt'));
+        return names.find(name=>!existingDownloads.has(name));
+      },'offline Blob download reached disk',1800);
+    } catch {
+      assert.match(offlineExportFeedback.notice,/已请求下载.*请核实文件已保存/,
+        'offline UI must describe a request, never falsely claim saved bytes');
+      t.diagnostic('OFFLINE DOWNLOAD UNVERIFIED: Chromium requested Blob download but no new file landed; keep mobile offline-export P0 open');
+    }
+    if(offlineFile){
+      const offlineDownloaded=await readFile(join(offlineDownloadDir,offlineFile),'utf8');
+      assert.deepEqual(JSON.parse(offlineDownloaded),offlineAfter,
+        'offline landed file must equal the reviewed snapshot');
+      t.diagnostic('Chromium offline Blob download actually landed and matched saved bytes');
+    }
+    assert.deepEqual(await readSave(b),offlineAfter,
+      'offline export must remain read-only');
+  } finally {
+    await call('Network.emulateNetworkConditions',{
+      offline:false,latency:0,downloadThroughput:-1,uploadThroughput:-1
+    },b.sessionId);
+  }
+  await until(async()=>await evalOn(b,'navigator.onLine===true'),
+    'browser network restored');
+  // Once online again, the user must still be able to obtain a real file.
+  // Never treat the earlier offline click/notice as proof of a saved backup.
+  const onlineBaseline=await readSave(b);
+  const onlineDownloadDir=await mkdtemp(join(temp,'online-download-'));
+  await call('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:onlineDownloadDir});
+  const beforeOnlineDownload=new Set((await readdir(onlineDownloadDir)).filter(
+    name=>name.endsWith('.json')||name.endsWith('.txt')));
+  await evalOn(b,"document.getElementById('export-local-save').click();true");
+  const onlineFile=await until(async()=>{
+    const names=(await readdir(onlineDownloadDir)).filter(
+      name=>name.endsWith('.json')||name.endsWith('.txt'));
+    return names.find(name=>!beforeOnlineDownload.has(name));
+  },'real local export after reconnect');
+  assert.deepEqual(JSON.parse(await readFile(join(onlineDownloadDir,onlineFile),'utf8')),onlineBaseline,
+    'reconnected download must match the persisted snapshot exactly');
+  assert.deepEqual(await readSave(b),onlineBaseline,
+    'reconnected export must not change progress');
+  t.diagnostic('Chromium offline gameplay and online recovery download verified; offline file landing remains an explicit manual gate');
 
   t.diagnostic(`Chromium two-tab lock, BFCache persisted=${bfcache}, download=${file}, reset/import/backup verified`);
 });
