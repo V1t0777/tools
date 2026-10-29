@@ -493,6 +493,66 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     assert.equal(layout.reducedMotion,true,'reduced-motion emulation must be active');
     t.diagnostic(`Chromium mobile viewport ${width}px: no overflow; board min ${layout.boardMin.toFixed(1)}px; warehouse min ${layout.warehouseMin.toFixed(1)}px`);
   }
+
+  // P2.65bg: real CDP touch pan plus cross-scroll two-tap movement at 320px.
+  await call('Emulation.setDeviceMetricsOverride',{
+    width:320,height:812,deviceScaleFactor:3,mobile:true,screenWidth:320,screenHeight:812
+  },b.sessionId);
+  await front(b);
+  await sleep(220);
+  const beforeNarrow=await readSave(b);
+  const panStart=await evalOn(b,'(()=>{const s=document.querySelector(".board-section");s.scrollIntoView({block:"center"});s.scrollLeft=0;const r=document.querySelectorAll("#board .cell")[3].getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};})()');
+  assert.ok(panStart.x>110&&panStart.x<300&&panStart.y>0&&panStart.y<812,
+    '320px native pan must start on a visible board cell');
+  await sleep(120);
+  await call('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[
+    {...panStart,id:20,radiusX:2,radiusY:2,force:1}
+  ]},b.sessionId);
+  for(const delta of [35,70,110]){
+    await call('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[
+      {x:panStart.x-delta,y:panStart.y,id:20,radiusX:2,radiusY:2,force:1}
+    ]},b.sessionId);
+    await sleep(65);
+  }
+  await call('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]},b.sessionId);
+  await until(async()=>await evalOn(b,'document.querySelector(".board-section").scrollLeft>4'),
+    '320px native touch gesture pans the board');
+  assert.deepEqual(await readSave(b),beforeNarrow,'panning must not modify the save');
+  assert.equal(await evalOn(b,'document.querySelectorAll(".drag-ghost").length'),0,
+    'panning must not leave a drag ghost');
+  const narrowPair=await evalOn(b,'(()=>{const a=JSON.parse(localStorage.getItem("toolbox.merge-isle.local.v1")).board;return {from:a.findIndex(x=>x?.kind==="material"),to:a.findIndex((x,i)=>!x&&i%7===6)};})()');
+  assert.ok(narrowPair.from>=0&&narrowPair.to>=0,'need material and last-column vacancy');
+  assert.equal(await evalOn(b,'document.querySelectorAll("#board .cell.selected").length'),0,
+    'two-tap move must start without stale selection');
+  async function narrowTap(slot,id){
+    const p=await evalOn(b,'(()=>{const el=document.querySelectorAll("#board .cell")['+slot+'];el.scrollIntoView({block:"center",inline:"nearest"});const r=el.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};})()');
+    assert.ok(p.x>0&&p.x<320&&p.y>0&&p.y<812,'tap must be on screen');
+    await until(async()=>await evalOn(b,'document.elementFromPoint('+p.x+','+p.y+')?.closest?.("[data-slot]")?.dataset.slot==="'+slot+'"'),
+      '320px hit test after scrolling');
+    await sleep(100);
+    await call('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[
+      {...p,id,radiusX:2,radiusY:2,force:1}
+    ]},b.sessionId);
+    await sleep(75);
+    await call('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]},b.sessionId);
+  }
+  await narrowTap(narrowPair.from,21);
+  await until(async()=>await evalOn(b,'document.querySelector("#board .cell.selected")?.dataset.slot==="'+narrowPair.from+'"'),
+    'first tap selects material');
+  assert.deepEqual(await readSave(b),beforeNarrow,'selection must not write');
+  await narrowTap(narrowPair.to,22);
+  await waitWithSnapshot(async()=>(await readSave(b)).revision===beforeNarrow.revision+1,
+    '320px cross-scroll move saved once',b);
+  const afterNarrow=await readSave(b);
+  assert.deepEqual(afterNarrow.board[narrowPair.to],beforeNarrow.board[narrowPair.from],
+    'last-column target must receive original material');
+  assert.equal(afterNarrow.board[narrowPair.from],null,'source must be cleared');
+  assert.equal(afterNarrow.energy,beforeNarrow.energy,'movement must not spend energy');
+  await sleep(150);
+  assert.equal((await readSave(b)).revision,beforeNarrow.revision+1,
+    'compatibility click must not duplicate move');
+  t.diagnostic('Chromium 320px native touch pan and cross-scroll two-tap move verified');
+
   // Dispatch a native CDP touch sequence on the actual producer and assert
   // exactly one saved action (not a duplicate synthetic compatibility click).
   await call('Emulation.setDeviceMetricsOverride',{
