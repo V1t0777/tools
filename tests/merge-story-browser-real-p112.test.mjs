@@ -595,14 +595,14 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
       'story re-entry cannot replay fourth or fifth order');
     assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
 
-    // P125/P128/P129: continue the SAME browser save through seven more genuine orders.
+    // P130: continue the SAME browser save through nine more genuine orders.
     // No snapshot injection, direct engine call, clock override or RNG stub:
     // every production, merge and delivery uses the rendered 56-cell UI.
     await navigate(b,'/merge/story-workshop.html','#workshop-board');
     await until(async()=>evalOn(b,
       "document.querySelectorAll('#workshop-board button').length===56"),
       'P125 continuous browser economy ready');
-    for(let goal=6;goal<=12;goal++){
+    for(let goal=6;goal<=14;goal++){
       const baseline=await readJSON(b,workshopKey);
       assert.equal(baseline.progress.orders,goal-1);
       for(let step=0;step<72;step++){
@@ -649,6 +649,11 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
         },'P125 persisted genuine UI action toward order '+goal);
         const updated=await readJSON(b,workshopKey);
         assert.equal(validateSave(updated),true,'every UI action retains strict save schema');
+        assert.ok(updated.energy>=0&&updated.energy<=120,
+          'each genuine UI action must preserve finite energy bounds');
+        assert.ok(updated.progress.orders>=current.progress.orders&&
+          updated.progress.orders<=current.progress.orders+1,
+          'one UI action cannot silently grant multiple orders');
         assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
       }
       const delivered=await readJSON(b,workshopKey);
@@ -661,29 +666,29 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
       assert.ok(delivered.revision>baseline.revision,
         'each new delivered order must follow real persisted UI actions');
     }
-    const twelveOrders=await readJSON(b,workshopKey);
-    assert.equal(twelveOrders.progress.orders,12,'twelve consecutive orders must be genuinely delivered');
-    assert.equal(validateSave(twelveOrders),true,'twelve-order UI save remains strictly valid');
-    assert.ok(twelveOrders.energy>=0&&twelveOrders.energy<=120,
+    const fourteenOrders=await readJSON(b,workshopKey);
+    assert.equal(fourteenOrders.progress.orders,14,'fourteen consecutive orders must be genuinely delivered');
+    assert.equal(validateSave(fourteenOrders),true,'fourteen-order UI save remains strictly valid');
+    assert.ok(fourteenOrders.energy>=0&&fourteenOrders.energy<=120,
       'continuous UI production must not invent or underflow energy');
-    const twelveOrdersRaw=await readRaw(b,workshopKey);
+    const fourteenOrdersRaw=await readRaw(b,workshopKey);
     await navigate(b,'/merge/story.html','#journey-read');
     await until(async()=>evalOn(b,
       "document.getElementById('progress-count').textContent.includes('6 / 12')"),
-      'P129 narrative remains garden-gated after twelve real UI orders');
+      'P130 narrative remains garden-gated after fourteen real UI orders');
     assert.equal(await evalOn(b,"document.getElementById('journey-read').hidden"),true);
-    assert.equal(await readRaw(b,workshopKey),twelveOrdersRaw,
-      'narrative navigation cannot replay the sixth to twelfth UI deliveries');
+    assert.equal(await readRaw(b,workshopKey),fourteenOrdersRaw,
+      'narrative navigation cannot replay the sixth to fourteenth UI deliveries');
     await navigate(b,'/merge/story-workshop.html','#workshop-board');
     await until(async()=>evalOn(b,
       "document.querySelectorAll('#workshop-board button').length===56"),
-      'P129 workshop reload after twelve real UI orders');
-    assert.equal(await readRaw(b,workshopKey),twelveOrdersRaw,
-      'all twelve genuine orders survive a story/workshop round trip');
+      'P130 workshop reload after fourteen real UI orders');
+    assert.equal(await readRaw(b,workshopKey),fourteenOrdersRaw,
+      'all fourteen genuine orders survive a story/workshop round trip');
     assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
     // P124: use ONE deterministic, engine-earned economic lineage for all
     // three PRE-build snapshots and their POST-build audit checkpoints.
-    // The first twelve orders above are real UI actions; later progress is
+    // The first fourteen orders above are real UI actions; later progress is
     // loaded as test fixtures, NOT continuous UI grinding or device testing.
     const preBuild={},postBuild={};
     const economicReplay=simulateStoryBoard({seed:42,
@@ -912,7 +917,7 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     assert.equal(await evalOn(b,"document.getElementById('journey-workshop').hidden"),true);
     assert.equal(await readRaw(b,workshopKey),builtStorefrontRaw);
     assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
-    t.diagnostic('P129 real Chromium: twelve consecutive UI orders survive story/workshop navigation; later buildings still use detached engine-earned fixtures, not full UI completion');
+    t.diagnostic('P130 real Chromium: fourteen consecutive UI orders survive story/workshop navigation; each action preserves finite energy and at-most-one-order progress; later buildings still use detached engine-earned fixtures, not full UI completion');
     t.diagnostic('P126 real Chromium: stale peer tabs cannot double-charge garden, harbor or storefront; not iPhone/WeChat device testing');
     t.diagnostic('P123 real Chromium: harbor + storefront buttons charge once; chapters 3-4 reach 12/12; later economy uses detached real-engine pre-build fixtures, not continuous UI grinding');
     t.diagnostic('P122 Chromium: real garden button deducts once and unlocks tea-table; post-five-order economy uses an engine-earned fixture, not continuous UI grinding');
