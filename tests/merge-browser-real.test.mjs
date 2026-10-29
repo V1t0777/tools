@@ -1065,7 +1065,58 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
       'offline observer must not claim a file was saved');
     assert.equal(await evalOn(a,`localStorage.getItem(${JSON.stringify(key)})`),
       crossTabRaw,'offline export must not write or roll back the newer save');
-    t.diagnostic('Chromium offline observer adopted online tab save without rollback or backup mutation');
+    // P2.65bk: adoption must not leave the offline observer read-only. A
+    // fresh two-click move writes once under Web Locks; the online tab then
+    // adopts those exact bytes without a rollback or backup replacement.
+    const offlineMovePair=await evalOn(a,`(()=>{
+      const cells=JSON.parse(localStorage.getItem("toolbox.merge-isle.local.v1")).board;
+      return {from:cells.findIndex(item=>item?.kind==='material'),
+        to:cells.findIndex(item=>item===null)};
+    })()`);
+    assert.ok(offlineMovePair.from>=0&&offlineMovePair.to>=0,
+      'offline observer needs a material and empty slot for a legal move');
+    await waitWithSnapshot(async()=>await evalOn(a,
+      `document.getElementById('save-status').textContent.includes('已保存于此浏览器') &&
+        document.querySelectorAll('#board .cell').length===49`),
+      'offline observer verified fresh board before moving',a);
+    await evalOn(a,`document.querySelector('#board .cell[data-slot="${offlineMovePair.from}"]').click();true`);
+    await until(async()=>await evalOn(a,
+      `document.querySelector('#board .cell.selected')?.dataset.slot==='${offlineMovePair.from}'`),
+      'offline first tap selects a material');
+    assert.equal(await evalOn(a,`localStorage.getItem(${JSON.stringify(key)})`),
+      crossTabRaw,'offline selection must not write or roll back shared progress');
+    await evalOn(a,`document.querySelector('#board .cell[data-slot="${offlineMovePair.to}"]').click();true`);
+    await waitWithSnapshot(async()=>(await readSave(a)).revision===crossTabSave.revision+1,
+      'offline observer move persisted exactly once',a);
+    const offlineMoveRaw=await evalOn(a,`localStorage.getItem(${JSON.stringify(key)})`);
+    const offlineMoveSave=JSON.parse(offlineMoveRaw);
+    assert.deepEqual(offlineMoveSave.board[offlineMovePair.to],
+      crossTabSave.board[offlineMovePair.from],'offline move must preserve item identity');
+    assert.equal(offlineMoveSave.board[offlineMovePair.from],null,
+      'offline move must clear the original cell');
+    assert.equal(offlineMoveSave.energy,crossTabSave.energy,
+      'offline movement must not consume energy');
+    await sleep(180);
+    assert.equal((await readSave(a)).revision,crossTabSave.revision+1,
+      'offline move must not generate duplicate writes');
+    assert.equal(await evalOn(a,
+      `localStorage.getItem(${JSON.stringify(key+'.restore-backup-v3')})`),
+      crossTabBackupBefore,'offline write must not replace recovery backup');
+    await front(b);
+    await waitWithSnapshot(async()=>await evalOn(b,
+      `document.querySelector('#board .cell[data-slot="${offlineMovePair.to}"]')?.classList.contains('filled') &&
+        !document.querySelector('#board .cell[data-slot="${offlineMovePair.from}"]')?.classList.contains('filled') &&
+        document.getElementById('save-status').textContent.includes('已保存于此浏览器')`),
+      'online tab rendered offline observer move',b);
+    assert.equal(await evalOn(b,`localStorage.getItem(${JSON.stringify(key)})`),
+      offlineMoveRaw,'online tab must retain exact offline write bytes');
+    assert.equal(await evalOn(b,
+      `localStorage.getItem(${JSON.stringify(key+'.restore-backup-v3')})`),
+      crossTabBackupBefore,'online adoption must preserve restore backup');
+    await front(a);
+    assert.equal(await evalOn(a,'navigator.onLine'),false,
+      'offline writer must remain offline after round-trip reconciliation');
+    t.diagnostic('Chromium offline/online two-way save adoption and one legal offline move verified');
   } finally {
     await call('Network.emulateNetworkConditions',{
       offline:false,latency:0,downloadThroughput:-1,uploadThroughput:-1
