@@ -631,8 +631,8 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
               click="document.querySelectorAll('#workshop-board button')["+
                 pair[1]+"].click();true";
             }else{
-              const target=current.orders.slice().sort((a,b)=>
-                a.tier-b.tier||Number(a.id.slice(1))-Number(b.id.slice(1)))[0];
+              const targets=current.orders.slice().sort((a,b)=>
+                a.tier-b.tier||Number(a.id.slice(1))-Number(b.id.slice(1)));
               if(current.energy===0){
                 // Earned one-time items may recover energy; no injected resources.
                 const supply=['soda','meal'].find(id=>current.bag[id]>0);
@@ -640,10 +640,21 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
                 click="document.querySelector('#story-supply-bag [data-supply-use="+
                   JSON.stringify(supply)+"]').click();true";
               }else{
-                const slot=current.board.findIndex(item=>item?.kind==='producer'&&
-                  item.chain===target.chain);
-                assert.ok(slot>=0,'P131 real producer exists for '+target.chain);
-                const producer=current.board[slot];
+                // P138: while one order's producer cools, use another
+                // active order's legitimately charged producer instead of
+                // waiting idle. No clock or resource injection is permitted.
+                const choices=targets.map(target=>{
+                  const slot=current.board.findIndex(item=>item?.kind==='producer'&&
+                    item.chain===target.chain);
+                  assert.ok(slot>=0,'P138 real producer exists for '+target.chain);
+                  return {slot,producer:current.board[slot]};
+                });
+                const now=Date.now();
+                const choice=choices.find(item=>item.producer.charges>0||
+                  item.producer.cooldownUntil<=now)||
+                  choices.reduce((best,item)=>item.producer.cooldownUntil<
+                    best.producer.cooldownUntil?item:best);
+                const {slot,producer}=choice;
                 if(producer.charges===0&&producer.cooldownUntil>Date.now()+3000){
                   const cooldownRaw=await readRaw(b,workshopKey);
                   await evalOn(b,"document.querySelectorAll('#workshop-board button')["+
@@ -695,6 +706,9 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
           'UI orders cannot change garden construction state');
         assert.ok(delivered.revision>baseline.revision,
           'each new delivered order must follow real persisted UI actions');
+        if(goal%5===0||goal===end)
+          process.stderr.write('[P138] real UI order '+goal+
+            ' persisted; no fixture or clock override\\n');
       }
     }
     await deliverOrdersThrough(6,20,0);
