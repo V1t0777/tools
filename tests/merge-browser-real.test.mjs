@@ -1197,5 +1197,75 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     resetAfterRelease,'stale tab must not resurrect progress after reset');
   t.diagnostic('Chromium Web Lock contention rejected reset without backup write; new confirmation reset once and stale tab stayed blocked');
 
+  // P2.65bq: a stale tab needs an explicit reload after another tab's reset.
+  // Once revalidated, it can make a legal write and B must adopt those bytes.
+  await call('Page.reload',{ignoreCache:true},a.sessionId);
+  await waitWithSnapshot(async()=>await evalOn(a,
+    "document.readyState==='complete'&&document.getElementById('save-status')?.textContent.includes('已保存于此浏览器')"),
+    'stale tab explicitly reloaded after reset',a);
+  assert.equal(await evalOn(a,'localStorage.getItem('+JSON.stringify(key)+')'),
+    resetAfterRelease,'reloaded tab must adopt exact reset baseline');
+  await front(a);
+  await evalOn(a,"document.querySelector('#board .producer').click();true");
+  await waitWithSnapshot(async()=>(await readSave(a)).revision===1,
+    'one legal action after explicit reset reload',a);
+  const importLockRaw=await evalOn(a,'localStorage.getItem('+JSON.stringify(key)+')');
+  const importLockState=JSON.parse(importLockRaw);
+  const importLockBackup=await evalOn(a,
+    'localStorage.getItem('+JSON.stringify(key+'.restore-backup-v3')+')');
+  const importLockStory=await evalOn(a,
+    "localStorage.getItem('toolbox.merge-isle.story.local.v1')");
+  await front(b);
+  await waitWithSnapshot(async()=>await evalOn(b,
+    "document.getElementById('save-status').textContent.includes('已同步')&&document.querySelector('#energy').textContent.startsWith("+JSON.stringify(String(importLockState.energy)+' /')+")"),
+    'other tab adopted legal post-reset write',b);
+  assert.equal(await evalOn(b,'localStorage.getItem('+JSON.stringify(key)+')'),
+    importLockRaw,'import contender must use latest save baseline');
+
+  // Native Web Lock held by A must reject B's confirmed File.text import.
+  // No backup reservation, deferred replay or stale success notice is allowed.
+  await evalOn(a,'window.__p265bqHold=navigator.locks.request('+JSON.stringify(lock)+',()=>new Promise(resolve=>window.__p265bqUnlock=resolve));true');
+  await until(async()=>await evalOn(a,"typeof window.__p265bqUnlock==='function'"),
+    'other tab acquired save lock before import');
+  await front(b);
+  await evalOn(b,"(()=>{window.__p265bqConfirms=0;window.confirm=()=>{window.__p265bqConfirms++;return true;};const input=document.getElementById('import-normal-file');input.click=()=>{};document.getElementById('import-normal-save').click();const transfer=new DataTransfer();transfer.items.add(new File(["+JSON.stringify(downloaded)+"],'locked-import.json',{type:'application/json'}));input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));return true;})()");
+  await waitWithSnapshot(async()=>await evalOn(b,
+    "document.getElementById('notice').textContent.includes('其他标签正在保存')"),
+    'confirmed import rejected under real competing Web Lock',b,6000);
+  assert.equal(await evalOn(b,'window.__p265bqConfirms'),1,
+    'busy import must require an explicit confirmation');
+  assert.equal(await evalOn(b,'localStorage.getItem('+JSON.stringify(key)+')'),
+    importLockRaw,'busy import must preserve current normal save bytes');
+  assert.equal(await evalOn(b,
+    'localStorage.getItem('+JSON.stringify(key+'.restore-backup-v3')+')'),
+    importLockBackup,'busy import must not reserve or replace backup');
+  assert.equal(await evalOn(b,
+    "localStorage.getItem('toolbox.merge-isle.story.local.v1')"),
+    importLockStory,'busy normal import must preserve story save');
+  await waitWithSnapshot(async()=>await evalOn(b,
+    "document.getElementById('cancel-normal-import').hidden&&!document.getElementById('import-normal-save').disabled"),
+    'busy import released chooser and UI flight',b);
+  await evalOn(a,'window.__p265bqUnlock();true');
+  await until(async()=>await evalOn(a,
+    'navigator.locks.query().then(s=>!s.held.some(x=>x.name==='+JSON.stringify(lock)+'))'),
+    'competing import lock released');
+  await sleep(120);
+  assert.equal(await evalOn(b,'localStorage.getItem('+JSON.stringify(key)+')'),
+    importLockRaw,'released lock must not replay old import confirmation');
+  await front(b);
+  await evalOn(b,"document.querySelector('#board .producer').click();true");
+  await waitWithSnapshot(async()=>(await readSave(b)).revision===2,
+    'fresh gameplay after rejected import',b);
+  assert.equal((await readSave(b)).energy,importLockState.energy-1,
+    'fresh action must consume exactly one energy');
+  assert.equal(await evalOn(b,
+    'localStorage.getItem('+JSON.stringify(key+'.restore-backup-v3')+')'),
+    importLockBackup,'subsequent gameplay must preserve recovery backup');
+  assert.equal(await evalOn(b,
+    "localStorage.getItem('toolbox.merge-isle.story.local.v1')"),
+    importLockStory,'subsequent gameplay must preserve story isolation');
+  t.diagnostic('Chromium post-reset reload and confirmed native import lock contention verified without backup write or deferred replay');
+
+
   t.diagnostic(`Chromium two-tab lock, BFCache persisted=${bfcache}, download=${file}, reset/import/backup verified`);
 });
