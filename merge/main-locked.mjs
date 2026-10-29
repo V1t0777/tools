@@ -569,6 +569,11 @@ board.addEventListener('pointercancel', event => {
 // Mobile WebViews may drop capture on scroll, DOM replacement or interruption
 // without a pointercancel. Never turn that abandoned drag into a later drop.
 board.addEventListener('lostpointercapture', event => {
+  // Touch browsers release implicit pointer capture after a normal tap.
+  // That event is NOT a canceled gesture: revoking the lease here would
+  // swallow the native compatibility click for producers and materials.
+  // Only an unfinished, matching material drag needs cancellation.
+  if(!drag||event.pointerId!==drag.id)return;
   rejectBoardPointer();
   completeDrag(event,true);
 });
@@ -752,6 +757,10 @@ document.addEventListener('visibilitychange',()=>{
         importPicker=null;queuedHiddenSelection=null;
       }else importPicker.hiddenOnce=true;
     }else queuedHiddenSelection=null;
+    // A second background transition revokes the old chooser. The visible
+    // cancel control must reflect that revocation immediately, even if the
+    // native file input never emits a cancel/change event.
+    refreshImportCancel();
   }
 });
 const saveActions=byId('export-local-save').parentElement;

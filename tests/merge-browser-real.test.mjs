@@ -76,7 +76,9 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     await rm(temp,{recursive:true,force:true,maxRetries:3});
   });
   const portFile=join(temp,'DevToolsActivePort');
-  await until(()=>existsSync(portFile),'Chrome debugging port');
+  // A busy CI runner can need longer than the default 12s to create the
+  // DevTools port. This remains a bounded hard failure, never a mock fallback.
+  await until(()=>existsSync(portFile),'Chrome debugging port',20000);
   const [port,wsPath]=(await readFile(portFile,'utf8')).trim().split('\n');
   client=cdp(`ws://127.0.0.1:${port}${wsPath}`);
   await client.ready;
@@ -92,6 +94,36 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     const result=await call('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true,userGesture:true},p.sessionId);
     if(result.exceptionDetails)throw Error('Browser JS: '+JSON.stringify(result.exceptionDetails));
     return result.result.value;
+  }
+  // Failure-only diagnostics preserve the original timeout. Never print raw
+  // save or backup bytes, and never convert a retry into a passing assertion.
+  async function waitWithSnapshot(check,label,p,limit=12000){
+    try{return await until(check,label,limit);}
+    catch(error){
+      try{
+        const snapshot=await evalOn(p,`(()=>{
+          const raw=localStorage.getItem("toolbox.merge-isle.local.v1");
+          let save=null;
+          try{save=raw?JSON.parse(raw):null;}catch{}
+          const backup=localStorage.getItem("toolbox.merge-isle.local.v1.restore-backup-v3");
+          return {
+            revision:save?.revision,energy:save?.energy,rawLength:raw?.length,
+            backupLength:backup?.length,hidden:document.hidden,
+            status:document.getElementById('save-status')?.textContent,
+            notice:document.getElementById('notice')?.textContent,
+            displayedEnergy:document.getElementById('energy')?.textContent,
+            importDisabled:document.getElementById('import-normal-save')?.disabled,
+            cancelHidden:document.getElementById('cancel-normal-import')?.hidden,
+            ghosts:document.querySelectorAll('.drag-ghost').length,
+            lastTouchEvents:window.__touchTrace?.slice(-12)
+          };
+        })()`);
+        t.diagnostic('Chromium failure snapshot ['+label+']: '+JSON.stringify(snapshot));
+      }catch(snapshotError){
+        t.diagnostic('Chromium failure snapshot unavailable ['+label+']: '+String(snapshotError));
+      }
+      throw error;
+    }
   }
   const front=async p=>{await call('Target.activateTarget',{targetId:p.targetId});await call('Page.bringToFront',{},p.sessionId);};
   async function navigate(p,url){
@@ -160,13 +192,36 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   // correctly reject its first destructive click during reconciliation.
   await until(async()=>await evalOn(b,`document.querySelector('#energy').textContent.startsWith(${JSON.stringify(String(savedSnapshot.energy)+' /')})`),'reset tab adopted latest progress');
   await evalOn(b,`window.confirm=()=>true;document.getElementById('reset').click();true`);
-  await until(async()=>{
+  // A background clock or a cross-tab reconciliation can legitimately hold
+  // the same lock during the first click. Retry only if the exact reviewed
+  // snapshot is still unchanged; never confirm against unseen new progress.
+  let resetCompleted=false;
+  try{
+    await until(async()=>{
+      const current=await readSave(b);
+      return current.revision===0&&current.energy>savedSnapshot.energy;
+    },'first reset attempt',3000);
+    resetCompleted=true;
+  }catch{
+    const still=await readSave(b);
+    assert.deepEqual(still,savedSnapshot,'reset retry requires unchanged reviewed baseline');
+    t.diagnostic('First reset click was rejected while save remained unchanged; retrying after lock settles');
+    await sleep(250);
+    await evalOn(b,`document.getElementById('reset').click();true`);
+  }
+  if(!resetCompleted)await until(async()=>{
     const current=await readSave(b);
     return current.revision===0&&current.energy>savedSnapshot.energy;
   },'confirmed reset persisted');
   const resetRaw=await evalOn(b,`localStorage.getItem(${JSON.stringify(key)})`);
   const resetSnapshot=JSON.parse(resetRaw);
   assert.notDeepEqual(resetSnapshot,savedSnapshot,'reset must not retain the prior progress');
+  // Storage persistence can precede the async UI publication. Do not start a
+  // destructive import against a reset not yet displayed to the player.
+  await until(async()=>await evalOn(b,`document.getElementById('save-status').textContent.includes('已保存于此浏览器')&&
+    document.querySelector('#energy').textContent.startsWith(${JSON.stringify(String(resetSnapshot.energy)+' /')})&&
+    !document.getElementById('import-normal-save').disabled`),
+    'reset UI published before import');
   await front(a);
   // A reset lowers revision. A tab holding the older higher revision MUST
   // block rather than silently adopting a rollback or resurrecting old data.
@@ -185,10 +240,10 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     chooser.dispatchEvent(new Event('change',{bubbles:true}));
     return true;
   })()`);
-  await until(async()=>{
+  await waitWithSnapshot(async()=>{
     const current=await readSave(b);
     return current.revision===savedSnapshot.revision&&current.energy===savedSnapshot.energy;
-  },'downloaded save restored after reset');
+  },'downloaded save restored after reset',b);
   assert.deepEqual(await readSave(b),savedSnapshot,'restored state must match downloaded JSON');
   const backup=await evalOn(b,`localStorage.getItem(${JSON.stringify(key+'.restore-backup-v3')})`);
   assert.equal(backup,resetRaw,'restore must preserve the exact pre-restore reset bytes');
@@ -268,7 +323,578 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   assert.equal(await evalOn(b,'window.__importConfirmCount'),0,'stale chooser must not show destructive confirmation');
   await evalOn(b,`document.querySelector('#board .producer').click();true`);
   await until(async()=>(await readSave(b)).revision===changedState.revision+1,'fresh gameplay after rejected chooser');
+  // P2.65bd: while a native file chooser is pending, neither a destructive
+  // reset nor a backup download may proceed on a possibly stale baseline.
+  // Use a chooser stub only; real browser storage, buttons and Web Locks remain live.
+  await front(b);
+  const chooserLeaseRaw=await evalOn(b,`localStorage.getItem(${JSON.stringify(key)})`);
+  const chooserLeaseBackup=await evalOn(b,`localStorage.getItem(${JSON.stringify(key+'.restore-backup-v3')})`);
+  const downloadsBeforeLease=(await readdir(temp)).filter(name=>name.endsWith('.json')||name.endsWith('.txt')).length;
+  const chooserLease=await evalOn(b,`(()=>{
+    window.__blockedResetConfirms=0;
+    window.confirm=()=>{window.__blockedResetConfirms++;return true;};
+    const input=document.getElementById('import-normal-file');
+    input.click=()=>{};
+    document.getElementById('import-normal-save').click();
+    return !document.getElementById('cancel-normal-import').hidden;
+  })()`);
+  assert.equal(chooserLease,true,'native chooser lease must be active');
+  await evalOn(b,`document.getElementById('reset').click();document.getElementById('export-local-save').click();true`);
+  await sleep(120);
+  assert.equal(await evalOn(b,'window.__blockedResetConfirms'),0,
+    'reset must not ask for confirmation while chooser is pending');
+  assert.equal(await evalOn(b,`localStorage.getItem(${JSON.stringify(key)})`),chooserLeaseRaw,
+    'reset blocked by chooser must preserve exact save bytes');
+  assert.equal(await evalOn(b,`localStorage.getItem(${JSON.stringify(key+'.restore-backup-v3')})`),chooserLeaseBackup,
+    'blocked reset must preserve exact restore backup bytes');
+  assert.equal((await readdir(temp)).filter(name=>name.endsWith('.json')||name.endsWith('.txt')).length,
+    downloadsBeforeLease,'export must not initiate a download while chooser is pending');
+  await evalOn(b,`document.getElementById('cancel-normal-import').click();true`);
+  await until(async()=>await evalOn(b,`document.getElementById('cancel-normal-import').hidden`),
+    'chooser cancellation releases pending UI');
+  assert.equal(await evalOn(b,`localStorage.getItem(${JSON.stringify(key)})`),chooserLeaseRaw,
+    'canceling a pending chooser must not mutate save');
+  t.diagnostic('Chromium pending chooser blocked reset and export without touching save/backup');
+
+  // P2.65be: a native chooser may deliver its File change while the tab is
+  // hidden. No confirmation, read/restore or backup overwrite is allowed
+  // until the page returns and its lifecycle reconciliation has run.
+  await front(b);
+  const hiddenChooserRaw=await evalOn(b,`localStorage.getItem(${JSON.stringify(key)})`);
+  const hiddenChooserBackup=await evalOn(b,`localStorage.getItem(${JSON.stringify(key+'.restore-backup-v3')})`);
+  const hiddenPickerOpen=await evalOn(b,`(()=>{
+    window.__hiddenChooserConfirmStates=[];
+    window.confirm=()=>{window.__hiddenChooserConfirmStates.push(document.hidden);return false;};
+    const input=document.getElementById('import-normal-file');
+    input.click=()=>{};
+    document.getElementById('import-normal-save').click();
+    return !document.getElementById('cancel-normal-import').hidden;
+  })()`);
+  assert.equal(hiddenPickerOpen,true,'hidden chooser must start with an active import lease');
+  await front(a);
+  await until(async()=>await evalOn(b,'document.hidden'),'chooser tab hidden before file selection');
+  await evalOn(b,`(()=>{
+    const input=document.getElementById('import-normal-file');
+    const transfer=new DataTransfer();
+    transfer.items.add(new File([${JSON.stringify(downloaded)}],'hidden-chooser.json',{type:'application/json'}));
+    input.files=transfer.files;
+    input.dispatchEvent(new Event('change',{bubbles:true}));
+    return true;
+  })()`);
+  assert.deepEqual(await evalOn(b,'window.__hiddenChooserConfirmStates'),[],
+    'hidden file selection must not invoke a destructive confirmation');
+  assert.equal(await evalOn(b,`localStorage.getItem(${JSON.stringify(key)})`),hiddenChooserRaw,
+    'hidden file selection must not write the save');
+  assert.equal(await evalOn(b,`localStorage.getItem(${JSON.stringify(key+'.restore-backup-v3')})`),hiddenChooserBackup,
+    'hidden file selection must not replace the backup');
+  await front(b);
+  await until(async()=>!await evalOn(b,'document.hidden'),'chooser tab returned to foreground');
+  await waitWithSnapshot(async()=>await evalOn(b,`document.getElementById('cancel-normal-import').hidden`),
+    'hidden chooser settled after foreground reconciliation',b);
+  assert.deepEqual(await evalOn(b,'window.__hiddenChooserConfirmStates').then(states=>states.filter(Boolean)),[],
+    'no hidden-state confirmation may occur during chooser return');
+  assert.equal(await evalOn(b,`localStorage.getItem(${JSON.stringify(key)})`),hiddenChooserRaw,
+    'declined or rejected hidden chooser must preserve save bytes');
+  assert.equal(await evalOn(b,`localStorage.getItem(${JSON.stringify(key+'.restore-backup-v3')})`),hiddenChooserBackup,
+    'declined or rejected hidden chooser must preserve backup bytes');
+
+  // A second background transition is not one native chooser roundtrip:
+  // revoke the stale chooser and its visible cancel UI immediately. Any
+  // delayed change from that input must remain unable to restore progress.
+  const doubleHidePicker=await evalOn(b,`(()=>{
+    window.__doubleHideConfirms=0;
+    window.confirm=()=>{window.__doubleHideConfirms++;return true;};
+    const input=document.getElementById('import-normal-file');
+    input.click=()=>{};
+    document.getElementById('import-normal-save').click();
+    return !document.getElementById('cancel-normal-import').hidden;
+  })()`);
+  assert.equal(doubleHidePicker,true,'double-hide scenario must begin with active chooser');
+  await front(a);
+  await until(async()=>await evalOn(b,'document.hidden'),'first chooser background');
+  await front(b);
+  await until(async()=>!await evalOn(b,'document.hidden'),'first chooser foreground');
+  await front(a);
+  await until(async()=>await evalOn(b,'document.hidden'),'second chooser background');
+  await waitWithSnapshot(async()=>await evalOn(b,`document.getElementById('cancel-normal-import').hidden`),
+    'second hide must revoke orphaned chooser cancel UI',b);
+  await front(b);
+  await until(async()=>!await evalOn(b,'document.hidden'),'second chooser foreground');
+  await evalOn(b,`(()=>{
+    const input=document.getElementById('import-normal-file');
+    const transfer=new DataTransfer();
+    transfer.items.add(new File([${JSON.stringify(downloaded)}],'twice-hidden-stale.json',{type:'application/json'}));
+    input.files=transfer.files;
+    input.dispatchEvent(new Event('change',{bubbles:true}));
+    return true;
+  })()`);
+  await until(async()=>await evalOn(b,`document.getElementById('notice').textContent.includes('文件选择期间页面或存档已变化')`),
+    'twice-hidden stale chooser rejected');
+  assert.equal(await evalOn(b,'window.__doubleHideConfirms'),0,
+    'twice-hidden chooser must not request destructive confirmation');
+  assert.equal(await evalOn(b,`localStorage.getItem(${JSON.stringify(key)})`),hiddenChooserRaw,
+    'twice-hidden stale chooser must preserve save');
+  assert.equal(await evalOn(b,`localStorage.getItem(${JSON.stringify(key+'.restore-backup-v3')})`),hiddenChooserBackup,
+    'twice-hidden stale chooser must preserve backup');
+  t.diagnostic('Chromium hidden chooser deferral, second-hide cancellation and stale file rejection verified');
+
   t.diagnostic('Chromium invalid import, detached chooser, cross-tab chooser baseline and recovery-backup integrity verified');
+
+  // P2.65aw: exercise the actual page under mobile viewport metrics, not
+  // a static stylesheet grep. This is Chromium emulation, NOT iPhone/WeChat.
+  await front(b);
+  await call('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1},b.sessionId);
+  for(const width of [320,375,390,430,768]){
+    await call('Emulation.setDeviceMetricsOverride',{
+      width,height:812,deviceScaleFactor:3,mobile:true,screenWidth:width,screenHeight:812
+    },b.sessionId);
+    await call('Emulation.setEmulatedMedia',{
+      features:[{name:'prefers-reduced-motion',value:'reduce'}]
+    },b.sessionId);
+    await sleep(90);
+    const layout=await evalOn(b,`(()=>{
+      const width=window.innerWidth;
+      const visible=el=>{
+        const s=getComputedStyle(el),r=el.getBoundingClientRect();
+        return s.display!=='none'&&s.visibility!=='hidden'&&r.width>0&&r.height>0;
+      };
+      const bounds=el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right,height:r.height,width:r.width}};
+      const critical=[...document.querySelectorAll('.shell,.board-section,#board,.resource-bar,.save-actions,.supply-section,.orders-section,.management-section,button,select')].filter(visible);
+      const clipped=critical.filter(el=>{if(width<=360&&(el.id==='board'||el.closest('#board')))return false;const r=bounds(el);return r.left < -1||r.right > width+1;}).map(el=>el.id||el.className).slice(0,12);
+      const targets=[...document.querySelectorAll('.order-button,.small-action,.secondary-action,.guide-action,.save-actions button,#how-to,.back-link,.supply-select')].filter(visible);
+      const tooShort=targets.filter(el=>bounds(el).height<43.5).map(el=>el.id||el.className).slice(0,12);
+      const minSize=selector=>Math.min(...[...document.querySelectorAll(selector)].filter(visible).map(el=>bounds(el).width),999);
+      return {width,scrollWidth:document.documentElement.scrollWidth,clipped,tooShort,
+        boardMin:minSize('#board .cell'),warehouseMin:minSize('#warehouse .warehouse-slot'),
+        boardScrollRange:document.querySelector('.board-section').scrollWidth-document.querySelector('.board-section').clientWidth,
+        warehouseColumns:getComputedStyle(document.querySelector('#warehouse')).gridTemplateColumns.split(' ').length,
+        orderColumns:getComputedStyle(document.querySelector('#orders')).gridTemplateColumns.split(' ').length,
+        reducedMotion:matchMedia('(prefers-reduced-motion: reduce)').matches};
+    })()`);
+    assert.equal(layout.width,width,'mobile viewport width must match CDP device metrics');
+    assert.ok(layout.scrollWidth<=width+1,`horizontal document overflow at ${width}px: ${JSON.stringify(layout)}`);
+    assert.deepEqual(layout.clipped,[],`clipped controls at ${width}px`);
+    assert.deepEqual(layout.tooShort,[],`undersized non-board touch targets at ${width}px`);
+    assert.ok(layout.warehouseMin>=44,`warehouse slots below 44px at ${width}px`);
+    assert.ok(layout.boardMin>=44,`board targets below 44px at ${width}px`);
+    if(width<=360){
+      assert.ok(layout.boardScrollRange>0,'320px board must scroll inside its section, not overflow the document');
+      const reached=await evalOn(b,`(()=>{
+        const section=document.querySelector('.board-section');
+        section.scrollLeft=section.scrollWidth;
+        const cell=document.querySelector('#board .cell[data-slot="6"]').getBoundingClientRect();
+        return {scrollLeft:section.scrollLeft,left:cell.left,right:cell.right};
+      })()`);
+      assert.ok(reached.scrollLeft>0&&reached.left>=-1&&reached.right<=width+1,
+        `last board column must be reachable inside the 320px viewport: ${JSON.stringify(reached)}`);
+    }
+    assert.equal(layout.warehouseColumns,width<=480?4:8,'warehouse responsive columns');
+    assert.equal(layout.orderColumns,width<=480?2:3,'order responsive columns');
+    assert.equal(layout.reducedMotion,true,'reduced-motion emulation must be active');
+    t.diagnostic(`Chromium mobile viewport ${width}px: no overflow; board min ${layout.boardMin.toFixed(1)}px; warehouse min ${layout.warehouseMin.toFixed(1)}px`);
+  }
+
+  // P2.65bg: real CDP touch pan plus cross-scroll two-tap movement at 320px.
+  await call('Emulation.setDeviceMetricsOverride',{
+    width:320,height:812,deviceScaleFactor:3,mobile:true,screenWidth:320,screenHeight:812
+  },b.sessionId);
+  await front(b);
+  await sleep(220);
+  const beforeNarrow=await readSave(b);
+  const panStart=await evalOn(b,'(()=>{const s=document.querySelector(".board-section");s.scrollIntoView({block:"center"});s.scrollLeft=0;const r=document.querySelectorAll("#board .cell")[3].getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};})()');
+  assert.ok(panStart.x>110&&panStart.x<300&&panStart.y>0&&panStart.y<812,
+    '320px native pan must start on a visible board cell');
+  await sleep(120);
+  await call('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[
+    {...panStart,id:20,radiusX:2,radiusY:2,force:1}
+  ]},b.sessionId);
+  for(const delta of [35,70,110]){
+    await call('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[
+      {x:panStart.x-delta,y:panStart.y,id:20,radiusX:2,radiusY:2,force:1}
+    ]},b.sessionId);
+    await sleep(65);
+  }
+  await call('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]},b.sessionId);
+  await until(async()=>await evalOn(b,'document.querySelector(".board-section").scrollLeft>4'),
+    '320px native touch gesture pans the board');
+  assert.deepEqual(await readSave(b),beforeNarrow,'panning must not modify the save');
+  assert.equal(await evalOn(b,'document.querySelectorAll(".drag-ghost").length'),0,
+    'panning must not leave a drag ghost');
+  const narrowPair=await evalOn(b,'(()=>{const a=JSON.parse(localStorage.getItem("toolbox.merge-isle.local.v1")).board;return {from:a.findIndex(x=>x?.kind==="material"),to:a.findIndex((x,i)=>!x&&i%7===6)};})()');
+  assert.ok(narrowPair.from>=0&&narrowPair.to>=0,'need material and last-column vacancy');
+  assert.equal(await evalOn(b,'document.querySelectorAll("#board .cell.selected").length'),0,
+    'two-tap move must start without stale selection');
+  async function narrowTap(slot,id){
+    const p=await evalOn(b,'(()=>{const el=document.querySelectorAll("#board .cell")['+slot+'];el.scrollIntoView({block:"center",inline:"nearest"});const r=el.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};})()');
+    assert.ok(p.x>0&&p.x<320&&p.y>0&&p.y<812,'tap must be on screen');
+    await until(async()=>await evalOn(b,'document.elementFromPoint('+p.x+','+p.y+')?.closest?.("[data-slot]")?.dataset.slot==="'+slot+'"'),
+      '320px hit test after scrolling');
+    await sleep(100);
+    await call('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[
+      {...p,id,radiusX:2,radiusY:2,force:1}
+    ]},b.sessionId);
+    await sleep(75);
+    await call('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]},b.sessionId);
+  }
+  await narrowTap(narrowPair.from,21);
+  await until(async()=>await evalOn(b,'document.querySelector("#board .cell.selected")?.dataset.slot==="'+narrowPair.from+'"'),
+    'first tap selects material');
+  assert.deepEqual(await readSave(b),beforeNarrow,'selection must not write');
+  await narrowTap(narrowPair.to,22);
+  await waitWithSnapshot(async()=>(await readSave(b)).revision===beforeNarrow.revision+1,
+    '320px cross-scroll move saved once',b);
+  const afterNarrow=await readSave(b);
+  assert.deepEqual(afterNarrow.board[narrowPair.to],beforeNarrow.board[narrowPair.from],
+    'last-column target must receive original material');
+  assert.equal(afterNarrow.board[narrowPair.from],null,'source must be cleared');
+  assert.equal(afterNarrow.energy,beforeNarrow.energy,'movement must not spend energy');
+  await sleep(150);
+  assert.equal((await readSave(b)).revision,beforeNarrow.revision+1,
+    'compatibility click must not duplicate move');
+  t.diagnostic('Chromium 320px native touch pan and cross-scroll two-tap move verified');
+
+  // P2.65bh: verify vertical page scrolling is not trapped by the narrow
+  // board's horizontal scroller. Also prove save controls remain reachable
+  // after a real gesture; this is Chromium emulation, not physical iOS.
+  const verticalPoint=await evalOn(b,`(()=>{
+    const cell=document.querySelector('#board .cell[data-slot="3"]');
+    cell.scrollIntoView({block:'center',inline:'nearest'});
+    const r=cell.getBoundingClientRect();
+    return {x:r.left+r.width/2,y:r.top+r.height/2};
+  })()`);
+  assert.ok(verticalPoint.x>0&&verticalPoint.x<320&&verticalPoint.y>170&&verticalPoint.y<812,
+    'vertical gesture must begin on a visible board cell with travel room');
+  await sleep(120);
+  const verticalBefore=await evalOn(b,`({
+    y:window.scrollY,x:document.querySelector('.board-section').scrollLeft
+  })`);
+  const verticalSave=await readSave(b);
+  await call('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[
+    {...verticalPoint,id:23,radiusX:2,radiusY:2,force:1}
+  ]},b.sessionId);
+  for(const delta of [40,85,135]){
+    await call('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[
+      {x:verticalPoint.x,y:verticalPoint.y-delta,id:23,radiusX:2,radiusY:2,force:1}
+    ]},b.sessionId);
+    await sleep(65);
+  }
+  await call('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]},b.sessionId);
+  await until(async()=>await evalOn(b,`window.scrollY>${verticalBefore.y}+8`),
+    '320px vertical swipe must scroll the document');
+  await sleep(160);
+  const verticalAfter=await evalOn(b,`({
+    y:window.scrollY,x:document.querySelector('.board-section').scrollLeft,
+    ghosts:document.querySelectorAll('.drag-ghost').length
+  })`);
+  assert.ok(Math.abs(verticalAfter.x-verticalBefore.x)<5,
+    'vertical swipe must not unexpectedly pan the board sideways');
+  assert.equal(verticalAfter.ghosts,0,'vertical swipe must leave no drag ghost');
+  assert.deepEqual(await readSave(b),verticalSave,'vertical swipe must not change save');
+
+  // Native scrollIntoView and elementFromPoint must locate each control even
+  // if the board was horizontally panned and the page vertically scrolled.
+  for(const id of ['export-local-save','export-abnormal-reset-backup','reset','import-normal-save']){
+    const point=await evalOn(b,`(()=>{
+      const el=document.getElementById(${JSON.stringify(id)});
+      if(!el)return null;
+      el.scrollIntoView({block:'center',inline:'nearest'});
+      const r=el.getBoundingClientRect();
+      return {x:r.left+r.width/2,y:r.top+r.height/2,disabled:el.disabled};
+    })()`);
+    assert.ok(point&&!point.disabled&&point.x>0&&point.x<320&&point.y>0&&point.y<812,
+      '320px save control must be enabled and onscreen: '+id);
+    await until(async()=>await evalOn(b,`document.elementFromPoint(${point.x},${point.y})?.closest('button')?.id===${JSON.stringify(id)}`),
+      '320px save control hit test: '+id);
+  }
+  await evalOn(b,`(()=>{
+    document.getElementById('notice').textContent='';
+    document.getElementById('export-local-save').click();
+    return true;
+  })()`);
+  await until(async()=>await evalOn(b,`/下载|导出/.test(document.getElementById('notice').textContent)`),
+    '320px export control must handle click after panning');
+  assert.deepEqual(await readSave(b),verticalSave,
+    'export after vertical/horizontal panning must not write game state');
+  t.diagnostic('Chromium 320px vertical page pan, save-control hit testing and export click verified');
+
+
+  // Dispatch a native CDP touch sequence on the actual producer and assert
+  // exactly one saved action (not a duplicate synthetic compatibility click).
+  await call('Emulation.setDeviceMetricsOverride',{
+    width:390,height:844,deviceScaleFactor:3,mobile:true,screenWidth:390,screenHeight:844
+  },b.sessionId);
+  await front(b);
+  // CDP device-metrics changes dispatch asynchronous resize/layout events.
+  // Allow the final viewport and page lifecycle to settle before pointerdown.
+  await sleep(350);
+  const beforeTouch=await readSave(b);
+  const center=await evalOn(b,`(()=>{
+    const el=document.querySelector('#board .producer');
+    el.scrollIntoView({block:'center',inline:'nearest'});
+    const r=el.getBoundingClientRect();
+    return {x:r.left+r.width/2,y:r.top+r.height/2};
+  })()`);
+  assert.ok(center.x>0&&center.x<390&&center.y>0&&center.y<844,'producer must be onscreen for native touch');
+  await sleep(150);
+  await evalOn(b,`(()=>{
+    window.__touchTrace=[];
+    for(const type of ['touchstart','touchend','touchcancel','pointerdown','pointerup','pointercancel','lostpointercapture','click'])
+      document.addEventListener(type,event=>window.__touchTrace.push({
+        type,target:event.target?.className,detail:event.detail,
+        slot:event.target?.closest?.('[data-slot]')?.dataset.slot,
+        isPrimary:event.isPrimary,pointerType:event.pointerType,
+        x:event.clientX,y:event.clientY
+      }),true);
+    return true;
+  })()`);
+  await call('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[
+    {x:center.x,y:center.y,id:1,radiusX:2,radiusY:2,force:1}
+  ]},b.sessionId);
+  await sleep(75);
+  await call('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]},b.sessionId);
+  const trace=await evalOn(b,`({
+    events:window.__touchTrace,
+    hidden:document.hidden,
+    hit:document.elementFromPoint(${center.x},${center.y})?.className,
+    notice:document.getElementById('notice').textContent,
+    status:document.getElementById('save-status').textContent,
+  })`);
+  t.diagnostic('CDP native touch trace: '+JSON.stringify({beforeRevision:beforeTouch.revision,...trace}));
+  await until(async()=> (await readSave(b)).revision===beforeTouch.revision+1,'native touch producer persisted once');
+  await sleep(250);
+  const afterTouch=await readSave(b);
+  assert.equal(afterTouch.revision,beforeTouch.revision+1,'touch compatibility click must not duplicate production');
+  assert.equal(afterTouch.energy,beforeTouch.energy-1,'touch must consume exactly one energy');
+  t.diagnostic('Chromium mobile-emulated physical touch protocol: exactly one producer write');
+
+
+  // P2.65ax: native touch drag, OS cancellation and fresh-touch recovery.
+  // Dispatch real CDP touch sequences, never synthetic DOM pointer events.
+  const dragGeometry=await evalOn(b,`(()=>{
+    const save=JSON.parse(localStorage.getItem("toolbox.merge-isle.local.v1"));
+    const from=save.board.findIndex(item=>item?.kind==='material');
+    if(from<0)throw Error('No material to drag');
+    const candidates=save.board.map((item,i)=>item?null:i).filter(i=>i!==null);
+    if(!candidates.length)throw Error('No empty destination');
+    const distance=i=>Math.hypot((i%7)-(from%7),Math.floor(i/7)-Math.floor(from/7));
+    const to=candidates.sort((x,y)=>distance(x)-distance(y))[0];
+    document.getElementById('board').scrollIntoView({block:'center'});
+    const center=i=>{
+      const r=document.querySelector('#board [data-slot="'+i+'"]').getBoundingClientRect();
+      return {x:r.left+r.width/2,y:r.top+r.height/2};
+    };
+    return {from,to,start:center(from),end:center(to)};
+  })()`);
+  for(const point of [dragGeometry.start,dragGeometry.end])
+    assert.ok(point.x>0&&point.x<390&&point.y>0&&point.y<844,'drag targets must be onscreen');
+  await sleep(160);
+  const beforeDrag=await readSave(b);
+  const movedItem=beforeDrag.board[dragGeometry.from];
+  assert.ok(movedItem?.kind==='material','native drag must start on material');
+  await call('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[
+    {...dragGeometry.start,id:2,radiusX:2,radiusY:2,force:1}
+  ]},b.sessionId);
+  await sleep(65);
+  await call('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[
+    {x:(dragGeometry.start.x+dragGeometry.end.x)/2,
+     y:(dragGeometry.start.y+dragGeometry.end.y)/2,id:2,radiusX:2,radiusY:2,force:1}
+  ]},b.sessionId);
+  await sleep(65);
+  await call('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[
+    {...dragGeometry.end,id:2,radiusX:2,radiusY:2,force:1}
+  ]},b.sessionId);
+  await sleep(65);
+  await call('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]},b.sessionId);
+  await until(async()=>(await readSave(b)).revision===beforeDrag.revision+1,
+    'native material drag persisted exactly once');
+  await sleep(250);
+  const afterDrag=await readSave(b);
+  assert.equal(afterDrag.revision,beforeDrag.revision+1,'native drag must not double-write');
+  assert.equal(afterDrag.board[dragGeometry.from],null,'drag source must be empty');
+  assert.deepEqual(afterDrag.board[dragGeometry.to],movedItem,'destination must retain material');
+  assert.equal(afterDrag.energy,beforeDrag.energy,'dragging must not spend energy');
+  assert.equal(await evalOn(b,`document.querySelectorAll('.drag-ghost').length`),0,
+    'drag ghost must be removed after pointerup');
+
+  // OS touch cancellation must never commit a half-finished move.
+  const cancelGeometry=await evalOn(b,`(()=>{
+    const save=JSON.parse(localStorage.getItem("toolbox.merge-isle.local.v1"));
+    const from=${dragGeometry.to};
+    const to=save.board.findIndex((item,i)=>!item&&i!==from);
+    if(to<0)throw Error('No empty cancellation target');
+    document.getElementById('board').scrollIntoView({block:'center'});
+    const center=i=>{
+      const r=document.querySelector('#board [data-slot="'+i+'"]').getBoundingClientRect();
+      return {x:r.left+r.width/2,y:r.top+r.height/2};
+    };
+    return {start:center(from),end:center(to)};
+  })()`);
+  for(const point of [cancelGeometry.start,cancelGeometry.end])
+    assert.ok(point.x>0&&point.x<390&&point.y>0&&point.y<844,'cancel targets must be onscreen');
+  await sleep(120);
+  await call('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[
+    {...cancelGeometry.start,id:3,radiusX:2,radiusY:2,force:1}
+  ]},b.sessionId);
+  await sleep(65);
+  await call('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[
+    {...cancelGeometry.end,id:3,radiusX:2,radiusY:2,force:1}
+  ]},b.sessionId);
+  await sleep(65);
+  await call('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]},b.sessionId);
+  await sleep(300);
+  const afterCancel=await readSave(b);
+  assert.deepEqual(afterCancel,afterDrag,'OS touch cancellation must preserve save');
+  assert.equal(await evalOn(b,`document.querySelectorAll('.drag-ghost').length`),0,
+    'cancelled touch must remove the ghost');
+  const newProducer=await evalOn(b,`(()=>{
+    const el=document.querySelector('#board .producer');
+    el.scrollIntoView({block:'center'});
+    const r=el.getBoundingClientRect();
+    return {x:r.left+r.width/2,y:r.top+r.height/2};
+  })()`);
+  // Wait for hit-testing after scroll and touchCancel. A fixed sleep can
+  // dispatch the next gesture onto an old compositor target.
+  await until(async()=>await evalOn(b,`(()=>{
+    const hit=document.elementFromPoint(${newProducer.x},${newProducer.y});
+    return !document.hidden&&!!hit?.closest?.('.producer')&&
+      document.querySelectorAll('.drag-ghost').length===0;
+  })()`),'fresh producer hit target after cancel');
+  await call('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[
+    {...newProducer,id:4,radiusX:2,radiusY:2,force:1}
+  ]},b.sessionId);
+  await sleep(65);
+  await call('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]},b.sessionId);
+  await waitWithSnapshot(async()=>(await readSave(b)).revision===afterCancel.revision+1,
+    'fresh producer touch after cancellation',b);
+  await sleep(250);
+  const afterRecovery=await readSave(b);
+  assert.equal(afterRecovery.revision,afterCancel.revision+1,
+    'fresh touch after cancellation must commit only once');
+  assert.equal(afterRecovery.energy,afterCancel.energy-1,
+    'fresh touch after cancellation must consume exactly one energy');
+  t.diagnostic('Chromium native touch drag, touchCancel and fresh-touch recovery passed');
+
+
+  // P2.65ay: background a native material drag, then update the save from
+  // another tab. A stale touch must never overwrite the newer save.
+  const hiddenDrag=await evalOn(b,`(()=>{
+    const save=JSON.parse(localStorage.getItem("toolbox.merge-isle.local.v1"));
+    const from=save.board.findIndex(item=>item?.kind==='material');
+    const to=save.board.findIndex((item,i)=>!item&&i!==from);
+    if(from<0||to<0)throw Error('No material/empty cell');
+    document.getElementById('board').scrollIntoView({block:'center'});
+    const center=i=>{
+      const r=document.querySelector('#board [data-slot="'+i+'"]').getBoundingClientRect();
+      return {x:r.left+r.width/2,y:r.top+r.height/2};
+    };
+    return {start:center(from),end:center(to)};
+  })()`);
+  for(const p of [hiddenDrag.start,hiddenDrag.end])
+    assert.ok(p.x>0&&p.x<390&&p.y>0&&p.y<844,'background drag target onscreen');
+  await sleep(120);
+  const beforeHide=await readSave(b);
+  await call('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[
+    {...hiddenDrag.start,id:5,radiusX:2,radiusY:2,force:1}
+  ]},b.sessionId);
+  await sleep(65);
+  await call('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[
+    {...hiddenDrag.end,id:5,radiusX:2,radiusY:2,force:1}
+  ]},b.sessionId);
+  await until(async()=>await evalOn(b,`document.querySelectorAll('.drag-ghost').length===1`),
+    'drag ghost visible before tab background');
+  await front(a);
+  await until(async()=>await evalOn(b,'document.hidden'),'touch owner hidden');
+  assert.deepEqual(await readSave(a),beforeHide,'unfinished drag must not write');
+  await until(async()=>await evalOn(a,`document.querySelector('#energy').textContent.startsWith(${JSON.stringify(String(beforeHide.energy)+' /')})`),
+    'other tab adopted save before writing');
+  await evalOn(a,`document.querySelector('#board .producer').click();true`);
+  await until(async()=>(await readSave(a)).revision===beforeHide.revision+1,
+    'other tab saved while touch owner hidden');
+  const newerRaw=await evalOn(a,`localStorage.getItem(${JSON.stringify(key)})`);
+  const newerState=JSON.parse(newerRaw);
+  await front(b);
+  await until(async()=>!await evalOn(b,'document.hidden'),'touch owner visible');
+  await until(async()=>await evalOn(b,`document.querySelector('#energy').textContent.startsWith(${JSON.stringify(String(newerState.energy)+' /')})`),
+    'foreground tab adopted concurrent save');
+  await call('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]},b.sessionId);
+  await sleep(200);
+  assert.equal(await evalOn(b,`localStorage.getItem(${JSON.stringify(key)})`),newerRaw,
+    'stale background drag must not overwrite newer save');
+  assert.equal(await evalOn(b,`document.querySelectorAll('.drag-ghost').length`),0,
+    'background drag ghost must be removed');
+  const fresh=await evalOn(b,`(()=>{
+    const el=document.querySelector('#board .producer');
+    el.scrollIntoView({block:'center'});
+    const r=el.getBoundingClientRect();
+    return {x:r.left+r.width/2,y:r.top+r.height/2};
+  })()`);
+  // A foreground visibility event and scroll can settle before the compositor
+  // updates hit testing. Check the actual target instead of a fixed delay.
+  await until(async()=>await evalOn(b,`(()=>{
+    const hit=document.elementFromPoint(${fresh.x},${fresh.y});
+    return !document.hidden&&!!hit?.closest?.('.producer')&&
+      document.querySelectorAll('.drag-ghost').length===0;
+  })()`),'fresh producer hit target after background');
+  await call('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[
+    {...fresh,id:6,radiusX:2,radiusY:2,force:1}
+  ]},b.sessionId);
+  await sleep(65);
+  await call('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]},b.sessionId);
+  // Preserve the immediate UI rejection reason: the existing 12s timeout
+  // snapshot can outlive the 2.4s notice and hide a legitimate busy guard.
+  const immediateAfterBackgroundTouch=await evalOn(b,`({
+    notice:document.getElementById('notice').textContent,
+    status:document.getElementById('save-status').textContent,
+    visible:!document.hidden,
+    recentEvents:window.__touchTrace?.slice(-6).map(e=>e.type)
+  })`);
+  // A foreground reconciliation may discover a newer cross-tab snapshot
+  // only when the first touch arrives. That touch MUST be rejected (not
+  // replayed) and the user must make a distinct, fresh gesture. Do not turn
+  // an arbitrary timeout into success: permit only the exact safe rejection,
+  // unchanged bytes, and then require one verified new write.
+  let firstBackgroundTouchSaved=false;
+  try{
+    await until(async()=>(await readSave(b)).revision===newerState.revision+1,
+      'first fresh touch after background',2200);
+    firstBackgroundTouchSaved=true;
+  }catch{
+    const rejectedRaw=await evalOn(b,`localStorage.getItem(${JSON.stringify(key)})`);
+    assert.equal(rejectedRaw,newerRaw,
+      'rejected first foreground touch must preserve the exact newer save bytes');
+    assert.equal(immediateAfterBackgroundTouch.visible,true,
+      'only a visible-page safe rejection may be retried');
+    assert.match(immediateAfterBackgroundTouch.notice,
+      /存档已更新或正在保存，请在最新棋盘上重新操作/,
+      'retry requires the explicit stale-board safety notice');
+    t.diagnostic('First foreground tap safely rejected against stale board; requiring a new physical touch');
+    const retryPoint=await evalOn(b,`(()=>{
+      const el=document.querySelector('#board .producer');
+      el.scrollIntoView({block:'center',inline:'nearest'});
+      const r=el.getBoundingClientRect();
+      return {x:r.left+r.width/2,y:r.top+r.height/2};
+    })()`);
+    await until(async()=>await evalOn(b,`(()=>{
+      const hit=document.elementFromPoint(${retryPoint.x},${retryPoint.y});
+      return !document.hidden&&!!hit?.closest?.('.producer')&&
+        document.querySelectorAll('.drag-ghost').length===0;
+    })()`),'retry producer hit target after safe rejection');
+    await sleep(160);
+    await call('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[
+      {...retryPoint,id:7,radiusX:2,radiusY:2,force:1}
+    ]},b.sessionId);
+    await sleep(75);
+    await call('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]},b.sessionId);
+    await waitWithSnapshot(async()=>(await readSave(b)).revision===newerState.revision+1,
+      'new physical touch after safe foreground rejection',b);
+  }
+  if(firstBackgroundTouchSaved)
+    t.diagnostic('First foreground touch committed against verified latest save');
+  await sleep(200);
+  const recovered=await readSave(b);
+  assert.equal(recovered.revision,newerState.revision+1,'fresh touch writes exactly once');
+  assert.equal(recovered.energy,newerState.energy-1,'fresh touch spends one energy');
+  t.diagnostic('Chromium background mid-drag, concurrent tab write and fresh touch recovery passed');
 
   t.diagnostic(`Chromium two-tab lock, BFCache persisted=${bfcache}, download=${file}, reset/import/backup verified`);
 });

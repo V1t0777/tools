@@ -1,0 +1,32 @@
+# V3.1 P2.65aw｜普通模式窄屏布局与真实 Chromium 触控门禁（未发布）
+
+## 修复与验证范围
+- 普通模式 480px 及以下视口：棋盘边距缩小以尽量保留可点击格宽；订单由三列改为两列，仓库由八列改为四列，减少小屏误触与拥挤。
+- 经营、升级、补给操作按钮统一至少 44px 高；不修改金币、体力、订单、存档格式、跨标签协议或正式导航。
+- 在现有真实 Chromium 双标签/BFCache/下载/恢复组合回归之后，利用 CDP 的真实移动视口模拟 320/375/390/430/768 CSS px，断言整页无横向溢出、关键区域及按钮不被裁切、主要触控按钮高至少 44px、仓库格子宽至少 44px、375px 以上棋盘格宽至少 44px。
+- 320px 极窄屏棋盘格约 37px，受七列布局物理宽度约束，列为实机体验风险，不宣称达到 44px；优先保证无整页横向滚动、仓库与订单可操作。
+- 用 Chromium DevTools Input.dispatchTouchEvent 真实分发触摸序列给生产器，检查只产生一次存档 revision 增量及一次体力消耗；测试不是 DOM .click() 替身。
+- 模拟 prefers-reduced-motion，检查媒体查询被启用；不代表 iOS 安全区、实际物理触控或微信 WebView 验收。
+
+## 分支协作
+剧情 PR #59 HEAD 在本轮开始检查为 6ab21bf，剧情分支的 merge/style.css 仅在上游原文后追加 .story-entry-link 样式。本轮移动端规则插入在既有 P2.16 段落之前，避免覆盖剧情独立样式。故事分支后续须基于最新 #58 安全同步、回归，禁止强推或同时改 story 源文件。
+
+## 发行边界
+保持 PR #58/#59 Open/Draft；禁止 main、Pages/Cloudflare/Edge 发布、Supabase 线上操作、正式导航与部署白名单修改。最终三项 CI 必须绑定本轮新 SHA 全部通过才可报告通过；Chromium 模拟不能替代 iPhone Safari、微信内置浏览器原生文件选择/下载/后台恢复及真机触控。Cloudflare 后台真实部署状态不可独立核实则继续列为风险。
+
+## P0 真触控故障与修复证据
+- 首次加入真实 CDP 触摸序列后，自动化发现 `pointerdown → touchstart → pointerup → touchend → lostpointercapture → click` 的原生兼容点击被错误判定为过期；此前 DOM `.click()` 不会产生该序列，因此漏测。
+- 原因：触摸浏览器在正常点按结束后会自动释放**隐式指针捕获**，但 `lostpointercapture` 处理器无条件撤销棋盘点击许可，即使没有进行中的材料拖拽。
+- 修复：只有仍存在且 pointerId 匹配的**未完成拖拽**才在捕获丢失时取消；普通生产器、空格和材料轻触的正常捕获释放不再误撤销点击许可。保留 `pointercancel`、页面隐藏、BFCache、存档基线变更的旧触控拒绝。
+- 最终验收要求：真实 Chromium 390px 移动视口通过 `Input.dispatchTouchEvent` 触摸生产器，恰好一次 revision +1、体力 -1，且短暂等待后无第二次写入。必须核对最终 SHA 的 Actions 日志；不能将本轮诊断中间提交的失败视为通过。
+
+## P2.65ax｜触摸拖拽与取消专项回归（2026-10-29）
+- 在真实 Chromium 移动视口下，使用 CDP `Input.dispatchTouchEvent` 执行材料拖至空格，验证仅一次 revision 写入、源格清空、目标材料等价、体力不变、拖拽浮层清理。
+- 模拟 OS 中断触发 `touchCancel`，验证中断前后存档状态一致、无浮层残留；随后再次真实触摸生产器，验证仅一次写入与一次体力扣除。
+- 属于 Chromium 触摸事件自动化，不等同于 iPhone Safari/微信 WebView 物理触控；仍需真机验收。最终 HEAD 三项 CI 均成功后才可报告通过。
+
+## P2.65ay｜Chromium 后台中断拖拽与跨标签恢复（2026-10-29）
+- 390px 视口以 CDP touchStart/touchMove 启动未完成的材料拖拽，验证拖拽浮层出现；切换真实标签页并确认触摸标签 document.hidden。
+- 另一标签在后台期间生产并写入新 revision；返回原标签后必须采用最新进度，旧拖拽不能覆盖新存档，浮层必须清除。
+- 新一轮 CDP 触摸生产须恰好增加一次 revision、消耗一次体力。
+- 此测试覆盖真实 Chromium 标签可见性、Web Locks/localStorage 与 CDP 触控，不代表 iPhone Safari/微信 WebView 实机；BFCache 仍由独立导航测试验证。

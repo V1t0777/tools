@@ -5,6 +5,7 @@ import { createInitialState, advanceTime, moveOrMerge, produce, fulfillOrder,
   storeItem, withdrawItem, upgradeWarehouse, upgradeProducer, upgradeBuilding,
   getLevelProgress, validateSave, CELL_COUNT, MAX_ENERGY, ENERGY_REGEN_MS } from './engine.mjs';
 import { BUILDINGS, getWarehouseUpgrade, getProducerUpgrade } from './economy.mjs';
+import { diagnoseBoard } from './board-diagnostics.mjs';
 
 const DAY = 86_400_000, MINUTE = 60_000, ACTION_MS = 4_000;
 const PROFILES = Object.freeze({
@@ -71,6 +72,7 @@ export function simulateFriction({seed=1,days=30,sessionsPerDay=2,sessionMinutes
   const totals={produced:0,merged:0,orders:0,earned:0,spent:0,upgrades:0,
     stored:0,withdrawn:0,mistakes:0,actions:0,energySpent:0,
     fullBoardSessions:0,warehouseFullSessions:0,blockedSessions:0,hardDeadlockSessions:0,
+    behaviorBlockedSessions:0,recoverableFullSessions:0,
     highPressureSessions:0,orderInWarehouseSessions:0,maxOccupied:occupied(state),
     maxWarehouseUsed:warehouseUsed(state)};
   const daily=[];
@@ -79,7 +81,7 @@ export function simulateFriction({seed=1,days=30,sessionsPerDay=2,sessionMinutes
     for(let session=0;session<sessionsPerDay;session++) {
       let now=start+day*DAY+Math.floor((session+1)*DAY/(sessionsPerDay+1));
       const end=now+sessionMinutes*MINUTE;
-      let blocked=false, hardDeadlock=false, warehouseFull=false, full=false, high=false, hidden=false;
+      let blocked=false, warehouseFull=false, full=false, high=false, hidden=false;
       state=advanceTime(state,now);
       while(now<end) {
         state=advanceTime(state,now);
@@ -125,7 +127,6 @@ export function simulateFriction({seed=1,days=30,sessionsPerDay=2,sessionMinutes
           }
           if(!result) {
             blocked=true;
-            hardDeadlock=!pair&&!order&&used===state.warehouse.capacity;
             break;
           }
         }
@@ -150,10 +151,16 @@ export function simulateFriction({seed=1,days=30,sessionsPerDay=2,sessionMinutes
         totals.maxWarehouseUsed=Math.max(totals.maxWarehouseUsed,warehouseUsed(state));
         now+=ACTION_MS;
       }
+      // A player's failed choice is not a rules-level deadlock. Recheck the
+      // actual post-session engine state, including affordable warehouse upgrades.
+      const diagnosis=diagnoseBoard(state);
+      const rulesDeadlocked=diagnosis.recovery==='hard-deadlock';
+      totals.behaviorBlockedSessions+=Number(blocked&&!rulesDeadlocked);
+      totals.recoverableFullSessions+=Number(diagnosis.recovery==='recoverable');
       totals.fullBoardSessions+=Number(full);
       totals.warehouseFullSessions+=Number(warehouseFull);
       totals.blockedSessions+=Number(blocked);
-      totals.hardDeadlockSessions+=Number(hardDeadlock);
+      totals.hardDeadlockSessions+=Number(rulesDeadlocked);
       totals.highPressureSessions+=Number(high);
       totals.orderInWarehouseSessions+=Number(hidden);
     }
@@ -162,10 +169,14 @@ export function simulateFriction({seed=1,days=30,sessionsPerDay=2,sessionMinutes
     daily.push({day:day+1,level:getLevelProgress(state.xp).level,coins:state.coins,
       orders:totals.orders-beforeDay.orders,blockedSessions:totals.blockedSessions-beforeDay.blockedSessions,
       highPressureSessions:totals.highPressureSessions-beforeDay.highPressureSessions,
+      hardDeadlockSessions:totals.hardDeadlockSessions-beforeDay.hardDeadlockSessions,
+      behaviorBlockedSessions:totals.behaviorBlockedSessions-beforeDay.behaviorBlockedSessions,
+      recoverableFullSessions:totals.recoverableFullSessions-beforeDay.recoverableFullSessions,
       occupied:occupied(state),warehouseUsed:warehouseUsed(state)});
   }
   return {scenario:{seed,days,sessionsPerDay,sessionMinutes,behavior,policy},totals,daily,
     final:{coins:state.coins,xp:state.xp,level:getLevelProgress(state.xp).level,
       boardOccupied:occupied(state),warehouseUsed:warehouseUsed(state),
-      warehouseCapacity:state.warehouse.capacity,energy:state.energy}};
+      warehouseCapacity:state.warehouse.capacity,energy:state.energy,
+      recovery:diagnoseBoard(state).recovery}};
 }
