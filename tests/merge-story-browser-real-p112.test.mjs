@@ -510,6 +510,73 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     assert.equal(await readRaw(b,workshopKey),threeOrdersRaw,
       'narrative reload must not rewrite the three-order workshop save');
     assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
+
+    // P119: the real order generator rotates back to tea and bakery after
+    // three deliveries. Use only the existing tier-1 pieces and rendered
+    // 56-cell buttons to complete two more genuine tier-2 requests.
+    // Each merge and fulfillment must be exactly one persisted transaction.
+    for(const chain of ['tea','bakery']){
+      const beforeOrder=await readJSON(b,workshopKey);
+      const targetOrderIndex=beforeOrder.orders.findIndex(order=>
+        order.chain===chain&&order.tier===2);
+      assert.ok(targetOrderIndex>=0,chain+' next real tier-2 order exists');
+      const sourceSlots=beforeOrder.board.flatMap((item,index)=>
+        item?.kind==='material'&&item.chain===chain&&item.tier===1?[index]:[]);
+      assert.ok(sourceSlots.length>=2,chain+' has two genuine tier-1 pieces');
+      await evalOn(b,
+        "document.querySelectorAll('#workshop-board button')["+sourceSlots[0]+"].click();true");
+      await evalOn(b,
+        "document.querySelectorAll('#workshop-board button')["+sourceSlots[1]+"].click();true");
+      await until(async()=>{
+        try{return (await readJSON(b,workshopKey)).revision===beforeOrder.revision+1;}
+        catch{return false;}
+      },chain+' real tier-1 merge persisted');
+      const merged=await readJSON(b,workshopKey);
+      assert.equal(merged.progress.orders,beforeOrder.progress.orders,
+        'merging '+chain+' cannot award a phantom order');
+      assert.equal(merged.coins,beforeOrder.coins,'merge cannot award coins');
+      assert.equal(merged.xp,beforeOrder.xp,'merge cannot award experience');
+      assert.ok(merged.board.some(item=>item?.kind==='material'&&
+        item.chain===chain&&item.tier===2),
+        chain+' tier-2 must exist after actual UI merge');
+      assert.equal(await evalOn(b,
+        "document.querySelectorAll('#workshop-orders .workshop-order button')["+
+        targetOrderIndex+"].disabled"),false);
+      await evalOn(b,
+        "document.querySelectorAll('#workshop-orders .workshop-order button')["+
+        targetOrderIndex+"].click();true");
+      await until(async()=>{
+        try{return (await readJSON(b,workshopKey)).progress.orders===
+          beforeOrder.progress.orders+1;}
+        catch{return false;}
+      },chain+' real tier-2 delivery persisted');
+      const deliveredNext=await readJSON(b,workshopKey);
+      assert.equal(deliveredNext.revision,merged.revision+1,
+        chain+' delivery must commit exactly once');
+      assert.ok(deliveredNext.coins>merged.coins,'real order earns coins');
+      assert.ok(deliveredNext.xp>merged.xp,'real order earns experience');
+      assert.equal(deliveredNext.buildings.garden,0,
+        'orders cannot silently build the garden');
+      assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
+    }
+    const fiveOrders=await readJSON(b,workshopKey);
+    assert.equal(fiveOrders.progress.orders,5,
+      'two further real deliveries must persist after the initial three');
+    assert.ok(fiveOrders.xp>=28&&fiveOrders.xp<190,
+      'five real deliveries reach early progression but not garden level 4');
+    assert.ok(fiveOrders.coins<160,
+      'five real deliveries cannot bypass the 160-coin garden cost');
+    assert.equal(await evalOn(b,"document.getElementById('build-garden').disabled"),true);
+    const fiveOrdersRaw=await readRaw(b,workshopKey);
+    await navigate(b,'/merge/story.html','#journey-read');
+    await until(async()=>evalOn(b,
+      "document.getElementById('progress-count').textContent.includes('6 / 12')"),
+      'five real orders must not skip chapter-two garden construction');
+    assert.equal(await evalOn(b,"document.getElementById('journey-read').hidden"),true);
+    assert.equal(await readRaw(b,workshopKey),fiveOrdersRaw,
+      'story re-entry cannot replay fourth or fifth order');
+    assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
+    t.diagnostic('P119 real Chromium: tea and bakery tier-1 UI merges → fourth and fifth real deliveries; garden remains locked, normal mode isolated');
     t.diagnostic('P118 real Chromium: second bakery order + floral UI merge + third order; garden remains gated, save survives narrative reload');
     t.diagnostic('P117 real Chromium: first six scenes → garden economic gate → round-trip, no premature build or normal-mode writes');
     t.diagnostic('P116 real Chromium: damaged-save recovery → real order button → first-order scene unlock, no normal-mode writes');
