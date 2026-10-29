@@ -676,6 +676,15 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
           assert.ok(updated.progress.orders>=current.progress.orders&&
             updated.progress.orders<=current.progress.orders+1,
             'one UI action cannot silently grant multiple orders');
+          if(updated.progress.orders===current.progress.orders){
+            assert.equal(updated.coins,current.coins,
+              'production, merging and earned-supply use cannot mint coins');
+            assert.equal(updated.xp,current.xp,
+              'non-delivery UI actions cannot mint experience');
+          }else{
+            assert.ok(updated.coins>current.coins&&updated.xp>current.xp,
+              'only a real delivered order may award coins and experience');
+          }
           assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
         }
         const delivered=await readJSON(b,workshopKey);
@@ -885,6 +894,44 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
       'P134 post-garden progress reloaded');
     assert.equal(await readRaw(b,workshopKey),thirtyRaw,
       '30 genuine orders and garden construction survive navigation');
+    assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
+    // P135: keep the exact same paid-for-garden browser save. No replay
+    // checkpoint or direct engine call is loaded for deliveries 31–36.
+    const thirtyCheckpoint=await readJSON(b,workshopKey);
+    await deliverOrdersThrough(31,36,1);
+    const thirtySixOrders=await readJSON(b,workshopKey);
+    assert.equal(thirtySixOrders.progress.orders,36,
+      'six more orders must be delivered through the actual workshop UI');
+    assert.equal(validateSave(thirtySixOrders),true);
+    assert.equal(thirtySixOrders.buildings.garden,1);
+    assert.equal(thirtySixOrders.buildings.harbor,0,
+      'orders alone must not silently build the harbor');
+    assert.ok(thirtySixOrders.coins>thirtyCheckpoint.coins);
+    assert.ok(thirtySixOrders.xp>thirtyCheckpoint.xp);
+    assert.ok(thirtySixOrders.revision>thirtyCheckpoint.revision);
+    assert.equal(thirtySixOrders.achievements.orders20,1);
+    assert.equal(thirtySixOrders.bag.reset,thirtyCheckpoint.bag.reset,
+      'the one-time twentieth-order reward cannot be reissued');
+    const harborReadyAfter36=getLevel(thirtySixOrders.xp)>=BUILDINGS.harbor.minLevel&&
+      thirtySixOrders.coins>=BUILDINGS.harbor.coins;
+    assert.equal(await evalOn(b,"document.getElementById('build-harbor').disabled"),
+      !harborReadyAfter36,'harbor button must track the actual 36-order economy');
+    const thirtySixRaw=await readRaw(b,workshopKey);
+    await navigate(b,'/merge/story.html','#journey-read');
+    await until(async()=>evalOn(b,
+      "document.getElementById('progress-count').textContent.includes('9 / 12')"),
+      'P135 harbor narrative remains construction-gated after 36 orders');
+    assert.equal(await evalOn(b,"document.getElementById('journey-read').hidden"),true);
+    assert.equal(await readRaw(b,storyKey),storyBeforeMoreOrders,
+      'six more orders must not write any narrative scene');
+    assert.equal(await readRaw(b,workshopKey),thirtySixRaw,
+      'narrative return cannot replay any of the 36 deliveries');
+    await navigate(b,'/merge/story-workshop.html','#workshop-board');
+    await until(async()=>evalOn(b,
+      "document.querySelectorAll('#workshop-board button').length===56"),
+      'P135 36-order workshop reloaded');
+    assert.equal(await readRaw(b,workshopKey),thirtySixRaw,
+      '36 genuine orders survive the second story/workshop round-trip');
     assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
     // Harbor and storefront below STILL use detached engine-earned fixtures.
     await evalOn(b,'localStorage.setItem('+
