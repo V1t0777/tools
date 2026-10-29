@@ -160,6 +160,16 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   // A real browser navigation exercises pagehide and restoration. Chrome may
   // elect not to use BFCache; persisted===true is reported, not assumed.
   await evalOn(a,`window.addEventListener('pagehide',()=>sessionStorage.setItem('merge-pagehide','1'));window.addEventListener('pageshow',e=>sessionStorage.setItem('merge-bfcache',String(e.persisted)));true`);
+  // P2.65bv: capture two persistent touch leases on the actual page BEFORE
+  // navigating away. A genuine BFCache restoration must not revive them.
+  const beforeBfcacheGesture=await evalOn(a,'localStorage.getItem('+JSON.stringify(key)+')');
+  await evalOn(a,`(()=>{
+    for(const id of ['reset','export-local-save']){
+      document.getElementById(id).dispatchEvent(new PointerEvent('pointerdown',
+        {bubbles:true,pointerType:'touch',isPrimary:true}));
+    }
+    return true;
+  })()`);
   await call('Page.navigate',{url:base+'/merge/absent-test-page'},a.sessionId);
   await until(async()=>await evalOn(a,`document.readyState==='complete'&&location.pathname.includes('absent-test-page')`),'away navigation');
   const history=await call('Page.getNavigationHistory',{},a.sessionId);
@@ -170,9 +180,51 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   assert.equal(bfcache,'true','This gate requires a genuine pageshow.persisted BFCache restoration');
   assert.equal((await readSave(a)).revision,after.revision+1);
 
+  // The restored document has the same buttons and save bytes, but its
+  // pagehide invalidated the earlier pointerdown generation. Neither a late
+  // reset click nor a late export click may be treated as fresh consent.
+  await evalOn(a,`(()=>{
+    window.__bvResetConfirms=0;
+    window.confirm=()=>{window.__bvResetConfirms++;return false;};
+    window.__bvAnchorClicks=0;
+    window.__bvOriginalAnchorClick=HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click=function(){window.__bvAnchorClicks++;};
+    for(const id of ['reset','export-local-save']){
+      document.getElementById(id).dispatchEvent(new MouseEvent('click',
+        {bubbles:true,detail:1}));
+    }
+    return true;
+  })()`);
+  await sleep(80);
+  assert.equal(await evalOn(a,'window.__bvResetConfirms'),0,
+    'BFCache must reject the pre-pagehide reset pointer even when bytes match');
+  assert.equal(await evalOn(a,'window.__bvAnchorClicks'),0,
+    'BFCache must reject the pre-pagehide export pointer');
+  assert.equal(await evalOn(a,'localStorage.getItem('+JSON.stringify(key)+')'),
+    beforeBfcacheGesture,'late BFCache touch clicks must not mutate save bytes');
+  await evalOn(a,`(()=>{
+    const button=document.getElementById('reset');
+    button.dispatchEvent(new PointerEvent('pointerdown',
+      {bubbles:true,pointerType:'touch',isPrimary:true}));
+    button.dispatchEvent(new MouseEvent('click',{bubbles:true,detail:1}));
+    return true;
+  })()`);
+  assert.equal(await evalOn(a,'window.__bvResetConfirms'),1,
+    'a new post-BFCache touch may reach a fresh, declined reset confirmation');
+  assert.equal(await evalOn(a,'localStorage.getItem('+JSON.stringify(key)+')'),
+    beforeBfcacheGesture,'declined fresh reset must preserve the original bytes');
+  await evalOn(a,'HTMLAnchorElement.prototype.click=window.__bvOriginalAnchorClick;true');
+  t.diagnostic('Chromium genuine BFCache revoked stale reset/export touches and allowed a fresh reset confirmation');
+
   await call('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:temp});
   await front(a);
-  await evalOn(a,`document.getElementById('export-local-save').click();true`);
+  await evalOn(a,`(()=>{
+    const button=document.getElementById('export-local-save');
+    button.dispatchEvent(new PointerEvent('pointerdown',
+      {bubbles:true,pointerType:'touch',isPrimary:true}));
+    button.dispatchEvent(new MouseEvent('click',{bubbles:true,detail:1}));
+    return true;
+  })()`);
   const file=await until(async()=>{
     const names=await readdir(temp);
     return names.find(name=>name.endsWith('.json')||name.endsWith('.txt'));
