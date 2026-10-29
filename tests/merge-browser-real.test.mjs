@@ -460,12 +460,13 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
       };
       const bounds=el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right,height:r.height,width:r.width}};
       const critical=[...document.querySelectorAll('.shell,.board-section,#board,.resource-bar,.save-actions,.supply-section,.orders-section,.management-section,button,select')].filter(visible);
-      const clipped=critical.filter(el=>{const r=bounds(el);return r.left < -1||r.right > width+1;}).map(el=>el.id||el.className).slice(0,12);
+      const clipped=critical.filter(el=>{if(width<=360&&(el.id==='board'||el.closest('#board')))return false;const r=bounds(el);return r.left < -1||r.right > width+1;}).map(el=>el.id||el.className).slice(0,12);
       const targets=[...document.querySelectorAll('.order-button,.small-action,.secondary-action,.guide-action,.save-actions button,#how-to,.back-link,.supply-select')].filter(visible);
       const tooShort=targets.filter(el=>bounds(el).height<43.5).map(el=>el.id||el.className).slice(0,12);
       const minSize=selector=>Math.min(...[...document.querySelectorAll(selector)].filter(visible).map(el=>bounds(el).width),999);
       return {width,scrollWidth:document.documentElement.scrollWidth,clipped,tooShort,
         boardMin:minSize('#board .cell'),warehouseMin:minSize('#warehouse .warehouse-slot'),
+        boardScrollRange:document.querySelector('.board-section').scrollWidth-document.querySelector('.board-section').clientWidth,
         warehouseColumns:getComputedStyle(document.querySelector('#warehouse')).gridTemplateColumns.split(' ').length,
         orderColumns:getComputedStyle(document.querySelector('#orders')).gridTemplateColumns.split(' ').length,
         reducedMotion:matchMedia('(prefers-reduced-motion: reduce)').matches};
@@ -475,7 +476,18 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     assert.deepEqual(layout.clipped,[],`clipped controls at ${width}px`);
     assert.deepEqual(layout.tooShort,[],`undersized non-board touch targets at ${width}px`);
     assert.ok(layout.warehouseMin>=44,`warehouse slots below 44px at ${width}px`);
-    assert.ok(layout.boardMin>=(width>=375?44:35),`board targets too narrow at ${width}px`);
+    assert.ok(layout.boardMin>=44,`board targets below 44px at ${width}px`);
+    if(width<=360){
+      assert.ok(layout.boardScrollRange>0,'320px board must scroll inside its section, not overflow the document');
+      const reached=await evalOn(b,`(()=>{
+        const section=document.querySelector('.board-section');
+        section.scrollLeft=section.scrollWidth;
+        const cell=document.querySelector('#board .cell[data-slot="6"]').getBoundingClientRect();
+        return {scrollLeft:section.scrollLeft,left:cell.left,right:cell.right};
+      })()`);
+      assert.ok(reached.scrollLeft>0&&reached.left>=-1&&reached.right<=width+1,
+        `last board column must be reachable inside the 320px viewport: ${JSON.stringify(reached)}`);
+    }
     assert.equal(layout.warehouseColumns,width<=480?4:8,'warehouse responsive columns');
     assert.equal(layout.orderColumns,width<=480?2:3,'order responsive columns');
     assert.equal(layout.reducedMotion,true,'reduced-motion emulation must be active');

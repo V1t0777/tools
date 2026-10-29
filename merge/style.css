@@ -74,6 +74,16 @@ body{background:radial-gradient(circle at 5% 12%,rgba(221,194,136,.23),transpare
   .warehouse{grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
 }
 
+/* P2.65bf: 320px fallback keeps every 7-column cell at 44px.
+   Only the board section scrolls horizontally; the page does not.
+   Native panning takes priority over drag on this narrow viewport;
+   tap-to-select and tap-to-merge remain available. */
+@media(max-width:360px){
+  .board-section{overflow-x:auto;overscroll-behavior-x:contain}
+  .board{width:max-content;grid-template-columns:repeat(7,44px);touch-action:auto}
+  .board .cell{touch-action:auto}
+}
+
 /* P2.16: accessible, narrow-screen safe manual raw-save backup action. */
 .board-footer{flex-wrap:wrap;gap:6px 10px}
 .save-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:flex-end}
