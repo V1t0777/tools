@@ -17,6 +17,7 @@ import {nextStoryConstructionBudget,wouldSpendStoryConstructionReserve} from './
 import {describeStoryConstructionResources} from './construction-progress.mjs';
 import {nextStoryWorkshopAction,isStoryWorkshopRouteCurrent} from './workshop-next-step.mjs';
 import {guardStoryPersistentGesture} from './persistent-gesture-guard.mjs';
+import {describeStoryWorkshopStall} from './resource-recovery.mjs';
 const $=id=>document.getElementById(id);
 const storage=(()=>{try{return window.localStorage;}catch{return null;}})();
 const webLocks=(()=>{try{return window.navigator?.locks??null;}catch{return null;}})();
@@ -265,7 +266,12 @@ async function commit(result){
   // One in-flight action per tab; Web Locks serializes participating tabs.
   // The existing exact-raw CAS remains mandatory inside the lock callback.
   if(!revalidateWorkshopBeforeInteraction())return;
-  if(!result.ok){$('board-notice').textContent=result.message;return;}
+  if(!result.ok){
+    // A failure hint only reads the engine state; no automatic grants or writes.
+    const hint=describeStoryWorkshopStall(state,Date.now());
+    $('board-notice').textContent=result.message+(hint?' · '+hint.message:'');
+    return;
+  }
   const expectedEpoch=storageEpoch;
   const buildingChanged=['garden','harbor','storefront'].some(name=>
     state.buildings[name]!==result.state.buildings[name]);
