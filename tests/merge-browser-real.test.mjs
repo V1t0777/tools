@@ -1405,5 +1405,83 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     t.diagnostic('Chromium native chooser cancel, same-file re-selection twice, declined restore and fresh gameplay verified');
   }
 
+
+  // P2.65bt: persistent save controls survive DOM rerenders. A pointerdown
+  // made on an older reviewed save must be invalidated when an external
+  // Web-Locked engine write is adopted WHILE this tab remains foreground.
+  // Pointer/click delivery is deterministic here; storage, engine, Web Locks,
+  // lifecycle reconciliation and the actual page handlers are Chromium.
+  {
+    await front(b);
+    assert.equal(await evalOn(b,'document.hidden'),false,'lease test requires foreground tab');
+    const baselineRaw=await evalOn(b,'localStorage.getItem('+JSON.stringify(key)+')');
+    const baseline=JSON.parse(baselineRaw);
+    const backupRaw=await evalOn(b,'localStorage.getItem('+JSON.stringify(key+'.restore-backup-v3')+')');
+    const storyRaw=await evalOn(b,"localStorage.getItem('toolbox.merge-isle.story.local.v1')");
+    const produceExternally='(async()=>{const {produce}=await import("/merge/engine.mjs");'+
+      'return navigator.locks.request('+JSON.stringify(lock)+',async()=>{'+
+      'const before=JSON.parse(localStorage.getItem('+JSON.stringify(key)+'));'+
+      'const slot=before.board.findIndex(item=>item?.kind==="producer");'+
+      'const next=produce(before,slot);if(!next.ok)throw Error("external produce rejected");'+
+      'localStorage.setItem('+JSON.stringify(key)+',JSON.stringify(next.state));'+
+      'return {revision:next.state.revision,energy:next.state.energy};});})()';
+    await evalOn(b,"(()=>{window.__btResetConfirms=0;window.confirm=()=>{window.__btResetConfirms++;return false;};"+
+      "document.getElementById('reset').dispatchEvent(new PointerEvent('pointerdown',"+
+      "{bubbles:true,pointerType:'touch',isPrimary:true}));return true;})()");
+    const external=await evalOn(a,produceExternally);
+    assert.equal(external.revision,baseline.revision+1,'external producer must advance one revision');
+    assert.equal(external.energy,baseline.energy-1,'external producer must spend one energy');
+    await waitWithSnapshot(async()=>await evalOn(b,
+      "document.getElementById('save-status').textContent.includes('已同步其他标签页') && "+
+      "document.querySelector('#energy').textContent.startsWith("+JSON.stringify(String(external.energy)+' /')+")"),
+      'foreground tab adopted external save without backgrounding',b);
+    assert.equal(await evalOn(b,'document.hidden'),false,'foreground lease must not be revoked by visibilitychange');
+    const adoptedRaw=await evalOn(b,'localStorage.getItem('+JSON.stringify(key)+')');
+    await evalOn(b,"document.getElementById('reset').dispatchEvent(new MouseEvent('click',{bubbles:true,detail:1}));true");
+    await sleep(90);
+    assert.equal(await evalOn(b,'window.__btResetConfirms'),0,
+      'stale persistent reset pointer must not ask for destructive confirmation');
+    assert.equal(await evalOn(b,'localStorage.getItem('+JSON.stringify(key)+')'),adoptedRaw,
+      'stale reset pointer must not overwrite newer save');
+    assert.equal(await evalOn(b,'localStorage.getItem('+JSON.stringify(key+'.restore-backup-v3')+')'),backupRaw,
+      'stale reset pointer must not replace backup');
+    await evalOn(b,"(()=>{const button=document.getElementById('reset');"+
+      "button.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,pointerType:'touch',isPrimary:true}));"+
+      "button.dispatchEvent(new MouseEvent('click',{bubbles:true,detail:1}));return true;})()");
+    assert.equal(await evalOn(b,'window.__btResetConfirms'),1,
+      'a fresh reset pointer may reach confirmation (declined by the test)');
+    assert.equal(await evalOn(b,'localStorage.getItem('+JSON.stringify(key)+')'),adoptedRaw);
+
+    // The same lease must protect a non-destructive persistent export. Count
+    // attempted anchor clicks without writing any file or assuming iOS download.
+    await evalOn(b,"(()=>{window.__btDownloadClicks=0;"+
+      "window.__btOriginalAnchorClick=HTMLAnchorElement.prototype.click;"+
+      "HTMLAnchorElement.prototype.click=function(){window.__btDownloadClicks++;};"+
+      "document.getElementById('export-local-save').dispatchEvent("+
+      "new PointerEvent('pointerdown',{bubbles:true,pointerType:'touch',isPrimary:true}));"+
+      "return true;})()");
+    const externalAgain=await evalOn(a,produceExternally);
+    assert.equal(externalAgain.revision,external.revision+1);
+    await waitWithSnapshot(async()=>await evalOn(b,
+      "document.getElementById('save-status').textContent.includes('已同步其他标签页') && "+
+      "document.querySelector('#energy').textContent.startsWith("+JSON.stringify(String(externalAgain.energy)+' /')+")"),
+      'foreground tab adopted second external save',b);
+    const latestRaw=await evalOn(b,'localStorage.getItem('+JSON.stringify(key)+')');
+    await evalOn(b,"document.getElementById('export-local-save').dispatchEvent("+
+      "new MouseEvent('click',{bubbles:true,detail:1}));true");
+    assert.equal(await evalOn(b,'window.__btDownloadClicks'),0,
+      'stale export pointer must not request a download for unseen progress');
+    await evalOn(b,"(()=>{const button=document.getElementById('export-local-save');"+
+      "button.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,pointerType:'touch',isPrimary:true}));"+
+      "button.dispatchEvent(new MouseEvent('click',{bubbles:true,detail:1}));return true;})()");
+    assert.equal(await evalOn(b,'window.__btDownloadClicks'),1,
+      'fresh export pointer may request a download');
+    await evalOn(b,'HTMLAnchorElement.prototype.click=window.__btOriginalAnchorClick;true');
+    assert.equal(await evalOn(b,'localStorage.getItem('+JSON.stringify(key)+')'),latestRaw);
+    assert.equal(await evalOn(b,'localStorage.getItem('+JSON.stringify(key+'.restore-backup-v3')+')'),backupRaw);
+    assert.equal(await evalOn(b,"localStorage.getItem('toolbox.merge-isle.story.local.v1')"),storyRaw);
+    t.diagnostic('Chromium foreground cross-tab adoption revoked stale persistent reset/export pointer leases');
+  }
+
   t.diagnostic(`Chromium two-tab lock, BFCache persisted=${bfcache}, download=${file}, reset/import/backup verified`);
 });

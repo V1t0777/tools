@@ -37,6 +37,11 @@ const runtime=createNormalPageRuntime({
   storage:store,locks:window.navigator?.locks??null,
   onVerified(next,raw,kind){
     const changed=raw!==persistedRaw;
+    // Persistent controls survive rerenders. A pointerdown made against an
+    // older reviewed save must not become a reset/export/upgrade click after
+    // a cross-tab adoption or another committed transaction changes the UI.
+    // This does not block a fresh keyboard click (detail === 0).
+    if(changed)persistentGestureGeneration++;
     state=next;persistedRaw=raw;saveIssue=null;
     if(kind!=='clock'||changed){
       selected=-1;activeGuidance=null;render();
