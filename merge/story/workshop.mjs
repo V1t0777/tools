@@ -14,6 +14,7 @@ import {shouldRefreshWorkshopForStoryEvent} from './storage-event-guard.mjs';
 import {storyGardenBuildAvailable,storyHarborBuildAvailable,storyStorefrontBuildAvailable} from './workshop-gate.mjs';
 import {storyBuildingWriteAllowed} from './building-commit-guard.mjs';
 import {nextStoryConstructionBudget,wouldSpendStoryConstructionReserve} from './supply-budget.mjs';
+import {describeStoryConstructionResources} from './construction-progress.mjs';
 import {nextStoryWorkshopAction,isStoryWorkshopRouteCurrent} from './workshop-next-step.mjs';
 import {guardStoryPersistentGesture} from './persistent-gesture-guard.mjs';
 const $=id=>document.getElementById(id);
@@ -217,7 +218,7 @@ function render(){
     ? '花园已修复。返回剧情页继续《两个人的下午茶》。'
     : !gardenStoryReady
       ? '先在剧情页完成《没有开花的花圃》，再来修复后院花园。'
-      : '需要 '+garden.minLevel+' 级和 '+garden.coins+' 金币；当前 '+level+' 级、'+state.coins+' 金币。通过交付委托积累资源。';
+      : describeStoryConstructionResources(state,garden);
   $('build-garden').disabled=disabled||built||!gardenStoryReady||level<garden.minLevel||state.coins<garden.coins;
   const harbor=BUILDINGS.harbor,harborBuilt=state.buildings.harbor===1;
   const harborStoryReady=!narrative.blocked&&storyHarborBuildAvailable(narrative.progress);
@@ -226,7 +227,7 @@ function render(){
     ? '港湾街角已修缮。返回剧情页继续《海雾里的灯》。'
     : !harborStoryReady
       ? '先完成《第一次独立修理》，确认学徒与岚叔的安全准备，再进行港湾修缮。'
-      : '需要 '+harbor.minLevel+' 级和 '+harbor.coins+' 金币；当前 '+level+' 级、'+state.coins+' 金币。';
+      : describeStoryConstructionResources(state,harbor);
   $('build-harbor').disabled=disabled||harborBuilt||!harborStoryReady||level<harbor.minLevel||state.coins<harbor.coins;
   const storefront=BUILDINGS.storefront,storefrontBuilt=state.buildings.storefront===1;
   const storefrontStoryReady=!narrative.blocked&&storyStorefrontBuildAvailable(narrative.progress);
@@ -235,7 +236,7 @@ function render(){
     ? '百物铺门面已修整。返回剧情页参加《大家的开张庆典》。'
     : !storefrontStoryReady
       ? '先读完《海雾里的灯》，再为居民们准备开张庆典。'
-      : '修整门面需要 '+storefront.minLevel+' 级和 '+storefront.coins+' 金币；目前 '+level+' 级、'+state.coins+' 金币。';
+      : '修整门面'+describeStoryConstructionResources(state,storefront);
   $('build-storefront').disabled=disabled||storefrontBuilt||!storefrontStoryReady||level<storefront.minLevel||state.coins<storefront.coins;
   $('reset-workshop').disabled=saving||pageSuspended()||reason==='STORAGE_UNAVAILABLE';
   $('export-corrupt-workshop').disabled=saving||pageSuspended()||reason!=='CORRUPT_SAVE'||typeof raw!=='string';

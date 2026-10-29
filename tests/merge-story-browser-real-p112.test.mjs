@@ -574,6 +574,14 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     assert.ok(fiveOrders.coins<160,
       'five real deliveries cannot bypass the 160-coin garden cost');
     assert.equal(await evalOn(b,"document.getElementById('build-garden').disabled"),true);
+    // P120: read-only deficits from the actual five-order browser state.
+    const hint=await evalOn(b,"document.getElementById('garden-hint').textContent");
+    assert.ok(hint.includes('还差 '+(190-fiveOrders.xp)+' 经验'),
+      'exact level-four XP deficit after five genuine deliveries');
+    assert.ok(hint.includes('还差 '+(160-fiveOrders.coins)+' 金币'),
+      'exact garden coin deficit after five genuine deliveries');
+    assert.equal((await readJSON(b,workshopKey)).revision,fiveOrders.revision,
+      'reading resource guidance cannot commit or grant rewards');
     const fiveOrdersRaw=await readRaw(b,workshopKey);
     await navigate(b,'/merge/story.html','#journey-read');
     await until(async()=>evalOn(b,
