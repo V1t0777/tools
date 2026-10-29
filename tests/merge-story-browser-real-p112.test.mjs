@@ -111,12 +111,49 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
       await call('Page.navigate',{url:base+path},p.sessionId);
       await until(async()=>evalOn(p,"document.readyState==='complete'&&!!document.querySelector("+JSON.stringify(selector)+")"),'load '+path);
     }
+    // P143: real Chromium mobile viewport geometry, not iOS/WebView device certification.
+    async function checkMobileLayout(p,width,kind){
+      await call('Emulation.setDeviceMetricsOverride',
+        {width,height:720,deviceScaleFactor:2,mobile:true},p.sessionId);
+      try{
+        const selectors=kind==='story'
+          ? ['.tabs button','#journey-read','#reset-story']
+          : ['#workshop-board button','.workshop-build','#reset-workshop',
+             '#workshop-orders button','#workshop-warehouse button'];
+        const metrics=await evalOn(p,'(()=>{const selectors='+JSON.stringify(selectors)+
+          ';const bad=[];let targets=0;for(const selector of selectors){'+
+          'for(const el of document.querySelectorAll(selector)){const style=getComputedStyle(el);'+
+          'if(style.display==="none"||style.visibility==="hidden"||!el.getClientRects().length)continue;'+
+          'targets++;const box=el.getBoundingClientRect();'+
+          'if(box.width<43.5||box.height<43.5)bad.push(selector+":"+Math.round(box.width)+"x"+Math.round(box.height));'+
+          '}}const board=document.querySelector(".workshop-board-wrap");'+
+          'return {viewport:document.documentElement.clientWidth,'+
+          'documentWidth:document.documentElement.scrollWidth,targets,bad,'+
+          'boardScroll:board?board.scrollWidth>board.clientWidth:null};})()');
+        assert.equal(metrics.viewport,width,'P143 viewport must match device emulation');
+        assert.ok(metrics.documentWidth<=width+1,
+          'P143 '+kind+' '+width+'px must not scroll the whole page horizontally: '+JSON.stringify(metrics));
+        assert.ok(metrics.targets>=(kind==='story'?4:60),
+          'P143 key mobile actions must be rendered: '+JSON.stringify(metrics));
+        assert.deepEqual(metrics.bad,[],
+          'P143 visible core touch controls must be at least 44x44 CSS px');
+        if(kind==='workshop'&&width===320)
+          assert.equal(metrics.boardScroll,true,
+            'P143 narrow screen must scroll only the board region, not the whole page');
+        t.diagnostic('P143 Chromium '+kind+' '+width+'px: '+metrics.targets+
+          ' core touch targets >=44px; no document-level horizontal overflow');
+      }finally{
+        await call('Emulation.clearDeviceMetricsOverride',{},p.sessionId);
+      }
+    }
     const readRaw=(p,key)=>evalOn(p,'localStorage.getItem('+JSON.stringify(key)+')');
     const readJSON=async(p,key)=>JSON.parse(await readRaw(p,key));
     const a=await page();await front(a);
     await navigate(a,'/merge/story.html','#journey-read');
     await until(async()=>evalOn(a,"document.getElementById('save-state').textContent.includes('已保存')"),'story initialized');
     await evalOn(a,'localStorage.setItem('+JSON.stringify(normalKey)+',"normal-mode-sentinel");true');
+    await checkMobileLayout(a,320,'story');
+    await checkMobileLayout(a,390,'story');
     async function finishScene(id,p=a){
       await until(async()=>evalOn(p,"!document.getElementById('journey-read').hidden&&!document.getElementById('journey-read').disabled"),'readable '+id);
       await evalOn(p,"document.getElementById('journey-read').click();true");
@@ -142,6 +179,8 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
 
     await navigate(a,'/merge/story-workshop.html','#workshop-board');
     await until(async()=>evalOn(a,"document.querySelectorAll('#workshop-board button').length===56"),'56 real cells');
+    await checkMobileLayout(a,320,'workshop');
+    await checkMobileLayout(a,390,'workshop');
     assert.match(await evalOn(a,"document.getElementById('workshop-next-guidance').textContent"),/委托|订单|第一单/);
     assert.equal(await evalOn(a,"document.getElementById('workshop-next-action').getAttribute('href')"),'#orders-goal');
     await evalOn(a,"document.querySelector('#workshop-board .producer').click();true");
