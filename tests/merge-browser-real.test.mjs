@@ -660,7 +660,38 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     status:document.getElementById('save-status').textContent,
   })`);
   t.diagnostic('CDP native touch trace: '+JSON.stringify({beforeRevision:beforeTouch.revision,...trace}));
-  await until(async()=> (await readSave(b)).revision===beforeTouch.revision+1,'native touch producer persisted once');
+  // A resize/foreground reconciliation may reject the first tap against
+  // an obsolete rendered board. Permit a second physical gesture ONLY when
+  // the first was explicitly refused and left the exact save unchanged.
+  // Unknown touch failures, duplicate writes or silent retries remain errors.
+  try {
+    await until(async()=>(await readSave(b)).revision===beforeTouch.revision+1,
+      'first native touch producer persisted',2200);
+  } catch {
+    assert.deepEqual(await readSave(b),beforeTouch,
+      'first safely rejected touch must preserve the complete original save');
+    assert.equal(trace.hidden,false,'retry requires a visible page');
+    assert.match(trace.notice,/存档已更新或正在保存，请在最新棋盘上重新操作/,
+      'only the explicit stale-board refusal authorizes a new gesture');
+    const freshCenter=await evalOn(b,`(()=>{
+      const el=document.querySelector('#board .producer');
+      el.scrollIntoView({block:'center',inline:'nearest'});
+      const r=el.getBoundingClientRect();
+      return {x:r.left+r.width/2,y:r.top+r.height/2};
+    })()`);
+    await until(async()=>await evalOn(b,
+      "document.elementFromPoint("+freshCenter.x+","+freshCenter.y+")?.closest('.producer')!==null"),
+      'retry producer is the actual hit target');
+    await sleep(160);
+    await call('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[
+      {...freshCenter,id:24,radiusX:2,radiusY:2,force:1}
+    ]},b.sessionId);
+    await sleep(75);
+    await call('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]},b.sessionId);
+    await waitWithSnapshot(async()=>(await readSave(b)).revision===beforeTouch.revision+1,
+      'new physical touch after explicit stale-board refusal',b);
+    t.diagnostic('First native producer touch safely rejected stale board; second distinct gesture saved');
+  }
   await sleep(250);
   const afterTouch=await readSave(b);
   assert.equal(afterTouch.revision,beforeTouch.revision+1,'touch compatibility click must not duplicate production');
