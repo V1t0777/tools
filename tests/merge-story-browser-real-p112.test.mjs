@@ -602,91 +602,94 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     await until(async()=>evalOn(b,
       "document.querySelectorAll('#workshop-board button').length===56"),
       'P125 continuous browser economy ready');
-    for(let goal=6;goal<=20;goal++){
-      const baseline=await readJSON(b,workshopKey);
-      assert.equal(baseline.progress.orders,goal-1);
-      for(let step=0;step<72;step++){
-        const current=await readJSON(b,workshopKey);
-        if(current.progress.orders===goal)break;
-        const readyIndex=current.orders.findIndex(order=>
-          current.board.some(item=>item?.kind==='material'&&
-            item.chain===order.chain&&item.tier===order.tier));
-        let click;
-        if(readyIndex>=0){
-          click="document.querySelectorAll('#workshop-orders .workshop-order button')["+
-            readyIndex+"].click();true";
-        }else{
-          const tierLimit=getMaxOrderTier(current.xp);
-          let pair=null;
-          for(let i=0;i<current.board.length&&!pair;i++){
-            const item=current.board[i];
-            if(item?.kind!=='material'||item.tier>=tierLimit)continue;
-            const j=current.board.findIndex((other,k)=>k>i&&
-              other?.kind==='material'&&other.chain===item.chain&&other.tier===item.tier);
-            if(j>=0)pair=[i,j];
-          }
-          if(pair){
-            await evalOn(b,"document.querySelectorAll('#workshop-board button')["+
-              pair[0]+"].click();true");
-            click="document.querySelectorAll('#workshop-board button')["+
-              pair[1]+"].click();true";
+    async function deliverOrdersThrough(start,end,expectedGarden){
+      for(let goal=start;goal<=end;goal++){
+        const baseline=await readJSON(b,workshopKey);
+        assert.equal(baseline.progress.orders,goal-1);
+        for(let step=0;step<72;step++){
+          const current=await readJSON(b,workshopKey);
+          if(current.progress.orders===goal)break;
+          const readyIndex=current.orders.findIndex(order=>
+            current.board.some(item=>item?.kind==='material'&&
+              item.chain===order.chain&&item.tier===order.tier));
+          let click;
+          if(readyIndex>=0){
+            click="document.querySelectorAll('#workshop-orders .workshop-order button')["+
+              readyIndex+"].click();true";
           }else{
-            const target=current.orders.slice().sort((a,b)=>
-              a.tier-b.tier||Number(a.id.slice(1))-Number(b.id.slice(1)))[0];
-            if(current.energy===0){
-              // Earned one-time items may recover energy; no injected resources.
-              const supply=['soda','meal'].find(id=>current.bag[id]>0);
-              assert.ok(supply,'P131 energy depleted without an earned recovery item');
-              click="document.querySelector('#story-supply-bag [data-supply-use="+
-                JSON.stringify(supply)+"]').click();true";
-            }else{
-              const slot=current.board.findIndex(item=>item?.kind==='producer'&&
-                item.chain===target.chain);
-              assert.ok(slot>=0,'P131 real producer exists for '+target.chain);
-              const producer=current.board[slot];
-              if(producer.charges===0&&producer.cooldownUntil>Date.now()+3000){
-                const cooldownRaw=await readRaw(b,workshopKey);
-                await evalOn(b,"document.querySelectorAll('#workshop-board button')["+
-                  slot+"].click();true");
-                assert.equal(await readRaw(b,workshopKey),cooldownRaw,
-                  'cooling producer must not spend energy or commit a save');
-                assert.match(await evalOn(b,
-                  "document.getElementById('board-notice').textContent"),/冷却/);
-              }
-              if(producer.charges===0){
-                const waitMs=Math.max(0,producer.cooldownUntil-Date.now()+150);
-                assert.ok(waitMs<=46000,'P131 cooldown must be bounded by real rules');
-                await sleep(waitMs); // genuine elapsed wall time, no clock override
-              }
+            const tierLimit=getMaxOrderTier(current.xp);
+            let pair=null;
+            for(let i=0;i<current.board.length&&!pair;i++){
+              const item=current.board[i];
+              if(item?.kind!=='material'||item.tier>=tierLimit)continue;
+              const j=current.board.findIndex((other,k)=>k>i&&
+                other?.kind==='material'&&other.chain===item.chain&&other.tier===item.tier);
+              if(j>=0)pair=[i,j];
+            }
+            if(pair){
+              await evalOn(b,"document.querySelectorAll('#workshop-board button')["+
+                pair[0]+"].click();true");
               click="document.querySelectorAll('#workshop-board button')["+
-                slot+"].click();true";
+                pair[1]+"].click();true";
+            }else{
+              const target=current.orders.slice().sort((a,b)=>
+                a.tier-b.tier||Number(a.id.slice(1))-Number(b.id.slice(1)))[0];
+              if(current.energy===0){
+                // Earned one-time items may recover energy; no injected resources.
+                const supply=['soda','meal'].find(id=>current.bag[id]>0);
+                assert.ok(supply,'P131 energy depleted without an earned recovery item');
+                click="document.querySelector('#story-supply-bag [data-supply-use="+
+                  JSON.stringify(supply)+"]').click();true";
+              }else{
+                const slot=current.board.findIndex(item=>item?.kind==='producer'&&
+                  item.chain===target.chain);
+                assert.ok(slot>=0,'P131 real producer exists for '+target.chain);
+                const producer=current.board[slot];
+                if(producer.charges===0&&producer.cooldownUntil>Date.now()+3000){
+                  const cooldownRaw=await readRaw(b,workshopKey);
+                  await evalOn(b,"document.querySelectorAll('#workshop-board button')["+
+                    slot+"].click();true");
+                  assert.equal(await readRaw(b,workshopKey),cooldownRaw,
+                    'cooling producer must not spend energy or commit a save');
+                  assert.match(await evalOn(b,
+                    "document.getElementById('board-notice').textContent"),/冷却/);
+                }
+                if(producer.charges===0){
+                  const waitMs=Math.max(0,producer.cooldownUntil-Date.now()+150);
+                  assert.ok(waitMs<=46000,'P131 cooldown must be bounded by real rules');
+                  await sleep(waitMs); // genuine elapsed wall time, no clock override
+                }
+                click="document.querySelectorAll('#workshop-board button')["+
+                  slot+"].click();true";
+              }
             }
           }
+          await evalOn(b,click);
+          await until(async()=>{
+            try{return (await readJSON(b,workshopKey)).revision===current.revision+1;}
+            catch{return false;}
+          },'P125 persisted genuine UI action toward order '+goal);
+          const updated=await readJSON(b,workshopKey);
+          assert.equal(validateSave(updated),true,'every UI action retains strict save schema');
+          assert.ok(updated.energy>=0&&updated.energy<=120,
+            'each genuine UI action must preserve finite energy bounds');
+          assert.ok(updated.progress.orders>=current.progress.orders&&
+            updated.progress.orders<=current.progress.orders+1,
+            'one UI action cannot silently grant multiple orders');
+          assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
         }
-        await evalOn(b,click);
-        await until(async()=>{
-          try{return (await readJSON(b,workshopKey)).revision===current.revision+1;}
-          catch{return false;}
-        },'P125 persisted genuine UI action toward order '+goal);
-        const updated=await readJSON(b,workshopKey);
-        assert.equal(validateSave(updated),true,'every UI action retains strict save schema');
-        assert.ok(updated.energy>=0&&updated.energy<=120,
-          'each genuine UI action must preserve finite energy bounds');
-        assert.ok(updated.progress.orders>=current.progress.orders&&
-          updated.progress.orders<=current.progress.orders+1,
-          'one UI action cannot silently grant multiple orders');
-        assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
+        const delivered=await readJSON(b,workshopKey);
+        assert.equal(delivered.progress.orders,goal,
+          'P125 must finish each genuine order without a test fixture');
+        assert.ok(delivered.coins>baseline.coins&&delivered.xp>baseline.xp,
+          'genuine UI delivery must earn coins and experience');
+        assert.equal(delivered.buildings.garden,expectedGarden,
+          'UI orders cannot change garden construction state');
+        assert.ok(delivered.revision>baseline.revision,
+          'each new delivered order must follow real persisted UI actions');
       }
-      const delivered=await readJSON(b,workshopKey);
-      assert.equal(delivered.progress.orders,goal,
-        'P125 must finish each genuine order without a test fixture');
-      assert.ok(delivered.coins>baseline.coins&&delivered.xp>baseline.xp,
-        'genuine UI delivery must earn coins and experience');
-      assert.equal(delivered.buildings.garden,0,
-        'orders cannot silently bypass garden construction');
-      assert.ok(delivered.revision>baseline.revision,
-        'each new delivered order must follow real persisted UI actions');
     }
+    await deliverOrdersThrough(6,20,0);
     const twentyOrders=await readJSON(b,workshopKey);
     assert.equal(twentyOrders.progress.orders,20,'twenty consecutive orders must be genuinely delivered');
     assert.equal(validateSave(twentyOrders),true,'twenty-order UI save remains strictly valid');
@@ -742,9 +745,8 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     assert.equal(preBuild.storefront.buildings.harbor,1);
     const earnedFixture=twentyOrders;
     assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
-    await evalOn(b,'localStorage.setItem('+
-      JSON.stringify(workshopKey)+','+
-      JSON.stringify(JSON.stringify(earnedFixture))+');true');
+    assert.equal(await readRaw(b,workshopKey),twentyOrdersRaw,
+      'garden payment must start from the original browser save, without reinjection');
     await navigate(b,'/merge/story-workshop.html','#workshop-board');
     await until(async()=>evalOn(b,
       "document.querySelectorAll('#workshop-board button').length===56&&"+
@@ -835,6 +837,49 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
       './story-workshop.html#harbor-goal');
     assert.equal(await readRaw(b,workshopKey),builtGardenRaw,
       'reading apprentice safety lesson cannot change garden economy');
+    // P133: continue from the SAME paid-for garden save through real UI
+    // orders 21–24. No detached snapshot may enter before this segment.
+    await navigate(b,'/merge/story-workshop.html','#workshop-board');
+    await until(async()=>evalOn(b,
+      "document.querySelectorAll('#workshop-board button').length===56"),
+      'P133 post-garden workshop ready');
+    assert.equal(await readRaw(b,workshopKey),builtGardenRaw,
+      'opening the post-garden workshop cannot rewrite the paid save');
+    const storyBeforeMoreOrders=await readRaw(b,storyKey);
+    await deliverOrdersThrough(21,24,1);
+    const twentyFourOrders=await readJSON(b,workshopKey);
+    assert.equal(twentyFourOrders.progress.orders,24,
+      'four additional orders must be delivered by real UI after garden');
+    assert.equal(validateSave(twentyFourOrders),true);
+    assert.equal(twentyFourOrders.buildings.garden,1);
+    assert.equal(twentyFourOrders.buildings.harbor,0);
+    assert.ok(twentyFourOrders.coins>builtGarden.coins,
+      'post-garden orders must accumulate genuine harbor resources');
+    assert.ok(twentyFourOrders.xp>builtGarden.xp);
+    assert.equal(twentyFourOrders.achievements.orders20,1,
+      'later orders cannot reissue the orders20 achievement');
+    assert.equal(twentyFourOrders.bag.reset,builtGarden.bag.reset,
+      'later orders cannot duplicate the reset card');
+    assert.equal(await evalOn(b,"document.getElementById('build-harbor').disabled"),true,
+      'harbor remains gated until both level and coin requirements are met');
+    const twentyFourRaw=await readRaw(b,workshopKey);
+    await navigate(b,'/merge/story.html','#journey-read');
+    await until(async()=>evalOn(b,
+      "document.getElementById('progress-count').textContent.includes('9 / 12')"),
+      'P133 third-chapter harbor gate survives post-garden orders');
+    assert.equal(await evalOn(b,"document.getElementById('journey-read').hidden"),true);
+    assert.equal(await readRaw(b,storyKey),storyBeforeMoreOrders,
+      'continuing the economy cannot skip or rewrite story scenes');
+    assert.equal(await readRaw(b,workshopKey),twentyFourRaw,
+      'returning to the story cannot replay later orders');
+    await navigate(b,'/merge/story-workshop.html','#workshop-board');
+    await until(async()=>evalOn(b,
+      "document.querySelectorAll('#workshop-board button').length===56"),
+      'P133 post-garden progress reloaded');
+    assert.equal(await readRaw(b,workshopKey),twentyFourRaw,
+      '24 genuine orders and garden construction survive navigation');
+    assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
+    // Harbor and storefront below STILL use detached engine-earned fixtures.
     await evalOn(b,'localStorage.setItem('+
       JSON.stringify(workshopKey)+','+JSON.stringify(JSON.stringify(preBuild.harbor))+');true');
     await navigate(b,'/merge/story-workshop.html','#workshop-board');
@@ -947,6 +992,7 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     assert.equal(await evalOn(b,"document.getElementById('journey-workshop').hidden"),true);
     assert.equal(await readRaw(b,workshopKey),builtStorefrontRaw);
     assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
+    t.diagnostic('P133 real Chromium: 24 genuine consecutive UI orders including four after paying for garden; harbor/storefront still use detached fixtures, not full UI completion');
     t.diagnostic('P132 real Chromium: twenty consecutive UI orders earn and pay for the actual garden, unlock tea-table, and resist peer-tab double-charge; harbor/storefront still use detached engine-earned fixtures, not full UI completion');
     t.diagnostic('P126 real Chromium: stale peer tabs cannot double-charge garden, harbor or storefront; not iPhone/WeChat device testing');
     t.diagnostic('P123 real Chromium: harbor + storefront buttons charge once; chapters 3-4 reach 12/12; later economy uses detached real-engine pre-build fixtures, not continuous UI grinding');
