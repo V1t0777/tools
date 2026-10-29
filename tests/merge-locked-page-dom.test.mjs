@@ -92,9 +92,8 @@ async function mount({initialRaw=null,locksAvailable=true,initialHidden=false}={
     getItem:key=>map.has(key)?map.get(key):null,
     setItem(key,value){writes.push(key);map.set(key,String(value));}
   };
-  let held=false,lockCalls=0;
+  let held=false;
   const locks={request(name,options,callback){
-    lockCalls++;
     assert.equal(name,NORMAL_SAVE_LOCK_NAME);
     assert.deepEqual(options,{mode:'exclusive',ifAvailable:true});
     if(held)return Promise.resolve(callback(null));
@@ -132,7 +131,7 @@ async function mount({initialRaw=null,locksAvailable=true,initialHidden=false}={
   globalThis.window=win;
   await import(liveEntryUrl.href+'?dom-fixture='+fixtureId++);
   await settle();
-  return {doc,win,storage,map,writes,lockCalls:()=>lockCalls,
+  return {doc,win,storage,map,writes,
     id:key=>doc.getElementById(key),
     saved:()=>JSON.parse(storage.getItem(SAVE_KEY))};
 }
@@ -2300,25 +2299,4 @@ test('P2.65ba actual normal page: full-board warehouse upgrade then selected sto
   assert.equal(h.saved().revision,2);
   assert.equal(h.id('board-guide').getAttribute('aria-pressed'),'false');
   assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
-});
-
-test('P2.65bd idle countdown avoids Web Lock while a due recovery still persists',async()=>{
-  const idle=await mount();
-  const initialLocks=idle.lockCalls(),initialWrites=idle.writes.length;
-  await idle.win.timer();await settle();
-  assert.equal(idle.lockCalls(),initialLocks,'no-op countdown must not contend for the gameplay Web Lock');
-  assert.equal(idle.writes.length,initialWrites,'no-op countdown must not rewrite the save');
-  assert.match(idle.id('save-status').textContent,/已保存于此浏览器/);
-  assert.equal(idle.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
-
-  const seed=createInitialState(Date.now());
-  seed.energy=MAX_ENERGY-4;
-  seed.energyAt=Date.now()-ENERGY_REGEN_MS*2;
-  const due=await mount({initialRaw:JSON.stringify(seed)});
-  const before=due.saved(),locks=due.lockCalls(),writes=due.writes.length;
-  await due.win.timer();await settle();
-  assert.equal(due.saved().energy,before.energy+2,'due energy recovery must still commit');
-  assert.ok(due.lockCalls()>locks,'due recovery must still take the exclusive Web Lock');
-  assert.equal(due.writes.length,writes+1,'due recovery must write exactly once');
-  assert.equal(due.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
 });

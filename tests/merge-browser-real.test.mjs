@@ -619,8 +619,21 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   ]},b.sessionId);
   await sleep(65);
   await call('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]},b.sessionId);
-  await waitWithSnapshot(async()=>(await readSave(b)).revision===newerState.revision+1,
-    'fresh touch after background',b);
+  // Preserve the immediate UI rejection reason: the existing 12s timeout
+  // snapshot can outlive the 2.4s notice and hide a legitimate busy guard.
+  const immediateAfterBackgroundTouch=await evalOn(b,`({
+    notice:document.getElementById('notice').textContent,
+    status:document.getElementById('save-status').textContent,
+    visible:!document.hidden,
+    recentEvents:window.__touchTrace?.slice(-6).map(e=>e.type)
+  })`);
+  try{
+    await waitWithSnapshot(async()=>(await readSave(b)).revision===newerState.revision+1,
+      'fresh touch after background',b);
+  }catch(error){
+    t.diagnostic('Immediate post-background touch state: '+JSON.stringify(immediateAfterBackgroundTouch));
+    throw error;
+  }
   await sleep(200);
   const recovered=await readSave(b);
   assert.equal(recovered.revision,newerState.revision+1,'fresh touch writes exactly once');
