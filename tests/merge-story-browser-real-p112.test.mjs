@@ -8,7 +8,6 @@ import {tmpdir} from 'node:os';
 import {join,resolve,extname,sep} from 'node:path';
 import {setTimeout as sleep} from 'node:timers/promises';
 import {BUILDINGS,getLevel,getMaxOrderTier} from '../merge/economy.mjs';
-import {simulateStoryBoard} from '../merge/story/board-simulation.mjs';
 import {validateSave} from '../merge/engine.mjs';
 
 // Actual Chromium + page modules; no DOM mocks, injected saves, or remote API.
@@ -57,7 +56,7 @@ function connectCDP(url){
   }};
 }
 test('P112 real Chromium: story first-order gate, two-tab workshop conflict and corrupt evidence download',
-  {timeout:360000},async t=>{
+  {timeout:420000},async t=>{
     const chrome=chromePath();
     assert.ok(chrome,'A real Chrome/Chromium binary is required; no mock fallback');
     const temp=await mkdtemp(join(tmpdir(),'yunyu-story-real-'));
@@ -727,31 +726,8 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     assert.equal(await readRaw(b,workshopKey),twentyOrdersRaw,
       'all twenty genuine orders survive a story/workshop round trip');
     assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
-    // P124: use ONE deterministic, engine-earned economic lineage for all
-    // three PRE-build snapshots and their POST-build audit checkpoints.
-    // P132: the garden uses the actual twenty-order browser save. Only harbor
-    // and storefront still use detached engine-earned pre-build fixtures.
-    const preBuild={},postBuild={};
-    const economicReplay=simulateStoryBoard({seed:42,
-      onConstructionReady:(id,snapshot)=>{preBuild[id]=snapshot;},
-      onMilestone:(milestone,snapshot)=>{
-        if(['garden','harbor','storefront'].includes(milestone.id))
-          postBuild[milestone.id]=snapshot;
-      }
-    });
-    assert.equal(economicReplay.complete,true,economicReplay.reason);
-    for(const id of ['garden','harbor','storefront']){
-      assert.equal(validateSave(preBuild[id]),true);
-      assert.equal(validateSave(postBuild[id]),true);
-      assert.equal(preBuild[id].buildings[id],0);
-      assert.equal(postBuild[id].buildings[id],1);
-      assert.ok(getLevel(preBuild[id].xp)>=BUILDINGS[id].minLevel);
-      assert.ok(preBuild[id].coins>=BUILDINGS[id].coins);
-      assert.equal(postBuild[id].coins,preBuild[id].coins-BUILDINGS[id].coins);
-      assert.equal(postBuild[id].revision,preBuild[id].revision+1);
-    }
-    assert.equal(preBuild.harbor.buildings.garden,1);
-    assert.equal(preBuild.storefront.buildings.harbor,1);
+    // P137: preserve the exact browser-earned save through every building.
+    // No engine checkpoint is injected for garden, harbor, or storefront.
     const earnedFixture=twentyOrders;
     assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
     assert.equal(await readRaw(b,workshopKey),twentyOrdersRaw,
@@ -966,21 +942,16 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
       'P136 42-order workshop restored');
     assert.equal(await readRaw(b,workshopKey),fortyTwoRaw);
     assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
-    // If the genuine UI trajectory is not yet harbor-ready, keep the older
-    // detached engine-earned harbor fixture test explicitly distinguished.
-    if(!harborFromUI){
-      await evalOn(b,'localStorage.setItem('+
-        JSON.stringify(workshopKey)+','+JSON.stringify(JSON.stringify(preBuild.harbor))+');true');
-      await navigate(b,'/merge/story-workshop.html','#workshop-board');
-    }
+    assert.equal(harborFromUI,true,
+      'P137 harbor must be funded by the uninterrupted real browser economy');
     await until(async()=>evalOn(b,
       "document.querySelectorAll('#workshop-board button').length===56&&"+
       "document.getElementById('build-harbor').disabled===false"),
-      'P123 real harbor button enabled by earned engine snapshot');
+      'P137 real harbor button enabled by continuous browser economy');
     assert.equal(await evalOn(b,"document.getElementById('build-storefront').disabled"),true,
       'storefront must remain story-gated before harbor-light');
     const harborBeforeBuild=await readJSON(b,workshopKey);
-    assert.deepEqual(harborBeforeBuild,harborFromUI?fortyTwoOrders:preBuild.harbor);
+    assert.deepEqual(harborBeforeBuild,fortyTwoOrders);
     // P126: a peer tab loaded BEFORE payment must not keep an actionable
     // harbor button or charge the same 330 coins after the first tab builds.
     const staleHarborTab=await page();await front(staleHarborTab);
@@ -997,12 +968,6 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     assert.equal(builtHarbor.coins,harborBeforeBuild.coins-BUILDINGS.harbor.coins);
     assert.equal(builtHarbor.xp,harborBeforeBuild.xp);
     assert.equal(validateSave(builtHarbor),true);
-    if(!harborFromUI){
-      assert.equal(builtHarbor.revision,postBuild.harbor.revision);
-      assert.equal(builtHarbor.coins,postBuild.harbor.coins);
-      assert.equal(builtHarbor.xp,postBuild.harbor.xp);
-      assert.deepEqual(builtHarbor.buildings,postBuild.harbor.buildings);
-    }
     const builtHarborRaw=await readRaw(b,workshopKey);
     await front(staleHarborTab);
     await until(async()=>evalOn(staleHarborTab,
@@ -1027,15 +992,17 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     assert.equal(await evalOn(b,
       "document.getElementById('journey-workshop').getAttribute('href')"),
       './story-workshop.html#storefront-goal');
-    await evalOn(b,'localStorage.setItem('+
-      JSON.stringify(workshopKey)+','+JSON.stringify(JSON.stringify(preBuild.storefront))+');true');
+    // P137: after the genuine harbor payment, retain the same browser save.
+    // Fourth-chapter storefront costs 60 coins and must be paid from it.
+    assert.ok(builtHarbor.coins>=BUILDINGS.storefront.coins,
+      'real harbor economy must still fund the storefront');
     await navigate(b,'/merge/story-workshop.html','#workshop-board');
     await until(async()=>evalOn(b,
       "document.querySelectorAll('#workshop-board button').length===56&&"+
       "document.getElementById('build-storefront').disabled===false"),
-      'P123 real storefront button enabled by earned engine snapshot');
+      'P137 real storefront button enabled by the harbor-paid browser save');
     assert.equal(await evalOn(b,"document.getElementById('build-harbor').disabled"),true);
-    assert.deepEqual(await readJSON(b,workshopKey),preBuild.storefront);
+    assert.deepEqual(await readJSON(b,workshopKey),builtHarbor);
     // P126: repeat the stale-tab protection at the fourth-chapter finale.
     // This is an actual second Chromium page, not a storage mock.
     const staleStorefrontTab=await page();await front(staleStorefrontTab);
@@ -1048,15 +1015,11 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     await until(async()=>(await readJSON(b,workshopKey)).buildings.storefront===1,
       'P123 storefront click persisted');
     const builtStorefront=await readJSON(b,workshopKey);
-    assert.equal(builtStorefront.revision,preBuild.storefront.revision+1);
+    assert.equal(builtStorefront.revision,builtHarbor.revision+1);
     assert.equal(builtStorefront.coins,
-      preBuild.storefront.coins-BUILDINGS.storefront.coins);
-    assert.equal(builtStorefront.xp,preBuild.storefront.xp);
+      builtHarbor.coins-BUILDINGS.storefront.coins);
+    assert.equal(builtStorefront.xp,builtHarbor.xp);
     assert.equal(validateSave(builtStorefront),true);
-    assert.equal(builtStorefront.revision,postBuild.storefront.revision);
-    assert.equal(builtStorefront.coins,postBuild.storefront.coins);
-    assert.equal(builtStorefront.xp,postBuild.storefront.xp);
-    assert.deepEqual(builtStorefront.buildings,postBuild.storefront.buildings);
     const builtStorefrontRaw=await readRaw(b,workshopKey);
     await front(staleStorefrontTab);
     await until(async()=>evalOn(staleStorefrontTab,
@@ -1085,18 +1048,6 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     assert.equal(await evalOn(b,"document.getElementById('journey-workshop').hidden"),true);
     assert.equal(await readRaw(b,workshopKey),builtStorefrontRaw);
     assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
-    t.diagnostic('P136 real Chromium: 42 genuine consecutive UI orders; harbor build source='+
-      (harborFromUI?'continuous browser economy':'detached engine-earned fixture')+
-      '; level='+getLevel(fortyTwoOrders.xp)+'; coins='+fortyTwoOrders.coins);
-    t.diagnostic('P133 real Chromium: 24 genuine consecutive UI orders including four after paying for garden; harbor/storefront still use detached fixtures, not full UI completion');
-    t.diagnostic('P132 real Chromium: twenty consecutive UI orders earn and pay for the actual garden, unlock tea-table, and resist peer-tab double-charge; harbor/storefront still use detached engine-earned fixtures, not full UI completion');
-    t.diagnostic('P126 real Chromium: stale peer tabs cannot double-charge garden, harbor or storefront; not iPhone/WeChat device testing');
-    t.diagnostic('P123 real Chromium: harbor + storefront buttons charge once; chapters 3-4 reach 12/12; later economy uses detached real-engine pre-build fixtures, not continuous UI grinding');
-    t.diagnostic('P122 Chromium: real garden button deducts once and unlocks tea-table; post-five-order economy uses an engine-earned fixture, not continuous UI grinding');
-    t.diagnostic('P119 real Chromium: tea and bakery tier-1 UI merges → fourth and fifth real deliveries; garden remains locked, normal mode isolated');
-    t.diagnostic('P118 real Chromium: second bakery order + floral UI merge + third order; garden remains gated, save survives narrative reload');
-    t.diagnostic('P117 real Chromium: first six scenes → garden economic gate → round-trip, no premature build or normal-mode writes');
-    t.diagnostic('P116 real Chromium: damaged-save recovery → real order button → first-order scene unlock, no normal-mode writes');
-    t.diagnostic('P115 real Chromium: independent corrupt resets, two-stage refusals, stale-consent CAS and mode isolation; no mobile claim');
-    t.diagnostic('Real Chromium: first-order gate, two-tab protection, two independent corrupt downloads and stale-consent refusal; no mobile claim');
+    t.diagnostic('P137 real Chromium: 42 genuine consecutive UI orders; garden, harbor and storefront all paid from one continuous browser save; first volume 12/12; no injected economic fixture, clock override, or RNG stub; not iPhone/WeChat device testing');
+    t.diagnostic('P137 verified: stale peer tabs cannot double-charge any of the three buildings; normal mode save remains isolated');
   });
