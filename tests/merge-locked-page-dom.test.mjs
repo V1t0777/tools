@@ -2267,3 +2267,36 @@ test('P2.65as canceled producer pointer cannot turn into a compatibility click',
   assert.equal(h.saved().revision,1);
   assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
 });
+
+test('P2.65ba actual normal page: full-board warehouse upgrade then selected storage is actionable',async()=>{
+  const seed=createInitialState(Date.now());
+  for(let i=0;i<seed.board.length;i++){
+    if(!seed.board[i])seed.board[i]={id:'m'+seed.nextId++,kind:'material',chain:'tea',tier:6};
+    else if(seed.board[i].kind==='material')seed.board[i].tier=6;
+  }
+  for(let i=0;i<seed.warehouse.capacity;i++)
+    seed.warehouse.slots[i]={id:'m'+seed.nextId++,kind:'material',chain:'tea',tier:6};
+  for(const order of seed.orders){order.chain='bakery';order.tier=2;}
+  seed.coins=500;seed.xp=100;
+  const h=await mount({initialRaw:JSON.stringify(seed)});
+  const initialItemId=h.saved().board[0].id;
+  h.id('board-guide').click();
+  assert.match(h.id('guidance-message').textContent,/扩容/);
+  assert.equal(h.id('warehouse-upgrade').disabled,false);
+  h.id('warehouse-upgrade').click();
+  await settle();
+  assert.equal(h.saved().warehouse.capacity,6);
+  assert.equal(h.saved().coins,450);
+  h.id('board-guide').click();
+  assert.match(h.id('guidance-message').textContent,/收入仓库/);
+  const board=h.id('board');
+  board.dispatch('click',{target:board.children[0],detail:0});
+  assert.equal(h.id('store-selected').disabled,false);
+  h.id('store-selected').click();
+  await settle();
+  assert.equal(h.saved().board[0],null);
+  assert.equal(h.saved().warehouse.slots[4].id,initialItemId);
+  assert.equal(h.saved().revision,2);
+  assert.equal(h.id('board-guide').getAttribute('aria-pressed'),'false');
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});
