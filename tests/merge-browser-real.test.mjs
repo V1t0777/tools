@@ -1014,5 +1014,65 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     'reconnected export must not change progress');
   t.diagnostic('Chromium offline gameplay and online recovery download verified; offline file landing remains an explicit manual gate');
 
+
+  // P2.65bj: a loaded, offline observer tab must still adopt a newer save
+  // written by another same-origin tab. Network state must not create a
+  // separate local authority or silently roll back the newer revision.
+  await front(a);
+  await call('Page.reload',{ignoreCache:true},a.sessionId);
+  await waitWithSnapshot(async()=>await evalOn(a,`document.readyState==='complete' &&
+    document.getElementById('save-status')?.textContent.includes('已保存于此浏览器')`),
+    'offline observer verified startup',a);
+  assert.deepEqual(await readSave(a),onlineBaseline,
+    'observer must start from the exact latest persisted state');
+  const crossTabBackupBefore=await evalOn(a,
+    `localStorage.getItem(${JSON.stringify(key+'.restore-backup-v3')})`);
+  await call('Network.enable',{},a.sessionId);
+  await call('Network.emulateNetworkConditions',{
+    offline:true,latency:0,downloadThroughput:0,uploadThroughput:0
+  },a.sessionId);
+  try {
+    await until(async()=>await evalOn(a,'navigator.onLine===false'),
+      'observer is offline before concurrent write');
+    await front(b);
+    await waitWithSnapshot(async()=>await evalOn(b,
+      `document.getElementById('save-status').textContent.includes('已保存于此浏览器') &&
+        document.querySelector('#energy').textContent.startsWith(${JSON.stringify(String(onlineBaseline.energy)+' /')})`),
+      'writer UI verified before offline observer update',b);
+    await evalOn(b,"document.querySelector('#board .producer').click();true");
+    await waitWithSnapshot(async()=>(await readSave(b)).revision===onlineBaseline.revision+1,
+      'online tab saved while observer was offline',b);
+    const crossTabRaw=await evalOn(b,`localStorage.getItem(${JSON.stringify(key)})`);
+    const crossTabSave=JSON.parse(crossTabRaw);
+    assert.equal(crossTabSave.energy,onlineBaseline.energy-1,
+      'writer must spend exactly one energy');
+    await front(a);
+    await waitWithSnapshot(async()=>await evalOn(a,
+      `document.querySelector('#energy').textContent.startsWith(${JSON.stringify(String(crossTabSave.energy)+' /')})`),
+      'offline observer adopted newer tab progress',a);
+    assert.equal(await evalOn(a,'navigator.onLine'),false,
+      'observer must still be offline when it adopts the shared save');
+    assert.equal(await evalOn(a,`localStorage.getItem(${JSON.stringify(key)})`),
+      crossTabRaw,'offline observer must preserve exact newer save bytes');
+    assert.equal(await evalOn(a,
+      `localStorage.getItem(${JSON.stringify(key+'.restore-backup-v3')})`),
+      crossTabBackupBefore,'offline reconciliation must not replace recovery backup');
+    // A read-only export request is allowed, but cannot prove iOS/WebView
+    // file landing. The prior download assertions remain the actual disk gate.
+    await evalOn(a,"document.getElementById('export-local-save').click();true");
+    assert.match(await evalOn(a,"document.getElementById('notice').textContent"),
+      /已请求下载.*请核实文件已保存/,
+      'offline observer must not claim a file was saved');
+    assert.equal(await evalOn(a,`localStorage.getItem(${JSON.stringify(key)})`),
+      crossTabRaw,'offline export must not write or roll back the newer save');
+    t.diagnostic('Chromium offline observer adopted online tab save without rollback or backup mutation');
+  } finally {
+    await call('Network.emulateNetworkConditions',{
+      offline:false,latency:0,downloadThroughput:-1,uploadThroughput:-1
+    },a.sessionId);
+  }
+  await until(async()=>await evalOn(a,'navigator.onLine===true'),
+    'observer network restored after cross-tab test');
+
   t.diagnostic(`Chromium two-tab lock, BFCache persisted=${bfcache}, download=${file}, reset/import/backup verified`);
 });
