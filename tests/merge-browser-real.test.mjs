@@ -1014,5 +1014,116 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     'reconnected export must not change progress');
   t.diagnostic('Chromium offline gameplay and online recovery download verified; offline file landing remains an explicit manual gate');
 
+
+  // P2.65bj: a loaded, offline observer tab must still adopt a newer save
+  // written by another same-origin tab. Network state must not create a
+  // separate local authority or silently roll back the newer revision.
+  await front(a);
+  await call('Page.reload',{ignoreCache:true},a.sessionId);
+  await waitWithSnapshot(async()=>await evalOn(a,`document.readyState==='complete' &&
+    document.getElementById('save-status')?.textContent.includes('已保存于此浏览器')`),
+    'offline observer verified startup',a);
+  assert.deepEqual(await readSave(a),onlineBaseline,
+    'observer must start from the exact latest persisted state');
+  const crossTabBackupBefore=await evalOn(a,
+    `localStorage.getItem(${JSON.stringify(key+'.restore-backup-v3')})`);
+  await call('Network.enable',{},a.sessionId);
+  await call('Network.emulateNetworkConditions',{
+    offline:true,latency:0,downloadThroughput:0,uploadThroughput:0
+  },a.sessionId);
+  try {
+    await until(async()=>await evalOn(a,'navigator.onLine===false'),
+      'observer is offline before concurrent write');
+    await front(b);
+    await waitWithSnapshot(async()=>await evalOn(b,
+      `document.getElementById('save-status').textContent.includes('已保存于此浏览器') &&
+        document.querySelector('#energy').textContent.startsWith(${JSON.stringify(String(onlineBaseline.energy)+' /')})`),
+      'writer UI verified before offline observer update',b);
+    await evalOn(b,"document.querySelector('#board .producer').click();true");
+    await waitWithSnapshot(async()=>(await readSave(b)).revision===onlineBaseline.revision+1,
+      'online tab saved while observer was offline',b);
+    const crossTabRaw=await evalOn(b,`localStorage.getItem(${JSON.stringify(key)})`);
+    const crossTabSave=JSON.parse(crossTabRaw);
+    assert.equal(crossTabSave.energy,onlineBaseline.energy-1,
+      'writer must spend exactly one energy');
+    await front(a);
+    await waitWithSnapshot(async()=>await evalOn(a,
+      `document.querySelector('#energy').textContent.startsWith(${JSON.stringify(String(crossTabSave.energy)+' /')})`),
+      'offline observer adopted newer tab progress',a);
+    assert.equal(await evalOn(a,'navigator.onLine'),false,
+      'observer must still be offline when it adopts the shared save');
+    assert.equal(await evalOn(a,`localStorage.getItem(${JSON.stringify(key)})`),
+      crossTabRaw,'offline observer must preserve exact newer save bytes');
+    assert.equal(await evalOn(a,
+      `localStorage.getItem(${JSON.stringify(key+'.restore-backup-v3')})`),
+      crossTabBackupBefore,'offline reconciliation must not replace recovery backup');
+    // A read-only export request is allowed, but cannot prove iOS/WebView
+    // file landing. The prior download assertions remain the actual disk gate.
+    await evalOn(a,"document.getElementById('export-local-save').click();true");
+    assert.match(await evalOn(a,"document.getElementById('notice').textContent"),
+      /已请求下载.*请核实文件已保存/,
+      'offline observer must not claim a file was saved');
+    assert.equal(await evalOn(a,`localStorage.getItem(${JSON.stringify(key)})`),
+      crossTabRaw,'offline export must not write or roll back the newer save');
+    // P2.65bk: adoption must not leave the offline observer read-only. A
+    // fresh two-click move writes once under Web Locks; the online tab then
+    // adopts those exact bytes without a rollback or backup replacement.
+    const offlineMovePair=await evalOn(a,`(()=>{
+      const cells=JSON.parse(localStorage.getItem("toolbox.merge-isle.local.v1")).board;
+      return {from:cells.findIndex(item=>item?.kind==='material'),
+        to:cells.findIndex(item=>item===null)};
+    })()`);
+    assert.ok(offlineMovePair.from>=0&&offlineMovePair.to>=0,
+      'offline observer needs a material and empty slot for a legal move');
+    await waitWithSnapshot(async()=>await evalOn(a,
+      `document.getElementById('save-status').textContent.includes('已保存于此浏览器') &&
+        document.querySelectorAll('#board .cell').length===56`),
+      'offline observer verified fresh board before moving',a);
+    await evalOn(a,`document.querySelector('#board .cell[data-slot="${offlineMovePair.from}"]').click();true`);
+    await until(async()=>await evalOn(a,
+      `document.querySelector('#board .cell.selected')?.dataset.slot==='${offlineMovePair.from}'`),
+      'offline first tap selects a material');
+    assert.equal(await evalOn(a,`localStorage.getItem(${JSON.stringify(key)})`),
+      crossTabRaw,'offline selection must not write or roll back shared progress');
+    await evalOn(a,`document.querySelector('#board .cell[data-slot="${offlineMovePair.to}"]').click();true`);
+    await waitWithSnapshot(async()=>(await readSave(a)).revision===crossTabSave.revision+1,
+      'offline observer move persisted exactly once',a);
+    const offlineMoveRaw=await evalOn(a,`localStorage.getItem(${JSON.stringify(key)})`);
+    const offlineMoveSave=JSON.parse(offlineMoveRaw);
+    assert.deepEqual(offlineMoveSave.board[offlineMovePair.to],
+      crossTabSave.board[offlineMovePair.from],'offline move must preserve item identity');
+    assert.equal(offlineMoveSave.board[offlineMovePair.from],null,
+      'offline move must clear the original cell');
+    assert.equal(offlineMoveSave.energy,crossTabSave.energy,
+      'offline movement must not consume energy');
+    await sleep(180);
+    assert.equal((await readSave(a)).revision,crossTabSave.revision+1,
+      'offline move must not generate duplicate writes');
+    assert.equal(await evalOn(a,
+      `localStorage.getItem(${JSON.stringify(key+'.restore-backup-v3')})`),
+      crossTabBackupBefore,'offline write must not replace recovery backup');
+    await front(b);
+    await waitWithSnapshot(async()=>await evalOn(b,
+      `document.querySelector('#board .cell[data-slot="${offlineMovePair.to}"]')?.classList.contains('filled') &&
+        !document.querySelector('#board .cell[data-slot="${offlineMovePair.from}"]')?.classList.contains('filled') &&
+        document.getElementById('save-status').textContent.includes('已保存于此浏览器')`),
+      'online tab rendered offline observer move',b);
+    assert.equal(await evalOn(b,`localStorage.getItem(${JSON.stringify(key)})`),
+      offlineMoveRaw,'online tab must retain exact offline write bytes');
+    assert.equal(await evalOn(b,
+      `localStorage.getItem(${JSON.stringify(key+'.restore-backup-v3')})`),
+      crossTabBackupBefore,'online adoption must preserve restore backup');
+    await front(a);
+    assert.equal(await evalOn(a,'navigator.onLine'),false,
+      'offline writer must remain offline after round-trip reconciliation');
+    t.diagnostic('Chromium offline/online two-way save adoption and one legal offline move verified');
+  } finally {
+    await call('Network.emulateNetworkConditions',{
+      offline:false,latency:0,downloadThroughput:-1,uploadThroughput:-1
+    },a.sessionId);
+  }
+  await until(async()=>await evalOn(a,'navigator.onLine===true'),
+    'observer network restored after cross-tab test');
+
   t.diagnostic(`Chromium two-tab lock, BFCache persisted=${bfcache}, download=${file}, reset/import/backup verified`);
 });
