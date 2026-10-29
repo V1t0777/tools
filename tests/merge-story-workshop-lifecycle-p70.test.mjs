@@ -505,3 +505,73 @@ test('P111 nested narrative StorageEvent during workshop render cannot restore s
     assert.equal(h.data.has(STORY_WORKSHOP_KEY),false);
   }finally{h.restore();}
 });
+
+
+test('P140 stale pointerdown cannot reset workshop after BFCache pagehide and pageshow',async()=>{
+  const h=await mount();
+  try{
+    const reset=h.document.getElementById('reset-workshop');
+    await reset.fire('pointerdown',{detail:1});
+    await h.window.emit('pagehide');
+    await h.window.emit('pageshow',{persisted:true});
+    await reset.fire('click',{detail:1});
+    assert.equal(h.writes,0,'an old physical gesture must not survive BFCache');
+    assert.match(h.notice(),/旧触控已取消/);
+    assert.equal(h.data.has(STORY_WORKSHOP_KEY),false);
+    await reset.fire('pointerdown',{detail:1});
+    await reset.fire('click',{detail:1});
+    assert.equal(h.writes,1,'a fresh visible tap may reset after revalidation');
+    assert.equal(h.data.get(SAVE_KEY),'normal-sentinel');
+  }finally{h.restore();}
+});
+
+test('P140 pointercancel revokes a pending workshop reset but fresh keyboard activation works',async()=>{
+  const h=await mount();
+  try{
+    const reset=h.document.getElementById('reset-workshop');
+    await reset.fire('pointerdown',{detail:1});
+    await reset.fire('pointercancel');
+    await reset.fire('click',{detail:1});
+    assert.equal(h.writes,0,'cancelled physical gesture must not reset');
+    assert.match(h.notice(),/旧触控已取消/);
+    await reset.fire('click',{detail:0});
+    assert.equal(h.writes,1,'new keyboard activation is a separate intention');
+    assert.equal(h.data.get(STORY_SAVE_KEY),'story-sentinel');
+    assert.equal(h.data.get(SAVE_KEY),'normal-sentinel');
+  }finally{h.restore();}
+});
+
+test('P140 peer workshop replacement between pointerdown and click blocks old reset',async()=>{
+  const h=await mount();
+  try{
+    const reset=h.document.getElementById('reset-workshop');
+    await reset.fire('pointerdown',{detail:1});
+    const peerRaw='{"peer":"new-workshop-save"}';
+    h.data.set(STORY_WORKSHOP_KEY,peerRaw);
+    await h.window.emit('storage',{key:STORY_WORKSHOP_KEY,storageArea:h.window.localStorage});
+    await reset.fire('click',{detail:1});
+    assert.equal(h.writes,0);
+    assert.equal(h.data.get(STORY_WORKSHOP_KEY),peerRaw);
+    assert.equal(h.data.get(STORY_SAVE_KEY),'story-sentinel');
+    assert.equal(h.data.get(SAVE_KEY),'normal-sentinel');
+    assert.match(h.status(),/已停止操作/);
+  }finally{h.restore();}
+});
+
+test('P140 story prerequisite refresh invalidates stale pointer without blocking fresh workshop reset',async()=>{
+  const h=await mount();
+  try{
+    const reset=h.document.getElementById('reset-workshop');
+    await reset.fire('pointerdown',{detail:1});
+    h.data.set(STORY_SAVE_KEY,'peer-story-updated');
+    await h.window.emit('storage',{key:STORY_SAVE_KEY,storageArea:h.window.localStorage});
+    await reset.fire('click',{detail:1});
+    assert.equal(h.writes,0,'dependency rerender invalidates the old pointer');
+    assert.match(h.notice(),/旧触控已取消/);
+    await reset.fire('pointerdown',{detail:1});
+    await reset.fire('click',{detail:1});
+    assert.equal(h.writes,1,'a fresh tap may reset the independent workshop');
+    assert.equal(h.data.get(STORY_SAVE_KEY),'peer-story-updated');
+    assert.equal(h.data.get(SAVE_KEY),'normal-sentinel');
+  }finally{h.restore();}
+});
