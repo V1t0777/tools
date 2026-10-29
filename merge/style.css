@@ -74,11 +74,14 @@ body{background:radial-gradient(circle at 5% 12%,rgba(221,194,136,.23),transpare
   .warehouse{grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
 }
 
-/* P2.65bf: 320px fallback keeps every 7-column cell at 44px.
-   Only the board section scrolls horizontally; the page does not.
-   Native panning takes priority over drag on this narrow viewport;
-   tap-to-select and tap-to-merge remain available. */
-@media(max-width:360px){
+/* P2.65bu: 320–375px compact iPhone layout. A seven-column board
+   must not shrink below 44px when the viewport is 361–375px wide.
+   Only the board section may pan horizontally; tap-to-merge remains usable.
+   Wrap the long preview badge below the navigation controls so the entire
+   document does not acquire an accidental horizontal scrollbar. */
+@media(max-width:375px){
+  .topbar{gap:6px;flex-wrap:wrap}
+  .topbar .eyebrow{order:3;flex-basis:100%;text-align:center}
   .board-section{overflow-x:auto;overscroll-behavior-x:contain}
   .board{width:max-content;grid-template-columns:repeat(7,44px);touch-action:auto}
   .board .cell{touch-action:auto}

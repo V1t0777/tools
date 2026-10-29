@@ -1483,5 +1483,51 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     t.diagnostic('Chromium foreground cross-tab adoption revoked stale persistent reset/export pointer leases');
   }
 
+  // P2.65bu: mobile-width layout is a release gate, not a screenshot claim.
+  // Exercise the actual page CSS in Chromium at narrow iPhone-sized widths.
+  // No synthetic game state or write is needed for this read-only check.
+  {
+    await front(b);
+    const beforeMobile=await evalOn(b,'localStorage.getItem('+JSON.stringify(key)+')');
+    try{
+      for(const width of [320,365,375,390]){
+        await call('Emulation.setDeviceMetricsOverride',
+          {width,height:812,deviceScaleFactor:3,mobile:true},b.sessionId);
+        const m=await evalOn(b,`(()=>{
+          const board=document.getElementById('board');
+          const section=board.closest('.board-section');
+          const cell=board.querySelector('.cell');
+          const exportButton=document.getElementById('export-local-save');
+          return {
+            viewport:innerWidth,
+            cellWidth:cell.getBoundingClientRect().width,
+            documentWidth:document.documentElement.scrollWidth,
+            sectionScroll:section.scrollWidth,
+            sectionClient:section.clientWidth,
+            touchAction:getComputedStyle(board).touchAction,
+            exportHeight:exportButton.getBoundingClientRect().height
+          };
+        })()`);
+        assert.equal(m.viewport,width,'emulated viewport must match requested width');
+        assert.ok(m.cellWidth>=43.95,
+          'seven-column touch cell must remain at least 44px at '+width+'px: '+JSON.stringify(m));
+        assert.ok(m.documentWidth<=width+1,
+          'ordinary page must not scroll horizontally at '+width+'px: '+JSON.stringify(m));
+        assert.ok(m.exportHeight>=43.95,
+          'manual save export must retain a 44px touch target at '+width+'px');
+        if(width<=375){
+          assert.equal(m.touchAction,'auto','narrow board must allow native panning');
+          if(width<=365)assert.ok(m.sectionScroll>m.sectionClient,
+            'narrow board should scroll inside its own section, not the page');
+        }
+      }
+    }finally{
+      await call('Emulation.clearDeviceMetricsOverride',{},b.sessionId);
+    }
+    assert.equal(await evalOn(b,'localStorage.getItem('+JSON.stringify(key)+')'),
+      beforeMobile,'viewport changes must never write or reset the normal save');
+    t.diagnostic('Chromium 320/365/375/390px mobile board hit targets, local overflow and save action verified');
+  }
+
   t.diagnostic(`Chromium two-tab lock, BFCache persisted=${bfcache}, download=${file}, reset/import/backup verified`);
 });
