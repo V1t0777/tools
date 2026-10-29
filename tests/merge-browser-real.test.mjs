@@ -1581,5 +1581,72 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     t.diagnostic('Chromium 320/365/375/390px mobile board hit targets, local overflow and save action verified');
   }
 
+
+  // P2.65bw: a native chooser started before a genuine BFCache navigation
+  // cannot publish a late file selection after pagehide revoked its epoch.
+  // The picker is controlled, but navigation and pageshow.persisted are real.
+  {
+    await front(b);
+    await waitWithSnapshot(async()=>await evalOn(b,
+      "document.getElementById('save-status').textContent.includes('已保存于此浏览器') && !document.getElementById('import-normal-save').disabled"),
+      'pre-BFCache import chooser ready',b);
+    const raw=await evalOn(b,'localStorage.getItem('+JSON.stringify(key)+')');
+    const backup=await evalOn(b,'localStorage.getItem('+JSON.stringify(key+'.restore-backup-v3')+')');
+    const story=await evalOn(b,"localStorage.getItem('toolbox.merge-isle.story.local.v1')");
+    await evalOn(b,"(()=>{"+
+      "window.__bwConfirms=0;window.confirm=()=>{window.__bwConfirms++;return false;};"+
+      "window.addEventListener('pageshow',e=>sessionStorage.setItem('merge-import-bfcache',String(e.persisted)));"+
+      "const input=document.getElementById('import-normal-file');"+
+      "window.__bwOldInput=input;input.click=()=>{};"+
+      "document.getElementById('import-normal-save').click();return true;})()");
+    assert.equal(await evalOn(b,"document.getElementById('cancel-normal-import').hidden"),false,
+      'native chooser must be pending before pagehide');
+    await call('Page.navigate',{url:base+'/merge/absent-test-page'},b.sessionId);
+    await until(async()=>await evalOn(b,
+      "document.readyState==='complete'&&location.pathname.includes('absent-test-page')"),
+      'navigate away with pending import chooser');
+    const history=await call('Page.getNavigationHistory',{},b.sessionId);
+    await call('Page.navigateToHistoryEntry',
+      {entryId:history.entries[history.currentIndex-1].id},b.sessionId);
+    await until(async()=>await evalOn(b,
+      "location.pathname==='/merge/index.html'&&!!document.getElementById('save-status')"),
+      'restore original import page');
+    await waitWithSnapshot(async()=>await evalOn(b,
+      "document.getElementById('save-status').textContent.includes('已保存') || document.getElementById('save-status').textContent.includes('已同步')"),
+      'post-BFCache import save reconciliation',b);
+    assert.equal(await evalOn(b,"sessionStorage.getItem('merge-import-bfcache')"),'true',
+      'import chooser regression requires genuine BFCache');
+    assert.equal(await evalOn(b,
+      "window.__bwOldInput===document.getElementById('import-normal-file')"),true,
+      'late chooser event must target the actual BFCache-restored input');
+    await evalOn(b,"(()=>{const transfer=new DataTransfer();"+
+      "transfer.items.add(new File(["+JSON.stringify(downloaded)+
+      "],'stale-bfcache.json',{type:'application/json'}));"+
+      "window.__bwOldInput.files=transfer.files;"+
+      "window.__bwOldInput.dispatchEvent(new Event('change',{bubbles:true}));return true;})()");
+    await sleep(120);
+    assert.equal(await evalOn(b,'window.__bwConfirms'),0,
+      'a pre-pagehide file selection cannot request a new restore confirmation');
+    assert.equal(await evalOn(b,'localStorage.getItem('+JSON.stringify(key)+')'),raw,
+      'late chooser event cannot overwrite current ordinary progress');
+    assert.equal(await evalOn(b,'localStorage.getItem('+JSON.stringify(key+'.restore-backup-v3')+')'),backup,
+      'late chooser event cannot reserve or replace the restore backup');
+    assert.equal(await evalOn(b,"localStorage.getItem('toolbox.merge-isle.story.local.v1')"),story,
+      'late chooser event must not affect story progress');
+    assert.equal(await evalOn(b,"document.getElementById('cancel-normal-import').hidden"),true,
+      'BFCache must release the old chooser lease');
+    await evalOn(b,"(()=>{const input=document.getElementById('import-normal-file');"+
+      "input.click=()=>{};document.getElementById('import-normal-save').click();"+
+      "input.dispatchEvent(new Event('cancel'));return true;})()");
+    await waitWithSnapshot(async()=>await evalOn(b,
+      "document.getElementById('cancel-normal-import').hidden && !document.getElementById('import-normal-save').disabled"),
+      'fresh chooser cancellation after BFCache',b);
+    assert.equal(await evalOn(b,'window.__bwConfirms'),0,
+      'fresh picker cancellation must not ask for restore confirmation');
+    assert.equal(await evalOn(b,'localStorage.getItem('+JSON.stringify(key)+')'),raw,
+      'new chooser cancellation must not modify progress');
+    t.diagnostic('Chromium genuine BFCache revoked pending import chooser, ignored late file and allowed fresh cancel');
+  }
+
   t.diagnostic(`Chromium two-tab lock, BFCache persisted=${bfcache}, download=${file}, reset/import/backup verified`);
 });
