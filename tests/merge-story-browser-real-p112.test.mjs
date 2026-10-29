@@ -837,47 +837,54 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
       './story-workshop.html#harbor-goal');
     assert.equal(await readRaw(b,workshopKey),builtGardenRaw,
       'reading apprentice safety lesson cannot change garden economy');
-    // P133: continue from the SAME paid-for garden save through real UI
-    // orders 21–24. No detached snapshot may enter before this segment.
+    // P134: continue from the SAME paid-for garden save through real UI
+    // orders 21–30. No detached snapshot may enter before this segment.
     await navigate(b,'/merge/story-workshop.html','#workshop-board');
     await until(async()=>evalOn(b,
       "document.querySelectorAll('#workshop-board button').length===56"),
-      'P133 post-garden workshop ready');
+      'P134 post-garden workshop ready');
     assert.equal(await readRaw(b,workshopKey),builtGardenRaw,
       'opening the post-garden workshop cannot rewrite the paid save');
     const storyBeforeMoreOrders=await readRaw(b,storyKey);
-    await deliverOrdersThrough(21,24,1);
-    const twentyFourOrders=await readJSON(b,workshopKey);
-    assert.equal(twentyFourOrders.progress.orders,24,
-      'four additional orders must be delivered by real UI after garden');
-    assert.equal(validateSave(twentyFourOrders),true);
-    assert.equal(twentyFourOrders.buildings.garden,1);
-    assert.equal(twentyFourOrders.buildings.harbor,0);
-    assert.ok(twentyFourOrders.coins>builtGarden.coins,
+    await deliverOrdersThrough(21,30,1);
+    const thirtyOrders=await readJSON(b,workshopKey);
+    assert.equal(thirtyOrders.progress.orders,30,
+      'ten additional orders must be delivered by real UI after garden');
+    assert.equal(validateSave(thirtyOrders),true);
+    assert.equal(thirtyOrders.buildings.garden,1);
+    assert.equal(thirtyOrders.buildings.harbor,0);
+    assert.ok(thirtyOrders.coins>builtGarden.coins,
       'post-garden orders must accumulate genuine harbor resources');
-    assert.ok(twentyFourOrders.xp>builtGarden.xp);
-    assert.equal(twentyFourOrders.achievements.orders20,1,
+    assert.ok(thirtyOrders.xp>builtGarden.xp);
+    assert.ok(thirtyOrders.revision>builtGarden.revision,
+      'post-garden orders must persist new revisions');
+    assert.equal(thirtyOrders.achievements.orders20,1,
       'later orders cannot reissue the orders20 achievement');
-    assert.equal(twentyFourOrders.bag.reset,builtGarden.bag.reset,
+    assert.equal(thirtyOrders.bag.reset,builtGarden.bag.reset,
       'later orders cannot duplicate the reset card');
-    assert.equal(await evalOn(b,"document.getElementById('build-harbor').disabled"),true,
-      'harbor remains gated until both level and coin requirements are met');
-    const twentyFourRaw=await readRaw(b,workshopKey);
+    // Harbor eligibility must follow genuine level AND coin requirements.
+    const harborEligible=getLevel(thirtyOrders.xp)>=BUILDINGS.harbor.minLevel&&
+      thirtyOrders.coins>=BUILDINGS.harbor.coins;
+    assert.equal(await evalOn(b,"document.getElementById('build-harbor').disabled"),
+      !harborEligible,'harbor button must reflect real level and coin gates');
+    assert.equal(await evalOn(b,"document.getElementById('build-storefront').disabled"),true,
+      'storefront must remain gated until harbor is built');
+    const thirtyRaw=await readRaw(b,workshopKey);
     await navigate(b,'/merge/story.html','#journey-read');
     await until(async()=>evalOn(b,
       "document.getElementById('progress-count').textContent.includes('9 / 12')"),
-      'P133 third-chapter harbor gate survives post-garden orders');
+      'P134 third-chapter harbor gate survives post-garden orders');
     assert.equal(await evalOn(b,"document.getElementById('journey-read').hidden"),true);
     assert.equal(await readRaw(b,storyKey),storyBeforeMoreOrders,
       'continuing the economy cannot skip or rewrite story scenes');
-    assert.equal(await readRaw(b,workshopKey),twentyFourRaw,
+    assert.equal(await readRaw(b,workshopKey),thirtyRaw,
       'returning to the story cannot replay later orders');
     await navigate(b,'/merge/story-workshop.html','#workshop-board');
     await until(async()=>evalOn(b,
       "document.querySelectorAll('#workshop-board button').length===56"),
-      'P133 post-garden progress reloaded');
-    assert.equal(await readRaw(b,workshopKey),twentyFourRaw,
-      '24 genuine orders and garden construction survive navigation');
+      'P134 post-garden progress reloaded');
+    assert.equal(await readRaw(b,workshopKey),thirtyRaw,
+      '30 genuine orders and garden construction survive navigation');
     assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
     // Harbor and storefront below STILL use detached engine-earned fixtures.
     await evalOn(b,'localStorage.setItem('+
