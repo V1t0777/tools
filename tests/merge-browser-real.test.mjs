@@ -356,6 +356,88 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     'canceling a pending chooser must not mutate save');
   t.diagnostic('Chromium pending chooser blocked reset and export without touching save/backup');
 
+  // P2.65be: a native chooser may deliver its File change while the tab is
+  // hidden. No confirmation, read/restore or backup overwrite is allowed
+  // until the page returns and its lifecycle reconciliation has run.
+  await front(b);
+  const hiddenChooserRaw=await evalOn(b,`localStorage.getItem(${JSON.stringify(key)})`);
+  const hiddenChooserBackup=await evalOn(b,`localStorage.getItem(${JSON.stringify(key+'.restore-backup-v3')})`);
+  const hiddenPickerOpen=await evalOn(b,`(()=>{
+    window.__hiddenChooserConfirmStates=[];
+    window.confirm=()=>{window.__hiddenChooserConfirmStates.push(document.hidden);return false;};
+    const input=document.getElementById('import-normal-file');
+    input.click=()=>{};
+    document.getElementById('import-normal-save').click();
+    return !document.getElementById('cancel-normal-import').hidden;
+  })()`);
+  assert.equal(hiddenPickerOpen,true,'hidden chooser must start with an active import lease');
+  await front(a);
+  await until(async()=>await evalOn(b,'document.hidden'),'chooser tab hidden before file selection');
+  await evalOn(b,`(()=>{
+    const input=document.getElementById('import-normal-file');
+    const transfer=new DataTransfer();
+    transfer.items.add(new File([${JSON.stringify(downloaded)}],'hidden-chooser.json',{type:'application/json'}));
+    input.files=transfer.files;
+    input.dispatchEvent(new Event('change',{bubbles:true}));
+    return true;
+  })()`);
+  assert.deepEqual(await evalOn(b,'window.__hiddenChooserConfirmStates'),[],
+    'hidden file selection must not invoke a destructive confirmation');
+  assert.equal(await evalOn(b,`localStorage.getItem(${JSON.stringify(key)})`),hiddenChooserRaw,
+    'hidden file selection must not write the save');
+  assert.equal(await evalOn(b,`localStorage.getItem(${JSON.stringify(key+'.restore-backup-v3')})`),hiddenChooserBackup,
+    'hidden file selection must not replace the backup');
+  await front(b);
+  await until(async()=>!await evalOn(b,'document.hidden'),'chooser tab returned to foreground');
+  await waitWithSnapshot(async()=>await evalOn(b,`document.getElementById('cancel-normal-import').hidden`),
+    'hidden chooser settled after foreground reconciliation',b);
+  assert.deepEqual(await evalOn(b,'window.__hiddenChooserConfirmStates').then(states=>states.filter(Boolean)),[],
+    'no hidden-state confirmation may occur during chooser return');
+  assert.equal(await evalOn(b,`localStorage.getItem(${JSON.stringify(key)})`),hiddenChooserRaw,
+    'declined or rejected hidden chooser must preserve save bytes');
+  assert.equal(await evalOn(b,`localStorage.getItem(${JSON.stringify(key+'.restore-backup-v3')})`),hiddenChooserBackup,
+    'declined or rejected hidden chooser must preserve backup bytes');
+
+  // A second background transition is not one native chooser roundtrip:
+  // revoke the stale chooser and its visible cancel UI immediately. Any
+  // delayed change from that input must remain unable to restore progress.
+  const doubleHidePicker=await evalOn(b,`(()=>{
+    window.__doubleHideConfirms=0;
+    window.confirm=()=>{window.__doubleHideConfirms++;return true;};
+    const input=document.getElementById('import-normal-file');
+    input.click=()=>{};
+    document.getElementById('import-normal-save').click();
+    return !document.getElementById('cancel-normal-import').hidden;
+  })()`);
+  assert.equal(doubleHidePicker,true,'double-hide scenario must begin with active chooser');
+  await front(a);
+  await until(async()=>await evalOn(b,'document.hidden'),'first chooser background');
+  await front(b);
+  await until(async()=>!await evalOn(b,'document.hidden'),'first chooser foreground');
+  await front(a);
+  await until(async()=>await evalOn(b,'document.hidden'),'second chooser background');
+  await waitWithSnapshot(async()=>await evalOn(b,`document.getElementById('cancel-normal-import').hidden`),
+    'second hide must revoke orphaned chooser cancel UI',b);
+  await front(b);
+  await until(async()=>!await evalOn(b,'document.hidden'),'second chooser foreground');
+  await evalOn(b,`(()=>{
+    const input=document.getElementById('import-normal-file');
+    const transfer=new DataTransfer();
+    transfer.items.add(new File([${JSON.stringify(downloaded)}],'twice-hidden-stale.json',{type:'application/json'}));
+    input.files=transfer.files;
+    input.dispatchEvent(new Event('change',{bubbles:true}));
+    return true;
+  })()`);
+  await until(async()=>await evalOn(b,`document.getElementById('notice').textContent.includes('文件选择期间页面或存档已变化')`),
+    'twice-hidden stale chooser rejected');
+  assert.equal(await evalOn(b,'window.__doubleHideConfirms'),0,
+    'twice-hidden chooser must not request destructive confirmation');
+  assert.equal(await evalOn(b,`localStorage.getItem(${JSON.stringify(key)})`),hiddenChooserRaw,
+    'twice-hidden stale chooser must preserve save');
+  assert.equal(await evalOn(b,`localStorage.getItem(${JSON.stringify(key+'.restore-backup-v3')})`),hiddenChooserBackup,
+    'twice-hidden stale chooser must preserve backup');
+  t.diagnostic('Chromium hidden chooser deferral, second-hide cancellation and stale file rejection verified');
+
   t.diagnostic('Chromium invalid import, detached chooser, cross-tab chooser baseline and recovery-backup integrity verified');
 
   // P2.65aw: exercise the actual page under mobile viewport metrics, not

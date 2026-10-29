@@ -757,6 +757,10 @@ document.addEventListener('visibilitychange',()=>{
         importPicker=null;queuedHiddenSelection=null;
       }else importPicker.hiddenOnce=true;
     }else queuedHiddenSelection=null;
+    // A second background transition revokes the old chooser. The visible
+    // cancel control must reflect that revocation immediately, even if the
+    // native file input never emits a cancel/change event.
+    refreshImportCancel();
   }
 });
 const saveActions=byId('export-local-save').parentElement;
