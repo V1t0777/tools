@@ -896,5 +896,50 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   assert.equal(recovered.energy,newerState.energy-1,'fresh touch spends one energy');
   t.diagnostic('Chromium background mid-drag, concurrent tab write and fresh touch recovery passed');
 
+
+  // P2.65bi: loaded normal mode must remain playable and export its exact
+  // snapshot when the browser goes offline. This is NOT an offline reload or
+  // installed-PWA test; it proves the already-loaded runtime has no network
+  // dependency for a normal action or a local Blob download.
+  await front(b);
+  await call('Network.enable',{},b.sessionId);
+  await call('Network.emulateNetworkConditions',{
+    offline:true,latency:0,downloadThroughput:0,uploadThroughput:0
+  },b.sessionId);
+  try {
+    await until(async()=>await evalOn(b,'navigator.onLine===false'),
+      'browser reports offline after network emulation');
+    const offlineBefore=await readSave(b);
+    await evalOn(b,"document.querySelector('#board .producer').click();true");
+    await waitWithSnapshot(async()=>(await readSave(b)).revision===offlineBefore.revision+1,
+      'offline normal-mode producer saved once',b);
+    const offlineAfter=await readSave(b);
+    assert.equal(offlineAfter.energy,offlineBefore.energy-1,
+      'offline production consumes exactly one energy');
+    await sleep(180);
+    assert.equal((await readSave(b)).revision,offlineBefore.revision+1,
+      'offline action must not duplicate its write');
+    const existingDownloads=new Set((await readdir(temp)).filter(
+      name=>name.endsWith('.json')||name.endsWith('.txt')));
+    await evalOn(b,"document.getElementById('export-local-save').click();true");
+    const offlineFile=await until(async()=>{
+      const names=(await readdir(temp)).filter(
+        name=>name.endsWith('.json')||name.endsWith('.txt'));
+      return names.find(name=>!existingDownloads.has(name));
+    },'offline Blob download reached disk');
+    const offlineDownloaded=await readFile(join(temp,offlineFile),'utf8');
+    assert.deepEqual(JSON.parse(offlineDownloaded),offlineAfter,
+      'offline download must equal the reviewed persisted snapshot');
+    assert.deepEqual(await readSave(b),offlineAfter,
+      'offline export must remain read-only');
+    t.diagnostic('Chromium loaded-page offline production and exact Blob download verified');
+  } finally {
+    await call('Network.emulateNetworkConditions',{
+      offline:false,latency:0,downloadThroughput:-1,uploadThroughput:-1
+    },b.sessionId);
+  }
+  await until(async()=>await evalOn(b,'navigator.onLine===true'),
+    'browser network restored');
+
   t.diagnostic(`Chromium two-tab lock, BFCache persisted=${bfcache}, download=${file}, reset/import/backup verified`);
 });
