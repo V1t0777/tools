@@ -372,6 +372,55 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     assert.equal(await readRaw(b,workshopKey),deliveredRaw,
       'reading the unlocked scene cannot replay the order or spend coins');
     assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
+
+    // P117: chapter-two causal order and garden economy gate through actual
+    // rendered scene buttons, without injecting progress or granting coins.
+    await finishScene('ledger',b);
+    await finishScene('garden-path',b);
+    await finishScene('seed',b);
+    const chapterTwoProgress=await readJSON(b,storyKey);
+    assert.deepEqual(chapterTwoProgress.packs.core.completed.main,
+      ['arrival','signboard','first-order','ledger','garden-path','seed'],
+      'six main scenes must persist in causal order before garden construction');
+    await until(async()=>evalOn(b,
+      "document.getElementById('progress-count').textContent.includes('6 / 12')&&"+
+      "!document.getElementById('journey-workshop').hidden"),
+      'chapter-two garden requirement displayed');
+    assert.equal(await evalOn(b,"document.getElementById('journey-read').hidden"),true,
+      'tea-table must not be readable before a real garden build');
+    assert.equal(await evalOn(b,
+      "document.getElementById('journey-workshop').getAttribute('href')"),
+      './story-workshop.html#garden-goal',
+      'chapter-two locked narrative must route to its real garden goal');
+    assert.match(await evalOn(b,
+      "document.getElementById('journey-guidance').textContent"),/花园/);
+    const beforeGardenVisit=await readRaw(b,workshopKey);
+    await navigate(b,'/merge/story-workshop.html','#workshop-board');
+    await until(async()=>evalOn(b,
+      "document.querySelectorAll('#workshop-board button').length===56"),
+      'chapter-two real workshop board restored');
+    assert.equal(await evalOn(b,"document.getElementById('build-garden').disabled"),true,
+      'narrative permission alone must not bypass the garden level/coin cost');
+    assert.match(await evalOn(b,"document.getElementById('garden-hint').textContent"),
+      /需要.*级.*金币/,
+      'garden hint must describe actual economy requirements after seed scene');
+    for(const id of ['build-harbor','build-storefront']){
+      assert.equal(await evalOn(b,
+        "document.getElementById("+JSON.stringify(id)+").disabled"),true,
+        'later buildings remain locked before their narrative prerequisites');
+    }
+    assert.equal(await readRaw(b,workshopKey),beforeGardenVisit,
+      'viewing a chapter-two locked building must not spend or rewrite workshop');
+    assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
+    await navigate(b,'/merge/story.html','#journey-read');
+    await until(async()=>evalOn(b,
+      "document.getElementById('progress-count').textContent.includes('6 / 12')"),
+      'chapter-two narrative survives workshop return');
+    assert.equal(await evalOn(b,"document.getElementById('journey-read').hidden"),true);
+    assert.equal(await readRaw(b,workshopKey),beforeGardenVisit,
+      'chapter-two round-trip must not auto-build the garden');
+    assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
+    t.diagnostic('P117 real Chromium: first six scenes → garden economic gate → round-trip, no premature build or normal-mode writes');
     t.diagnostic('P116 real Chromium: damaged-save recovery → real order button → first-order scene unlock, no normal-mode writes');
     t.diagnostic('P115 real Chromium: independent corrupt resets, two-stage refusals, stale-consent CAS and mode isolation; no mobile claim');
     t.diagnostic('Real Chromium: first-order gate, two-tab protection, two independent corrupt downloads and stale-consent refusal; no mobile claim');
