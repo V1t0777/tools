@@ -94,12 +94,11 @@ function render(){
   $('board-occupancy').textContent=used+' / '+state.board.length;
   $('warehouse-occupancy').textContent=stored+' / '+state.warehouse.capacity;
   $('store-selected').disabled=disabled||!selectedMaterial||!warehouseHasSpace;
+  const fullBoardGuidance=!boardHasSpace?describeStoryWorkshopStall(state,Date.now()):null;
   $('warehouse-hint').textContent=blocked
     ? '存档处于保护状态，仓库操作已暂停；请先核对存档提示。'
     : !boardHasSpace
-      ? warehouseHasSpace
-        ? '棋盘已满：选择一件材料后点击“收纳选中材料”，腾出生产空间；也可以合成同类同等级材料。'
-        : '棋盘和仓库都满：先合成两件同类同等级材料，腾出棋盘空间。'
+      ? (fullBoardGuidance?.message ?? '棋盘和仓库都满：请先检查委托、合成与仓库扩容。')
       : selectedMaterial
         ? warehouseHasSpace
           ? '已选中'+getItemName(state.board[selected])+'；可收纳至仓库。'
