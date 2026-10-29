@@ -1125,5 +1125,77 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   await until(async()=>await evalOn(a,'navigator.onLine===true'),
     'observer network restored after cross-tab test');
 
+
+  // P2.65bp: the actual two-tab UI must reject a confirmed reset while a
+  // different tab holds the ordinary-mode Web Lock, without changing either
+  // the current save or any recovery backup. A new confirmation after release
+  // must be required and must commit a single, independently verified reset.
+  await front(b);
+  await waitWithSnapshot(async()=>await evalOn(b,
+    "document.getElementById('save-status').textContent.includes('已保存于此浏览器')"),
+    'reset contender verified current board',b);
+  const resetLockBaseline=await evalOn(b,
+    'localStorage.getItem('+JSON.stringify(key)+')');
+  const resetLockBackup=await evalOn(b,
+    'localStorage.getItem('+JSON.stringify(key+'.restore-backup-v3')+')');
+  const resetLockStory=await evalOn(b,
+    "localStorage.getItem('toolbox.merge-isle.story.local.v1')");
+  assert.ok(JSON.parse(resetLockBaseline).revision>0,
+    'lock contention needs a nonempty game progress to protect');
+  await evalOn(a,
+    'window.__p265bpHold=navigator.locks.request('+JSON.stringify(lock)+',()=>new Promise(resolve=>window.__p265bpUnlock=resolve));true');
+  await until(async()=>await evalOn(a,
+    "typeof window.__p265bpUnlock==='function'"),
+    'other tab acquired ordinary save lock');
+  await front(b);
+  await evalOn(b, "window.__p265bpConfirmCount=0;window.confirm=()=>{window.__p265bpConfirmCount++;return true;};document.getElementById('reset').click();true");
+  await waitWithSnapshot(async()=>await evalOn(b,
+    "document.getElementById('notice').textContent.includes('占用存档')"),
+    'locked reset safely rejected with visible busy feedback',b,5000);
+  assert.equal(await evalOn(b,'window.__p265bpConfirmCount'),1,
+    'the rejected reset must still require explicit confirmation');
+  assert.equal(await evalOn(b,'localStorage.getItem('+JSON.stringify(key)+')'),
+    resetLockBaseline,'busy reset must not change the save');
+  assert.equal(await evalOn(b,
+    'localStorage.getItem('+JSON.stringify(key+'.restore-backup-v3')+')'),
+    resetLockBackup,'busy reset must not reserve or overwrite a backup');
+  assert.equal(await evalOn(b,
+    "localStorage.getItem('toolbox.merge-isle.story.local.v1')"),
+    resetLockStory,'busy ordinary reset must not touch story progress');
+  await evalOn(a,'window.__p265bpUnlock();true');
+  await until(async()=>await evalOn(a,
+    'navigator.locks.query().then(s=>!s.held.some(x=>x.name==='+JSON.stringify(lock)+'))'),
+    'other tab released ordinary save lock');
+  await front(b);
+  assert.equal(await evalOn(b,
+    'localStorage.getItem('+JSON.stringify(key)+')'),
+    resetLockBaseline,'releasing the lock must not auto-replay old confirmation');
+  await waitWithSnapshot(async()=>await evalOn(b,
+    "document.getElementById('save-status').textContent.includes('已保存于此浏览器')"),
+    'contender remained writable after rejected reset',b);
+  await evalOn(b,"document.getElementById('reset').click();true");
+  await waitWithSnapshot(async()=>{
+    const raw=await evalOn(b,'localStorage.getItem('+JSON.stringify(key)+')');
+    return raw!==resetLockBaseline&&JSON.parse(raw).revision===0;
+  },'freshly confirmed reset after lock release',b);
+  const resetAfterRelease=await evalOn(b,
+    'localStorage.getItem('+JSON.stringify(key)+')');
+  assert.equal(await evalOn(b,'window.__p265bpConfirmCount'),2,
+    'successful reset must require a second independent confirmation');
+  assert.equal(await evalOn(b,
+    'localStorage.getItem('+JSON.stringify(key+'.restore-backup-v3')+')'),
+    resetLockBackup,'normal reset must not overwrite the prior recovery backup');
+  assert.equal(await evalOn(b,
+    "localStorage.getItem('toolbox.merge-isle.story.local.v1')"),
+    resetLockStory,'successful ordinary reset must preserve story progress');
+  await front(a);
+  await waitWithSnapshot(async()=>await evalOn(a,
+    "document.getElementById('save-status').textContent.includes('已暂停')"),
+    'old tab blocked after competing reset',a);
+  await evalOn(a,"document.querySelector('#board .producer').click();true");
+  assert.equal(await evalOn(a,'localStorage.getItem('+JSON.stringify(key)+')'),
+    resetAfterRelease,'stale tab must not resurrect progress after reset');
+  t.diagnostic('Chromium Web Lock contention rejected reset without backup write; new confirmation reset once and stale tab stayed blocked');
+
   t.diagnostic(`Chromium two-tab lock, BFCache persisted=${bfcache}, download=${file}, reset/import/backup verified`);
 });
