@@ -321,6 +321,39 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   assert.equal(await evalOn(b,'window.__importConfirmCount'),0,'stale chooser must not show destructive confirmation');
   await evalOn(b,`document.querySelector('#board .producer').click();true`);
   await until(async()=>(await readSave(b)).revision===changedState.revision+1,'fresh gameplay after rejected chooser');
+  // P2.65bd: while a native file chooser is pending, neither a destructive
+  // reset nor a backup download may proceed on a possibly stale baseline.
+  // Use a chooser stub only; real browser storage, buttons and Web Locks remain live.
+  await front(b);
+  const chooserLeaseRaw=await evalOn(b,`localStorage.getItem(${JSON.stringify(key)})`);
+  const chooserLeaseBackup=await evalOn(b,`localStorage.getItem(${JSON.stringify(key+'.restore-backup-v3')})`);
+  const downloadsBeforeLease=(await readdir(temp)).filter(name=>name.endsWith('.json')||name.endsWith('.txt')).length;
+  const chooserLease=await evalOn(b,`(()=>{
+    window.__blockedResetConfirms=0;
+    window.confirm=()=>{window.__blockedResetConfirms++;return true;};
+    const input=document.getElementById('import-normal-file');
+    input.click=()=>{};
+    document.getElementById('import-normal-save').click();
+    return !document.getElementById('cancel-normal-import').hidden;
+  })()`);
+  assert.equal(chooserLease,true,'native chooser lease must be active');
+  await evalOn(b,`document.getElementById('reset').click();document.getElementById('export-local-save').click();true`);
+  await sleep(120);
+  assert.equal(await evalOn(b,'window.__blockedResetConfirms'),0,
+    'reset must not ask for confirmation while chooser is pending');
+  assert.equal(await evalOn(b,`localStorage.getItem(${JSON.stringify(key)})`),chooserLeaseRaw,
+    'reset blocked by chooser must preserve exact save bytes');
+  assert.equal(await evalOn(b,`localStorage.getItem(${JSON.stringify(key+'.restore-backup-v3')})`),chooserLeaseBackup,
+    'blocked reset must preserve exact restore backup bytes');
+  assert.equal((await readdir(temp)).filter(name=>name.endsWith('.json')||name.endsWith('.txt')).length,
+    downloadsBeforeLease,'export must not initiate a download while chooser is pending');
+  await evalOn(b,`document.getElementById('cancel-normal-import').click();true`);
+  await until(async()=>await evalOn(b,`document.getElementById('cancel-normal-import').hidden`),
+    'chooser cancellation releases pending UI');
+  assert.equal(await evalOn(b,`localStorage.getItem(${JSON.stringify(key)})`),chooserLeaseRaw,
+    'canceling a pending chooser must not mutate save');
+  t.diagnostic('Chromium pending chooser blocked reset and export without touching save/backup');
+
   t.diagnostic('Chromium invalid import, detached chooser, cross-tab chooser baseline and recovery-backup integrity verified');
 
   // P2.65aw: exercise the actual page under mobile viewport metrics, not
@@ -574,14 +607,20 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     const r=el.getBoundingClientRect();
     return {x:r.left+r.width/2,y:r.top+r.height/2};
   })()`);
-  await sleep(140);
+  // A foreground visibility event and scroll can settle before the compositor
+  // updates hit testing. Check the actual target instead of a fixed delay.
+  await until(async()=>await evalOn(b,`(()=>{
+    const hit=document.elementFromPoint(${fresh.x},${fresh.y});
+    return !document.hidden&&!!hit?.closest?.('.producer')&&
+      document.querySelectorAll('.drag-ghost').length===0;
+  })()`),'fresh producer hit target after background');
   await call('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[
     {...fresh,id:6,radiusX:2,radiusY:2,force:1}
   ]},b.sessionId);
   await sleep(65);
   await call('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]},b.sessionId);
-  await until(async()=>(await readSave(b)).revision===newerState.revision+1,
-    'fresh touch after background');
+  await waitWithSnapshot(async()=>(await readSave(b)).revision===newerState.revision+1,
+    'fresh touch after background',b);
   await sleep(200);
   const recovered=await readSave(b);
   assert.equal(recovered.revision,newerState.revision+1,'fresh touch writes exactly once');
