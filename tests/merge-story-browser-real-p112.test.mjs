@@ -803,6 +803,14 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     assert.equal(await evalOn(b,"document.getElementById('build-storefront').disabled"),true,
       'storefront must remain story-gated before harbor-light');
     assert.deepEqual(await readJSON(b,workshopKey),preBuild.harbor);
+    // P126: a peer tab loaded BEFORE payment must not keep an actionable
+    // harbor button or charge the same 330 coins after the first tab builds.
+    const staleHarborTab=await page();await front(staleHarborTab);
+    await navigate(staleHarborTab,'/merge/story-workshop.html','#workshop-board');
+    await until(async()=>evalOn(staleHarborTab,
+      "document.getElementById('build-harbor')?.disabled===false"),
+      'P126 peer tab sees harbor build-ready state');
+    await front(b);
     await evalOn(b,"document.getElementById('build-harbor').click();true");
     await until(async()=>(await readJSON(b,workshopKey)).buildings.harbor===1,
       'P123 harbor click persisted');
@@ -816,6 +824,15 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     assert.equal(builtHarbor.xp,postBuild.harbor.xp);
     assert.deepEqual(builtHarbor.buildings,postBuild.harbor.buildings);
     const builtHarborRaw=await readRaw(b,workshopKey);
+    await front(staleHarborTab);
+    await until(async()=>evalOn(staleHarborTab,
+      "document.getElementById('build-harbor')?.disabled===true"),
+      'P126 stale harbor tab must disable construction');
+    await evalOn(staleHarborTab,"document.getElementById('build-harbor').click();true");
+    assert.equal(await readRaw(staleHarborTab,workshopKey),builtHarborRaw,
+      'P126 stale harbor tab cannot spend 330 coins twice');
+    await call('Target.closeTarget',{targetId:staleHarborTab.targetId});
+    await front(b);
     await evalOn(b,"document.getElementById('build-harbor').click();true");
     assert.equal(await readRaw(b,workshopKey),builtHarborRaw,
       'harbor cannot be double-charged');
@@ -839,6 +856,14 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
       'P123 real storefront button enabled by earned engine snapshot');
     assert.equal(await evalOn(b,"document.getElementById('build-harbor').disabled"),true);
     assert.deepEqual(await readJSON(b,workshopKey),preBuild.storefront);
+    // P126: repeat the stale-tab protection at the fourth-chapter finale.
+    // This is an actual second Chromium page, not a storage mock.
+    const staleStorefrontTab=await page();await front(staleStorefrontTab);
+    await navigate(staleStorefrontTab,'/merge/story-workshop.html','#workshop-board');
+    await until(async()=>evalOn(staleStorefrontTab,
+      "document.getElementById('build-storefront')?.disabled===false"),
+      'P126 peer tab sees storefront build-ready state');
+    await front(b);
     await evalOn(b,"document.getElementById('build-storefront').click();true");
     await until(async()=>(await readJSON(b,workshopKey)).buildings.storefront===1,
       'P123 storefront click persisted');
@@ -853,6 +878,15 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     assert.equal(builtStorefront.xp,postBuild.storefront.xp);
     assert.deepEqual(builtStorefront.buildings,postBuild.storefront.buildings);
     const builtStorefrontRaw=await readRaw(b,workshopKey);
+    await front(staleStorefrontTab);
+    await until(async()=>evalOn(staleStorefrontTab,
+      "document.getElementById('build-storefront')?.disabled===true"),
+      'P126 stale storefront tab must disable construction');
+    await evalOn(staleStorefrontTab,"document.getElementById('build-storefront').click();true");
+    assert.equal(await readRaw(staleStorefrontTab,workshopKey),builtStorefrontRaw,
+      'P126 stale storefront tab cannot spend 60 coins twice');
+    await call('Target.closeTarget',{targetId:staleStorefrontTab.targetId});
+    await front(b);
     await evalOn(b,"document.getElementById('build-storefront').click();true");
     assert.equal(await readRaw(b,workshopKey),builtStorefrontRaw,
       'storefront cannot be double-charged');
@@ -871,6 +905,7 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     assert.equal(await evalOn(b,"document.getElementById('journey-workshop').hidden"),true);
     assert.equal(await readRaw(b,workshopKey),builtStorefrontRaw);
     assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
+    t.diagnostic('P126 real Chromium: stale peer tabs cannot double-charge garden, harbor or storefront; not iPhone/WeChat device testing');
     t.diagnostic('P123 real Chromium: harbor + storefront buttons charge once; chapters 3-4 reach 12/12; later economy uses detached real-engine pre-build fixtures, not continuous UI grinding');
     t.diagnostic('P122 Chromium: real garden button deducts once and unlocks tea-table; post-five-order economy uses an engine-earned fixture, not continuous UI grinding');
     t.diagnostic('P119 real Chromium: tea and bakery tier-1 UI merges → fourth and fifth real deliveries; garden remains locked, normal mode isolated');
