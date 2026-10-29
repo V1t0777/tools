@@ -23,10 +23,11 @@ const usedSlots=state=>state.board.filter(Boolean).length;
 const validSeed=value=>Number.isSafeInteger(value)&&value>=0&&value<=0xffffffff;
 
 /** Return a bounded, deterministic report. Does not expose or persist a save. */
-export function simulateStoryBoard({seed=1,maxActions=20_000,strategy='greedy',onMilestone=null}={}){
+export function simulateStoryBoard({seed=1,maxActions=20_000,strategy='greedy',onMilestone=null,onConstructionReady=null}={}){
   if(!STRATEGIES.has(strategy)||!validSeed(seed)||!Number.isSafeInteger(maxActions)||
     maxActions<1||maxActions>50_000||
-    (onMilestone!==null&&typeof onMilestone!=='function'))
+    (onMilestone!==null&&typeof onMilestone!=='function')||
+    (onConstructionReady!==null&&typeof onConstructionReady!=='function'))
     throw new RangeError('Invalid board simulation options');
 
   let now=START_TIME,state=createInitialState(now),randomState=seed>>>0;
@@ -59,6 +60,9 @@ export function simulateStoryBoard({seed=1,maxActions=20_000,strategy='greedy',o
     if(phase<BUILD_ORDER.length){
       const id=BUILD_ORDER[phase],rule=BUILDINGS[id];
       if(getLevel(state.xp)>=rule.minLevel&&state.coins>=rule.coins){
+        // Test-only observer receives a detached, genuinely earned PRE-build save.
+        // It cannot alter the live engine or bypass a construction cost.
+        if(onConstructionReady)onConstructionReady(id,structuredClone(state));
         const result=upgradeBuilding(state,id);
         if(!result.ok){reason='building-rejected';break;}
         state=result.state;phase++;snapshot(id);

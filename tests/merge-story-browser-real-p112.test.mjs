@@ -8,6 +8,7 @@ import {tmpdir} from 'node:os';
 import {join,resolve,extname,sep} from 'node:path';
 import {setTimeout as sleep} from 'node:timers/promises';
 import {BUILDINGS,getLevel} from '../merge/economy.mjs';
+import {simulateStoryBoard} from '../merge/story/board-simulation.mjs';
 import {createInitialState,fulfillOrder,moveOrMerge,produce,validateSave} from '../merge/engine.mjs';
 
 // P122: build a genuine engine-earned PRE-construction fixture. The browser
@@ -703,6 +704,105 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     assert.equal(await readRaw(b,workshopKey),builtGardenRaw,
       'returning to workshop cannot duplicate the garden transaction');
     assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
+    // P123: exercise the remaining two building buttons and chapter gates in
+    // actual Chromium. Pre-build snapshots come from a separate deterministic
+    // real-engine playthrough; they are NOT continuous browser UI grinding.
+    const preBuild={};
+    const economicReplay=simulateStoryBoard({seed:42,
+      onConstructionReady:(id,snapshot)=>{preBuild[id]=snapshot;}
+    });
+    assert.equal(economicReplay.complete,true,economicReplay.reason);
+    for(const id of ['harbor','storefront']){
+      assert.equal(validateSave(preBuild[id]),true);
+      assert.equal(preBuild[id].buildings[id],0);
+      assert.ok(getLevel(preBuild[id].xp)>=BUILDINGS[id].minLevel);
+      assert.ok(preBuild[id].coins>=BUILDINGS[id].coins);
+    }
+    assert.equal(preBuild.harbor.buildings.garden,1);
+    assert.equal(preBuild.storefront.buildings.harbor,1);
+
+    await navigate(b,'/merge/story.html','#journey-read');
+    await finishScene('old-pier',b);
+    await finishScene('apprentice',b);
+    await until(async()=>evalOn(b,
+      "document.getElementById('progress-count').textContent.includes('9 / 12')&&"+
+      "document.getElementById('journey-read').hidden"),'P123 harbor narrative gate');
+    assert.equal(await evalOn(b,
+      "document.getElementById('journey-workshop').getAttribute('href')"),
+      './story-workshop.html#harbor-goal');
+    assert.equal(await readRaw(b,workshopKey),builtGardenRaw,
+      'reading apprentice safety lesson cannot change garden economy');
+    await evalOn(b,'localStorage.setItem('+
+      JSON.stringify(workshopKey)+','+JSON.stringify(JSON.stringify(preBuild.harbor))+');true');
+    await navigate(b,'/merge/story-workshop.html','#workshop-board');
+    await until(async()=>evalOn(b,
+      "document.querySelectorAll('#workshop-board button').length===56&&"+
+      "document.getElementById('build-harbor').disabled===false"),
+      'P123 real harbor button enabled by earned engine snapshot');
+    assert.equal(await evalOn(b,"document.getElementById('build-storefront').disabled"),true,
+      'storefront must remain story-gated before harbor-light');
+    assert.deepEqual(await readJSON(b,workshopKey),preBuild.harbor);
+    await evalOn(b,"document.getElementById('build-harbor').click();true");
+    await until(async()=>(await readJSON(b,workshopKey)).buildings.harbor===1,
+      'P123 harbor click persisted');
+    const builtHarbor=await readJSON(b,workshopKey);
+    assert.equal(builtHarbor.revision,preBuild.harbor.revision+1);
+    assert.equal(builtHarbor.coins,preBuild.harbor.coins-BUILDINGS.harbor.coins);
+    assert.equal(builtHarbor.xp,preBuild.harbor.xp);
+    assert.equal(validateSave(builtHarbor),true);
+    const builtHarborRaw=await readRaw(b,workshopKey);
+    await evalOn(b,"document.getElementById('build-harbor').click();true");
+    assert.equal(await readRaw(b,workshopKey),builtHarborRaw,
+      'harbor cannot be double-charged');
+    await navigate(b,'/merge/story.html','#journey-read');
+    await finishScene('harbor-light',b);
+    assert.equal(await readRaw(b,workshopKey),builtHarborRaw,
+      'harbor-light narrative cannot repeat construction');
+    await until(async()=>evalOn(b,
+      "document.getElementById('progress-count').textContent.includes('10 / 12')&&"+
+      "document.getElementById('journey-read').hidden"),
+      'P123 storefront story gate');
+    assert.equal(await evalOn(b,
+      "document.getElementById('journey-workshop').getAttribute('href')"),
+      './story-workshop.html#storefront-goal');
+    await evalOn(b,'localStorage.setItem('+
+      JSON.stringify(workshopKey)+','+JSON.stringify(JSON.stringify(preBuild.storefront))+');true');
+    await navigate(b,'/merge/story-workshop.html','#workshop-board');
+    await until(async()=>evalOn(b,
+      "document.querySelectorAll('#workshop-board button').length===56&&"+
+      "document.getElementById('build-storefront').disabled===false"),
+      'P123 real storefront button enabled by earned engine snapshot');
+    assert.equal(await evalOn(b,"document.getElementById('build-harbor').disabled"),true);
+    assert.deepEqual(await readJSON(b,workshopKey),preBuild.storefront);
+    await evalOn(b,"document.getElementById('build-storefront').click();true");
+    await until(async()=>(await readJSON(b,workshopKey)).buildings.storefront===1,
+      'P123 storefront click persisted');
+    const builtStorefront=await readJSON(b,workshopKey);
+    assert.equal(builtStorefront.revision,preBuild.storefront.revision+1);
+    assert.equal(builtStorefront.coins,
+      preBuild.storefront.coins-BUILDINGS.storefront.coins);
+    assert.equal(builtStorefront.xp,preBuild.storefront.xp);
+    assert.equal(validateSave(builtStorefront),true);
+    const builtStorefrontRaw=await readRaw(b,workshopKey);
+    await evalOn(b,"document.getElementById('build-storefront').click();true");
+    assert.equal(await readRaw(b,workshopKey),builtStorefrontRaw,
+      'storefront cannot be double-charged');
+    await navigate(b,'/merge/story.html','#journey-read');
+    await finishScene('festival',b);
+    await finishScene('letter-answer',b);
+    assert.equal((await readJSON(b,storyKey)).packs.core.completed.main.length,12);
+    assert.equal(await readRaw(b,workshopKey),builtStorefrontRaw,
+      'festival finale must not grant extra money or rewrite workshop');
+    assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
+    await call('Page.reload',{ignoreCache:true},b.sessionId);
+    await until(async()=>evalOn(b,
+      "document.getElementById('progress-count')?.textContent.includes('12 / 12')"),
+      'P123 full first-volume finale persists after reload');
+    assert.equal(await evalOn(b,"document.getElementById('journey-read').hidden"),true);
+    assert.equal(await evalOn(b,"document.getElementById('journey-workshop').hidden"),true);
+    assert.equal(await readRaw(b,workshopKey),builtStorefrontRaw);
+    assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
+    t.diagnostic('P123 real Chromium: harbor + storefront buttons charge once; chapters 3-4 reach 12/12; later economy uses detached real-engine pre-build fixtures, not continuous UI grinding');
     t.diagnostic('P122 Chromium: real garden button deducts once and unlocks tea-table; post-five-order economy uses an engine-earned fixture, not continuous UI grinding');
     t.diagnostic('P119 real Chromium: tea and bakery tier-1 UI merges → fourth and fifth real deliveries; garden remains locked, normal mode isolated');
     t.diagnostic('P118 real Chromium: second bakery order + floral UI merge + third order; garden remains gated, save survives narrative reload');
