@@ -76,7 +76,9 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     await rm(temp,{recursive:true,force:true,maxRetries:3});
   });
   const portFile=join(temp,'DevToolsActivePort');
-  await until(()=>existsSync(portFile),'Chrome debugging port');
+  // A busy CI runner can need longer than the default 12s to create the
+  // DevTools port. This remains a bounded hard failure, never a mock fallback.
+  await until(()=>existsSync(portFile),'Chrome debugging port',20000);
   const [port,wsPath]=(await readFile(portFile,'utf8')).trim().split('\n');
   client=cdp(`ws://127.0.0.1:${port}${wsPath}`);
   await client.ready;
