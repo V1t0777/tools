@@ -595,7 +595,7 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
       'story re-entry cannot replay fourth or fifth order');
     assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
 
-    // P131: continue the SAME browser save through fifteen more genuine orders.
+    // P132: continue one genuine browser save to the first real garden payment.
     // No snapshot injection, direct engine call, clock override or RNG stub:
     // every production, merge and delivery uses the rendered 56-cell UI.
     await navigate(b,'/merge/story-workshop.html','#workshop-board');
@@ -690,6 +690,10 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     const twentyOrders=await readJSON(b,workshopKey);
     assert.equal(twentyOrders.progress.orders,20,'twenty consecutive orders must be genuinely delivered');
     assert.equal(validateSave(twentyOrders),true,'twenty-order UI save remains strictly valid');
+    assert.ok(getLevel(twentyOrders.xp)>=BUILDINGS.garden.minLevel,
+      'twenty genuine UI orders must earn the garden level without a fixture');
+    assert.ok(twentyOrders.coins>=BUILDINGS.garden.coins,
+      'twenty genuine UI orders must earn the full garden cost without a fixture');
     assert.ok(twentyOrders.energy>=0&&twentyOrders.energy<=120,
       'continuous UI production must not invent or underflow energy');
     assert.equal(twentyOrders.achievements.orders20,1,
@@ -713,8 +717,8 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
     // P124: use ONE deterministic, engine-earned economic lineage for all
     // three PRE-build snapshots and their POST-build audit checkpoints.
-    // The first twenty orders above are real UI actions; later progress is
-    // loaded as test fixtures, NOT continuous UI grinding or device testing.
+    // P132: the garden uses the actual twenty-order browser save. Only harbor
+    // and storefront still use detached engine-earned pre-build fixtures.
     const preBuild={},postBuild={};
     const economicReplay=simulateStoryBoard({seed:42,
       onConstructionReady:(id,snapshot)=>{preBuild[id]=snapshot;},
@@ -736,7 +740,7 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     }
     assert.equal(preBuild.harbor.buildings.garden,1);
     assert.equal(preBuild.storefront.buildings.harbor,1);
-    const earnedFixture=preBuild.garden;
+    const earnedFixture=twentyOrders;
     assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
     await evalOn(b,'localStorage.setItem('+
       JSON.stringify(workshopKey)+','+
@@ -775,11 +779,12 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     assert.equal(builtGarden.xp,earnedFixture.xp,
       'building must not fabricate experience');
     assert.equal(validateSave(builtGarden),true);
-    assert.equal(builtGarden.revision,postBuild.garden.revision,
-      'browser garden transaction matches the same economic replay');
-    assert.equal(builtGarden.coins,postBuild.garden.coins);
-    assert.equal(builtGarden.xp,postBuild.garden.xp);
-    assert.deepEqual(builtGarden.buildings,postBuild.garden.buildings);
+    assert.equal(builtGarden.progress.orders,20,
+      'real garden construction cannot fabricate extra order completions');
+    assert.equal(builtGarden.achievements.orders20,1,
+      'real garden construction cannot revoke the earned one-time achievement');
+    assert.equal(builtGarden.bag.reset,1,
+      'real garden construction cannot duplicate or consume the earned reset card');
     await until(async()=>evalOn(b,
       "document.getElementById('build-garden').disabled===true&&"+
       "document.getElementById('garden-status').textContent.includes('已修复')"),
@@ -815,8 +820,8 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     assert.equal(await readRaw(b,workshopKey),builtGardenRaw,
       'returning to workshop cannot duplicate the garden transaction');
     assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
-    // P124: the harbor and storefront pre-build snapshots above came from
-    // the SAME replay as garden, but each is loaded separately into Chromium.
+    // P132: the garden came from continuous UI play, not the engine fixture.
+    // Harbor and storefront remain separately loaded from one legal replay.
     // Compare each real UI build to its corresponding post-build checkpoint.
 
     await navigate(b,'/merge/story.html','#journey-read');
@@ -942,7 +947,7 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     assert.equal(await evalOn(b,"document.getElementById('journey-workshop').hidden"),true);
     assert.equal(await readRaw(b,workshopKey),builtStorefrontRaw);
     assert.equal(await readRaw(b,normalKey),'normal-mode-sentinel');
-    t.diagnostic('P130 real Chromium: fourteen consecutive UI orders survive story/workshop navigation; each action preserves finite energy and at-most-one-order progress; later buildings still use detached engine-earned fixtures, not full UI completion');
+    t.diagnostic('P132 real Chromium: twenty consecutive UI orders earn and pay for the actual garden, unlock tea-table, and resist peer-tab double-charge; harbor/storefront still use detached engine-earned fixtures, not full UI completion');
     t.diagnostic('P126 real Chromium: stale peer tabs cannot double-charge garden, harbor or storefront; not iPhone/WeChat device testing');
     t.diagnostic('P123 real Chromium: harbor + storefront buttons charge once; chapters 3-4 reach 12/12; later economy uses detached real-engine pre-build fixtures, not continuous UI grinding');
     t.diagnostic('P122 Chromium: real garden button deducts once and unlocks tea-table; post-five-order economy uses an engine-earned fixture, not continuous UI grinding');
