@@ -1,4 +1,4 @@
-import { WIDTH, CELL_COUNT, MAX_ENERGY, ENERGY_REGEN_MS, CHAINS, createInitialState,
+import { WIDTH, CELL_COUNT, MAX_ENERGY, ENERGY_REGEN_MS, CHAINS, createInitialState, advanceTime,
   moveOrMerge, produce, fulfillOrder, getItemIcon, getItemName,
   storeItem, withdrawItem, upgradeWarehouse, upgradeProducer, upgradeBuilding,
   getLevelProgress, getMaxOrderTier, getProducerUpgrade, getWarehouseUpgrade,
@@ -1096,7 +1096,17 @@ window.setInterval(async()=>{
   timerPending=true;
   try{
     if(!revalidateResumedSave())return;
-    handleTransactionResult(await runtime.clock({now:Date.now()}),'clock');
+    const now=Date.now();
+    // The 1s UI countdown is not a storage transaction. Most ticks cannot
+    // regenerate energy or recharge a producer; avoid taking the shared Web
+    // Lock and blocking a genuine touch just to re-publish identical bytes.
+    // This read-only fast path follows the exact-byte lifecycle reconcile.
+    // When time can change the save, retain the original locked clock path.
+    if(advanceTime(state,now)===state){
+      renderResources(now);refreshSupplyControls(now);
+      return;
+    }
+    handleTransactionResult(await runtime.clock({now}),'clock');
   }catch{pauseUnsafe('CLOCK_OUTCOME_UNCERTAIN');}
   finally{timerPending=false;}
 },1000);
