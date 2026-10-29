@@ -90,7 +90,7 @@ test('P2.65bm cross-tab overwrite during backup reservation cannot be reset away
   f.onWrite(key=>{if(key===ABNORMAL_RESET_BACKUP_KEY)f.map.set(SAVE_KEY,newer);});
   const result=await f.runtime.reset({confirmed:true,requireOriginalBackup:true,now:2000});
   assert.equal(result.ok,false);
-  assert.equal(result.reason,'STALE_BASELINE');
+  assert.equal(result.reason,'CURRENT_SAVE_CHANGED');
   assert.equal(f.runtime.blocked,true);
   assert.equal(f.map.get(SAVE_KEY),newer);
   assert.equal(f.map.get(ABNORMAL_RESET_BACKUP_KEY),f.original);
