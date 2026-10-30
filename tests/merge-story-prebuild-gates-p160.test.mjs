@@ -58,10 +58,15 @@ function persist(storage,state){
   assert.equal(validateSave(state),true);
   const previous=readStoryWorkshop(storage,NOW);
   assert.equal(previous.blocked,false);
-  assert.equal(writeStoryWorkshop(storage,state,{expectedRaw:previous.raw}),true,
-    'persist rejected: previous revision '+previous.state.revision+
-    ', next revision '+state.revision+', previous bytes '+(previous.raw?.length??0)+
-    ', next bytes '+JSON.stringify(state).length);
+  // Two buildings can become affordable consecutively: the next pre-build
+  // snapshot may be byte-identical to the just-saved previous milestone.
+  // Reuse it instead of inventing a revision or performing a rejected write.
+  const encoded=JSON.stringify(state);
+  if(previous.raw===encoded)return previous;
+  assert.ok(state.revision>previous.state.revision,
+    'changed snapshot must advance revision; previous '+previous.state.revision+
+    ', next '+state.revision);
+  assert.equal(writeStoryWorkshop(storage,state,{expectedRaw:previous.raw}),true);
   const restored=readStoryWorkshop(storage,NOW);
   assert.deepEqual(restored.state,state);
   return restored;
