@@ -5,6 +5,7 @@
 import { createInitialState, advanceTime, moveOrMerge, produce, fulfillOrder,
   upgradeWarehouse, upgradeProducer, upgradeBuilding, getLevelProgress,
   validateSave, MAX_ENERGY, ENERGY_REGEN_MS, CELL_COUNT } from './engine.mjs';
+import { diagnoseBoard } from './board-diagnostics.mjs';
 import { BUILDINGS, getWarehouseUpgrade, getProducerUpgrade } from './economy.mjs';
 
 const DAY = 86_400_000;
@@ -97,7 +98,8 @@ export function simulateEconomy({seed=1, days=30, sessionsPerDay=3,
   let state = createInitialState(start);
   const totals = {produced:0, merged:0, orders:0, earned:0, spent:0,
     upgrades:0, warehouseUpgrades:0, producerUpgrades:0, buildings:0,
-    energySpent:0, boardFullSessions:0, energyLimitedSessions:0,
+    energySpent:0, boardFullSessions:0, recoverableFullSessions:0,
+    hardDeadlockSessions:0, energyLimitedSessions:0,
     actions:0, maxOccupied:countOccupied(state.board)};
   const daily = [];
   const milestones = {};
@@ -127,7 +129,16 @@ export function simulateEconomy({seed=1, days=30, sessionsPerDay=3,
               const producerSlot = chooseProducer(state);
               if (empty && state.energy > 0 && producerSlot !== null) {
                 result=produce(state,producerSlot,now,rng);kind='produce';
-              } else if (!empty) {boardBlocked=true;break;}
+              } else if (!empty) {
+                // The simulator intentionally does not perform warehouse moves.
+                // A full board is not automatically a rules-level deadlock:
+                // diagnose against the real engine before counting the blocker.
+                const diagnosis=diagnoseBoard(state);
+                if(diagnosis.recovery==='recoverable')totals.recoverableFullSessions++;
+                else if(diagnosis.recovery==='hard-deadlock')totals.hardDeadlockSessions++;
+                else throw Error('Unexpected full-board recovery classification');
+                boardBlocked=true;break;
+              }
               else {
                 // Idle until next energy tick or producer recharge, if within session.
                 const nextEnergy = state.energy < MAX_ENERGY ? state.energyAt + ENERGY_REGEN_MS : Infinity;
@@ -169,9 +180,13 @@ export function simulateEconomy({seed=1, days=30, sessionsPerDay=3,
       orders:totals.orders-dayBefore.orders,produced:totals.produced-dayBefore.produced,
       earned:totals.earned-dayBefore.earned,spent:totals.spent-dayBefore.spent,
       boardFullSessions:totals.boardFullSessions-dayBefore.boardFullSessions,
+      recoverableFullSessions:totals.recoverableFullSessions-dayBefore.recoverableFullSessions,
+      hardDeadlockSessions:totals.hardDeadlockSessions-dayBefore.hardDeadlockSessions,
       energyLimitedSessions:totals.energyLimitedSessions-dayBefore.energyLimitedSessions,
       occupied:countOccupied(state.board)});
   }
+  if(totals.boardFullSessions!==totals.recoverableFullSessions+totals.hardDeadlockSessions)
+    throw Error('Full-board recovery classification invariant failed');
   if (state.coins !== totals.earned - totals.spent || state.energy < 0)
     throw Error('Economic conservation invariant failed');
   return {scenario:{seed,days,sessionsPerDay,sessionMinutes,policy},
