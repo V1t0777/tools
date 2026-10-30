@@ -233,7 +233,7 @@ test('P147 long background return projects recovered energy and producer without
 test('P147 recovered full energy disables wasteful supply use without a save write',async()=>{
   const now=Date.now(),state=createInitialState(now);
   state.energy=MAX_ENERGY-1;state.energyAt=now-2*ENERGY_REGEN_MS;
-  state.bag.soda=1;
+  state.bag.soda=1;state.shop.purchases.soda=1;
   assert.equal(validateSave(state),true);
   const f=await mount(state);
   try{
@@ -251,7 +251,7 @@ test('P147 recovered full energy disables wasteful supply use without a save wri
 test('P147 unexpired cooldown remains visibly blocked after BFCache and never auto-spends cards',async()=>{
   const now=Date.now(),state=createInitialState(now);
   state.board[42].charges=0;state.board[42].cooldownUntil=now+120000;
-  state.bag.reset=1;
+  state.bag.reset=1;state.shop.purchases.reset=1;
   assert.equal(validateSave(state),true);
   const f=await mount(state);
   try{
