@@ -1091,6 +1091,15 @@ test('P2.65m hidden native change defers file read and restore until verified vi
   assert.equal(h.storage.getItem(SAVE_KEY),imported);
   assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),original);
   assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  button.click();
+  const fresh=controls.find(e=>e.id==='import-normal-file');
+  assert.notEqual(fresh,input,'hidden successful chooser must rotate before next consent');
+  input.dispatch('change');input.dispatch('cancel');await settle();
+  assert.equal(controls.find(e=>e.id==='cancel-normal-import').hidden,false,
+    'late hidden chooser events cannot cancel a newer chooser');
+  assert.equal(confirmations,1,'late events cannot request another restore');
+  assert.equal(h.storage.getItem(SAVE_KEY),imported);
+  fresh.dispatch('cancel');
 });
 
 test('P2.65m queued hidden file is revoked by BFCache pagehide',async()=>{
