@@ -1,4 +1,4 @@
-import {WIDTH,MAX_ENERGY,CHAINS,getLevel,moveOrMerge,produce,fulfillOrder,storeItem,withdrawItem,upgradeBuilding,getItemIcon,getItemName,useSupply,purchaseSupply,SUPPLY_ITEMS} from '../engine.mjs';
+import {WIDTH,MAX_ENERGY,CHAINS,getLevel,moveOrMerge,produce,fulfillOrder,storeItem,withdrawItem,upgradeWarehouse,getWarehouseUpgrade,upgradeBuilding,getItemIcon,getItemName,useSupply,purchaseSupply,SUPPLY_ITEMS} from '../engine.mjs';
 import {BUILDINGS} from '../economy.mjs';
 import {readStoryWorkshop,writeStoryWorkshop,STORY_WORKSHOP_KEY} from './workshop-storage.mjs';
 import {readStorySave} from './local-storage.mjs';
@@ -94,6 +94,27 @@ function render(){
   $('board-occupancy').textContent=used+' / '+state.board.length;
   $('warehouse-occupancy').textContent=stored+' / '+state.warehouse.capacity;
   $('store-selected').disabled=disabled||!selectedMaterial||!warehouseHasSpace;
+  // P145: an advertised paid deadlock escape must be actionable in story mode.
+  // The existing engine remains the sole authority for level, cost and revision.
+  const warehouseUpgrade=getWarehouseUpgrade(state.warehouse.capacity);
+  const warehouseBudget=nextStoryConstructionBudget(state);
+  const warehouseReserveRisk=warehouseUpgrade&&wouldSpendStoryConstructionReserve(
+    warehouseBudget,warehouseUpgrade.coins);
+  const upgradeButton=$('upgrade-story-warehouse');
+  upgradeButton.textContent=warehouseUpgrade
+    ? '扩容仓库至 '+warehouseUpgrade.newCapacity+' 格 · ◈'+warehouseUpgrade.coins
+    : '仓库已达到最大容量';
+  upgradeButton.disabled=disabled||!warehouseUpgrade||!warehouseBudget.ok||
+    getLevel(state.xp)<warehouseUpgrade.minLevel||state.coins<warehouseUpgrade.coins;
+  $('warehouse-upgrade-hint').textContent=!warehouseUpgrade
+    ? '仓库已达到当前规则允许的最大容量。'
+    : getLevel(state.xp)<warehouseUpgrade.minLevel
+      ? '扩容需达到 '+warehouseUpgrade.minLevel+' 级；当前为 '+getLevel(state.xp)+' 级。'
+      : state.coins<warehouseUpgrade.coins
+        ? '扩容需 ◈'+warehouseUpgrade.coins+'，目前 ◈'+state.coins+'。'
+        : warehouseReserveRisk
+          ? '扩容将动用下一处建筑的金币储备，付款前需要再次确认。'
+          : '扩容会实际扣除剧情金币；不会影响普通模式仓库。';
   const fullBoardGuidance=!boardHasSpace?describeStoryWorkshopStall(state,Date.now()):null;
   $('warehouse-hint').textContent=blocked
     ? '存档处于保护状态，仓库操作已暂停；请先核对存档提示。'
@@ -320,7 +341,7 @@ function touch(index){
 // Persistent buttons/links survive render(). A pointer started before a
 // BFCache transition or another render cannot authorize a delayed click.
 // This only revokes stale gestures; every write still uses the original CAS.
-for(const id of ['workshop-next-action','store-selected','build-garden',
+for(const id of ['workshop-next-action','store-selected','upgrade-story-warehouse','build-garden',
   'build-harbor','build-storefront','export-corrupt-workshop','reset-workshop']){
   guardStoryPersistentGesture($(id),
     ()=>lifecycleEpoch+':'+storageEpoch+':'+renderGeneration,
@@ -355,6 +376,30 @@ $('store-selected').addEventListener('click',()=>{
     $('board-notice').textContent='请先选中棋盘上的一件材料。';return;
   }
   commit(storeItem(state,selected));
+});
+$('upgrade-story-warehouse').addEventListener('click',()=>{
+  if(!revalidateWorkshopBeforeInteraction())return;
+  const rule=getWarehouseUpgrade(state.warehouse.capacity);
+  const budget=nextStoryConstructionBudget(state);
+  if(!rule||!budget.ok){
+    $('board-notice').textContent='无法确认仓库扩容条件，请核对当前存档。';
+    return;
+  }
+  if(wouldSpendStoryConstructionReserve(budget,rule.coins)){
+    let approved=false;
+    try{
+      approved=window.confirm('扩容仓库会使下一处建设「'+
+        BUILDINGS[budget.id].name+'」金币不足。确认继续支付吗？')===true;
+    }catch{}
+    // A native dialog is not a lease: check the original bytes after it closes.
+    if(!revalidateWorkshopBeforeInteraction())return;
+    if(!approved){
+      $('board-notice').textContent='已取消仓库扩容，金币未扣除。';
+      return;
+    }
+  }
+  // Existing engine rules, Web Lock, exact-byte CAS and publication checks.
+  return commit(upgradeWarehouse(state));
 });
 $('build-garden').addEventListener('click',()=>{
   if(blocked||saving)return;
