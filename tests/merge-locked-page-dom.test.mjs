@@ -984,6 +984,18 @@ test('P2.65l chooser pagehide or second hide always revokes selection',async()=>
     assert.equal(h.storage.getItem(SAVE_KEY),original,sequence);
     assert.equal(h.writes.length,before,sequence);
     assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null,sequence);
+    // Reopening a picker after a revoked lifecycle must use a fresh input:
+    // an old native event must not inherit the new user's permission.
+    const button=h.id('export-local-save').parentElement.children.find(e=>e.id==='import-normal-save');
+    button.click();
+    const fresh=h.id('export-local-save').parentElement.children.find(e=>e.id==='import-normal-file');
+    assert.notEqual(fresh,input,sequence+' must rotate the native input');
+    input.dispatch('change');input.dispatch('cancel');await settle();
+    assert.equal(h.storage.getItem(SAVE_KEY),original,'old chooser cannot restore after '+sequence);
+    fresh.files=[{size:imported.length,text:async()=>imported}];
+    fresh.dispatch('change');await settle();
+    assert.equal(h.storage.getItem(SAVE_KEY),imported,'new chooser remains usable after '+sequence);
+    assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),original,sequence);
   }
 });
 
@@ -1192,8 +1204,13 @@ test('P2.65p pagehide immediately releases hung import and ignores late file res
   assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null);
   assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
   button.click();
+  const fresh=h.id('export-local-save').parentElement.children.find(e=>e.id==='import-normal-file');
+  assert.notEqual(fresh,input,'BFCache recovery must not reuse a revoked input');
   input.files=[{size:imported.length,text:async()=>imported}];
   input.dispatch('change');await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),original,'late old input cannot use new chooser lease');
+  fresh.files=[{size:imported.length,text:async()=>imported}];
+  fresh.dispatch('change');await settle();
   assert.equal(h.storage.getItem(SAVE_KEY),imported);
   assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),original);
 });

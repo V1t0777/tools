@@ -746,6 +746,9 @@ guardPersistentChooserClick(byId('export-abnormal-reset-backup'), () => {
 // a generous grace period for delayed 'change'; never authorize a stale file.
 const IMPORT_PICKER_RETURN_GRACE_MS=15_000;
 let importEpoch=0,importBusy=false,importPicker=null,queuedHiddenSelection=null;
+// A revoked BFCache/second-hide chooser must never share its DOM input with a
+// later user gesture: late native events are otherwise indistinguishable.
+let importFileNeedsRotation=false;
 const importPending=()=>importBusy||importPicker!==null||queuedHiddenSelection!==null;
 let activeImportRead=null;
 let deliverHiddenSelection=()=>{};
@@ -764,6 +767,7 @@ function abortImportOnLifecycleExit(){
     '浏览器未能确认导入已取消，已暂停操作；请保留存档并重新打开页面核对');
 }
 window.addEventListener('pagehide',()=>{
+  importFileNeedsRotation=true;
   persistentGestureGeneration++;
   try{abortImportOnLifecycleExit();}
   finally{
@@ -794,6 +798,7 @@ document.addEventListener('visibilitychange',()=>{
     if(importPicker){
       if(importPicker.hiddenOnce){
         importPicker=null;queuedHiddenSelection=null;
+        importFileNeedsRotation=true;
       }else importPicker.hiddenOnce=true;
     }else queuedHiddenSelection=null;
     // A second background transition revokes the old chooser. The visible
@@ -883,6 +888,17 @@ if(saveActions){
     // cannot revoke a restore waiting for its Web Lock. Fail closed.
     if(typeof AbortController!=='function'){
       hint('当前浏览器缺少安全取消能力，暂不能导入存档');return;
+    }
+    // On BFCache/pagehide or a second background transition, the old input
+    // may still emit change/cancel after this new chooser opens. Rotate before
+    // granting a new lease, while still inside the user's click gesture.
+    if(importFileNeedsRotation){
+      try{replaceImportFile();importFileNeedsRotation=false;}
+      catch{
+        pauseUnsafe('IMPORT_PICKER_REPLACE_FAILED',
+          '无法隔离旧文件选择器，已暂停操作；请重新打开页面核对');
+        return;
+      }
     }
     // Opening a native chooser invalidates selected cells, captured drags
     // and detached action buttons. Late pointer events cannot become new
