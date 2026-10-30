@@ -965,6 +965,11 @@ if(saveActions){
         hint('未选择文件，已取消导入；请重新点击导入');
         return;
       }
+    // A nonempty native change consumes this input's chooser lease, including
+    // the iOS/WebView case where the selection arrives while hidden. A late
+    // duplicate on the same node must not inherit the next import consent.
+    // Rotate on the next user click, retaining this File for the current read.
+    if(file&&picker&&!importBusy)importFileNeedsRotation=true;
     // Some iOS/WebView choosers deliver change before visibility becomes
     // visible. Hold only the File handle, never read, confirm or write hidden.
     if(document.hidden&&picker?.hiddenOnce&&file){
@@ -981,12 +986,6 @@ if(saveActions){
       hint('文件选择事件重复，已取消导入，请重新选择');
       return;
     }
-    // A nonempty native change consumes this input's chooser lease. A late
-    // duplicate change/cancel on the same DOM node must not inherit the next
-    // chooser's consent, even when the first import was valid or rejected.
-    // Rotate at the next explicit click, not here: the selected File remains
-    // readable while the current restore is still in flight.
-    if(file&&picker&&!importBusy)importFileNeedsRotation=true;
     void acceptSelectedFile(file,picker);
     });
   }
