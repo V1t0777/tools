@@ -496,6 +496,81 @@ test('P0 mobile Chromium: 320–430px normal mode layout, native touch and save 
     assert.equal(await evalFn(k=>localStorage.getItem(k),storyKey),storySentinel);
     assert.equal(await evalFn(()=>document.documentElement.scrollWidth<=
       document.documentElement.clientWidth+1),true);
+    // The reset control is also a destructive mobile touch path. A canceled
+    // confirmation must preserve the cross-tab-adopted save, and a confirmed
+    // reset must publish a clean baseline without touching story/backup bytes.
+    const tapControl=async selector=>{
+      await evalFn(sel=>{
+        const el=document.querySelector(sel);
+        el.scrollIntoView({behavior:'instant',block:'center',inline:'center'});
+      },selector);
+      await evalFn(()=>new Promise(resolve=>
+        requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+      const point=await evalFn(sel=>{
+        const r=document.querySelector(sel).getBoundingClientRect();
+        return {x:r.left+r.width/2,y:r.top+r.height/2};
+      },selector);
+      assert.equal(await evalFn(({selector,x,y})=>
+        !!document.elementFromPoint(x,y)?.closest(selector),
+        {selector,...point}),true,'mobile touch target '+selector);
+      await call('Input.dispatchTouchEvent',
+        {type:'touchStart',touchPoints:[point]},sessionId);
+      await call('Input.dispatchTouchEvent',
+        {type:'touchEnd',touchPoints:[]},sessionId);
+    };
+    await evalFn(()=>{
+      window.__mobileResetConfirms=0;
+      window.confirm=()=>{window.__mobileResetConfirms++;return false;};
+    });
+    await tapControl('#reset');
+    await until(()=>evalFn(()=>window.__mobileResetConfirms===1),
+      'mobile reset cancellation confirmation');
+    assert.equal(await evalFn(k=>localStorage.getItem(k),KEY),finalRaw,
+      'declined reset must not replace adopted save');
+    assert.equal(await evalFn(k=>localStorage.getItem(k),backupKey),beforeBackup);
+    assert.equal(await evalFn(k=>localStorage.getItem(k),storyKey),storySentinel);
+
+    await evalFn(()=>{window.confirm=()=>{window.__mobileResetConfirms++;return true;};});
+    await tapControl('#reset');
+    await until(()=>evalFn(k=>{
+      const raw=localStorage.getItem(k);
+      if(!raw)return false;
+      const state=JSON.parse(raw);
+      return state.revision===0&&
+        document.getElementById('notice').textContent.includes('已重置试玩进度')&&
+        document.getElementById('save-status').textContent.includes('已保存于此浏览器');
+    },KEY),'confirmed mobile reset published');
+    assert.equal(await evalFn(()=>window.__mobileResetConfirms),2);
+    const resetRaw=await evalFn(k=>localStorage.getItem(k),KEY);
+    const resetState=JSON.parse(resetRaw);
+    assert.notEqual(resetRaw,finalRaw);
+    assert.equal(resetState.energy,initial.energy);
+    assert.equal(resetState.coins,initial.coins);
+    assert.equal(resetState.xp,initial.xp);
+    assert.equal(await evalFn(k=>localStorage.getItem(k),backupKey),beforeBackup);
+    assert.equal(await evalFn(k=>localStorage.getItem(k),storyKey),storySentinel);
+
+    await tapControl('#board .producer');
+    await until(()=>evalFn(k=>JSON.parse(localStorage.getItem(k))?.revision===1,KEY),
+      'post-reset mobile touch persisted');
+    await until(()=>evalFn(()=>
+      document.getElementById('save-status').textContent.includes('已保存于此浏览器')&&
+      !document.getElementById('export-local-save').disabled),
+      'post-reset export ready');
+    const postResetRaw=await evalFn(k=>localStorage.getItem(k),KEY);
+    assert.equal(JSON.parse(postResetRaw).energy,initial.energy-1);
+    await rm(downloadedPath,{force:true});
+    await tapControl('#export-local-save');
+    await until(()=>existsSync(downloadedPath),'post-reset JSON download',15000);
+    assert.equal(await readFile(downloadedPath,'utf8'),postResetRaw,
+      'post-reset export must match the new verified save');
+    assert.equal(await evalFn(k=>localStorage.getItem(k),KEY),postResetRaw);
+    assert.equal(await evalFn(k=>localStorage.getItem(k),backupKey),beforeBackup);
+    assert.equal(await evalFn(k=>localStorage.getItem(k),storyKey),storySentinel);
+    assert.equal(await evalFn(()=>
+      document.documentElement.scrollWidth<=document.documentElement.clientWidth+1),true);
+    t.diagnostic('320px Chromium reset: canceled touch preserved cross-tab save; confirmed touch reset, fresh production and exact JSON download passed. Not iPhone/WeChat.');
+
     t.diagnostic('320px Chromium: B locked UI write while A BFCache; A adopted B, rejected stale chooser, resumed native touch, exact downloaded JSON. Not iPhone/WeChat.');
 
     t.diagnostic('Mobile Chromium: 320–430px layout, touch/download/declined import, genuine BFCache stale chooser rejection, fresh touch and exact re-export passed. Not iPhone Safari/WeChat testing.');
