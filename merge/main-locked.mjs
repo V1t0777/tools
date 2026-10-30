@@ -833,6 +833,7 @@ if(saveActions){
     importFile=fresh;
     bindImportFileEvents(fresh);
     saveActions.append(fresh);
+    importFileNeedsRotation=false;
   }
   const cancelImportButton=document.createElement('button');
   cancelImportButton.id='cancel-normal-import';
@@ -974,7 +975,7 @@ if(saveActions){
     // visible. Hold only the File handle, never read, confirm or write hidden.
     if(document.hidden&&picker?.hiddenOnce&&file){
       if(!queuedHiddenSelection){
-        queuedHiddenSelection={file,picker};
+        queuedHiddenSelection={file,picker,input};
       }else{
         importPicker=null;queuedHiddenSelection=null;importFile.value='';
         hint('文件选择事件重复，已取消导入，请重新选择');
@@ -986,7 +987,7 @@ if(saveActions){
       hint('文件选择事件重复，已取消导入，请重新选择');
       return;
     }
-    void acceptSelectedFile(file,picker);
+    void settleSelectedFile(file,picker,input);
     });
   }
   bindImportFileEvents(importFile);
@@ -1008,9 +1009,25 @@ if(saveActions){
     // Never promise the previous save was untouched after a confirmed restore.
     if(!saveIssue)hint('已请求取消导入；若此前已确认恢复，请核对当前棋盘与恢复前备份');
   },{allowDuringImport:true});
-  deliverHiddenSelection=({file,picker})=>{
-    if(importPicker===picker)void acceptSelectedFile(file,picker);
+  deliverHiddenSelection=({file,picker,input})=>{
+    if(importPicker===picker)void settleSelectedFile(file,picker,input);
   };
+  // Keep the native input attached until its read/confirmation has settled:
+  // a native cancel during an in-flight read must still abort that read.
+  // Once settled, detach the consumed input before any new user gesture.
+  function settleSelectedFile(file,picker,input){
+    const retire=()=>{
+      if(input!==importFile||!importFileNeedsRotation)return;
+      try{replaceImportFile();}
+      catch{pauseUnsafe('IMPORT_PICKER_REPLACE_FAILED',
+        '无法隔离已完成的文件选择器，已暂停操作；请重新打开页面核对');}
+    };
+    void acceptSelectedFile(file,picker).then(retire,()=>{
+      pauseUnsafe('IMPORT_FILE_HANDLER_FAILED',
+        '文件选择结果无法安全确认，已暂停操作；请重新打开页面核对');
+      retire();
+    });
+  }
   async function acceptSelectedFile(file,picker){
     if(importPicker===picker)importPicker=null;
     else picker=null;
