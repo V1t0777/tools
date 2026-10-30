@@ -233,4 +233,90 @@ test('P0 real Chromium deadlock rescue: consent, stale selection, BFCache and on
   assert.equal((await save()).board[2],null);
   await checkOthers();
   t.diagnostic('Chromium genuine BFCache invalidated old rescue touch and accepted fresh confirmed rescue');
+
+  // A remains foreground throughout the following two-tab race. B performs
+  // an actual same-origin Web Locks transaction without invoking its hidden
+  // page's UI. This isolates storage adoption from visibility/BFCache guards.
+  await seed();
+  const {targetId:otherTarget}=await call('Target.createTarget',{url:'about:blank'});
+  const {sessionId:otherSession}=await call('Target.attachToTarget',
+    {targetId:otherTarget,flatten:true});
+  await call('Page.enable',{},otherSession);
+  await call('Runtime.enable',{},otherSession);
+  await call('Page.navigate',{url:base+'/merge/index.html'},otherSession);
+  async function otherEvaluate(expression){
+    const result=await call('Runtime.evaluate',
+      {expression,returnByValue:true,awaitPromise:true,userGesture:true},otherSession);
+    if(result.exceptionDetails)throw Error('Other tab JS: '+JSON.stringify(result.exceptionDetails));
+    return result.result.value;
+  }
+  await until(()=>otherEvaluate("location.pathname==='/merge/index.html' && document.readyState==='complete'"),
+    'second same-origin tab loaded');
+  await front();
+  assert.equal(await evaluate('document.hidden'),false,'primary tab must remain foreground');
+  await select(2);
+  await evaluate("window.__rescueConfirmCount=0;window.confirm=()=>{window.__rescueConfirmCount++;return true;};true");
+  await pointer('deadlock-discard');
+  const oldCrossTabRaw=await raw();
+  const competing=await otherEvaluate("(async()=>{"+
+    "const key="+JSON.stringify(KEY)+";"+
+    "const {discardDeadlockedMaterial}=await import('/merge/deadlock-rescue.mjs');"+
+    "const {validateSave}=await import('/merge/engine.mjs');"+
+    "return navigator.locks.request('toolbox.merge-isle.normal-save.write-v1',"+
+    "{mode:'exclusive',ifAvailable:true},lock=>{"+
+    "if(!lock)return {ok:false,reason:'LOCK_BUSY'};"+
+    "const old=localStorage.getItem(key);"+
+    "const s=JSON.parse(old);"+
+    "const result=discardDeadlockedMaterial(s,5,"+
+    "{confirmed:true,expectedItemId:s.board[5].id});"+
+    "if(!result.ok||!validateSave(result.state))return {ok:false,reason:'ENGINE_REJECTED'};"+
+    "const next=JSON.stringify(result.state);"+
+    "localStorage.setItem(key,next);"+
+    "return {ok:true,old,next,revision:result.state.revision};"+
+    "});})()");
+  assert.equal(competing.ok,true,'competing tab must perform a valid locked engine write');
+  assert.equal(competing.old,oldCrossTabRaw,'other tab must begin from reviewed bytes');
+  await until(()=>evaluate(
+    "document.getElementById('save-status').textContent.includes('已同步其他标签页')"),
+    'foreground tab adopted locked external rescue');
+  assert.equal(await evaluate('document.hidden'),false,
+    'cross-tab invalidation must not rely on hiding the primary tab');
+  assert.equal(await evaluate("document.querySelector('#board .cell.selected')===null"),true);
+  await clickTouch('deadlock-discard');
+  assert.equal(await evaluate('window.__rescueConfirmCount'),0,
+    'stale pointer must never invoke destructive consent after adoption');
+  assert.equal(await raw(),competing.next,'stale rescue click must not overwrite the other tab');
+  assert.equal((await save()).board[5],null);
+  await checkOthers();
+  // One empty slot must permit a fresh, ordinary action after adoption.
+  await select(42);
+  await until(async()=>(await save()).revision===competing.revision+1,
+    'fresh production after foreground cross-tab adoption');
+  assert.equal((await save()).board.filter(Boolean).length,56);
+  await checkOthers();
+  t.diagnostic('Chromium foreground two-tab Web Lock adoption revoked stale rescue touch; fresh production succeeded');
+
+  // An uncoordinated legacy tab can replace storage during the synchronous
+  // native confirmation. The reviewed exact bytes must remain authoritative:
+  // no rescue write is allowed even when the new bytes validate structurally.
+  await seed();
+  await select(2);
+  const beforeConfirm=await raw();
+  await evaluate("window.__rescueConfirmCount=0;window.__injectedRaw=null;"+
+    "window.confirm=()=>{window.__rescueConfirmCount++;"+
+    "const key="+JSON.stringify(KEY)+";"+
+    "const s=JSON.parse(localStorage.getItem(key));s.revision++;"+
+    "window.__injectedRaw=JSON.stringify(s);"+
+    "localStorage.setItem(key,window.__injectedRaw);return true;};true");
+  await evaluate("document.getElementById('deadlock-discard').click();true");
+  assert.equal(await evaluate('window.__rescueConfirmCount'),1);
+  const injectedRaw=await evaluate('window.__injectedRaw');
+  assert.notEqual(injectedRaw,beforeConfirm);
+  assert.equal(await raw(),injectedRaw,
+    'reentrant save replacement must survive without an extra rescue write');
+  assert.equal((await save()).board.filter(Boolean).length,56,
+    'old consent must not discard any material from the new save');
+  await checkOthers();
+  t.diagnostic('Chromium rescue consent rejected reentrant exact-byte change without modifying the replacement save');
+
 });
