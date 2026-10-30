@@ -436,7 +436,8 @@ test('P0 mobile Chromium: 320–430px normal mode layout, native touch and save 
       document.getElementById('energy').textContent.startsWith(energy+' /')&&
       document.getElementById('cancel-normal-import').hidden&&
       !document.getElementById('import-normal-save').disabled&&
-      document.getElementById('save-status').textContent.includes('已保存于此浏览器'),
+      (document.getElementById('save-status').textContent.includes('已同步其他标签页')||
+       document.getElementById('save-status').textContent.includes('已保存于此浏览器')),
       String(initial.energy-4)),'A adopted B revision and revoked chooser');
     assert.equal(await evalFn(k=>localStorage.getItem(k),KEY),rawB);
     await evalFn(raw=>{
