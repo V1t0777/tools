@@ -1,5 +1,5 @@
 /** Side-effect-free narrative runtime; NEVER writes to normal-mode economy. */
-import {registerStoryPack,validateStoryProgress} from '../mode-boundaries.mjs';
+import {registerStoryPack,validateStoryProgress,MAX_TRACKED_NODES,MAX_TRACKED_CHOICES} from '../mode-boundaries.mjs';
 const own=(obj,key)=>Object.prototype.hasOwnProperty.call(obj,key);
 const idPattern=/^[a-z][a-z0-9-]{0,63}$/;
 // Align pack preflight with the persisted save's reserved-name contract.
@@ -17,6 +17,8 @@ function checkPack(pack){
     !text(pack.title)||!Number.isSafeInteger(pack.version)||pack.version<1||
     !Array.isArray(pack.entries)||pack.entries.length>1500)throw new TypeError('Invalid story pack');
   const seen=new Set();
+  const perKind={main:0,side:0,incident:0};
+  let choiceScenes=0,hasDailyIncidents=false;
   for(const item of pack.entries){
     if(!plain(item)||!validStoryId(item.id)||!kinds.has(item.kind)||seen.has(item.id)||
       !text(item.title)||!text(item.chapter)||!text(item.place)||typeof item.repeatable!=='boolean'||
@@ -29,7 +31,17 @@ function checkPack(pack){
       new Set(item.choices.map(c=>c.id)).size!==item.choices.length ||
       (item.repeatable&&item.kind!=='incident'))throw new TypeError('Invalid story entry: '+String(item?.id));
     seen.add(item.id);
+    // The save schema has finite per-kind completion arrays. Reject a pack
+    // before a late chapter becomes impossible to persist.
+    if(++perKind[item.kind]>MAX_TRACKED_NODES)
+      throw new TypeError('Story pack completion budget exceeded');
+    if(item.choices.length)choiceScenes++;
+    if(item.kind==='incident')hasDailyIncidents=true;
   }
+  // A daily incident consumes one additional choices slot for its durable
+  // day pin. Old day pins are recycled, but the current one must always fit.
+  if(choiceScenes+Number(hasDailyIncidents)>MAX_TRACKED_CHOICES)
+    throw new TypeError('Story pack choice budget exceeded');
   return pack;
 }
 export function validateStoryPack(pack){try{checkPack(pack);return true;}catch{return false;}}
