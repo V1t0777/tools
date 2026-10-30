@@ -950,6 +950,13 @@ if(saveActions){
     input.addEventListener('change',()=>{
       if(input!==importFile)return;
       const picker=importPicker,file=importFile.files?.[0];
+      // A nonempty change consumes the native chooser before its asynchronous
+      // File.text()/Web Lock work completes. Duplicate change events during
+      // that flight must NOT start a second handler: its early cleanup could
+      // detach the input and make a later native cancel unable to abort the
+      // original restore. Preserve the first read's cancellation lease.
+      // An unrequested/retired chooser result likewise has no authority.
+      if(!picker||importBusy)return;
       // An empty native change ends this chooser, but it is NOT the same as
       // the 'cancel' event on every Safari/WebView version. Reusing the input
       // would let a late old change/cancel inherit the next chooser's lease.
