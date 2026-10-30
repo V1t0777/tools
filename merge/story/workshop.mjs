@@ -1,4 +1,4 @@
-import {WIDTH,MAX_ENERGY,CHAINS,getLevel,moveOrMerge,produce,fulfillOrder,storeItem,withdrawItem,upgradeWarehouse,getWarehouseUpgrade,upgradeBuilding,getItemIcon,getItemName,useSupply,purchaseSupply,SUPPLY_ITEMS} from '../engine.mjs';
+import {WIDTH,MAX_ENERGY,CHAINS,getLevel,advanceTime,moveOrMerge,produce,fulfillOrder,storeItem,withdrawItem,upgradeWarehouse,getWarehouseUpgrade,upgradeBuilding,getItemIcon,getItemName,useSupply,purchaseSupply,SUPPLY_ITEMS} from '../engine.mjs';
 import {BUILDINGS} from '../economy.mjs';
 import {readStoryWorkshop,writeStoryWorkshop,STORY_WORKSHOP_KEY} from './workshop-storage.mjs';
 import {readStorySave} from './local-storage.mjs';
@@ -59,8 +59,12 @@ function render(){
   // must not paint outdated building eligibility over it.
   if(currentRender!==renderGeneration)return;
   const disabled=blocked||saving||pageSuspended();
+  // Project elapsed energy/cooldown on return from a long mobile suspension.
+  // This is strictly read-only: the persisted raw snapshot and write CAS stay
+  // unchanged until an explicit engine action advances time and commits.
+  const visibleState=advanceTime(state,Date.now());
   status();
-  $('energy').textContent=state.energy+' / '+MAX_ENERGY;
+  $('energy').textContent=visibleState.energy+' / '+MAX_ENERGY;
   $('coins').textContent=String(state.coins);
   $('xp').textContent=String(state.xp);
   const count=state.progress.orders;
@@ -78,7 +82,8 @@ function render(){
       const glyph=document.createElement('span');glyph.className='glyph';glyph.textContent=getItemIcon(item);
       button.append(glyph);
       const info=document.createElement('span');info.className='tier';
-      info.textContent=item.kind==='producer'?(item.charges>0?item.charges+'次':'冷却中'):'Lv.'+item.tier;
+      const visibleItem=visibleState.board[i];
+      info.textContent=item.kind==='producer'?(visibleItem.charges>0?visibleItem.charges+'次':'冷却中'):'Lv.'+item.tier;
       button.append(info);
     }
     button.addEventListener('click',guardRenderedAction(()=>touch(i)));fragment.append(button);
@@ -150,11 +155,11 @@ function render(){
     button.type='button';button.className='story-supply-action';
     button.dataset.supplyUse=id;
     button.textContent=item.icon+' 使用'+item.name+' · '+item.effect+'（剩余 '+state.bag[id]+'）';
-    button.disabled=disabled||state.bag[id]===0||state.energy>=MAX_ENERGY;
+    button.disabled=disabled||state.bag[id]===0||visibleState.energy>=MAX_ENERGY;
     button.addEventListener('click',guardRenderedAction(()=>commit(useSupply(state,id))));
     bag.append(button);
   }
-  const cooling=state.board.filter(item=>item?.kind==='producer'&&
+  const cooling=visibleState.board.filter(item=>item?.kind==='producer'&&
     item.charges===0&&item.cooldownUntil>Date.now());
   const cooldownList=$('story-supply-cooldowns');cooldownList.replaceChildren();
   $('story-supply-cooldown-hint').textContent=cooling.length

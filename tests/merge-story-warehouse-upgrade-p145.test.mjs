@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {createInitialState,storeItem,produce,validateSave,MAX_TIER} from '../merge/engine.mjs';
+import {createInitialState,storeItem,produce,validateSave,MAX_TIER,MAX_ENERGY,ENERGY_REGEN_MS,PRODUCER_CHARGES} from '../merge/engine.mjs';
 import {STORY_WORKSHOP_KEY,readStoryWorkshop} from '../merge/story/workshop-storage.mjs';
 import {SAVE_KEY} from '../merge/storage.mjs';
 import {STORY_SAVE_KEY} from '../merge/mode-boundaries.mjs';
@@ -195,5 +195,72 @@ test('P146 same-revision peer replacement during warehouse consent is rejected',
     assert.match(f.document.getElementById('board-notice').textContent,/存档已变化/);
     assert.equal(f.map.get(SAVE_KEY),'normal-mode-sentinel');
     assert.equal(f.map.get(STORY_SAVE_KEY),'story-dialogue-sentinel');
+  }finally{f.restore();}
+});
+
+
+test('P147 long background return projects recovered energy and producer without writing',async()=>{
+  const now=Date.now(),state=createInitialState(now);
+  state.energy=0;state.energyAt=now-3*ENERGY_REGEN_MS-1000;
+  state.board[42].charges=0;state.board[42].cooldownUntil=now-5000;
+  assert.equal(validateSave(state),true);
+  const f=await mount(state);
+  try{
+    const energy=f.document.getElementById('energy');
+    const cell=()=>f.document.getElementById('workshop-board').children[0].children[42];
+    assert.equal(energy.textContent,'3 / '+MAX_ENERGY);
+    assert.equal(cell().children[1].textContent,PRODUCER_CHARGES+'次');
+    assert.match(f.document.getElementById('story-supply-cooldown-hint').textContent,/没有正在冷却/);
+    assert.equal(f.writes,0);
+    f.window.emit('pagehide');
+    assert.equal(cell().disabled,true);
+    f.window.emit('pageshow');
+    assert.equal(cell().disabled,false);
+    assert.equal(energy.textContent,'3 / '+MAX_ENERGY);
+    assert.equal(f.writes,0);
+    await cell().click();
+    const saved=readStoryWorkshop(f.storage);
+    assert.equal(saved.blocked,false);
+    assert.equal(saved.state.energy,2);
+    assert.equal(saved.state.board[42].charges,PRODUCER_CHARGES-1);
+    assert.equal(saved.state.revision,1);
+    assert.equal(f.writes,1);
+    assert.equal(f.map.get(SAVE_KEY),'normal-mode-sentinel');
+    assert.equal(f.map.get(STORY_SAVE_KEY),'story-dialogue-sentinel');
+  }finally{f.restore();}
+});
+
+test('P147 recovered full energy disables wasteful supply use without a save write',async()=>{
+  const now=Date.now(),state=createInitialState(now);
+  state.energy=MAX_ENERGY-1;state.energyAt=now-2*ENERGY_REGEN_MS;
+  state.bag.soda=1;
+  assert.equal(validateSave(state),true);
+  const f=await mount(state);
+  try{
+    const soda=f.document.getElementById('story-supply-bag').children[0];
+    assert.equal(f.document.getElementById('energy').textContent,MAX_ENERGY+' / '+MAX_ENERGY);
+    assert.equal(soda.disabled,true);
+    assert.equal(f.writes,0);
+    f.window.emit('pagehide');f.window.emit('pageshow');
+    assert.equal(f.document.getElementById('story-supply-bag').children[0].disabled,true);
+    assert.equal(f.writes,0);
+    assert.equal(readStoryWorkshop(f.storage).state.energy,MAX_ENERGY-1);
+  }finally{f.restore();}
+});
+
+test('P147 unexpired cooldown remains visibly blocked after BFCache and never auto-spends cards',async()=>{
+  const now=Date.now(),state=createInitialState(now);
+  state.board[42].charges=0;state.board[42].cooldownUntil=now+120000;
+  state.bag.reset=1;
+  assert.equal(validateSave(state),true);
+  const f=await mount(state);
+  try{
+    const cell=()=>f.document.getElementById('workshop-board').children[0].children[42];
+    assert.equal(cell().children[1].textContent,'冷却中');
+    f.window.emit('pagehide');f.window.emit('pageshow');
+    assert.equal(cell().children[1].textContent,'冷却中');
+    assert.match(f.document.getElementById('story-supply-cooldown-hint').textContent,/正在冷却/);
+    assert.equal(f.writes,0);
+    assert.equal(readStoryWorkshop(f.storage).state.bag.reset,1);
   }finally{f.restore();}
 });
