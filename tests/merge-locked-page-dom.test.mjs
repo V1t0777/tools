@@ -1172,8 +1172,17 @@ test('P2.65n second file import preserves original backup without blocking gamep
   assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),original);
   const writes=h.writes.length;
   const second=JSON.stringify({...h.saved(),revision:2,coins:84});
-  button.click();input.files=[{size:second.length,text:async()=>second}];
-  input.dispatch('change');await settle();
+  button.click();
+  const fresh=controls.find(e=>e.id==='import-normal-file');
+  assert.notEqual(fresh,input,'completed chooser must not be reused for a second consent');
+  assert.equal(input.parentElement,null,'old completed chooser is detached');
+  input.files=[{size:second.length,text:async()=>second}];
+  input.dispatch('change');input.dispatch('cancel');await settle();
+  assert.equal(controls.find(e=>e.id==='cancel-normal-import').hidden,false,
+    'late old chooser events cannot revoke a new pending consent');
+  assert.equal(h.storage.getItem(SAVE_KEY),first,'late old chooser cannot overwrite save');
+  fresh.files=[{size:second.length,text:async()=>second}];
+  fresh.dispatch('change');await settle();
   assert.match(h.id('notice').textContent,/备份槽/);
   assert.equal(h.writes.length,writes,'second import must not overwrite either slot');
   assert.equal(h.storage.getItem(SAVE_KEY),first);
