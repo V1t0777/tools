@@ -475,15 +475,21 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   // A second background transition is not one native chooser roundtrip:
   // revoke the stale chooser and its visible cancel UI immediately. Any
   // delayed change from that input must remain unable to restore progress.
-  const doubleHidePicker=await evalOn(b,`(()=>{
+  await waitWithSnapshot(async()=>await evalOn(b,
+    "document.getElementById('cancel-normal-import').hidden&&"+
+    "!document.getElementById('import-normal-save').disabled"),
+    'previous hidden chooser fully released before next selection',b);
+  await evalOn(b,`(()=>{
     window.__doubleHideConfirms=0;
     window.confirm=()=>{window.__doubleHideConfirms++;return true;};
     const input=document.getElementById('import-normal-file');
     input.click=()=>{};
     document.getElementById('import-normal-save').click();
-    return !document.getElementById('cancel-normal-import').hidden;
+    return true;
   })()`);
-  assert.equal(doubleHidePicker,true,'double-hide scenario must begin with active chooser');
+  await waitWithSnapshot(async()=>await evalOn(b,
+    "!document.getElementById('cancel-normal-import').hidden"),
+    'double-hide scenario begins with active chooser',b);
   await front(a);
   await until(async()=>await evalOn(b,'document.hidden'),'first chooser background');
   await front(b);
