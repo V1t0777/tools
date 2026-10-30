@@ -146,6 +146,43 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
         await call('Emulation.clearDeviceMetricsOverride',{},p.sessionId);
       }
     }
+    // P144: real Chromium preference emulation and narrow-screen CSS safe-area contract.
+    // Emulated preferences do not establish iOS notch or WebView device behavior.
+    async function checkMobilePreferences(p,kind){
+      await call('Emulation.setDeviceMetricsOverride',
+        {width:320,height:720,deviceScaleFactor:2,mobile:true},p.sessionId);
+      try{
+        await call('Emulation.setEmulatedMedia',{features:[
+          {name:'prefers-color-scheme',value:'dark'},
+          {name:'prefers-reduced-motion',value:'reduce'}
+        ]},p.sessionId);
+        const metrics=await evalOn(p,'(()=>{const root=document.documentElement;'+
+          'const safe=Array.from(document.styleSheets).some(sheet=>'+
+          'Array.from(sheet.cssRules||[]).some(rule=>'+
+          'rule.conditionText?.includes("360px")&&'+
+          'Array.from(rule.cssRules||[]).some(inner=>'+
+          'inner.selectorText===".story-shell"&&'+
+          'inner.style.paddingLeft.includes("safe-area-inset-left")&&'+
+          'inner.style.paddingRight.includes("safe-area-inset-right"))));'+
+          'const track=document.querySelector("#progress-fill");'+
+          'return {dark:matchMedia("(prefers-color-scheme: dark)").matches,'+
+          'reduce:matchMedia("(prefers-reduced-motion: reduce)").matches,'+
+          'scheme:getComputedStyle(root).colorScheme,'+
+          'motion:track?getComputedStyle(track).transitionDuration:null,'+
+          'overflow:root.scrollWidth>root.clientWidth+1,safe};})()');
+        assert.equal(metrics.dark,true,'P144 dark preference must be active');
+        assert.equal(metrics.reduce,true,'P144 reduced-motion preference must be active');
+        assert.equal(metrics.scheme,'dark','P144 story theme must use dark color scheme');
+        assert.equal(metrics.overflow,false,'P144 dark narrow page must not overflow');
+        assert.equal(metrics.safe,true,'P144 320px override must preserve both safe-area insets');
+        if(kind==='story')
+          assert.equal(metrics.motion,'0s','P144 story progress animation must honor reduced motion');
+        t.diagnostic('P144 Chromium '+kind+' 320px: dark/reduced-motion and safe-area CSS contract');
+      }finally{
+        await call('Emulation.setEmulatedMedia',{features:[]},p.sessionId);
+        await call('Emulation.clearDeviceMetricsOverride',{},p.sessionId);
+      }
+    }
     const readRaw=(p,key)=>evalOn(p,'localStorage.getItem('+JSON.stringify(key)+')');
     const readJSON=async(p,key)=>JSON.parse(await readRaw(p,key));
     const a=await page();await front(a);
@@ -154,6 +191,7 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     await evalOn(a,'localStorage.setItem('+JSON.stringify(normalKey)+',"normal-mode-sentinel");true');
     await checkMobileLayout(a,320,'story');
     await checkMobileLayout(a,390,'story');
+    await checkMobilePreferences(a,'story');
     async function finishScene(id,p=a){
       await until(async()=>evalOn(p,"!document.getElementById('journey-read').hidden&&!document.getElementById('journey-read').disabled"),'readable '+id);
       await evalOn(p,"document.getElementById('journey-read').click();true");
@@ -181,6 +219,7 @@ test('P112 real Chromium: story first-order gate, two-tab workshop conflict and 
     await until(async()=>evalOn(a,"document.querySelectorAll('#workshop-board button').length===56"),'56 real cells');
     await checkMobileLayout(a,320,'workshop');
     await checkMobileLayout(a,390,'workshop');
+    await checkMobilePreferences(a,'workshop');
     assert.match(await evalOn(a,"document.getElementById('workshop-next-guidance').textContent"),/委托|订单|第一单/);
     assert.equal(await evalOn(a,"document.getElementById('workshop-next-action').getAttribute('href')"),'#orders-goal');
     await evalOn(a,"document.querySelector('#workshop-board .producer').click();true");
