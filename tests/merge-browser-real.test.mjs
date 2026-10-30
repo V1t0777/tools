@@ -830,7 +830,12 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   assert.equal(await evalOn(b,`document.querySelectorAll('.drag-ghost').length`),0,
     'cancelled touch must remove the ghost');
   const newProducer=await evalOn(b,`(()=>{
-    const el=document.querySelector('#board .producer');
+    // Prior gameplay may have exhausted the first producer. The recovery
+    // assertion is about native touch after cancellation, not cooldown.
+    const save=JSON.parse(localStorage.getItem("toolbox.merge-isle.local.v1"));
+    const slot=save.board.findIndex(item=>item?.kind==='producer'&&item.charges>0);
+    if(slot<0)throw Error('No charged producer available after touch cancellation');
+    const el=document.querySelector('#board [data-slot="'+slot+'"]');
     el.scrollIntoView({block:'center'});
     const r=el.getBoundingClientRect();
     return {x:r.left+r.width/2,y:r.top+r.height/2};
