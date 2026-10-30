@@ -307,8 +307,14 @@ test('P0 mobile Chromium: 320–430px normal mode layout, native touch and save 
       window.__staleMobileInput.files=files.files;
       window.__staleMobileInput.dispatchEvent(new Event('change',{bubbles:true}));
     },initialRaw);
-    await until(()=>evalFn(()=>document.getElementById('notice').textContent.includes(
-      '文件选择期间页面或存档已变化')),'stale chooser rejected after BFCache');
+    // Revoked native inputs now drop unsolicited change synchronously,
+    // without creating a second async handler or promising a fresh consent.
+    // Wait one task turn and verify the safety state, not a transient hint.
+    await evalFn(()=>new Promise(resolve=>setTimeout(resolve,30)));
+    assert.equal(await evalFn(()=>document.getElementById('cancel-normal-import').hidden),true,
+      'stale BFCache chooser must not re-arm the import cancellation UI');
+    assert.equal(await evalFn(()=>document.getElementById('import-normal-save').disabled),false,
+      'stale BFCache chooser must not start a new import flight');
     assert.equal(await evalFn(()=>window.__returnConfirms),0);
     assert.equal(await evalFn(k=>localStorage.getItem(k),KEY),beforeLeave);
     assert.equal(await evalFn(k=>localStorage.getItem(k),backupKey),beforeBackup);
