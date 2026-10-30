@@ -58,7 +58,10 @@ function persist(storage,state){
   assert.equal(validateSave(state),true);
   const previous=readStoryWorkshop(storage,NOW);
   assert.equal(previous.blocked,false);
-  assert.equal(writeStoryWorkshop(storage,state,{expectedRaw:previous.raw}),true);
+  assert.equal(writeStoryWorkshop(storage,state,{expectedRaw:previous.raw}),true,
+    'persist rejected: previous revision '+previous.state.revision+
+    ', next revision '+state.revision+', previous bytes '+(previous.raw?.length??0)+
+    ', next bytes '+JSON.stringify(state).length);
   const restored=readStoryWorkshop(storage,NOW);
   assert.deepEqual(restored.state,state);
   return restored;
