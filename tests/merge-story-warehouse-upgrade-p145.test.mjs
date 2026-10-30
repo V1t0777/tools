@@ -306,3 +306,54 @@ test('P149 impossible cooldown suppresses misleading engine countdown without sp
     assert.equal(f.map.get(STORY_SAVE_KEY),'story-dialogue-sentinel');
   }finally{f.restore();}
 });
+
+test('P150 cold start warns about a future energy timestamp before any failed tap',async()=>{
+  const now=Date.now(),state=createInitialState(now);
+  state.energy=0;state.energyAt=now+2*ENERGY_REGEN_MS;
+  assert.equal(validateSave(state),true);
+  const f=await mount(state);
+  try{
+    const notice=()=>f.document.getElementById('board-notice').textContent;
+    assert.match(notice(),/设备时间早于存档的体力计时/);
+    assert.doesNotMatch(notice(),/预计\\d+秒后自然恢复/);
+    assert.equal(f.writes,0);
+    f.window.emit('pagehide');f.window.emit('pageshow');
+    assert.match(notice(),/设备时间早于存档的体力计时/);
+    assert.equal(f.writes,0);
+    assert.equal(f.map.get(STORY_WORKSHOP_KEY),JSON.stringify(state));
+    assert.equal(f.map.get(SAVE_KEY),'normal-mode-sentinel');
+    assert.equal(f.map.get(STORY_SAVE_KEY),'story-dialogue-sentinel');
+  }finally{f.restore();}
+});
+
+test('P150 BFCache return warns about impossible producer cooldown without spending a card',async()=>{
+  const now=Date.now(),state=createInitialState(now);
+  state.board=state.board.map(item=>item?.kind==='producer'
+    ? {...item,charges:0,cooldownUntil:now+2*PRODUCER_RECHARGE_MS}:item);
+  state.bag.reset=1;state.shop.purchases.reset=1;
+  assert.equal(validateSave(state),true);
+  const f=await mount(state);
+  try{
+    const notice=()=>f.document.getElementById('board-notice').textContent;
+    assert.match(notice(),/工坊冷却时间超出正常上限/);
+    f.window.emit('pagehide');f.window.emit('pageshow');
+    assert.match(notice(),/工坊冷却时间超出正常上限/);
+    assert.equal(f.writes,0);
+    assert.equal(readStoryWorkshop(f.storage).state.bag.reset,1);
+    assert.equal(f.map.get(SAVE_KEY),'normal-mode-sentinel');
+    assert.equal(f.map.get(STORY_SAVE_KEY),'story-dialogue-sentinel');
+  }finally{f.restore();}
+});
+
+test('P150 ordinary cooldown must not be mistaken for device clock rollback',async()=>{
+  const now=Date.now(),state=createInitialState(now);
+  state.board[42].charges=0;
+  state.board[42].cooldownUntil=now+PRODUCER_RECHARGE_MS;
+  assert.equal(validateSave(state),true);
+  const f=await mount(state);
+  try{
+    assert.doesNotMatch(f.document.getElementById('board-notice').textContent,/设备时间|冷却时间超出正常上限/);
+    assert.equal(f.writes,0);
+    assert.equal(f.map.get(STORY_WORKSHOP_KEY),JSON.stringify(state));
+  }finally{f.restore();}
+});
