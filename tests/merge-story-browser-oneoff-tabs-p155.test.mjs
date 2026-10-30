@@ -200,5 +200,64 @@ test('P155 real Chromium tabs: a peer completes a pinned one-off; stale UI block
     assert.equal(await readRaw(a,normalKey),'normal-mode-sentinel');
     assert.equal(await readRaw(a,workshopKey),null,
       'the incident cannot initialize or change story workshop economy');
-    t.diagnostic('P155 two real Chromium tabs: peer completion, stale-tab block, read-only replay');
+    // P156: exercise real Chromium DOM/localStorage with simulated BFCache
+    // lifecycle events. These synthetic events are NOT a Safari BFCache test.
+    await evalOn(a,"window.dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}));true");
+    assert.equal(await evalOn(a,"document.getElementById('story-dialog').open"),false);
+    await evalOn(a,"window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}));true");
+    await until(async()=>evalOn(a,
+      "document.getElementById('journey-daily-read')?.hidden===false&&"+
+      "document.getElementById('journey-daily-read')?.disabled===false"),
+    'unchanged suspended snapshot resumes without a write');
+    assert.equal(await readRaw(a,STORY_SAVE_KEY),committed,
+      'a clean simulated BFCache return must not increment story revision');
+
+    // A same-document storage mutation emits no StorageEvent to itself.
+    // Emulate a peer write missed during suspension, preserving revision but
+    // changing valid choice bytes. The resumed page must fail closed.
+    await evalOn(a,"document.getElementById('journey-daily-read').click();true");
+    await until(async()=>evalOn(a,"document.getElementById('story-dialog').open"),
+      'read-only dialogue reopened before suspension');
+    await evalOn(a,"window.dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}));true");
+    const keyExpr=JSON.stringify(STORY_SAVE_KEY);
+    const replacement=await evalOn(a,`(()=>{
+      const save=JSON.parse(localStorage.getItem(${keyExpr}));
+      save.packs.core.choices['old-crate']=
+        save.packs.core.choices['old-crate']==='register'?'ask':'register';
+      const raw=JSON.stringify(save);
+      localStorage.setItem(${keyExpr},raw);
+      return raw;
+    })()`);
+    assert.notEqual(replacement,committed);
+    assert.equal(JSON.parse(replacement).revision,JSON.parse(committed).revision,
+      'same-revision byte changes must not be treated as an identical pin');
+    await evalOn(a,"window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}));true");
+    await until(async()=>evalOn(a,
+      "document.getElementById('save-state').textContent.includes('其他标签页')"),
+    'resume refuses a changed same-revision raw snapshot');
+    assert.equal(await evalOn(a,"document.getElementById('story-dialog').open"),false);
+    assert.equal(await evalOn(a,"document.getElementById('journey-daily-read').hidden"),true);
+    await evalOn(a,"document.getElementById('complete-story').click();true");
+    assert.equal(await readRaw(a,STORY_SAVE_KEY),replacement,
+      'blocked resume must never overwrite the changed save');
+
+    // Missing original bytes must also block a resumed tab, rather than
+    // silently initializing a new story over a deleted save.
+    await call('Page.reload',{ignoreCache:true},a.sessionId);
+    await until(async()=>evalOn(a,
+      "document.getElementById('journey-daily-read')?.hidden===false"),
+    'valid replacement loads before deletion');
+    await evalOn(a,"window.dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}));true");
+    await evalOn(a,'localStorage.removeItem('+keyExpr+');true');
+    await evalOn(a,"window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}));true");
+    await until(async()=>evalOn(a,
+      "document.getElementById('save-state').textContent.includes('其他标签页')"),
+    'missing original snapshot blocks resume');
+    assert.equal(await readRaw(a,STORY_SAVE_KEY),null,
+      'a suspended page must not recreate a deleted story save');
+    assert.equal(await readRaw(a,normalKey),'normal-mode-sentinel',
+      'none of the lifecycle checks may touch normal-mode storage');
+    assert.equal(await readRaw(a,workshopKey),null,
+      'none of the lifecycle checks may initialize story economy');
+    t.diagnostic('P156 Chromium: clean lifecycle, same-revision changed bytes, deleted snapshot all guarded');
   });
