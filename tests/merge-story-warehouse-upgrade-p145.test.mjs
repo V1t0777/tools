@@ -315,7 +315,7 @@ test('P150 cold start warns about a future energy timestamp before any failed ta
   try{
     const notice=()=>f.document.getElementById('board-notice').textContent;
     assert.match(notice(),/设备时间早于存档的体力计时/);
-    assert.doesNotMatch(notice(),/预计\\d+秒后自然恢复/);
+    assert.doesNotMatch(notice(),/预计\d+秒后自然恢复/);
     assert.equal(f.writes,0);
     f.window.emit('pagehide');f.window.emit('pageshow');
     assert.match(notice(),/设备时间早于存档的体力计时/);
