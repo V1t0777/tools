@@ -48,7 +48,7 @@ function cdp(url){
 }
 
 test('P0 mobile Chromium: 320–430px normal mode layout, native touch and save controls',
-  {timeout:90000},async t=>{
+  {timeout:110000},async t=>{
     const chrome=chromePath();
     assert.ok(chrome,'Real Chromium required; DOM mocks cannot satisfy mobile layout gate');
     const temp=await mkdtemp(join(tmpdir(),'merge-mobile-normal-'));
@@ -110,6 +110,7 @@ test('P0 mobile Chromium: 320–430px normal mode layout, native touch and save 
       !!document.getElementById('import-normal-save')),'verified mobile startup');
     await setViewport(320);
     const initial=await evalFn(k=>JSON.parse(localStorage.getItem(k)),KEY);
+    const initialRaw=await evalFn(k=>localStorage.getItem(k),KEY);
     assert.equal(initial.revision,0);
 
     for(const width of [320,375,390,430]){
@@ -166,5 +167,83 @@ test('P0 mobile Chromium: 320–430px normal mode layout, native touch and save 
     assert.equal(after.energy,initial.energy-1);
     assert.equal(await evalFn(()=>document.documentElement.scrollWidth<=
       document.documentElement.clientWidth+1),true);
-    t.diagnostic('Mobile Chromium 320/375/390/430 CSS px passed; native touch persisted revision 1. This is not iPhone Safari/WeChat testing.');
+    // Complete the mobile-sized save workflow with actual Chromium bytes:
+    // a native touch export, a declined older-file import, and resumed play.
+    // This is CDP mobile emulation, NOT an iOS/WeChat file picker.
+    const savedRaw=await evalFn(k=>localStorage.getItem(k),KEY);
+    const backupKey=KEY+'.restore-backup-v3';
+    const beforeBackup=await evalFn(k=>localStorage.getItem(k),backupKey);
+    const storyKey='toolbox.merge-isle.story.local.v1';
+    const storySentinel='mobile-normal-isolation-sentinel';
+    await evalFn((k,value)=>localStorage.setItem(k,value),storyKey,storySentinel);
+    await call('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:temp});
+    const exportTap=await evalFn(()=>{
+      const el=document.getElementById('export-local-save');
+      el.scrollIntoView({block:'center',inline:'center'});
+      const r=el.getBoundingClientRect();
+      return {x:r.left+r.width/2,y:r.top+r.height/2};
+    });
+    await until(()=>evalFn(({x,y})=>
+      !!document.elementFromPoint(x,y)?.closest('#export-local-save'),exportTap),
+      '320px native touch reaches export button');
+    await call('Input.dispatchTouchEvent',
+      {type:'touchStart',touchPoints:[exportTap]},sessionId);
+    await call('Input.dispatchTouchEvent',
+      {type:'touchEnd',touchPoints:[]},sessionId);
+    const downloadedPath=join(temp,'yunyu-normal-save-v3.json');
+    await until(()=>existsSync(downloadedPath),'mobile emulated native-touch download',15000);
+    assert.equal(await readFile(downloadedPath,'utf8'),savedRaw,
+      'native-touch export must download exact verified save bytes');
+    assert.equal(await evalFn(k=>localStorage.getItem(k),KEY),savedRaw,
+      'mobile export must not mutate the normal save');
+    assert.equal(await evalFn(k=>localStorage.getItem(k),backupKey),beforeBackup);
+
+    // Use a prior revision through the real input change handler. Declining
+    // confirmation must neither downgrade the save nor poison later touches.
+    await evalFn(oldRaw=>{
+      window.__mobileImportConfirms=0;
+      window.confirm=()=>{window.__mobileImportConfirms++;return false;};
+      const input=document.getElementById('import-normal-file');
+      input.click=()=>{}; // replace only the native OS picker in CDP
+      document.getElementById('import-normal-save').click();
+      const transfer=new DataTransfer();
+      transfer.items.add(new File([oldRaw],'previous-normal.json',
+        {type:'application/json'}));
+      input.files=transfer.files;
+      input.dispatchEvent(new Event('change',{bubbles:true}));
+    },initialRaw);
+    await until(()=>evalFn(()=>
+      document.getElementById('notice').textContent.includes('已取消导入')&&
+      !document.getElementById('import-normal-save').disabled&&
+      document.getElementById('cancel-normal-import').hidden),
+      '320px declined older import releases UI');
+    assert.equal(await evalFn(()=>window.__mobileImportConfirms),1);
+    assert.equal(await evalFn(k=>localStorage.getItem(k),KEY),savedRaw,
+      'declined mobile import must preserve current progress');
+    assert.equal(await evalFn(k=>localStorage.getItem(k),backupKey),beforeBackup);
+    assert.equal(await evalFn(k=>localStorage.getItem(k),storyKey),storySentinel);
+
+    const resumedTap=await evalFn(()=>{
+      const el=document.querySelector('#board .producer');
+      el.scrollIntoView({block:'center',inline:'center'});
+      const r=el.getBoundingClientRect();
+      return {x:r.left+r.width/2,y:r.top+r.height/2};
+    });
+    await until(()=>evalFn(({x,y})=>
+      !!document.elementFromPoint(x,y)?.closest('#board .producer'),resumedTap),
+      '320px native touch reaches producer after declined import');
+    await call('Input.dispatchTouchEvent',
+      {type:'touchStart',touchPoints:[resumedTap]},sessionId);
+    await call('Input.dispatchTouchEvent',
+      {type:'touchEnd',touchPoints:[]},sessionId);
+    await until(()=>evalFn(k=>JSON.parse(localStorage.getItem(k))?.revision===2,KEY),
+      'mobile play resumes after declined import');
+    const resumed=await evalFn(k=>JSON.parse(localStorage.getItem(k)),KEY);
+    assert.equal(resumed.energy,initial.energy-2);
+    assert.equal(await evalFn(k=>localStorage.getItem(k),storyKey),storySentinel);
+    assert.equal(await readFile(downloadedPath,'utf8'),savedRaw,
+      'download remains a snapshot after later gameplay');
+    assert.equal(await evalFn(()=>
+      document.documentElement.scrollWidth<=document.documentElement.clientWidth+1),true);
+    t.diagnostic('Mobile Chromium 320/375/390/430px layout, native producer/export touches, exact JSON download, declined import and resumed play passed. Not iPhone Safari/WeChat testing.');
   });
