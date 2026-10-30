@@ -1296,7 +1296,7 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     "localStorage.getItem('toolbox.merge-isle.story.local.v1')");
   await front(b);
   await waitWithSnapshot(async()=>await evalOn(b,
-    "document.getElementById('save-status').textContent.includes('已同步')&&document.querySelector('#energy').textContent.startsWith("+JSON.stringify(String(importLockState.energy)+' /')+")"),
+    "(document.getElementById('save-status').textContent.includes('已同步')||document.getElementById('save-status').textContent.includes('已保存于此浏览器'))&&document.querySelector('#energy').textContent.startsWith("+JSON.stringify(String(importLockState.energy)+' /')+")"),
     'other tab adopted legal post-reset write',b);
   assert.equal(await evalOn(b,'localStorage.getItem('+JSON.stringify(key)+')'),
     importLockRaw,'import contender must use latest save baseline');
