@@ -220,10 +220,13 @@ function guardRenderedAction(action){
 // Persistent buttons survive board rerenders. A pointer begun while the
 // native import chooser is active must not turn into a delayed compatibility
 // click after cancellation. Dynamic buttons already use render generations.
-function guardPersistentChooserClick(button,action,{allowDuringImport=false}={}){
-  let stalePointer=false,pointerGeneration=null;
+function guardPersistentChooserClick(button,action,{allowDuringImport=false,bindRenderGeneration=false}={}){
+  let stalePointer=false,pointerGeneration=null,pointerRenderGeneration=null;
   button.addEventListener('pointerdown',()=>{
     pointerGeneration=persistentGestureGeneration;
+    // Store-selected is a persistent DOM button but its target is ephemeral:
+    // selecting/deselecting a material rerenders without changing save bytes.
+    pointerRenderGeneration=bindRenderGeneration?renderGeneration:null;
     stalePointer=!allowDuringImport&&importPending();
   });
   button.addEventListener('pointercancel',()=>{stalePointer=true;});
@@ -231,8 +234,10 @@ function guardPersistentChooserClick(button,action,{allowDuringImport=false}={})
     // The pointer may have started BEFORE the chooser opened or before a
     // BFCache transition. Its later compatibility click is still obsolete.
     const expired=stalePointer||(pointerGeneration!==null&&
-      pointerGeneration!==persistentGestureGeneration);
-    stalePointer=false;pointerGeneration=null;
+      pointerGeneration!==persistentGestureGeneration)||
+      (bindRenderGeneration&&pointerRenderGeneration!==null&&
+       pointerRenderGeneration!==renderGeneration);
+    stalePointer=false;pointerGeneration=null;pointerRenderGeneration=null;
     if(expired&&event.detail!==0){
       hint('页面或导入状态已变化，请重新点击当前按钮');
       return;
@@ -620,7 +625,7 @@ guardPersistentChooserClick(byId('store-selected'),()=>{
   if(selected < 0){hint('先点击选择一个原料');return;}
   const slot=selected;
   commit(current=>storeItem(current,slot));
-});
+},{bindRenderGeneration:true});
 guardPersistentChooserClick(byId('warehouse-upgrade'),()=>commit(current=>upgradeWarehouse(current)));
 byId('supply-producer').addEventListener('change',()=>refreshSupplyControls());
 

@@ -1,0 +1,17 @@
+# P2.65bx｜普通模式持久收纳按钮的旧选择触控失效（未发布）
+
+## 风险与修复
+
+普通模式的「将选中的原料收入仓库」按钮在棋盘重新渲染时不会重建。此前其指针租约仅绑定存档原始字节/页面代次；若玩家按下收纳按钮后又取消并重新选择原料，界面已重新渲染但存档未写入，迟到的兼容 click 可能将新选择误当作旧触控授权，造成错误收纳。
+
+本轮为该按钮额外绑定 `renderGeneration`：仅指针开始时的界面代次与点击时一致才允许执行。原有 `persistentGestureGeneration` 的跨标签/BFCache/导入保护不变；键盘激活 `event.detail===0` 仍允许重新验证后操作。其他持久按钮不依赖临时选中格，不改变其现有策略。
+
+## 回归
+
+`tests/merge-browser-real.test.mjs` 使用真实 Chromium 页面、普通模式运行时、原生 localStorage/Web Locks，重置出独立初始棋盘并生产一份材料，验证：选中材料→按下收纳按钮→取消/重新选择→旧 click 不写存档或仓库；新的指针点击恰好完成一次合法收纳；恢复前备份与剧情存档原始字节不变。
+
+测试对触控事件顺序使用确定性注入，不等于 iPhone Safari 或微信 WebView 真机触控。全仓库 Node、`bash scripts/security-check.sh`、静态部署隔离及完整历史密钥扫描以新 SHA 的 GitHub Actions 为准，未通过不得标记完成。
+
+## 发行边界
+
+仅修改 Draft PR #58 的普通模式页面、测试和本文档。保持 PR #58/#59 Open/Draft；不修改 story 源码、main、正式导航或部署白名单，不发布 Pages/Cloudflare/Edge，不操作线上 Supabase，不制作作弊后门。Cloudflare 后台状态与真实 iPhone/微信文件操作仍待独立验收。

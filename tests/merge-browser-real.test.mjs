@@ -1648,5 +1648,60 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     t.diagnostic('Chromium genuine BFCache revoked pending import chooser, ignored late file and allowed fresh cancel');
   }
 
+
+  // P2.65bx: unlike reset/export, the persistent store-selected button
+  // targets an ephemeral selection. Selection changes rerender the board
+  // without touching storage, so a delayed touch must not store a material
+  // that was reselected after the original pointerdown.
+  {
+    await front(b);
+    await waitWithSnapshot(async()=>await evalOn(b,
+      "document.getElementById('save-status').textContent.includes('已保存') && !document.getElementById('reset').disabled"),
+      'selection lease setup ready',b);
+    const oldRaw=await evalOn(b,'localStorage.getItem('+JSON.stringify(key)+')');
+    await evalOn(b,"(()=>{window.confirm=()=>true;document.getElementById('reset').click();return true;})()");
+    await waitWithSnapshot(async()=>await evalOn(b,
+      'localStorage.getItem('+JSON.stringify(key)+')!=='+JSON.stringify(oldRaw)+
+      " && JSON.parse(localStorage.getItem("+JSON.stringify(key)+")).revision===0"),
+      'selection lease isolated reset',b);
+    await evalOn(b,"document.querySelector('#board .producer').click();true");
+    await waitWithSnapshot(async()=> (await readSave(b)).revision===1,
+      'selection lease material production',b);
+    const slot=await evalOn(b,
+      "document.querySelector('#board .cell.filled:not(.producer)')?.dataset.slot??null");
+    assert.notEqual(slot,null,'producer must create a selectable material');
+    const select=()=>evalOn(b,
+      "document.querySelector('#board [data-slot="+JSON.stringify(slot)+"]').click();true");
+    await select();
+    assert.equal(await evalOn(b,"document.getElementById('store-selected').disabled"),false);
+    const baseline=await evalOn(b,'localStorage.getItem('+JSON.stringify(key)+')');
+    const backup=await evalOn(b,
+      "localStorage.getItem("+JSON.stringify(key+'.restore-backup-v3')+")");
+    const story=await evalOn(b,
+      "localStorage.getItem('toolbox.merge-isle.story.local.v1')");
+    await evalOn(b,"document.getElementById('store-selected').dispatchEvent("+
+      "new PointerEvent('pointerdown',{bubbles:true,pointerType:'touch',isPrimary:true}));true");
+    await select(); // deselect: renderGeneration advances, no storage write
+    await select(); // reselect: the old pointer is still unauthorized
+    assert.equal(await evalOn(b,"document.getElementById('store-selected').disabled"),false);
+    await evalOn(b,"document.getElementById('store-selected').dispatchEvent("+
+      "new MouseEvent('click',{bubbles:true,detail:1}));true");
+    await sleep(100);
+    assert.equal(await evalOn(b,'localStorage.getItem('+JSON.stringify(key)+')'),baseline,
+      'stale store-selected touch must not write a newly selected target');
+    assert.equal((await readSave(b)).warehouse.slots.filter(Boolean).length,0);
+    await evalOn(b,"(()=>{const button=document.getElementById('store-selected');"+
+      "button.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,pointerType:'touch',isPrimary:true}));"+
+      "button.dispatchEvent(new MouseEvent('click',{bubbles:true,detail:1}));return true;})()");
+    await waitWithSnapshot(async()=> (await readSave(b)).revision===2,
+      'fresh store-selected touch commits exactly once',b);
+    assert.equal((await readSave(b)).warehouse.slots.filter(Boolean).length,1);
+    assert.equal(await evalOn(b,
+      "localStorage.getItem("+JSON.stringify(key+'.restore-backup-v3')+")"),backup);
+    assert.equal(await evalOn(b,
+      "localStorage.getItem('toolbox.merge-isle.story.local.v1')"),story);
+    t.diagnostic('Chromium selection rerender revoked stale persistent store touch; fresh store succeeded once');
+  }
+
   t.diagnostic(`Chromium two-tab lock, BFCache persisted=${bfcache}, download=${file}, reset/import/backup verified`);
 });
