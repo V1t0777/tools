@@ -2,23 +2,30 @@
 import {registerStoryPack,validateStoryProgress} from '../mode-boundaries.mjs';
 const own=(obj,key)=>Object.prototype.hasOwnProperty.call(obj,key);
 const idPattern=/^[a-z][a-z0-9-]{0,63}$/;
+// Align pack preflight with the persisted save's reserved-name contract.
+// A valid pack must never fail only when its first dialogue is saved.
+const reservedNames=new Set(['__proto__','constructor','prototype']);
+const validStoryId=value=>typeof value==='string'&&idPattern.test(value)&&!reservedNames.has(value);
+const validStoryPackId=value=>typeof value==='string'&&
+  /^([a-z][a-z0-9-]{0,31})(\.[a-z][a-z0-9-]{0,31})?$/.test(value)&&
+  value.split('.').every(part=>!reservedNames.has(part));
 const kinds=new Set(['main','side','incident']);
 const plain=value=>!!value&&typeof value==='object'&&!Array.isArray(value)&&Object.getPrototypeOf(value)===Object.prototype;
 const text=value=>typeof value==='string'&&value.length>0&&value.length<=800;
 function checkPack(pack){
-  if(!plain(pack)||typeof pack.id!=='string'||!/^([a-z][a-z0-9-]{0,31})(\.[a-z][a-z0-9-]{0,31})?$/.test(pack.id)||
+  if(!plain(pack)||!validStoryPackId(pack.id)||
     !text(pack.title)||!Number.isSafeInteger(pack.version)||pack.version<1||
     !Array.isArray(pack.entries)||pack.entries.length>1500)throw new TypeError('Invalid story pack');
   const seen=new Set();
   for(const item of pack.entries){
-    if(!plain(item)||!idPattern.test(item.id)||!kinds.has(item.kind)||seen.has(item.id)||
+    if(!plain(item)||!validStoryId(item.id)||!kinds.has(item.kind)||seen.has(item.id)||
       !text(item.title)||!text(item.chapter)||!text(item.place)||typeof item.repeatable!=='boolean'||
       !Array.isArray(item.requires)||item.requires.length>20||
       !item.requires.every(id=>seen.has(id))||
       !Array.isArray(item.lines)||item.lines.length<1||item.lines.length>30||
       !item.lines.every(line=>plain(line)&&text(line.speaker)&&text(line.text))||
       !Array.isArray(item.choices)||item.choices.length>6||
-      !item.choices.every(c=>plain(c)&&idPattern.test(c.id)&&text(c.label)&&text(c.reply))||
+      !item.choices.every(c=>plain(c)&&validStoryId(c.id)&&text(c.label)&&text(c.reply))||
       new Set(item.choices.map(c=>c.id)).size!==item.choices.length ||
       (item.repeatable&&item.kind!=='incident'))throw new TypeError('Invalid story entry: '+String(item?.id));
     seen.add(item.id);
