@@ -24,7 +24,7 @@ export function getBoardGuidance(state) {
   };
   if (!hint) {
     return { ...root, message:diagnosis.recovery === 'hard-deadlock'
-      ? '棋盘与仓库已完全卡死。可选中一件原料，点击「死局解围」并确认弃置以腾出一格；不会返还资源，建议先导出存档。'
+      ? '棋盘与仓库已完全卡死。可选中一件原料，点击「死局解围」并确认弃置以腾出一格；不会返还资源，请先保留存档并导出备份。'
       : '暂时没有可执行的整理步骤，可以稍后再查看。' };
   }
   switch (hint.type) {
