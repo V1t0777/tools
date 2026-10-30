@@ -259,5 +259,70 @@ test('P155 real Chromium tabs: a peer completes a pinned one-off; stale UI block
       'none of the lifecycle checks may touch normal-mode storage');
     assert.equal(await readRaw(a,workshopKey),null,
       'none of the lifecycle checks may initialize story economy');
+
+    // P157: real Chromium history navigation, not synthetic lifecycle events.
+    // Chrome may restore BFCache or reload the page (no-store responses).
+    // Both paths must preserve exact storage bytes and refuse stale writes.
+    await evalOn(a,'localStorage.setItem('+keyExpr+','+JSON.stringify(replacement)+');true');
+    await call('Page.reload',{ignoreCache:true},a.sessionId);
+    await until(async()=>evalOn(a,
+      "document.getElementById('journey-daily-read')?.hidden===false"),
+    'valid pinned incident reloaded before history navigation');
+    async function navigateAwayFromStory(){
+      await call('Page.navigate',{url:base+'/merge/story/story.css'},a.sessionId);
+      await until(async()=>evalOn(a,
+        "location.pathname==='/merge/story/story.css'&&document.readyState==='complete'"),
+      'real Chromium navigation away from story');
+    }
+    async function returnThroughHistory(label){
+      const history=await call('Page.getNavigationHistory',{},a.sessionId);
+      const previous=history.entries[history.currentIndex-1];
+      assert.ok(previous?.url.includes('/merge/story.html'),
+        'history must return to the original story document');
+      await call('Page.navigateToHistoryEntry',{entryId:previous.id},a.sessionId);
+      await until(async()=>evalOn(a,
+        "location.pathname==='/merge/story.html'&&document.readyState==='complete'&&!!document.getElementById('save-state')"),
+      label);
+    }
+    await navigateAwayFromStory();
+    await returnThroughHistory('unchanged story restored by actual browser back navigation');
+    await until(async()=>evalOn(a,
+      "document.getElementById('journey-daily-read')?.hidden===false&&"+
+      "!document.getElementById('save-state').textContent.includes('其他标签页')"),
+    'unchanged history return remains readable');
+    assert.equal(await readRaw(a,STORY_SAVE_KEY),replacement,
+      'real navigation without a peer edit cannot rewrite the story save');
+    assert.equal(await evalOn(a,"document.getElementById('story-dialog').open"),false);
+
+    // Leave a real dialogue through browser navigation, then let the other
+    // real tab change its same-revision bytes while the first tab is away.
+    await evalOn(a,"document.getElementById('journey-daily-read').click();true");
+    await until(async()=>evalOn(a,"document.getElementById('story-dialog').open"),
+      'dialogue open before actual history navigation');
+    await navigateAwayFromStory();
+    await evalOn(b,'localStorage.setItem('+keyExpr+','+JSON.stringify(committed)+');true');
+    assert.equal(await readRaw(b,STORY_SAVE_KEY),committed);
+    await returnThroughHistory('peer-edited story restored by actual browser back navigation');
+    const historyOutcome=await until(async()=>evalOn(a,
+      "(()=>{const status=document.getElementById('save-state')?.textContent||'';"+
+      "if(status.includes('其他标签页'))return 'blocked';"+
+      "if(document.getElementById('journey-daily-read')?.hidden===false)return 'fresh';"+
+      "return false;})()"),
+    'history return must block stale BFCache or load current bytes');
+    assert.ok(['blocked','fresh'].includes(historyOutcome));
+    assert.equal(await evalOn(a,"document.getElementById('story-dialog').open"),false,
+      'a navigation return cannot preserve an old actionable dialogue');
+    if(historyOutcome==='blocked'){
+      assert.equal(await evalOn(a,"document.getElementById('journey-daily-read').hidden"),true,
+        'stale BFCache must hide actions until a deliberate reload');
+    }
+    await evalOn(a,"document.getElementById('complete-story').click();true");
+    assert.equal(await readRaw(a,STORY_SAVE_KEY),committed,
+      'history return cannot overwrite a peer edit, even at the same revision');
+    assert.equal(await readRaw(a,normalKey),'normal-mode-sentinel');
+    assert.equal(await readRaw(a,workshopKey),null);
+    t.diagnostic('P157 actual Chromium history: unchanged return and peer-edited return ('+
+      historyOutcome+') preserved storage; BFCache eligibility not asserted');
+
     t.diagnostic('P156 Chromium: clean lifecycle, same-revision changed bytes, deleted snapshot all guarded');
   });
