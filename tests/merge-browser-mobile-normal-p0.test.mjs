@@ -317,9 +317,17 @@ test('P0 mobile Chromium: 320–430px normal mode layout, native touch and save 
     // A new picker can be declined safely, then normal native touch and
     // an exact JSON download still work in the restored mobile document.
     await evalFn(raw=>{
+      // BFCache revocation replaces the native input *inside* the new click.
+      // Stub the prototype for that synchronous gesture, then target the
+      // newly installed input rather than the stale pre-click element.
+      const originalClick=HTMLInputElement.prototype.click;
+      HTMLInputElement.prototype.click=function(){
+        if(this.id==='import-normal-file')return;
+        return originalClick.call(this);
+      };
+      try{document.getElementById('import-normal-save').click();}
+      finally{HTMLInputElement.prototype.click=originalClick;}
       const input=document.getElementById('import-normal-file');
-      input.click=()=>{};
-      document.getElementById('import-normal-save').click();
       const files=new DataTransfer();
       files.items.add(new File([raw],'fresh-mobile.json',{type:'application/json'}));
       input.files=files.files;

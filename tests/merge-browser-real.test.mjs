@@ -1313,7 +1313,7 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   await until(async()=>await evalOn(a,"typeof window.__p265bqUnlock==='function'"),
     'other tab acquired save lock before import');
   await front(b);
-  await evalOn(b,"(()=>{window.__p265bqConfirms=0;window.confirm=()=>{window.__p265bqConfirms++;return true;};const input=document.getElementById('import-normal-file');input.click=()=>{};document.getElementById('import-normal-save').click();const transfer=new DataTransfer();transfer.items.add(new File(["+JSON.stringify(downloaded)+"],'locked-import.json',{type:'application/json'}));input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));return true;})()");
+  await evalOn(b,"(()=>{window.__p265bqConfirms=0;window.confirm=()=>{window.__p265bqConfirms++;return true;};const originalClick=HTMLInputElement.prototype.click;HTMLInputElement.prototype.click=function(){if(this.id==='import-normal-file')return;return originalClick.call(this);};try{document.getElementById('import-normal-save').click();}finally{HTMLInputElement.prototype.click=originalClick;}const input=document.getElementById('import-normal-file');const transfer=new DataTransfer();transfer.items.add(new File(["+JSON.stringify(downloaded)+"],'locked-import.json',{type:'application/json'}));input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));return true;})()");
   await waitWithSnapshot(async()=>await evalOn(b,
     "(document.getElementById('notice').textContent.includes('其他标签正在保存')||document.getElementById('notice').textContent.includes('正在安全保存或其他标签页占用存档'))"),
     'confirmed import rejected under real competing Web Lock',b,6000);
