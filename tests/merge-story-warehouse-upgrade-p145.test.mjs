@@ -278,7 +278,7 @@ test('P149 rollback energy warning is actionable after BFCache and never writes 
     await cell().click();
     const notice=f.document.getElementById('board-notice').textContent;
     assert.match(notice,/设备时间早于存档的体力计时/);
-    assert.doesNotMatch(notice,/预计\\d+秒后自然恢复/);
+    assert.doesNotMatch(notice,/预计\d+秒后自然恢复/);
     assert.equal(f.writes,0);
     assert.equal(f.map.get(STORY_WORKSHOP_KEY),JSON.stringify(state));
     assert.equal(f.map.get(SAVE_KEY),'normal-mode-sentinel');
@@ -298,7 +298,7 @@ test('P149 impossible cooldown suppresses misleading engine countdown without sp
     await cell.click();
     const notice=f.document.getElementById('board-notice').textContent;
     assert.match(notice,/工坊冷却时间超出正常上限/);
-    assert.doesNotMatch(notice,/冷却中，剩余\\s*\\d+\\s*秒/);
+    assert.doesNotMatch(notice,/冷却中，剩余\s*\d+\s*秒/);
     assert.equal(f.writes,0);
     assert.equal(f.map.get(STORY_WORKSHOP_KEY),JSON.stringify(state));
     assert.equal(readStoryWorkshop(f.storage).state.bag.reset,1);
