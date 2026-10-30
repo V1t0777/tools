@@ -97,7 +97,10 @@ test('P0 mobile Chromium: 320–430px normal mode layout, native touch and save 
       await until(()=>evalFn(w=>document.documentElement.clientWidth===w,width),
         'mobile viewport '+width);
     };
-    await setViewport(320);
+    // about:blank has no viewport meta and may use a 980px layout viewport.
+    // Apply device metrics first; assert the CSS viewport only after navigation.
+    await call('Emulation.setDeviceMetricsOverride',
+      {width:320,height:740,deviceScaleFactor:3,mobile:true},sessionId);
     await call('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1},sessionId);
     await call('Page.navigate',
       {url:'http://127.0.0.1:'+server.address().port+'/merge/index.html'},sessionId);
@@ -105,6 +108,7 @@ test('P0 mobile Chromium: 320–430px normal mode layout, native touch and save 
       document.getElementById('save-status')?.textContent.includes('已保存于此浏览器')&&
       document.querySelectorAll('#board .cell').length===56&&
       !!document.getElementById('import-normal-save')),'verified mobile startup');
+    await setViewport(320);
     const initial=await evalFn(k=>JSON.parse(localStorage.getItem(k)),KEY);
     assert.equal(initial.revision,0);
 
