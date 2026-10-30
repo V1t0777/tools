@@ -997,6 +997,10 @@ test('P2.65l duplicate import click cannot replace a pending chooser lease',asyn
   button.click();button.click();
   assert.equal(chooserOpens,1,'only one native chooser may be outstanding');
   input.dispatch('cancel');
+  assert.equal(input.parentElement,null,'native cancellation detaches old input');
+  const fresh=h.id('export-local-save').parentElement.children.find(e=>e.id==='import-normal-file');
+  assert.notEqual(fresh,input);
+  fresh.click=()=>{chooserOpens++;};
   button.click();
   assert.equal(chooserOpens,2,'explicit cancellation permits a fresh chooser');
 });
@@ -1211,9 +1215,14 @@ test('P2.65s native cancel after change aborts hung file read and permits a fres
   assert.equal(h.storage.getItem(SAVE_KEY),original);
   assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null);
   assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  const fresh=h.id('export-local-save').parentElement.children.find(e=>e.id==='import-normal-file');
+  assert.notEqual(fresh,input,'native cancel rotates file input');
   button.click();
   input.files=[{size:imported.length,text:async()=>imported}];
   input.dispatch('change');await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),original,'late old-input event cannot restore');
+  fresh.files=[{size:imported.length,text:async()=>imported}];
+  fresh.dispatch('change');await settle();
   assert.equal(h.storage.getItem(SAVE_KEY),imported);
   assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),original);
 });
@@ -1235,9 +1244,14 @@ test('P2.65s native cancel after confirmation revokes restore waiting for Web Lo
   assert.equal(h.storage.getItem(SAVE_KEY),original,'cancelled lock cannot write save');
   assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null,'cannot reserve backup');
   assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  const fresh=h.id('export-local-save').parentElement.children.find(e=>e.id==='import-normal-file');
+  assert.notEqual(fresh,input);
   button.click();
   input.files=[{size:imported.length,text:async()=>imported}];
   input.dispatch('change');await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),original,'old picker cannot authorize new consent');
+  fresh.files=[{size:imported.length,text:async()=>imported}];
+  fresh.dispatch('change');await settle();
   assert.equal(h.storage.getItem(SAVE_KEY),imported,'safe cancellation remains retryable');
 });
 
@@ -1501,6 +1515,10 @@ test('P2.65z orphaned native chooser recovers after focus grace without any save
   assert.equal(deadlines.length,1,'focus return must schedule bounded recovery');
   button.click();assert.equal(opens,1,'do not overlap native choosers before grace');
   deadlines.shift()();
+  assert.equal(input.parentElement,null,'expired chooser input must be detached');
+  const fresh=h.id('export-local-save').parentElement.children.find(e=>e.id==='import-normal-file');
+  assert.notEqual(fresh,input);
+  fresh.click=()=>{opens++;};
   button.click();assert.equal(opens,2,'an orphaned chooser no longer blocks retry');
   assert.equal(h.writes.length,before);
   assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null);
@@ -1537,6 +1555,8 @@ test('P2.65z old picker timeout cannot clear a fresh picker; visible return also
   button.click();h.win.dispatch('blur');h.win.dispatch('focus');
   assert.equal(deadlines.length,1);
   input.dispatch('cancel');
+  const second=h.id('export-local-save').parentElement.children.find(e=>e.id==='import-normal-file');
+  second.click=()=>{opens++;};
   button.click();assert.equal(opens,2);
   deadlines.shift()();
   button.click();assert.equal(opens,2,'old callback cannot release newer picker');
@@ -1544,6 +1564,8 @@ test('P2.65z old picker timeout cannot clear a fresh picker; visible return also
   h.doc.hidden=false;h.doc.dispatch('visibilitychange');
   assert.equal(deadlines.length,1,'visible return schedules a new grace period');
   deadlines.shift()();
+  const third=h.id('export-local-save').parentElement.children.find(e=>e.id==='import-normal-file');
+  third.click=()=>{opens++;};
   button.click();assert.equal(opens,3);
   assert.equal(h.writes.length,before);
   assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null);
@@ -1582,8 +1604,14 @@ test('P2.65aa expired chooser rejects late file, fresh chooser can still import'
   input.dispatch('change');await settle();
   assert.equal(h.storage.getItem(SAVE_KEY),original);
   assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null);
-  button.click();input.files=[{size:imported.length,text:async()=>imported}];
-  input.dispatch('change');await settle();
+  const fresh=h.id('export-local-save').parentElement.children.find(e=>e.id==='import-normal-file');
+  assert.notEqual(fresh,input,'timeout must rotate native chooser identity');
+  button.click();
+  input.files=[{size:imported.length,text:async()=>imported}];
+  input.dispatch('change');input.dispatch('cancel');await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),original,'old change/cancel cannot use new chooser lease');
+  fresh.files=[{size:imported.length,text:async()=>imported}];
+  fresh.dispatch('change');await settle();
   assert.equal(h.storage.getItem(SAVE_KEY),imported);
   assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),original);
   assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
