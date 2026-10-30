@@ -6,6 +6,8 @@ import { WIDTH, CELL_COUNT, MAX_ENERGY, ENERGY_REGEN_MS, CHAINS, createInitialSt
 import { BUILDINGS } from './economy.mjs';
 import { SAVE_KEY, ABNORMAL_RESET_BACKUP_KEY } from './storage.mjs';
 import { getBoardGuidance } from './board-guidance.mjs';
+import { diagnoseBoard } from './board-diagnostics.mjs';
+import { discardDeadlockedMaterial } from './deadlock-rescue.mjs';
 import { getSupplyControlSnapshot } from './supply-controls.mjs';
 import { deriveNormalMilestones } from './normal-milestones.mjs';
 import { prepareLocalSaveExport, prepareAbnormalResetBackupExport } from './save-export.mjs';
@@ -298,6 +300,9 @@ function renderSystems() {
   const selectedItem=state.board[selected];
   byId('store-selected').disabled = selectedItem?.kind!=='material' ||
     state.warehouse.slots.slice(0,state.warehouse.capacity).every(Boolean);
+  // The last-resort escape is unavailable while normal recovery exists.
+  byId('deadlock-discard').disabled = selectedItem?.kind!=='material' ||
+    diagnoseBoard(state).recovery!=='hard-deadlock';
   const w= getWarehouseUpgrade(state.warehouse.capacity);
   const wbtn=byId('warehouse-upgrade');
   wbtn.textContent=w?`扩容至 ${w.newCapacity} 格 · ${w.coins} 金币（Lv.${w.minLevel}）`:'仓库已满级';
@@ -625,6 +630,30 @@ guardPersistentChooserClick(byId('store-selected'),()=>{
   if(selected < 0){hint('先点击选择一个原料');return;}
   const slot=selected;
   commit(current=>storeItem(current,slot));
+},{bindRenderGeneration:true});
+guardPersistentChooserClick(byId('deadlock-discard'),async()=>{
+  if(pageSuspended()||importPending()||saveIssue||runtime.busy){
+    hint('页面或存档尚未就绪，请完成导入或保存后再解围');return;
+  }
+  if(!revalidateResumedSave())return;
+  const slot=selected,item=state.board[slot];
+  if(item?.kind!=='material'||diagnoseBoard(state).recovery!=='hard-deadlock'){
+    hint('当前仍有正常整理途径，不能弃置原料');return;
+  }
+  // Consent binds to reviewed raw bytes, item identity, UI render and file epoch.
+  const reviewedRaw=runtime.raw,reviewedRender=renderGeneration,reviewedImport=importEpoch;
+  if(!window.confirm('棋盘和仓库已满且无其他解围操作。确定永久弃置选中的「'+
+      getItemName(item)+'」腾出一格吗？此操作不会返还金币、经验或物品，建议先导出存档。'))return;
+  if(pageSuspended()||importPending()||saveIssue||runtime.busy||
+      importEpoch!==reviewedImport||renderGeneration!==reviewedRender||
+      selected!==slot||state.board[slot]?.id!==item.id||
+      runtime.raw!==reviewedRaw||!revalidateResumedSave()||
+      runtime.raw!==reviewedRaw){
+    hint('确认期间页面、选中物品或存档已变化；解围已取消，请重新确认');return;
+  }
+  commit(current=>discardDeadlockedMaterial(current,slot,{
+    confirmed:true,expectedItemId:item.id
+  }));
 },{bindRenderGeneration:true});
 guardPersistentChooserClick(byId('warehouse-upgrade'),()=>commit(current=>upgradeWarehouse(current)));
 byId('supply-producer').addEventListener('change',()=>refreshSupplyControls());

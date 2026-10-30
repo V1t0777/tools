@@ -56,7 +56,7 @@
           <p id="guidance-message" class="guidance-message" role="status" aria-live="polite">棋盘太满时，可以点“整理提示”寻找合法操作。只提示，不自动操作。</p>
         </div>
         <div id="board" class="board" role="group" aria-label="七列八行的合成棋盘"></div>
-        <div class="board-footer"><span id="save-status" role="status">本地试玩档 · 不上传云端</span><div class="save-actions"><button id="export-local-save" class="text-button" type="button">导出原始存档</button><button id="export-abnormal-reset-backup" class="text-button" type="button">导出重置前备份</button><button id="reset" class="text-button" type="button">重置试玩进度</button></div></div><p class="save-export-note">可下载当前浏览器保存的原始数据作为人工备份；此功能不导入存档，也不会上传网络。异常存档将以文本格式导出。若曾在异常状态下重置，可单独导出当时保留的重置前备份；下载不等于恢复。</p><button id="store-selected" class="secondary-action" type="button" disabled>将选中的原料收入仓库</button>
+        <div class="board-footer"><span id="save-status" role="status">本地试玩档 · 不上传云端</span><div class="save-actions"><button id="export-local-save" class="text-button" type="button">导出原始存档</button><button id="export-abnormal-reset-backup" class="text-button" type="button">导出重置前备份</button><button id="reset" class="text-button" type="button">重置试玩进度</button></div></div><p class="save-export-note">可下载当前浏览器保存的原始数据作为人工备份；此功能不导入存档，也不会上传网络。异常存档将以文本格式导出。若曾在异常状态下重置，可单独导出当时保留的重置前备份；下载不等于恢复。</p><button id="store-selected" class="secondary-action" type="button" disabled>将选中的原料收入仓库</button><button id="deadlock-discard" class="secondary-action" type="button" disabled aria-describedby="deadlock-discard-note">死局解围：弃置选中原料</button><p id="deadlock-discard-note" class="help-line">仅在棋盘与仓库完全卡死、没有正常解围途径时启用；必须再次确认，弃置不返还资源。建议先导出存档。</p>
       </section>
       <section class="orders-section" aria-labelledby="orders-title">
         <div class="section-heading"><div><p class="overline">CUSTOMER REQUESTS</p><h2 id="orders-title">街坊委托</h2></div><span class="capacity">完成即可得奖励</span></div>
@@ -95,6 +95,7 @@
       <p>③ 拿到委托需要的物品后，点击「交付」领取金币与经验。体力随时间恢复。</p>
       <p>④ 用金币升级生产器、扩充仓库和建设街区；等级决定新订单难度。P1 存档可以自动迁移。</p>
       <p>⑤ 棋盘太满时，可以点击「整理提示」，标出可以交付、合成、收纳或升级的合法操作；提示不会自动执行操作或扣费。</p>
+      <p>⑥ 仅当棋盘和仓库真正卡死时，可选中一件原料并明确确认弃置以腾出一格；不返还任何资源，建议事先导出存档。</p>
       <p class="dialog-caution">当前只是 P2 研发预览：采用占位物品图标，进度仅保存在当前浏览器，不会同步至 Supabase。</p>
       <button class="primary" id="close-guide" type="button">明白了</button>
     </div>

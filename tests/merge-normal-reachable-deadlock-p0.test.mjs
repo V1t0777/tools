@@ -5,6 +5,7 @@ import {
   storeItem, moveOrMerge, produce, fulfillOrder, upgradeWarehouse, advanceTime
 } from '../merge/engine.mjs';
 import { diagnoseBoard } from '../merge/board-diagnostics.mjs';
+import { discardDeadlockedMaterial } from '../merge/deadlock-rescue.mjs';
 
 const START = 1_000_000;
 const MAX_STEPS = 12_000;
@@ -103,4 +104,35 @@ test('P0 ordinary legal actions can reach full-board/full-warehouse hard deadloc
     coins: state.coins, xp: state.xp, revision: state.revision,
     finalActions: actions.slice(-8)
   }));
+});
+
+test('P0 legal-action deadlock requires explicit one-item sacrifice and resumes production',()=>{
+  const {state,terminal,iterations}=reachableDeadlock();
+  assert.equal(terminal,true);
+  const slot=state.board.findIndex(item=>item?.kind==='material');
+  const id=state.board[slot].id,raw=JSON.stringify(state);
+  for(const options of [{},{confirmed:false,expectedItemId:id},
+      {confirmed:true,expectedItemId:'m999999'}]){
+    const refused=discardDeadlockedMaterial(state,slot,options);
+    assert.equal(refused.ok,false);
+    assert.equal(refused.state,state);
+    assert.equal(JSON.stringify(state),raw);
+  }
+  const recovered=discardDeadlockedMaterial(state,slot,{confirmed:true,expectedItemId:id});
+  assert.equal(recovered.ok,true);
+  assert.equal(recovered.kind,'deadlock-discard');
+  assert.equal(recovered.state.revision,state.revision+1);
+  assert.equal(recovered.state.board.filter(Boolean).length,CELL_COUNT-1);
+  assert.equal(recovered.state.coins,state.coins);
+  assert.equal(recovered.state.xp,state.xp);
+  assert.deepEqual(recovered.state.warehouse,state.warehouse);
+  assert.deepEqual(recovered.state.orders,state.orders);
+  assert.equal(validateSave(recovered.state),true);
+  assert.equal(JSON.stringify(state),raw);
+  assert.notEqual(diagnoseBoard(recovered.state).recovery,'hard-deadlock');
+  assert.equal(discardDeadlockedMaterial(recovered.state,slot,
+    {confirmed:true,expectedItemId:id}).ok,false);
+  const produced=produce(recovered.state,42,START+(iterations+5)*ENERGY_REGEN_MS,()=>0.01);
+  assert.equal(produced.ok,true);
+  assert.equal(validateSave(produced.state),true);
 });
