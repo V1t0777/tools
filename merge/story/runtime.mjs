@@ -88,7 +88,20 @@ export function dailyStoryIncident(progress,pack,dayKey){
   // P47: an incident first displayed today stays fixed after mainline unlocks
   // more candidates. A malformed pin is never silently rerolled.
   const pinned=progress.packs[pack.id]?.choices[dailyPinKey(dayKey)];
-  if(pinned!==undefined)return candidates.find(item=>item.id===pinned)??null;
+  if(pinned!==undefined){
+    const eligible=candidates.find(item=>item.id===pinned);
+    if(eligible)return eligible;
+    // A one-off incident can be completed after its daily pin was saved.
+    // Keep that exact completed scene readable for the pinned day rather than
+    // falsely reporting corruption or rerolling a different incident.
+    // An uncompleted, foreign or no-longer-unlocked pin still fails closed.
+    const saved=progress.packs[pack.id];
+    if(!saved?.completed.incident.includes(pinned))return null;
+    const oneOff=pack.entries.find(item=>
+      item.id===pinned&&item.kind==='incident'&&!item.repeatable);
+    const completed=new Set(Object.values(saved.completed).flat());
+    return oneOff&&oneOff.requires.every(id=>completed.has(id))?oneOff:null;
+  }
   if(!candidates.length)return null;
   let hash=2166136261;
   for(const char of pack.id+':'+dayKey){hash=Math.imul(hash^char.charCodeAt(0),16777619)>>>0;}
