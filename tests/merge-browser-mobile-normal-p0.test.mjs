@@ -148,7 +148,7 @@ test('P0 mobile Chromium: 320–430px normal mode layout, native touch and save 
     await setViewport(320);
     const point=await evalFn(()=>{
       const el=document.querySelector('#board .producer');
-      el.scrollIntoView({block:'center',inline:'center'});
+      el.scrollIntoView({behavior:'instant',block:'center',inline:'center'});
       const r=el.getBoundingClientRect();
       return {x:r.left+r.width/2,y:r.top+r.height/2};
     });
@@ -179,7 +179,7 @@ test('P0 mobile Chromium: 320–430px normal mode layout, native touch and save 
     await call('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:temp});
     const exportTap=await evalFn(()=>{
       const el=document.getElementById('export-local-save');
-      el.scrollIntoView({block:'center',inline:'center'});
+      el.scrollIntoView({behavior:'instant',block:'center',inline:'center'});
       const r=el.getBoundingClientRect();
       return {x:r.left+r.width/2,y:r.top+r.height/2};
     });
@@ -225,19 +225,40 @@ test('P0 mobile Chromium: 320–430px normal mode layout, native touch and save 
 
     const resumedTap=await evalFn(()=>{
       const el=document.querySelector('#board .producer');
-      el.scrollIntoView({block:'center',inline:'center'});
+      el.scrollIntoView({behavior:'instant',block:'center',inline:'center'});
       const r=el.getBoundingClientRect();
       return {x:r.left+r.width/2,y:r.top+r.height/2};
     });
     await until(()=>evalFn(({x,y})=>
       !!document.elementFromPoint(x,y)?.closest('#board .producer'),resumedTap),
       '320px native touch reaches producer after declined import');
+    await evalFn(()=>new Promise(resolve=>
+      requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true)))));
+    assert.equal(await evalFn(({x,y})=>
+      !!document.elementFromPoint(x,y)?.closest('#board .producer'),resumedTap),true,
+      'producer must remain under finger after scroll settles');
     await call('Input.dispatchTouchEvent',
       {type:'touchStart',touchPoints:[resumedTap]},sessionId);
     await call('Input.dispatchTouchEvent',
       {type:'touchEnd',touchPoints:[]},sessionId);
-    await until(()=>evalFn(k=>JSON.parse(localStorage.getItem(k))?.revision===2,KEY),
-      'mobile play resumes after declined import');
+    try{
+      await until(()=>evalFn(k=>JSON.parse(localStorage.getItem(k))?.revision===2,KEY),
+        'mobile play resumes after declined import');
+    }catch(error){
+      const snapshot=await evalFn(k=>{
+        const raw=localStorage.getItem(k);
+        let state=null;
+        try{state=raw?JSON.parse(raw):null;}catch{}
+        return {revision:state?.revision,energy:state?.energy,
+          notice:document.getElementById('notice')?.textContent,
+          saveStatus:document.getElementById('save-status')?.textContent,
+          importDisabled:document.getElementById('import-normal-save')?.disabled,
+          cancelHidden:document.getElementById('cancel-normal-import')?.hidden,
+          pageHidden:document.hidden};
+      },KEY);
+      t.diagnostic('Mobile resumed touch failure-only snapshot: '+JSON.stringify(snapshot));
+      throw error;
+    }
     const resumed=await evalFn(k=>JSON.parse(localStorage.getItem(k)),KEY);
     assert.equal(resumed.energy,initial.energy-2);
     assert.equal(await evalFn(k=>localStorage.getItem(k),storyKey),storySentinel);
@@ -312,13 +333,18 @@ test('P0 mobile Chromium: 320–430px normal mode layout, native touch and save 
     assert.equal(await evalFn(k=>localStorage.getItem(k),KEY),beforeLeave);
     const postReturnTap=await evalFn(()=>{
       const el=document.querySelector('#board .producer');
-      el.scrollIntoView({block:'center',inline:'center'});
+      el.scrollIntoView({behavior:'instant',block:'center',inline:'center'});
       const r=el.getBoundingClientRect();
       return {x:r.left+r.width/2,y:r.top+r.height/2};
     });
     await until(()=>evalFn(({x,y})=>
       !!document.elementFromPoint(x,y)?.closest('#board .producer'),postReturnTap),
       'post-BFCache mobile producer hit');
+    await evalFn(()=>new Promise(resolve=>
+      requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true)))));
+    assert.equal(await evalFn(({x,y})=>
+      !!document.elementFromPoint(x,y)?.closest('#board .producer'),postReturnTap),true,
+      'producer must remain under finger after scroll settles');
     await call('Input.dispatchTouchEvent',
       {type:'touchStart',touchPoints:[postReturnTap]},sessionId);
     await call('Input.dispatchTouchEvent',
@@ -334,7 +360,7 @@ test('P0 mobile Chromium: 320–430px normal mode layout, native touch and save 
     await rm(downloadedPath,{force:true});
     const postReturnExport=await evalFn(()=>{
       const el=document.getElementById('export-local-save');
-      el.scrollIntoView({block:'center',inline:'center'});
+      el.scrollIntoView({behavior:'instant',block:'center',inline:'center'});
       const r=el.getBoundingClientRect();
       return {x:r.left+r.width/2,y:r.top+r.height/2};
     });
