@@ -204,7 +204,18 @@ test('P0 real Chromium deadlock rescue: consent, stale selection, BFCache and on
   assert.equal(await raw(),bfcacheRaw,'pre-pagehide pointer cannot rescue after BFCache');
   await pointer('deadlock-discard');
   await clickTouch('deadlock-discard');
-  await until(async()=>(await save()).revision===1,'fresh post-BFCache rescue');
+  try{await until(async()=>(await save()).revision===1,'fresh post-BFCache rescue');}
+  catch(error){
+    const snapshot=await evaluate("(()=>({confirms:window.__rescueConfirmCount,"+
+      "status:document.getElementById('save-status').textContent,"+
+      "notice:document.getElementById('notice').textContent,"+
+      "disabled:document.getElementById('deadlock-discard').disabled,"+
+      "selected:document.querySelector('#board .cell.selected')?.dataset.slot,"+
+      "revision:JSON.parse(localStorage.getItem('toolbox.merge-isle.local.v1')).revision,"+
+      "hidden:document.hidden}))()");
+    t.diagnostic('BFCache rescue failure-only snapshot: '+JSON.stringify(snapshot));
+    throw error;
+  }
   assert.equal((await save()).board[2],null);
   await checkOthers();
   t.diagnostic('Chromium genuine BFCache invalidated old rescue touch and accepted fresh confirmed rescue');
