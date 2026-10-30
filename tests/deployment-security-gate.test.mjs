@@ -31,3 +31,9 @@ test('three security workflow jobs remain independent',()=>{
   assert.match(security,/fetch-depth:\s*0/);
   assert.doesNotMatch(security,/^    needs:/m);
 });
+
+test('draft story commits run security checks without enabling Pages deployment',()=>{
+  assert.match(security,/push:\s*\n\s*# Draft story branch:[^\n]*\n\s*branches: \[main, feat\/merge-story-v1-candidate-20261023\]/);
+  assert.match(pages,/push:\s*\n\s*branches: \[main\]/);
+  assert.doesNotMatch(pages,/feat\/merge-story-v1-candidate-20261023/);
+});

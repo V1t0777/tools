@@ -94,3 +94,7 @@ body{background:radial-gradient(circle at 5% 12%,rgba(221,194,136,.23),transpare
 .save-actions #export-local-save,.save-actions #export-abnormal-reset-backup{background:#edf2e9;color:#385f54;text-decoration:none;border:1px solid #bfd2c4}
 .save-export-note{margin:3px 4px 8px;color:#6e8077;font-size:11px;line-height:1.55;overflow-wrap:anywhere}
 @media(max-width:380px){.board-footer{align-items:flex-start}.save-actions{width:100%;justify-content:space-between}}
+
+.story-entry-link{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:8px 17px;margin:2px 0 15px;background:#ebf1e9;border:1px solid #bccfc2;border-radius:13px;color:#3b675a;font-size:13px;font-weight:800;text-decoration:none}
+.story-entry-link:focus-visible{outline:3px solid #547ec4;outline-offset:3px}
+@media(prefers-color-scheme:dark){.story-entry-link{background:#25443a;border-color:#628c7a;color:#e8f3e9}}
