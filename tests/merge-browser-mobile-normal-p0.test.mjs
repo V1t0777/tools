@@ -460,8 +460,13 @@ test('P0 mobile Chromium: 320–430px normal mode layout, native touch and save 
       window.__crossStaleInput.files=transfer.files;
       window.__crossStaleInput.dispatchEvent(new Event('change',{bubbles:true}));
     },initialRaw);
-    await until(()=>evalFn(()=>document.getElementById('notice').textContent.includes(
-      '文件选择期间页面或存档已变化')),'old chooser rejected after B update');
+    // The stale input has no chooser lease: it is silently ignored rather
+    // than starting another async file handler or showing a transient hint.
+    await evalFn(()=>new Promise(resolve=>setTimeout(resolve,30)));
+    assert.equal(await evalFn(()=>document.getElementById('cancel-normal-import').hidden),true,
+      'old chooser cannot re-arm import after B has written the save');
+    assert.equal(await evalFn(()=>document.getElementById('import-normal-save').disabled),false,
+      'old chooser cannot start a new file read after cross-tab adoption');
     assert.equal(await evalFn(()=>window.__crossConfirm),0);
     assert.equal(await evalFn(k=>localStorage.getItem(k),KEY),rawB);
     const nextTap=await evalFn(()=>{
