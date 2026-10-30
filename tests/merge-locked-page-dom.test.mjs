@@ -2395,3 +2395,61 @@ test('P2.65cp empty native file change rotates chooser identity and blocks late 
     'successful restore preserves the exact prior save');
   assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
 });
+
+test('P2.65cr duplicate native change cannot retire an active file read before cancel',async()=>{
+  const h=await mount(),original=h.storage.getItem(SAVE_KEY),writes=h.writes.length;
+  const row=h.id('export-local-save').parentElement;
+  const button=row.children.find(e=>e.id==='import-normal-save');
+  const input=row.children.find(e=>e.id==='import-normal-file');
+  const imported=JSON.stringify({...h.saved(),coins:147,revision:1});
+  let resolveRead,reads=0,confirms=0;
+  h.win.confirm=()=>{confirms++;return true;};
+  button.click();
+  input.files=[{size:imported.length,text:()=>{
+    reads++;
+    return new Promise(resolve=>{resolveRead=resolve;});
+  }}];
+  input.dispatch('change');await settle();
+  assert.equal(reads,1,'first selection starts exactly one native file read');
+  assert.equal(button.disabled,true,'original read still owns the import flight');
+  input.dispatch('change');await settle();
+  assert.equal(input.parentElement,row,
+    'duplicate nonempty change must not detach the input while its read can be canceled');
+  assert.equal(reads,1,'duplicate event must not read the file again');
+  input.dispatch('cancel');await settle();
+  assert.equal(button.disabled,false,'native cancel must still abort the first read');
+  resolveRead(imported);await settle();
+  assert.equal(confirms,0,'canceled read must never reach restore confirmation');
+  assert.equal(h.storage.getItem(SAVE_KEY),original);
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  assert.equal(h.writes.length,writes,'duplicate and canceled events must not write');
+});
+
+test('P2.65cr duplicate native change cannot bypass cancel of a Web Lock restore',async()=>{
+  const h=await mount(),original=h.storage.getItem(SAVE_KEY),writes=h.writes.length;
+  const row=h.id('export-local-save').parentElement;
+  const button=row.children.find(e=>e.id==='import-normal-save');
+  const input=row.children.find(e=>e.id==='import-normal-file');
+  const imported=JSON.stringify({...h.saved(),coins:148,revision:1});
+  let confirms=0;
+  h.win.confirm=()=>{confirms++;return true;};
+  h.win.pauseNextLock=true;
+  button.click();
+  input.files=[{size:imported.length,text:async()=>imported}];
+  input.dispatch('change');await settle();
+  assert.equal(confirms,1,'first selection is the only confirmed restore');
+  assert.equal(typeof h.win.releaseLock,'function','restore is waiting for its Web Lock');
+  input.dispatch('change');await settle();
+  assert.equal(input.parentElement,row,
+    'duplicate event must preserve the native cancel handler while restore waits');
+  input.dispatch('cancel');await settle();
+  h.win.releaseLock();await settle();
+  assert.equal(button.disabled,false);
+  assert.equal(h.storage.getItem(SAVE_KEY),original,
+    'cancel after duplicate change must revoke the pending locked restore');
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null,
+    'canceled restore cannot reserve the backup slot');
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+  assert.equal(h.writes.length,writes,'no original or story save write is permitted');
+});
