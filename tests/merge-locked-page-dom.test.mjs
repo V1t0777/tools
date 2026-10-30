@@ -2348,8 +2348,10 @@ test('P2.65ba actual normal page: full-board warehouse upgrade then selected sto
 
 test('P2.65cp empty native file change rotates chooser identity and blocks late events',async()=>{
   const h=await mount(),original=h.storage.getItem(SAVE_KEY),before=h.writes.length;
-  const button=h.id('import-normal-save'),cancel=h.id('cancel-normal-import');
-  const old=h.id('import-normal-file');
+  const controls=h.id('export-local-save').parentElement.children;
+  const button=controls.find(e=>e.id==='import-normal-save');
+  const cancel=controls.find(e=>e.id==='cancel-normal-import');
+  const old=controls.find(e=>e.id==='import-normal-file');
   button.click();
   assert.equal(cancel.hidden,false,'native chooser is awaiting selection');
   old.files=[];
