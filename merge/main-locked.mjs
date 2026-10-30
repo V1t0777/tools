@@ -819,6 +819,16 @@ if(saveActions){
     return input;
   };
   let importFile=makeImportFile();
+  // Revoked native choosers can emit a late change/cancel after a new one
+  // starts. Replace the DOM input, not merely its value, to isolate leases.
+  function replaceImportFile(){
+    const previous=importFile;
+    const fresh=makeImportFile();
+    previous.remove();
+    importFile=fresh;
+    bindImportFileEvents(fresh);
+    saveActions.append(fresh);
+  }
   const cancelImportButton=document.createElement('button');
   cancelImportButton.id='cancel-normal-import';
   cancelImportButton.type='button';
@@ -847,7 +857,13 @@ if(saveActions){
         // An old timeout must never cancel a newer chooser, active file read,
         // or a legitimate selection delivered after the focus event.
         if(importPicker!==picker||importBusy||pageSuspended())return;
-        importPicker=null;queuedHiddenSelection=null;importFile.value='';
+        importPicker=null;queuedHiddenSelection=null;
+        try{replaceImportFile();}
+        catch{
+          pauseUnsafe('IMPORT_PICKER_REPLACE_FAILED',
+            '无法隔离旧文件选择器，已暂停操作；请重新打开页面核对');
+          return;
+        }
         refreshImportCancel();
         hint('文件选择器未返回结果，已解除等待；请重新点击导入');
       },IMPORT_PICKER_RETURN_GRACE_MS);
@@ -910,6 +926,9 @@ if(saveActions){
       // late change/cancel events even if a newer picker is already open.
       if(input!==importFile)return;
       cancelPendingImport();
+      try{replaceImportFile();}
+      catch{pauseUnsafe('IMPORT_PICKER_REPLACE_FAILED',
+        '无法隔离已取消的文件选择器，已暂停操作；请重新打开页面核对');}
     });
     input.addEventListener('change',()=>{
       if(input!==importFile)return;
@@ -941,12 +960,12 @@ if(saveActions){
     cancelPendingImport();
     // Replacing the native input isolates delayed events from the old
     // chooser; merely clearing its value would not distinguish generations.
-    const previous=importFile;
-    const fresh=makeImportFile();
-    previous.remove();
-    importFile=fresh;
-    bindImportFileEvents(fresh);
-    saveActions.append(fresh);
+    try{replaceImportFile();}
+    catch{
+      pauseUnsafe('IMPORT_PICKER_REPLACE_FAILED',
+        '无法隔离已取消的文件选择器，已暂停操作；请重新打开页面核对');
+      return;
+    }
     cancelImportButton.hidden=true;
     // Cancellation cannot undo a write that finished before this click.
     // Never promise the previous save was untouched after a confirmed restore.
