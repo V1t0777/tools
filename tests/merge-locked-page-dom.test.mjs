@@ -891,7 +891,12 @@ test('P2.65j stale file chooser after BFCache cannot restore a previous gesture'
   assert.equal(h.storage.getItem(SAVE_KEY),original);
   assert.equal(h.writes.length,before);
   assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null);
-  assert.match(h.id('notice').textContent,/重新点击导入/);
+  // A revoked input now drops unsolicited change without a second async
+  // handler. Its lack of a notice is not consent to restore anything.
+  assert.equal(h.id('cancel-normal-import').hidden,true,
+    'revoked chooser cannot re-arm the import cancellation UI');
+  assert.match(h.id('save-status').textContent,/已保存于此浏览器/,
+    'BFCache return retains a verified normal save');
 });
 test('P2.65j chooser cannot silently adopt a new cross-tab save baseline',async()=>{
   const h=await mount();
