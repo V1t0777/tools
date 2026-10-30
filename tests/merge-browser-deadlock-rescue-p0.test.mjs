@@ -57,8 +57,9 @@ test('P0 real Chromium deadlock rescue: consent, stale selection, BFCache and on
     const path=decodeURIComponent(new URL(req.url,'http://localhost').pathname);
     const file=resolve(root,'.'+path);
     if(!file.startsWith(root+sep)){res.writeHead(403).end();return;}
-    try{res.writeHead(200,{'Content-Type':mime[extname(file)]??'application/octet-stream',
-      'Cache-Control':'no-store'}).end(await readFile(file));}
+    try{const bytes=await readFile(file);
+      res.writeHead(200,{'Content-Type':mime[extname(file)]??'application/octet-stream',
+        'Cache-Control':'no-store'}).end(bytes);}
     catch{res.writeHead(404).end('not found');}
   });
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
