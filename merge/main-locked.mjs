@@ -981,7 +981,13 @@ if(saveActions){
       hint('文件选择事件重复，已取消导入，请重新选择');
       return;
     }
-      void acceptSelectedFile(file,picker);
+    // A nonempty native change consumes this input's chooser lease. A late
+    // duplicate change/cancel on the same DOM node must not inherit the next
+    // chooser's consent, even when the first import was valid or rejected.
+    // Rotate at the next explicit click, not here: the selected File remains
+    // readable while the current restore is still in flight.
+    if(file&&picker&&!importBusy)importFileNeedsRotation=true;
+    void acceptSelectedFile(file,picker);
     });
   }
   bindImportFileEvents(importFile);
