@@ -373,8 +373,30 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   assert.equal(await evalOn(b,`localStorage.getItem(${JSON.stringify(key)})`),changedRaw,'stale chooser must not roll back newer tab progress');
   assert.equal(await evalOn(b,`localStorage.getItem(${JSON.stringify(key+'.restore-backup-v3')})`),originalBackup,'stale chooser must not replace recovery backup');
   assert.equal(await evalOn(b,'window.__importConfirmCount'),0,'stale chooser must not show destructive confirmation');
-  await evalOn(b,`document.querySelector('#board .producer').click();true`);
+  // The locked transaction publishes its save bytes before the UI flight
+  // finishes. A revision-only poll can therefore race the next import click:
+  // observe the real gameplay success notice, emitted after runtime.action()
+  // settles, instead of adding an arbitrary CI timing delay.
+  await evalOn(b,`(()=>{
+    window.__postChooserActionFinished=false;
+    const notice=document.getElementById('notice');
+    const observer=new MutationObserver(()=>{
+      if(notice.textContent.startsWith('获得 ')){
+        window.__postChooserActionFinished=true;
+        observer.disconnect();
+      }
+    });
+    observer.observe(notice,{childList:true,characterData:true,subtree:true});
+    document.querySelector('#board .producer').click();
+    return true;
+  })()`);
   await until(async()=>(await readSave(b)).revision===changedState.revision+1,'fresh gameplay after rejected chooser');
+  await waitWithSnapshot(async()=>await evalOn(b,
+    "window.__postChooserActionFinished===true && "+
+    "document.getElementById('save-status').textContent.includes('已保存于此浏览器') && "+
+    "!document.getElementById('import-normal-save').disabled && "+
+    "document.getElementById('cancel-normal-import').hidden"),
+    'fresh gameplay UI flight settled before chooser lease',b);
   // P2.65bd: while a native file chooser is pending, neither a destructive
   // reset nor a backup download may proceed on a possibly stale baseline.
   // Use a chooser stub only; real browser storage, buttons and Web Locks remain live.
