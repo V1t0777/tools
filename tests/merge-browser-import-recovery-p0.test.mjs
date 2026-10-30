@@ -127,6 +127,20 @@ test('P0 Chromium: rejected read, cancelled late read, resumed play and fresh im
         typeof window.__lateResolve==='function';
     },initial);
     assert.equal(pending,true,'second chooser must hold a pending native File read');
+    // While a native File.text() is unresolved, the same persistent export
+    // control must not request a Blob download of an unreviewed snapshot.
+    const blockedExport=await evalFn(()=>{
+      const original=HTMLAnchorElement.prototype.click;
+      let clicks=0;
+      HTMLAnchorElement.prototype.click=function(){clicks++;};
+      try{
+        document.getElementById('export-local-save').click();
+        return {clicks,notice:document.getElementById('notice').textContent};
+      }finally{HTMLAnchorElement.prototype.click=original;}
+    });
+    assert.equal(blockedExport.clicks,0,'pending file read must block export anchor');
+    assert.match(blockedExport.notice,/正在选择或核验导入文件/,
+      'blocked export must explain the pending import');
     assert.equal(await evalFn(()=>{
       const old=document.getElementById('import-normal-file');
       document.getElementById('cancel-normal-import').click();
@@ -145,6 +159,18 @@ test('P0 Chromium: rejected read, cancelled late read, resumed play and fresh im
     await until(()=>evalFn(()=>document.getElementById('notice').textContent.startsWith('获得 ')&&
       !document.getElementById('import-normal-save').disabled),'gameplay UI settled');
     const gameplay=await evalFn(k=>localStorage.getItem(k),key);
+    // Real Chromium Blob download, not an intercepted anchor: the exact
+    // current save must be recoverable after read failure and cancellation.
+    await call('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:temp});
+    await evalFn(()=>document.getElementById('export-local-save').click());
+    const downloadedPath=join(temp,'yunyu-normal-save-v3.json');
+    await until(()=>existsSync(downloadedPath),'download after import recovery',15000);
+    assert.equal(await readFile(downloadedPath,'utf8'),gameplay,
+      'post-error download must contain the exact verified original bytes');
+    assert.equal(await evalFn(k=>localStorage.getItem(k),key),gameplay,
+      'read-only export must not write to the normal save');
+    assert.equal(await evalFn(k=>localStorage.getItem(k),backup),originalBackup,
+      'read-only export must not overwrite the recovery backup');
     await evalFn(raw=>{
       const input=document.getElementById('import-normal-file');input.click=()=>{};
       document.getElementById('import-normal-save').click();
@@ -158,5 +184,5 @@ test('P0 Chromium: rejected read, cancelled late read, resumed play and fresh im
     assert.equal(await evalFn(k=>localStorage.getItem(k),key),gameplay);
     assert.equal(await evalFn(k=>localStorage.getItem(k),backup),originalBackup);
     assert.equal(await evalFn(k=>localStorage.getItem(k),story),'story-recovery-sentinel');
-    t.diagnostic('Chromium rejected File.text, late cancellation, resumed gameplay and fresh declined import verified');
+    t.diagnostic('Chromium blocked export during pending read, downloaded exact bytes after recovery, and declined fresh import');
   });
