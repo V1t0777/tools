@@ -48,7 +48,7 @@ function cdp(url){
 }
 
 test('P0 mobile Chromium: 320–430px normal mode layout, native touch and save controls',
-  {timeout:110000},async t=>{
+  {timeout:140000},async t=>{
     const chrome=chromePath();
     assert.ok(chrome,'Real Chromium required; DOM mocks cannot satisfy mobile layout gate');
     const temp=await mkdtemp(join(tmpdir(),'merge-mobile-normal-'));
@@ -245,5 +245,112 @@ test('P0 mobile Chromium: 320–430px normal mode layout, native touch and save 
       'download remains a snapshot after later gameplay');
     assert.equal(await evalFn(()=>
       document.documentElement.scrollWidth<=document.documentElement.clientWidth+1),true);
-    t.diagnostic('Mobile Chromium 320/375/390/430px layout, native producer/export touches, exact JSON download, declined import and resumed play passed. Not iPhone Safari/WeChat testing.');
+
+    // Mobile BFCache + pending chooser: old input events must never authorize
+    // a restore after pagehide. Only the OS picker is stubbed.
+    const beforeLeave=await evalFn(k=>localStorage.getItem(k),KEY);
+    await evalFn(()=>{
+      window.__mobileBfcacheReturn=false;
+      window.addEventListener('pageshow',e=>{
+        if(e.persisted)window.__mobileBfcacheReturn=true;
+      });
+      window.__returnConfirms=0;
+      window.confirm=()=>{window.__returnConfirms++;return false;};
+      const input=document.getElementById('import-normal-file');
+      window.__staleMobileInput=input;
+      input.click=()=>{};
+      document.getElementById('import-normal-save').click();
+    });
+    await until(()=>evalFn(()=>!document.getElementById('cancel-normal-import').hidden),
+      'pending mobile chooser before navigation');
+    await call('Page.navigate',
+      {url:'http://127.0.0.1:'+server.address().port+'/merge/mobile-away-test'},sessionId);
+    await until(()=>evalFn(()=>location.pathname==='/merge/mobile-away-test'&&
+      document.readyState==='complete'),'mobile navigation away');
+    const history=await call('Page.getNavigationHistory',{},sessionId);
+    await call('Page.navigateToHistoryEntry',
+      {entryId:history.entries[history.currentIndex-1].id},sessionId);
+    await until(()=>evalFn(()=>location.pathname==='/merge/index.html'&&
+      !!document.getElementById('import-normal-save')),'mobile history return');
+    assert.equal(await evalFn(()=>window.__mobileBfcacheReturn),true,
+      'must exercise genuine BFCache, not a reload');
+    await until(()=>evalFn(()=>
+      document.getElementById('save-status').textContent.includes('已保存于此浏览器')&&
+      document.getElementById('cancel-normal-import').hidden&&
+      !document.getElementById('import-normal-save').disabled),
+      'BFCache revoked chooser and revalidated save');
+    assert.equal(await evalFn(k=>localStorage.getItem(k),KEY),beforeLeave);
+    await evalFn(raw=>{
+      const files=new DataTransfer();
+      files.items.add(new File([raw],'stale-mobile.json',{type:'application/json'}));
+      window.__staleMobileInput.files=files.files;
+      window.__staleMobileInput.dispatchEvent(new Event('change',{bubbles:true}));
+    },initialRaw);
+    await until(()=>evalFn(()=>document.getElementById('notice').textContent.includes(
+      '文件选择期间页面或存档已变化')),'stale chooser rejected after BFCache');
+    assert.equal(await evalFn(()=>window.__returnConfirms),0);
+    assert.equal(await evalFn(k=>localStorage.getItem(k),KEY),beforeLeave);
+    assert.equal(await evalFn(k=>localStorage.getItem(k),backupKey),beforeBackup);
+    assert.equal(await evalFn(k=>localStorage.getItem(k),storyKey),storySentinel);
+
+    // A new picker can be declined safely, then normal native touch and
+    // an exact JSON download still work in the restored mobile document.
+    await evalFn(raw=>{
+      const input=document.getElementById('import-normal-file');
+      input.click=()=>{};
+      document.getElementById('import-normal-save').click();
+      const files=new DataTransfer();
+      files.items.add(new File([raw],'fresh-mobile.json',{type:'application/json'}));
+      input.files=files.files;
+      input.dispatchEvent(new Event('change',{bubbles:true}));
+    },initialRaw);
+    await until(()=>evalFn(()=>document.getElementById('notice').textContent.includes(
+      '已取消导入')&&!document.getElementById('import-normal-save').disabled&&
+      document.getElementById('cancel-normal-import').hidden),
+      'fresh import declined after BFCache');
+    assert.equal(await evalFn(()=>window.__returnConfirms),1);
+    assert.equal(await evalFn(k=>localStorage.getItem(k),KEY),beforeLeave);
+    const postReturnTap=await evalFn(()=>{
+      const el=document.querySelector('#board .producer');
+      el.scrollIntoView({block:'center',inline:'center'});
+      const r=el.getBoundingClientRect();
+      return {x:r.left+r.width/2,y:r.top+r.height/2};
+    });
+    await until(()=>evalFn(({x,y})=>
+      !!document.elementFromPoint(x,y)?.closest('#board .producer'),postReturnTap),
+      'post-BFCache mobile producer hit');
+    await call('Input.dispatchTouchEvent',
+      {type:'touchStart',touchPoints:[postReturnTap]},sessionId);
+    await call('Input.dispatchTouchEvent',
+      {type:'touchEnd',touchPoints:[]},sessionId);
+    await until(()=>evalFn(k=>JSON.parse(localStorage.getItem(k))?.revision===3,KEY),
+      'post-BFCache mobile production persisted');
+    await until(()=>evalFn(()=>document.getElementById('notice').textContent.startsWith(
+      '获得 ')&&document.getElementById('save-status').textContent.includes(
+      '已保存于此浏览器')&&!document.getElementById('import-normal-save').disabled),
+      'post-BFCache UI settled before export');
+    const postReturnRaw=await evalFn(k=>localStorage.getItem(k),KEY);
+    assert.equal(JSON.parse(postReturnRaw).energy,initial.energy-3);
+    await rm(downloadedPath,{force:true});
+    const postReturnExport=await evalFn(()=>{
+      const el=document.getElementById('export-local-save');
+      el.scrollIntoView({block:'center',inline:'center'});
+      const r=el.getBoundingClientRect();
+      return {x:r.left+r.width/2,y:r.top+r.height/2};
+    });
+    await until(()=>evalFn(({x,y})=>
+      !!document.elementFromPoint(x,y)?.closest('#export-local-save'),
+      postReturnExport),'post-BFCache mobile export hit');
+    await call('Input.dispatchTouchEvent',
+      {type:'touchStart',touchPoints:[postReturnExport]},sessionId);
+    await call('Input.dispatchTouchEvent',
+      {type:'touchEnd',touchPoints:[]},sessionId);
+    await until(()=>existsSync(downloadedPath),'post-BFCache mobile download',15000);
+    assert.equal(await readFile(downloadedPath,'utf8'),postReturnRaw);
+    assert.equal(await evalFn(k=>localStorage.getItem(k),KEY),postReturnRaw);
+    assert.equal(await evalFn(k=>localStorage.getItem(k),backupKey),beforeBackup);
+    assert.equal(await evalFn(k=>localStorage.getItem(k),storyKey),storySentinel);
+    assert.equal(await evalFn(()=>document.documentElement.scrollWidth<=
+      document.documentElement.clientWidth+1),true);
+    t.diagnostic('Mobile Chromium: 320–430px layout, touch/download/declined import, genuine BFCache stale chooser rejection, fresh touch and exact re-export passed. Not iPhone Safari/WeChat testing.');
   });
