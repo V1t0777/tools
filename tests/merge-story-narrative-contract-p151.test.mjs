@@ -56,8 +56,9 @@ test('P151 optional stories and daily incidents never block the first-volume fin
     assert.ok(entry.requires.length>0,entry.id+' needs a story anchor');
     assert.ok(entry.requires.every(id=>mainIds.has(id)),
       entry.id+' must not depend on another optional entry');
-    assert.equal(entry.kind==='incident',entry.repeatable,
-      entry.id+' incident replay contract');
+    // The found crate is a one-off mystery clue; all other daily incidents replay.
+    assert.equal(entry.repeatable,entry.kind==='incident'&&entry.id!=='old-crate',
+      entry.id+' one-off versus replayable incident contract');
   }
   const incidentUnlocks={
     'cat-nap':'signboard','surprise-rain':'garden-path',
