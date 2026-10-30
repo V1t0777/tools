@@ -1123,7 +1123,15 @@ byId('close-guide').addEventListener('click', () => dialog.close());
 // The lifecycle bridge performs read-only storage/focus/BFCache reconciliation.
 if(store)lifecycle=attachNormalPageLifecycle({
   runtime,win:window,doc:document,storage:store,
-  cancelGesture(){cancelStaleGesture();selected=-1;activeGuidance=null;},
+  cancelGesture(){
+    // pagehide/visibility may clear the internal selection without a storage
+    // change. Keep persistent rescue/store buttons and the selected cell in
+    // sync BEFORE BFCache freezes this DOM; never leave an enabled action
+    // pointing at a selection that has already been revoked.
+    const needsRender=selected!==-1||activeGuidance!==null;
+    cancelStaleGesture();selected=-1;activeGuidance=null;
+    if(needsRender)render(); // read-only UI cleanup; no save or lock writes
+  },
   onBlur(){if(importPicker)importPicker.blurred=true;},
   onFocus(){releaseOrphanedPickerAfterReturn();},
   onReadyForStartup(){startNormalOnce();},

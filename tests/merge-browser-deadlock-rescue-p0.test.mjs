@@ -199,6 +199,10 @@ test('P0 real Chromium deadlock rescue: consent, stale selection, BFCache and on
   await ready();
   assert.equal(await evaluate("sessionStorage.getItem('rescue-bfcache')"),'true',
     'BFCache gate requires actual pageshow.persisted, not a synthetic event');
+  assert.equal(await evaluate("document.querySelector('#board .cell.selected')===null"),true,
+    'BFCache must not retain a visibly selected material after revoking its intent');
+  assert.equal(await evaluate("document.getElementById('deadlock-discard').disabled"),true,
+    'BFCache must disable persistent rescue control when selection is revoked');
   // Page lifecycle intentionally clears the selection. Re-select the same
   // material so the persistent button is enabled when the OLD touch arrives.
   // This proves pointer lease invalidation rather than merely disabled UI.
