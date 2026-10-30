@@ -85,6 +85,11 @@ test('P0 real Chromium deadlock rescue: consent, stale selection, BFCache and on
   const {sessionId}=await call('Target.attachToTarget',{targetId,flatten:true});
   await call('Page.enable',{},sessionId);
   await call('Runtime.enable',{},sessionId);
+  const front=async()=>{
+    await call('Target.activateTarget',{targetId});
+    await call('Page.bringToFront',{},sessionId);
+  };
+  await front();
   async function evaluate(expression){
     const result=await call('Runtime.evaluate',
       {expression,returnByValue:true,awaitPromise:true,userGesture:true},sessionId);
@@ -188,6 +193,7 @@ test('P0 real Chromium deadlock rescue: consent, stale selection, BFCache and on
   const history=await call('Page.getNavigationHistory',{},sessionId);
   await call('Page.navigateToHistoryEntry',
     {entryId:history.entries[history.currentIndex-1].id},sessionId);
+  await front();
   await until(()=>evaluate("location.pathname==='/merge/index.html' && !!document.getElementById('deadlock-discard')"),
     'history restore');
   await ready();
@@ -204,6 +210,10 @@ test('P0 real Chromium deadlock rescue: consent, stale selection, BFCache and on
   assert.equal(await raw(),bfcacheRaw,'pre-pagehide pointer cannot rescue after BFCache');
   await pointer('deadlock-discard');
   await clickTouch('deadlock-discard');
+  const immediate=await evaluate("(()=>({confirms:window.__rescueConfirmCount,"+
+    "notice:document.getElementById('notice').textContent,"+
+    "status:document.getElementById('save-status').textContent}))()");
+  t.diagnostic('BFCache fresh rescue immediate state: '+JSON.stringify(immediate));
   try{await until(async()=>(await save()).revision===1,'fresh post-BFCache rescue');}
   catch(error){
     const snapshot=await evaluate("(()=>({confirms:window.__rescueConfirmCount,"+
