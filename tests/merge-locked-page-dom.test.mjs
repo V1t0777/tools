@@ -2345,3 +2345,33 @@ test('P2.65ba actual normal page: full-board warehouse upgrade then selected sto
   assert.equal(h.id('board-guide').getAttribute('aria-pressed'),'false');
   assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
 });
+
+test('P2.65cp empty native file change rotates chooser identity and blocks late events',async()=>{
+  const h=await mount(),original=h.storage.getItem(SAVE_KEY),before=h.writes.length;
+  const button=h.id('import-normal-save'),cancel=h.id('cancel-normal-import');
+  const old=h.id('import-normal-file');
+  button.click();
+  assert.equal(cancel.hidden,false,'native chooser is awaiting selection');
+  old.files=[];
+  old.dispatch('change');await settle();
+  const fresh=h.id('export-local-save').parentElement.children.find(e=>e.id==='import-normal-file');
+  assert.notEqual(fresh,old,'empty change must rotate native input identity');
+  assert.equal(old.parentElement,null,'old chooser input is detached');
+  assert.equal(cancel.hidden,true,'empty selection must release the chooser UI');
+  assert.equal(h.storage.getItem(SAVE_KEY),original);
+  assert.equal(h.writes.length,before,'empty selection must never write');
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null);
+  button.click();
+  const imported=JSON.stringify({...h.saved(),coins:129,revision:1});
+  old.files=[{size:imported.length,text:async()=>imported}];
+  old.dispatch('change');old.dispatch('cancel');await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),original,
+    'late events from an empty old chooser cannot restore or cancel the new chooser');
+  assert.equal(cancel.hidden,false,'fresh chooser remains active after stale events');
+  fresh.files=[{size:imported.length,text:async()=>imported}];
+  fresh.dispatch('change');await settle();
+  assert.equal(h.storage.getItem(SAVE_KEY),imported,'new chooser remains usable');
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),original,
+    'successful restore preserves the exact prior save');
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});

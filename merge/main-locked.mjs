@@ -949,6 +949,22 @@ if(saveActions){
     input.addEventListener('change',()=>{
       if(input!==importFile)return;
       const picker=importPicker,file=importFile.files?.[0];
+      // An empty native change ends this chooser, but it is NOT the same as
+      // the 'cancel' event on every Safari/WebView version. Reusing the input
+      // would let a late old change/cancel inherit the next chooser's lease.
+      // Detach it before permitting another user gesture; never read a file.
+      if(!file&&picker&&!importBusy){
+        importPicker=null;queuedHiddenSelection=null;importEpoch++;
+        try{replaceImportFile();}
+        catch{
+          pauseUnsafe('IMPORT_PICKER_REPLACE_FAILED',
+            '无法隔离未选择文件的旧选择器，已暂停操作；请重新打开页面核对');
+          return;
+        }
+        refreshImportCancel();
+        hint('未选择文件，已取消导入；请重新点击导入');
+        return;
+      }
     // Some iOS/WebView choosers deliver change before visibility becomes
     // visible. Hold only the File handle, never read, confirm or write hidden.
     if(document.hidden&&picker?.hiddenOnce&&file){
