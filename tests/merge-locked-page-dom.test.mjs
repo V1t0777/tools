@@ -893,7 +893,8 @@ test('P2.65j stale file chooser after BFCache cannot restore a previous gesture'
   assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null);
   // A revoked input now drops unsolicited change without a second async
   // handler. Its lack of a notice is not consent to restore anything.
-  assert.equal(h.id('cancel-normal-import').hidden,true,
+  assert.equal(h.id('export-local-save').parentElement.children
+    .find(e=>e.id==='cancel-normal-import').hidden,true,
     'revoked chooser cannot re-arm the import cancellation UI');
   assert.match(h.id('save-status').textContent,/已保存于此浏览器/,
     'BFCache return retains a verified normal save');
