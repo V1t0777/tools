@@ -378,5 +378,124 @@ test('P0 mobile Chromium: 320–430px normal mode layout, native touch and save 
     assert.equal(await evalFn(k=>localStorage.getItem(k),storyKey),storySentinel);
     assert.equal(await evalFn(()=>document.documentElement.scrollWidth<=
       document.documentElement.clientWidth+1),true);
+
+    // A stays in BFCache while B performs a real, locked normal-mode UI write.
+    const preCross=await evalFn(k=>localStorage.getItem(k),KEY);
+    assert.equal(JSON.parse(preCross).revision,3);
+    await evalFn(()=>{
+      window.__mobileBfcacheReturn=false;
+      window.__crossConfirm=0;
+      window.confirm=()=>{window.__crossConfirm++;return false;};
+      const input=document.getElementById('import-normal-file');
+      window.__crossStaleInput=input;
+      input.click=()=>{}; // Only the native OS chooser is substituted.
+      document.getElementById('import-normal-save').click();
+    });
+    await until(()=>evalFn(()=>!document.getElementById('cancel-normal-import').hidden),
+      'cross-tab chooser pending');
+    await call('Page.navigate',{url:'http://127.0.0.1:'+
+      server.address().port+'/merge/mobile-cross-away'},sessionId);
+    await until(()=>evalFn(()=>location.pathname==='/merge/mobile-cross-away'&&
+      document.readyState==='complete'),'A navigated away');
+    const {targetId:tabB}=await call('Target.createTarget',{url:'about:blank'});
+    const {sessionId:sessionB}=await call('Target.attachToTarget',
+      {targetId:tabB,flatten:true});
+    await call('Page.enable',{},sessionB);
+    await call('Runtime.enable',{},sessionB);
+    const evalB=async expression=>{
+      const r=await call('Runtime.evaluate',
+        {expression,returnByValue:true,awaitPromise:true,userGesture:true},sessionB);
+      if(r.exceptionDetails)throw Error('B JS: '+JSON.stringify(r.exceptionDetails));
+      return r.result.value;
+    };
+    await call('Target.activateTarget',{targetId:tabB});
+    await call('Page.bringToFront',{},sessionB);
+    await call('Page.navigate',{url:'http://127.0.0.1:'+
+      server.address().port+'/merge/index.html'},sessionB);
+    await until(()=>evalB("document.readyState==='complete' && "+
+      "document.getElementById('save-status')?.textContent.includes('已保存于此浏览器')"),
+      'B verified normal startup');
+    assert.equal(await evalB('document.hidden'),false);
+    assert.equal(await evalB("JSON.parse(localStorage.getItem("+JSON.stringify(KEY)+")).revision"),3);
+    await evalB("document.querySelector('#board .producer').click();true");
+    await until(()=>evalB("JSON.parse(localStorage.getItem("+JSON.stringify(KEY)+")).revision===4"),
+      'B normal Web Locks write');
+    const rawB=await evalB("localStorage.getItem("+JSON.stringify(KEY)+")");
+    assert.notEqual(rawB,preCross);
+    assert.equal(JSON.parse(rawB).energy,initial.energy-4);
+    await call('Target.activateTarget',{targetId});
+    await call('Page.bringToFront',{},sessionId);
+    const nav=await call('Page.getNavigationHistory',{},sessionId);
+    await call('Page.navigateToHistoryEntry',
+      {entryId:nav.entries[nav.currentIndex-1].id},sessionId);
+    await until(()=>evalFn(()=>location.pathname==='/merge/index.html'&&
+      !!document.getElementById('save-status')),'A history return');
+    assert.equal(await evalFn(()=>window.__mobileBfcacheReturn),true,
+      'A must genuinely resume BFCache');
+    await until(()=>evalFn(energy=>
+      document.getElementById('energy').textContent.startsWith(energy+' /')&&
+      document.getElementById('cancel-normal-import').hidden&&
+      !document.getElementById('import-normal-save').disabled&&
+      document.getElementById('save-status').textContent.includes('已保存于此浏览器'),
+      String(initial.energy-4)),'A adopted B revision and revoked chooser');
+    assert.equal(await evalFn(k=>localStorage.getItem(k),KEY),rawB);
+    await evalFn(raw=>{
+      const transfer=new DataTransfer();
+      transfer.items.add(new File([raw],'old-cross-tab.json',{type:'application/json'}));
+      window.__crossStaleInput.files=transfer.files;
+      window.__crossStaleInput.dispatchEvent(new Event('change',{bubbles:true}));
+    },initialRaw);
+    await until(()=>evalFn(()=>document.getElementById('notice').textContent.includes(
+      '文件选择期间页面或存档已变化')),'old chooser rejected after B update');
+    assert.equal(await evalFn(()=>window.__crossConfirm),0);
+    assert.equal(await evalFn(k=>localStorage.getItem(k),KEY),rawB);
+    const nextTap=await evalFn(()=>{
+      const el=document.querySelector('#board .producer');
+      el.scrollIntoView({behavior:'instant',block:'center',inline:'center'});
+      const r=el.getBoundingClientRect();
+      return {x:r.left+r.width/2,y:r.top+r.height/2};
+    });
+    await until(()=>evalFn(({x,y})=>
+      !!document.elementFromPoint(x,y)?.closest('#board .producer'),nextTap),
+      'A fresh producer hit');
+    await evalFn(()=>new Promise(resolve=>
+      requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true)))));
+    assert.equal(await evalFn(({x,y})=>
+      !!document.elementFromPoint(x,y)?.closest('#board .producer'),nextTap),true);
+    await call('Input.dispatchTouchEvent',
+      {type:'touchStart',touchPoints:[nextTap]},sessionId);
+    await call('Input.dispatchTouchEvent',
+      {type:'touchEnd',touchPoints:[]},sessionId);
+    await until(()=>evalFn(k=>JSON.parse(localStorage.getItem(k))?.revision===5,KEY),
+      'A fresh native touch after B adoption');
+    await until(()=>evalFn(()=>document.getElementById('notice').textContent.startsWith(
+      '获得 ')&&document.getElementById('save-status').textContent.includes(
+      '已保存于此浏览器')&&!document.getElementById('import-normal-save').disabled),
+      'A settled before final export');
+    const finalRaw=await evalFn(k=>localStorage.getItem(k),KEY);
+    assert.equal(JSON.parse(finalRaw).energy,initial.energy-5);
+    await rm(downloadedPath,{force:true});
+    const nextExport=await evalFn(()=>{
+      const el=document.getElementById('export-local-save');
+      el.scrollIntoView({behavior:'instant',block:'center',inline:'center'});
+      const r=el.getBoundingClientRect();
+      return {x:r.left+r.width/2,y:r.top+r.height/2};
+    });
+    await until(()=>evalFn(({x,y})=>
+      !!document.elementFromPoint(x,y)?.closest('#export-local-save'),nextExport),
+      'A final export hit');
+    await call('Input.dispatchTouchEvent',
+      {type:'touchStart',touchPoints:[nextExport]},sessionId);
+    await call('Input.dispatchTouchEvent',
+      {type:'touchEnd',touchPoints:[]},sessionId);
+    await until(()=>existsSync(downloadedPath),'cross-tab export landed',15000);
+    assert.equal(await readFile(downloadedPath,'utf8'),finalRaw);
+    assert.equal(await evalFn(k=>localStorage.getItem(k),KEY),finalRaw);
+    assert.equal(await evalFn(k=>localStorage.getItem(k),backupKey),beforeBackup);
+    assert.equal(await evalFn(k=>localStorage.getItem(k),storyKey),storySentinel);
+    assert.equal(await evalFn(()=>document.documentElement.scrollWidth<=
+      document.documentElement.clientWidth+1),true);
+    t.diagnostic('320px Chromium: B locked UI write while A BFCache; A adopted B, rejected stale chooser, resumed native touch, exact downloaded JSON. Not iPhone/WeChat.');
+
     t.diagnostic('Mobile Chromium: 320–430px layout, touch/download/declined import, genuine BFCache stale chooser rejection, fresh touch and exact re-export passed. Not iPhone Safari/WeChat testing.');
   });
