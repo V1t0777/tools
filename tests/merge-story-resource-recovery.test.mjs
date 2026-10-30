@@ -53,3 +53,37 @@ test('P141 UI failure guidance cannot write or reach network',()=>{
   for(const forbidden of ['localStorage','sessionStorage','setItem(','fetch(','sendBeacon(','purchaseSupply(','writeStoryWorkshop('])
     assert.equal(source.includes(forbidden),false,forbidden);
 });
+
+test('P148 backwards device clock shows a safe energy warning, then normal engine recovery',()=>{
+  const state=createInitialState(NOW);
+  state.energy=0;
+  state.energyAt=NOW+2*ENERGY_REGEN_MS;
+  assert.equal(validateSave(state),true);
+  const original=structuredClone(state);
+  const warning=describeStoryWorkshopStall(state,NOW);
+  assert.equal(warning.code,'CLOCK_BEHIND_ENERGY');
+  assert.match(warning.message,/系统日期和时间/);
+  assert.equal(produce(state,42,NOW).ok,false);
+  assert.deepEqual(state,original,'diagnostic must not rewrite future timer');
+  assert.equal(describeStoryWorkshopStall(state,NOW+2*ENERGY_REGEN_MS).code,'ENERGY_WAIT');
+  const resumed=produce(state,42,NOW+3*ENERGY_REGEN_MS,()=>0);
+  assert.equal(resumed.ok,true);
+  assert.equal(resumed.state.revision,state.revision+1);
+  assert.equal(validateSave(resumed.state),true);
+});
+test('P148 impossible cooldown wait warns of clock rollback without granting a card',()=>{
+  const state=createInitialState(NOW);
+  state.board=state.board.map(x=>x?.kind==='producer'
+    ? {...x,charges:0,cooldownUntil:NOW+2*PRODUCER_RECHARGE_MS}:x);
+  assert.equal(validateSave(state),true);
+  const original=structuredClone(state);
+  const warning=describeStoryWorkshopStall(state,NOW);
+  assert.equal(warning.code,'CLOCK_BEHIND_COOLDOWN');
+  assert.match(warning.message,/设备时间回拨/);
+  assert.deepEqual(state,original);
+  assert.equal(describeStoryWorkshopStall(state,NOW+PRODUCER_RECHARGE_MS).code,'COOLDOWN_WAIT');
+  const resumed=produce(state,42,NOW+2*PRODUCER_RECHARGE_MS,()=>0);
+  assert.equal(resumed.ok,true);
+  assert.deepEqual(resumed.state.bag,state.bag,'no automatic cooldown card use');
+  assert.equal(validateSave(resumed.state),true);
+});

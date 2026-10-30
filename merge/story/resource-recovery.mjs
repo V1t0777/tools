@@ -1,5 +1,5 @@
 /** Read-only stalled-action guidance. No save writes, free supplies or auto actions. */
-import {advanceTime,ENERGY_REGEN_MS,MAX_TIER,getWarehouseUpgrade,getLevel} from '../engine.mjs';
+import {advanceTime,ENERGY_REGEN_MS,PRODUCER_RECHARGE_MS,MAX_ENERGY,MAX_TIER,getWarehouseUpgrade,getLevel} from '../engine.mjs';
 export function describeStoryWorkshopStall(state,now=Date.now()){
   if(!state||!Array.isArray(state.board)||!Array.isArray(state.warehouse?.slots)||
     !Number.isFinite(now)||now<0)return null;
@@ -24,6 +24,10 @@ export function describeStoryWorkshopStall(state,now=Date.now()){
       return {code:'BOARD_FULL_UPGRADE',message:'棋盘与仓库均满：可花费'+upgrade.coins+'金币扩容仓库，再收纳材料腾出空间。请注意建设金币预算。'};
     return {code:'BOARD_FULL_BLOCKED',message:'棋盘与仓库已满且无可合成材料；请保留原始存档，不要反复生产或重置，并反馈卡关。'};
   }
+  // A saved timer in the future means this device clock moved backwards.
+  // Never disguise it as an enormous ordinary energy countdown or rewrite it.
+  if(state.energy<MAX_ENERGY&&now<state.energyAt)
+    return {code:'CLOCK_BEHIND_ENERGY',message:'设备时间早于存档的体力计时，请核对系统日期和时间；不会自动修改存档或补发体力。'};
   const live=advanceTime(state,now);
   if(live.energy===0){
     const seconds=Math.max(0,Math.ceil((state.energyAt+ENERGY_REGEN_MS-now)/1000));
@@ -32,7 +36,11 @@ export function describeStoryWorkshopStall(state,now=Date.now()){
   }
   const producers=live.board.filter(x=>x?.kind==='producer');
   if(producers.length&&producers.every(x=>x.charges===0&&x.cooldownUntil>now)){
-    const seconds=Math.max(0,Math.ceil((Math.min(...producers.map(x=>x.cooldownUntil))-now)/1000));
+    const waitMs=Math.min(...producers.map(x=>x.cooldownUntil))-now;
+    // A normal producer cannot start with more than one full cooldown left.
+    if(waitMs>PRODUCER_RECHARGE_MS)
+      return {code:'CLOCK_BEHIND_COOLDOWN',message:'工坊冷却时间超出正常上限，可能是设备时间回拨；请核对系统时间，保留存档，不要反复重置。'};
+    const seconds=Math.max(0,Math.ceil(waitMs/1000));
     return {code:'COOLDOWN_WAIT',message:'全部工坊冷却中，最快约'+seconds+
       '秒后恢复；已有冷却卡可手动使用，不会自动消耗。'};
   }
