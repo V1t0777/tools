@@ -31,6 +31,7 @@ let renderGeneration=0;
 let pageGone=false,visibilitySuspended=false,resumePending=false;
 let lifecycleEpoch=0; // do not clear a new suspension triggered during a save read
 let renderedNextRoute=null;
+let visibleClockWarning=null; // only clear a warning previously painted by this view
 const pageSuspended=()=>pageGone||visibilitySuspended||document.visibilityState==='hidden';
 const guardRenderedAction=createWorkshopRenderedActionGuard(
   ()=>renderGeneration,
@@ -62,7 +63,24 @@ function render(){
   // Project elapsed energy/cooldown on return from a long mobile suspension.
   // This is strictly read-only: the persisted raw snapshot and write CAS stay
   // unchanged until an explicit engine action advances time and commits.
-  const visibleState=advanceTime(state,Date.now());
+  const now=Date.now();
+  const visibleState=advanceTime(state,now);
+  // P150: warn immediately on a visible cold start/BFCache return. Requiring
+  // a failed producer tap first would leave a misleading countdown on screen.
+  // This is a read-only diagnosis; it must not grant resources or write saves.
+  const clockHint=describeStoryWorkshopStall(state,now);
+  const isClockWarning=clockHint?.code==='CLOCK_BEHIND_ENERGY'||
+    clockHint?.code==='CLOCK_BEHIND_COOLDOWN';
+  const notice=$('board-notice');
+  if(isClockWarning){
+    notice.textContent=clockHint.message;
+    visibleClockWarning=clockHint.message;
+  }else if(visibleClockWarning!==null){
+    // Do not erase an unrelated operation/conflict notice set since render.
+    if(notice.textContent===visibleClockWarning)
+      notice.textContent='设备时间已恢复；请核对体力与工坊状态后继续操作。';
+    visibleClockWarning=null;
+  }
   status();
   $('energy').textContent=visibleState.energy+' / '+MAX_ENERGY;
   $('coins').textContent=String(state.coins);
