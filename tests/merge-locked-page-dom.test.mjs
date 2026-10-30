@@ -1092,7 +1092,7 @@ test('P2.65m hidden native change defers file read and restore until verified vi
   assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),original);
   assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
   button.click();
-  const fresh=controls.find(e=>e.id==='import-normal-file');
+  const fresh=h.id('export-local-save').parentElement.children.find(e=>e.id==='import-normal-file');
   assert.notEqual(fresh,input,'hidden successful chooser must rotate before next consent');
   input.dispatch('change');input.dispatch('cancel');await settle();
   assert.equal(controls.find(e=>e.id==='cancel-normal-import').hidden,false,
@@ -1182,7 +1182,7 @@ test('P2.65n second file import preserves original backup without blocking gamep
   const writes=h.writes.length;
   const second=JSON.stringify({...h.saved(),revision:2,coins:84});
   button.click();
-  const fresh=controls.find(e=>e.id==='import-normal-file');
+  const fresh=h.id('export-local-save').parentElement.children.find(e=>e.id==='import-normal-file');
   assert.notEqual(fresh,input,'completed chooser must not be reused for a second consent');
   assert.equal(input.parentElement,null,'old completed chooser is detached');
   input.files=[{size:second.length,text:async()=>second}];
