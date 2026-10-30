@@ -294,7 +294,11 @@ async function commit(result){
   if(!result.ok){
     // A failure hint only reads the engine state; no automatic grants or writes.
     const hint=describeStoryWorkshopStall(state,Date.now());
-    $('board-notice').textContent=result.message+(hint?' · '+hint.message:'');
+    // A rollback warning must replace the engine's misleading long countdown.
+    // Keep ordinary failure messages and guidance unchanged.
+    const clockWarning=hint?.code==='CLOCK_BEHIND_ENERGY'||hint?.code==='CLOCK_BEHIND_COOLDOWN';
+    $('board-notice').textContent=clockWarning?hint.message:
+      result.message+(hint?' · '+hint.message:'');
     return;
   }
   const expectedEpoch=storageEpoch;

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {createInitialState,storeItem,produce,validateSave,MAX_TIER,MAX_ENERGY,ENERGY_REGEN_MS,PRODUCER_CHARGES} from '../merge/engine.mjs';
+import {createInitialState,storeItem,produce,validateSave,MAX_TIER,MAX_ENERGY,ENERGY_REGEN_MS,PRODUCER_RECHARGE_MS,PRODUCER_CHARGES} from '../merge/engine.mjs';
 import {STORY_WORKSHOP_KEY,readStoryWorkshop} from '../merge/story/workshop-storage.mjs';
 import {SAVE_KEY} from '../merge/storage.mjs';
 import {STORY_SAVE_KEY} from '../merge/mode-boundaries.mjs';
@@ -262,5 +262,47 @@ test('P147 unexpired cooldown remains visibly blocked after BFCache and never au
     assert.match(f.document.getElementById('story-supply-cooldown-hint').textContent,/正在冷却/);
     assert.equal(f.writes,0);
     assert.equal(readStoryWorkshop(f.storage).state.bag.reset,1);
+  }finally{f.restore();}
+});
+
+
+test('P149 rollback energy warning is actionable after BFCache and never writes saves',async()=>{
+  const now=Date.now(),state=createInitialState(now);
+  state.energy=0;state.energyAt=now+2*ENERGY_REGEN_MS;
+  assert.equal(validateSave(state),true);
+  const f=await mount(state);
+  try{
+    const cell=()=>f.document.getElementById('workshop-board').children[0].children[42];
+    f.window.emit('pagehide');f.window.emit('pageshow');
+    assert.equal(cell().disabled,false);
+    await cell().click();
+    const notice=f.document.getElementById('board-notice').textContent;
+    assert.match(notice,/设备时间早于存档的体力计时/);
+    assert.doesNotMatch(notice,/预计\\d+秒后自然恢复/);
+    assert.equal(f.writes,0);
+    assert.equal(f.map.get(STORY_WORKSHOP_KEY),JSON.stringify(state));
+    assert.equal(f.map.get(SAVE_KEY),'normal-mode-sentinel');
+    assert.equal(f.map.get(STORY_SAVE_KEY),'story-dialogue-sentinel');
+  }finally{f.restore();}
+});
+
+test('P149 impossible cooldown suppresses misleading engine countdown without spending a card',async()=>{
+  const now=Date.now(),state=createInitialState(now);
+  state.board=state.board.map(item=>item?.kind==='producer'
+    ? {...item,charges:0,cooldownUntil:now+2*PRODUCER_RECHARGE_MS}:item);
+  state.bag.reset=1;state.shop.purchases.reset=1;
+  assert.equal(validateSave(state),true);
+  const f=await mount(state);
+  try{
+    const cell=f.document.getElementById('workshop-board').children[0].children[42];
+    await cell.click();
+    const notice=f.document.getElementById('board-notice').textContent;
+    assert.match(notice,/工坊冷却时间超出正常上限/);
+    assert.doesNotMatch(notice,/冷却中，剩余\\s*\\d+\\s*秒/);
+    assert.equal(f.writes,0);
+    assert.equal(f.map.get(STORY_WORKSHOP_KEY),JSON.stringify(state));
+    assert.equal(readStoryWorkshop(f.storage).state.bag.reset,1);
+    assert.equal(f.map.get(SAVE_KEY),'normal-mode-sentinel');
+    assert.equal(f.map.get(STORY_SAVE_KEY),'story-dialogue-sentinel');
   }finally{f.restore();}
 });
