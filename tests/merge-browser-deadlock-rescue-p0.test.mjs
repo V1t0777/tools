@@ -193,6 +193,12 @@ test('P0 real Chromium deadlock rescue: consent, stale selection, BFCache and on
   await ready();
   assert.equal(await evaluate("sessionStorage.getItem('rescue-bfcache')"),'true',
     'BFCache gate requires actual pageshow.persisted, not a synthetic event');
+  // Page lifecycle intentionally clears the selection. Re-select the same
+  // material so the persistent button is enabled when the OLD touch arrives.
+  // This proves pointer lease invalidation rather than merely disabled UI.
+  if(!await evaluate("document.querySelector('#board [data-slot=\"2\"]').classList.contains('selected')"))
+    await select(2);
+  assert.equal(await evaluate("document.getElementById('deadlock-discard').disabled"),false);
   await clickTouch('deadlock-discard');
   assert.equal(await evaluate('window.__rescueConfirmCount'),0);
   assert.equal(await raw(),bfcacheRaw,'pre-pagehide pointer cannot rescue after BFCache');
