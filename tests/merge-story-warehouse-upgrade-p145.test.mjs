@@ -51,8 +51,15 @@ async function mount(state,confirm=()=>true){
     createDocumentFragment(){return new Element();},
     addEventListener(){}
   };
+  const windowEvents=new Map();
   const window={localStorage:storage,navigator:{locks:null},confirm,
-    addEventListener(){}};
+    addEventListener(type,fn){
+      const handlers=windowEvents.get(type)??[];
+      handlers.push(fn);windowEvents.set(type,handlers);
+    },
+    emit(type){
+      for(const handler of windowEvents.get(type)??[])handler({type});
+    }};
   const priorWindow=globalThis.window,priorDocument=globalThis.document;
   globalThis.window=window;globalThis.document=document;
   try{
@@ -60,7 +67,7 @@ async function mount(state,confirm=()=>true){
   }catch(error){
     globalThis.window=priorWindow;globalThis.document=priorDocument;throw error;
   }
-  return {map,document,storage,get writes(){return writes;},
+  return {map,document,window,storage,get writes(){return writes;},
     restore(){globalThis.window=priorWindow;globalThis.document=priorDocument;}};
 }
 
@@ -132,4 +139,61 @@ test('P145 no bypass of level, price, or maximum capacity; mobile control contra
   assert.match(ui,/wouldSpendStoryConstructionReserve\(budget,rule.coins\)/);
   assert.match(css,/\.workshop-build\{[^}]*min-height:48px/);
   assert.equal(ui.includes('SAVE_KEY'),false);
+});
+
+test('P146 approved reserve spending expands warehouse exactly once',async()=>{
+  const f=await mount(initial(170),()=>true);
+  try{
+    await f.document.getElementById('upgrade-story-warehouse').click();
+    const saved=readStoryWorkshop(f.storage);
+    assert.equal(saved.blocked,false);
+    assert.equal(saved.state.warehouse.capacity,6);
+    assert.equal(saved.state.coins,120);
+    assert.equal(saved.state.revision,1);
+    assert.equal(f.writes,1);
+    assert.equal(f.map.get(SAVE_KEY),'normal-mode-sentinel');
+    assert.equal(f.map.get(STORY_SAVE_KEY),'story-dialogue-sentinel');
+  }finally{f.restore();}
+});
+
+test('P146 BFCache pagehide inside warehouse consent refuses stale payment',async()=>{
+  let f,confirms=0;
+  f=await mount(initial(170),()=>{
+    confirms++;
+    f.window.emit('pagehide');
+    return true;
+  });
+  try{
+    await f.document.getElementById('upgrade-story-warehouse').click();
+    assert.equal(confirms,1);
+    assert.equal(f.writes,0);
+    assert.equal(readStoryWorkshop(f.storage).state.warehouse.capacity,4);
+    assert.equal(readStoryWorkshop(f.storage).state.coins,170);
+    assert.equal(f.document.getElementById('upgrade-story-warehouse').disabled,true);
+    assert.equal(f.map.get(SAVE_KEY),'normal-mode-sentinel');
+    assert.equal(f.map.get(STORY_SAVE_KEY),'story-dialogue-sentinel');
+  }finally{f.restore();}
+});
+
+test('P146 same-revision peer replacement during warehouse consent is rejected',async()=>{
+  const initialState=initial(170);
+  let f;
+  f=await mount(initialState,()=>{
+    const peer=structuredClone(initialState);
+    peer.coins=165; // Same revision, different raw bytes: ABA-style stale view.
+    f.map.set(STORY_WORKSHOP_KEY,JSON.stringify(peer));
+    return true;
+  });
+  try{
+    await f.document.getElementById('upgrade-story-warehouse').click();
+    const saved=readStoryWorkshop(f.storage);
+    assert.equal(f.writes,0);
+    assert.equal(saved.blocked,false);
+    assert.equal(saved.state.revision,0);
+    assert.equal(saved.state.coins,165);
+    assert.equal(saved.state.warehouse.capacity,4);
+    assert.match(f.document.getElementById('board-notice').textContent,/存档已变化/);
+    assert.equal(f.map.get(SAVE_KEY),'normal-mode-sentinel');
+    assert.equal(f.map.get(STORY_SAVE_KEY),'story-dialogue-sentinel');
+  }finally{f.restore();}
 });
