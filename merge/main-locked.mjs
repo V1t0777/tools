@@ -862,7 +862,15 @@ if(saveActions){
       window.setTimeout(()=>{
         // An old timeout must never cancel a newer chooser, active file read,
         // or a legitimate selection delivered after the focus event.
-        if(importPicker!==picker||importBusy||pageSuspended())return;
+        if(importPicker!==picker||importBusy)return;
+        // A timeout fired while the app was backgrounded cannot conclude
+        // that the native picker was abandoned. Release this timer lease so
+        // the next verified visible/focus return can grant a fresh grace
+        // period instead of leaving the import control stuck indefinitely.
+        if(pageSuspended()){
+          picker.graceArmed=false;
+          return;
+        }
         importPicker=null;queuedHiddenSelection=null;
         try{replaceImportFile();}
         catch{

@@ -1566,6 +1566,31 @@ test('P2.65z orphaned native chooser recovers after focus grace without any save
   assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
 });
 
+test('P2.65cs backgrounded orphan timeout rearms on visible return without changing saves',async()=>{
+  const h=await mount(),before=h.writes.length;
+  const controls=h.id('export-local-save').parentElement.children;
+  const button=controls.find(e=>e.id==='import-normal-save');
+  const input=controls.find(e=>e.id==='import-normal-file');
+  let opens=0;input.click=()=>{opens++;};
+  const deadlines=[];
+  h.win.setTimeout=(fn,ms)=>{if(ms===15_000)deadlines.push(fn);return 1;};
+  button.click();h.win.dispatch('blur');h.win.dispatch('focus');
+  assert.equal(deadlines.length,1);
+  h.doc.hidden=true;h.doc.dispatch('visibilitychange');
+  deadlines.shift()();
+  assert.notEqual(input.parentElement,null,'hidden timeout must not retire native chooser');
+  h.doc.hidden=false;h.doc.dispatch('visibilitychange');
+  assert.equal(deadlines.length,1,'visible return must rearm grace after hidden expiry');
+  deadlines.shift()();
+  assert.equal(input.parentElement,null,'rearmed expiry retires orphaned input');
+  const fresh=h.id('export-local-save').parentElement.children.find(e=>e.id==='import-normal-file');
+  fresh.click=()=>{opens++;};
+  button.click();assert.equal(opens,2,'player can retry after background expiry');
+  assert.equal(h.writes.length,before);
+  assert.equal(h.storage.getItem(RESTORE_BACKUP_KEY),null);
+  assert.equal(h.storage.getItem(STORY_SAVE_KEY),'story-not-touched');
+});
+
 test('P2.65z valid delayed chooser change wins over stale focus recovery timer',async()=>{
   const h=await mount(),original=h.storage.getItem(SAVE_KEY);
   const controls=h.id('export-local-save').parentElement.children;
