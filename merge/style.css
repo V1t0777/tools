@@ -7,6 +7,11 @@ body{background:radial-gradient(circle at 5% 12%,rgba(221,194,136,.23),transpare
 .town{height:160px;position:relative;overflow:hidden;border-radius:23px;background:linear-gradient(#d5e8e6 5%,#e5efe9 66%,#c8d6bb 66%);box-shadow:var(--shadow);isolation:isolate}.town-sun{width:72px;height:72px;border-radius:50%;position:absolute;left:12%;top:8%;background:#f8e8b9;box-shadow:0 0 40px #ffeed0}.town-cloud{position:absolute;height:14px;width:85px;border-radius:100%;background:#fff9ecaa;filter:blur(5px)}.cloud-one{top:17%;left:37%}.cloud-two{top:31%;right:5%}.town-sea{position:absolute;inset:58% 0 0;background:linear-gradient(180deg,#94b7b0,#729e9d);clip-path:polygon(0 13%,19% 10%,36% 14%,54% 8%,80% 12%,100% 4%,100% 100%,0 100%)}.town-shore{position:absolute;bottom:0;left:0;width:100%;height:37px;background:#ddcaa0;clip-path:polygon(0 32%,35% 68%,60% 0,100% 37%,100% 100%,0 100%)}.town-shop{position:absolute;width:128px;height:81px;left:50%;bottom:25px;transform:translateX(-50%);background:linear-gradient(90deg,#dfbf92,#d6aa7f);border-radius:4px 4px 2px 2px;box-shadow:4px 8px 0 #30493a24}.town-roof{position:absolute;top:-21px;left:-12px;width:152px;height:26px;background:#627f72;clip-path:polygon(11% 0,85% 0,100% 100%,0 100%);border-radius:6px}.town-door{position:absolute;left:53px;bottom:0;width:29px;height:57px;background:#80634e;border:4px solid #b38a63;border-radius:7px 7px 0 0}.town-window{position:absolute;left:14px;top:19px;width:28px;height:29px;border:4px solid #fff1cd;background:#a6c6bc}.town-grass{position:absolute;bottom:0;height:8px;width:100%;background:#7e9e77}.town-note{position:absolute;left:12px;bottom:10px;font-size:10px;background:#fffaf4c9;padding:6px 9px;border-radius:10px;color:#49665d}
 .resource-bar{display:grid;grid-template-columns:1.45fr 1fr 1fr;gap:9px;margin:13px 0 22px}.resource{display:flex;align-items:center;gap:8px;min-width:0;background:rgba(255,252,245,.93);border:1px solid var(--line);box-shadow:0 4px 12px #526b5910;border-radius:15px;padding:10px}.resource-symbol{display:grid;place-items:center;flex-shrink:0;width:28px;height:28px;color:#aa8548;font-weight:900;font-size:19px;background:#f2e9d9;border-radius:9px}.resource strong{font-size:14px;display:block;font-variant-numeric:tabular-nums}.resource-label{font-size:10px;color:var(--subtle)}.resource small{font-size:10px;align-self:flex-end;color:#8b978c;margin-left:auto}
 .section-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:6px;margin-bottom:8px}.section-heading .overline{margin:0 0 3px}.section-heading h2{margin:0;font-family:Georgia,'Songti SC',serif;font-size:20px}.capacity{font-size:11px;color:#77948b;white-space:nowrap}.help-line{color:#7b8a7c;font-size:12px;margin:0 0 11px;line-height:1.6}.board-section{background:#fffdf7c8;padding:12px 10px 9px;border:1px solid #ffffffc9;border-radius:24px;box-shadow:var(--shadow)}
+.board-viewport{max-width:100%;min-width:0;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin}
+.board-scroll-controls{display:none;gap:8px;margin:0 0 8px}
+.board-scroll-controls[hidden]{display:none}
+.board-scroll-controls button{flex:1;min-width:44px;min-height:44px;padding:8px;border:1px solid #8ba79b;border-radius:11px;background:#f2f6eb;color:#385f54;font-weight:800}
+.board-scroll-controls button:disabled{opacity:.48;cursor:not-allowed}
 .board{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:clamp(3px,.8vw,6px);padding:8px;background:linear-gradient(150deg,#ccd8c6,#e6dec9);border:1px solid #b6c1ac;border-radius:18px;touch-action:pan-y;user-select:none;-webkit-user-select:none}
 .cell{position:relative;aspect-ratio:1/1;min-width:0;padding:0;border:1px solid #a4b7a774;border-radius:12px;background:#f9f5e7ac;display:flex;align-items:center;justify-content:center;touch-action:none;transition:background .12s,box-shadow .12s,transform .12s}.cell.filled{background:linear-gradient(140deg,#fffdf5,#eee6d6);border-color:#9ba8996e;box-shadow:0 2px 4px #64765a22}.cell[data-chain="tea"]{background:linear-gradient(140deg,#edf6e7,#d9e9d6)}.cell[data-chain="bakery"]{background:linear-gradient(140deg,#fff6de,#ead8b9)}.cell[data-chain="floral"]{background:linear-gradient(140deg,#f9eaf0,#e9d7db)}.cell.producer{background:linear-gradient(140deg,#f2dec3,#dcc9ac);border:1px solid #ac9771}.cell.selected{outline:3px solid #caa769;outline-offset:-3px;box-shadow:0 0 0 3px #fff9e4}.cell.drop-target{outline:3px solid #7c9c88;outline-offset:-3px}.cell:active{transform:scale(.975)}.cell .glyph{font-size:clamp(19px,6vw,36px);line-height:1;filter:drop-shadow(0 2px 1px #3d4c3224)}.cell .tier{position:absolute;bottom:3px;right:4px;font-size:9px;color:#6a7467;font-weight:800}.cell .charge{position:absolute;bottom:2px;left:0;right:0;text-align:center;font-weight:900;color:#735c43;background:#f7e6beae;font-size:9px}.cell.cooldown{opacity:.65}.drag-ghost{position:fixed;z-index:100;pointer-events:none;display:grid;place-items:center;transform:translate(-50%,-50%) scale(1.1);font-size:39px;width:56px;height:56px;background:#fffbf0ec;border-radius:15px;box-shadow:0 8px 24px #3a4a3850}
 .board-footer{display:flex;justify-content:space-between;align-items:center;gap:5px;padding:11px 4px 1px}.board-footer span{font-size:10px;color:#88928b}.text-button{border:0;background:none;padding:7px;color:#806d54;font-size:11px;font-weight:700;text-decoration:underline;text-underline-offset:3px}
@@ -76,15 +81,17 @@ body{background:radial-gradient(circle at 5% 12%,rgba(221,194,136,.23),transpare
 
 /* P2.65bu: 320–375px compact iPhone layout. A seven-column board
    must not shrink below 44px when the viewport is 361–375px wide.
-   Only the board section may pan horizontally; tap-to-merge remains usable.
+   The inner viewport scrolls via explicit buttons; materials remain draggable.
    Wrap the long preview badge below the navigation controls so the entire
    document does not acquire an accidental horizontal scrollbar. */
 @media(max-width:375px){
   .topbar{gap:6px;flex-wrap:wrap}
   .topbar .eyebrow{order:3;flex-basis:100%;text-align:center}
-  .board-section{overflow-x:auto;overscroll-behavior-x:contain}
-  .board{width:max-content;grid-template-columns:repeat(7,44px);touch-action:auto}
-  .board .cell{touch-action:auto}
+  .board-section{overflow-x:visible}
+  .board{width:max-content;grid-template-columns:repeat(7,44px);touch-action:pan-y}
+  .board .cell{touch-action:pan-y}
+  .board .cell.filled:not(.producer){touch-action:none}
+  .board-scroll-controls:not([hidden]){display:flex}
 }
 
 /* P2.16: accessible, narrow-screen safe manual raw-save backup action. */

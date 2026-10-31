@@ -55,6 +55,28 @@ const runtime=createNormalPageRuntime({
 });
 let lifecycle=null;
 const pageSuspended=()=>document.hidden||lifecycle?.suspended===true;
+// Scroll controls never change the game state or persist a save.
+const boardViewport=byId('board-viewport');
+const boardScrollControls=byId('board-scroll-controls');
+const boardScrollLeft=byId('board-scroll-left');
+const boardScrollRight=byId('board-scroll-right');
+function updateBoardScrollControls(){
+  const max=Math.max(0,boardViewport.scrollWidth-boardViewport.clientWidth);
+  boardScrollControls.hidden=max<=1;
+  boardScrollLeft.disabled=boardViewport.scrollLeft<=1;
+  boardScrollRight.disabled=boardViewport.scrollLeft>=max-1;
+}
+for(const [button,direction] of [[boardScrollLeft,-1],[boardScrollRight,1]]){
+  button.addEventListener('click',()=>{
+    if(pageSuspended()||runtime.busy||importPending())return;
+    const max=Math.max(0,boardViewport.scrollWidth-boardViewport.clientWidth);
+    const step=Math.max(44,Math.floor(boardViewport.clientWidth*.6));
+    boardViewport.scrollLeft=Math.max(0,Math.min(max,boardViewport.scrollLeft+direction*step));
+    updateBoardScrollControls();
+  });
+}
+boardViewport.addEventListener('scroll',updateBoardScrollControls,{passive:true});
+window.addEventListener('resize',updateBoardScrollControls);
 
 function hint(text) {
   notice.textContent = text;
@@ -204,6 +226,7 @@ function renderBoard(now = Date.now()) {
     fragment.append(button);
   });
   board.append(fragment);
+  updateBoardScrollControls();
   byId('free-cells').textContent = `空位 ${state.board.filter(i=>!i).length} / ${CELL_COUNT}`;
 }
 // Detached DOM controls can still receive queued events after a storage,

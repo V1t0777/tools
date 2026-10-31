@@ -546,7 +546,7 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
       const minSize=selector=>Math.min(...[...document.querySelectorAll(selector)].filter(visible).map(el=>bounds(el).width),999);
       return {width,scrollWidth:document.documentElement.scrollWidth,clipped,tooShort,
         boardMin:minSize('#board .cell'),warehouseMin:minSize('#warehouse .warehouse-slot'),
-        boardScrollRange:document.querySelector('.board-section').scrollWidth-document.querySelector('.board-section').clientWidth,
+        boardScrollRange:document.getElementById('board-viewport').scrollWidth-document.getElementById('board-viewport').clientWidth,
         warehouseColumns:getComputedStyle(document.querySelector('#warehouse')).gridTemplateColumns.split(' ').length,
         orderColumns:getComputedStyle(document.querySelector('#orders')).gridTemplateColumns.split(' ').length,
         reducedMotion:matchMedia('(prefers-reduced-motion: reduce)').matches};
@@ -560,7 +560,7 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     if(width<=360){
       assert.ok(layout.boardScrollRange>0,'320px board must scroll inside its section, not overflow the document');
       const reached=await evalOn(b,`(()=>{
-        const section=document.querySelector('.board-section');
+        const section=document.getElementById('board-viewport');
         section.scrollLeft=section.scrollWidth;
         const cell=document.querySelector('#board .cell[data-slot="6"]').getBoundingClientRect();
         return {scrollLeft:section.scrollLeft,left:cell.left,right:cell.right};
@@ -574,33 +574,34 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     t.diagnostic(`Chromium mobile viewport ${width}px: no overflow; board min ${layout.boardMin.toFixed(1)}px; warehouse min ${layout.warehouseMin.toFixed(1)}px`);
   }
 
-  // P2.65bg: real CDP touch pan plus cross-scroll two-tap movement at 320px.
+  // Narrow screen: native touch on explicit board navigation must never
+  // write a save. Material cells instead reserve gestures for dragging.
   await call('Emulation.setDeviceMetricsOverride',{
     width:320,height:812,deviceScaleFactor:3,mobile:true,screenWidth:320,screenHeight:812
   },b.sessionId);
   await front(b);
   await sleep(220);
   const beforeNarrow=await readSave(b);
-  const panStart=await evalOn(b,'(()=>{const s=document.querySelector(".board-section");s.scrollIntoView({block:"center"});s.scrollLeft=0;const r=document.querySelectorAll("#board .cell")[3].getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};})()');
-  assert.ok(panStart.x>110&&panStart.x<300&&panStart.y>0&&panStart.y<812,
-    '320px native pan must start on a visible board cell');
-  await sleep(120);
+  const rightButton=await evalOn(b,`(()=>{
+    const button=document.getElementById('board-scroll-right');
+    button.scrollIntoView({block:"center"});
+    const r=button.getBoundingClientRect();
+    return {x:r.left+r.width/2,y:r.top+r.height/2,hidden:button.parentElement.hidden};
+  })()`);
+  assert.equal(rightButton.hidden,false,'320px overflow requires board navigation');
+  assert.ok(rightButton.x>0&&rightButton.x<320&&rightButton.y>0&&rightButton.y<812,
+    'board navigation must be on screen');
   await call('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[
-    {...panStart,id:20,radiusX:2,radiusY:2,force:1}
+    {x:rightButton.x,y:rightButton.y,id:20,radiusX:2,radiusY:2,force:1}
   ]},b.sessionId);
-  for(const delta of [35,70,110]){
-    await call('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[
-      {x:panStart.x-delta,y:panStart.y,id:20,radiusX:2,radiusY:2,force:1}
-    ]},b.sessionId);
-    await sleep(65);
-  }
+  await sleep(75);
   await call('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]},b.sessionId);
-  await until(async()=>await evalOn(b,'document.querySelector(".board-section").scrollLeft>4'),
-    '320px native touch gesture pans the board');
-  assert.deepEqual(await readSave(b),beforeNarrow,'panning must not modify the save');
+  await until(async()=>await evalOn(b,'document.getElementById("board-viewport").scrollLeft>4'),
+    '320px touch activates board navigation');
+  assert.deepEqual(await readSave(b),beforeNarrow,'board navigation must not modify the save');
   assert.equal(await evalOn(b,'document.querySelectorAll(".drag-ghost").length'),0,
-    'panning must not leave a drag ghost');
-  const narrowPair=await evalOn(b,'(()=>{const a=JSON.parse(localStorage.getItem("toolbox.merge-isle.local.v1")).board;return {from:a.findIndex(x=>x?.kind==="material"),to:a.findIndex((x,i)=>!x&&i%7===6)};})()');
+    'board navigation must not leave a drag ghost');
+    const narrowPair=await evalOn(b,'(()=>{const a=JSON.parse(localStorage.getItem("toolbox.merge-isle.local.v1")).board;return {from:a.findIndex(x=>x?.kind==="material"),to:a.findIndex((x,i)=>!x&&i%7===6)};})()');
   assert.ok(narrowPair.from>=0&&narrowPair.to>=0,'need material and last-column vacancy');
   assert.equal(await evalOn(b,'document.querySelectorAll("#board .cell.selected").length'),0,
     'two-tap move must start without stale selection');
@@ -631,13 +632,13 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   await sleep(150);
   assert.equal((await readSave(b)).revision,beforeNarrow.revision+1,
     'compatibility click must not duplicate move');
-  t.diagnostic('Chromium 320px native touch pan and cross-scroll two-tap move verified');
+  t.diagnostic('Chromium 320px touch navigation and cross-scroll two-tap move verified');
 
   // P2.65bh: verify vertical page scrolling is not trapped by the narrow
   // board's horizontal scroller. Also prove save controls remain reachable
   // after a real gesture; this is Chromium emulation, not physical iOS.
   const verticalPoint=await evalOn(b,`(()=>{
-    const cell=document.querySelector('#board .cell[data-slot="3"]');
+    const cell=document.querySelector('#board .cell[data-slot="2"]');
     cell.scrollIntoView({block:'center',inline:'nearest'});
     const r=cell.getBoundingClientRect();
     return {x:r.left+r.width/2,y:r.top+r.height/2};
@@ -646,7 +647,7 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     'vertical gesture must begin on a visible board cell with travel room');
   await sleep(120);
   const verticalBefore=await evalOn(b,`({
-    y:window.scrollY,x:document.querySelector('.board-section').scrollLeft
+    y:window.scrollY,x:document.getElementById('board-viewport').scrollLeft
   })`);
   const verticalSave=await readSave(b);
   await call('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[
@@ -663,7 +664,7 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     '320px vertical swipe must scroll the document');
   await sleep(160);
   const verticalAfter=await evalOn(b,`({
-    y:window.scrollY,x:document.querySelector('.board-section').scrollLeft,
+    y:window.scrollY,x:document.getElementById('board-viewport').scrollLeft,
     ghosts:document.querySelectorAll('.drag-ghost').length
   })`);
   assert.ok(Math.abs(verticalAfter.x-verticalBefore.x)<5,
@@ -1596,8 +1597,8 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
             viewport:innerWidth,
             cellWidth:cell.getBoundingClientRect().width,
             documentWidth:document.documentElement.scrollWidth,
-            sectionScroll:section.scrollWidth,
-            sectionClient:section.clientWidth,
+            sectionScroll:document.getElementById('board-viewport').scrollWidth,
+            sectionClient:document.getElementById('board-viewport').clientWidth,
             touchAction:getComputedStyle(board).touchAction,
             exportHeight:exportButton.getBoundingClientRect().height
           };
@@ -1610,7 +1611,7 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
         assert.ok(m.exportHeight>=43.95,
           'manual save export must retain a 44px touch target at '+width+'px');
         if(width<=375){
-          assert.equal(m.touchAction,'auto','narrow board must allow native panning');
+          assert.equal(m.touchAction,'pan-y','narrow board must allow vertical page panning');
           if(width<=365)assert.ok(m.sectionScroll>m.sectionClient,
             'narrow board should scroll inside its own section, not the page');
         }
