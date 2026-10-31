@@ -115,7 +115,10 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
             importDisabled:document.getElementById('import-normal-save')?.disabled,
             cancelHidden:document.getElementById('cancel-normal-import')?.hidden,
             ghosts:document.querySelectorAll('.drag-ghost').length,
-            lastTouchEvents:window.__touchTrace?.slice(-12)
+            lastTouchEvents:window.__touchTrace?.slice(-12),
+            narrowTouchEvents:window.__narrowTrace?.slice(-18),
+            boardViewportScroll:document.getElementById('board-viewport')?.scrollLeft,
+            selectedSlot:document.querySelector('#board .cell.selected')?.dataset.slot
           };
         })()`);
         t.diagnostic('Chromium failure snapshot ['+label+']: '+JSON.stringify(snapshot));
@@ -617,9 +620,21 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
     await sleep(75);
     await call('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]},b.sessionId);
   }
+  await evalOn(b,`(()=>{
+    window.__narrowTrace=[];
+    for(const type of ['pointerdown','pointerup','pointercancel','lostpointercapture','click']){
+      document.addEventListener(type,event=>{
+        const cell=event.target?.closest?.('[data-slot]');
+        if(cell)window.__narrowTrace.push({type,slot:cell.dataset.slot,
+          detail:event.detail,pointerType:event.pointerType,hidden:document.hidden});
+      },true);
+    }
+    return true;
+  })()`);
   await narrowTap(narrowPair.from,21);
-  await until(async()=>await evalOn(b,'document.querySelector("#board .cell.selected")?.dataset.slot==="'+narrowPair.from+'"'),
-    'first tap selects material');
+  await waitWithSnapshot(async()=>await evalOn(b,
+    'document.querySelector("#board .cell.selected")?.dataset.slot==="'+narrowPair.from+'"'),
+    'first tap selects material',b);
   assert.deepEqual(await readSave(b),beforeNarrow,'selection must not write');
   await narrowTap(narrowPair.to,22);
   await waitWithSnapshot(async()=>(await readSave(b)).revision===beforeNarrow.revision+1,
