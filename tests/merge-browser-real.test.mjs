@@ -1498,6 +1498,15 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   // lifecycle reconciliation and the actual page handlers are Chromium.
   {
     await front(b);
+    // Earlier download tests deliberately keep Blob URLs alive for 120s.
+    // Start this independent gesture-lease check in a fresh document so its
+    // expected anchor click is not rejected by the separate eight-URL quota.
+    // Reload preserves localStorage and the real two-tab Web Locks contract.
+    await call('Page.reload',{ignoreCache:true},b.sessionId);
+    await waitWithSnapshot(async()=>await evalOn(b,
+      "document.readyState==='complete' && "+
+      "document.getElementById('save-status')?.textContent.includes('已保存于此浏览器')"),
+      'fresh document verified before persistent export lease',b);
     assert.equal(await evalOn(b,'document.hidden'),false,'lease test requires foreground tab');
     const baselineRaw=await evalOn(b,'localStorage.getItem('+JSON.stringify(key)+')');
     const baseline=JSON.parse(baselineRaw);
