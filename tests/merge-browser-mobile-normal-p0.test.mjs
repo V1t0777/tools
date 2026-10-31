@@ -118,7 +118,7 @@ test('P0 mobile Chromium: 320–430px normal mode layout, native touch and save 
       const layout=await evalFn(()=>{
         const rect=el=>el.getBoundingClientRect();
         const board=document.getElementById('board');
-        const section=document.querySelector('.board-section');
+        const section=document.getElementById('board-viewport');
         const controls=['how-to','board-guide','export-local-save','export-abnormal-reset-backup',
           'import-normal-save','export-restore-backup','reset','warehouse-upgrade',
           'store-selected','deadlock-discard'];
@@ -138,7 +138,7 @@ test('P0 mobile Chromium: 320–430px normal mode layout, native touch and save 
       assert.ok(layout.boardCellWidth>=43.5,
         'board touch cells must stay at least 44 CSS px at '+width);
       if(width===320)assert.ok(layout.boardScroll>0,
-        '320px board must pan within its own section, not the document');
+        '320px board must scroll within its own viewport, not the document');
       for(const control of layout.controls){
         assert.ok(control.visible,'missing control '+control.id+' at '+width);
         assert.ok(control.height>=43.5,
