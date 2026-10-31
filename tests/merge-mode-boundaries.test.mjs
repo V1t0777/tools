@@ -5,10 +5,29 @@ import { createInitialState, validateSave, SAVE_VERSION } from '../merge/engine.
 import { SAVE_KEY, saveLocal } from '../merge/storage.mjs';
 import {
   GAME_MODES, STORY_PROGRESS_VERSION, STORY_SAVE_KEY,
-  MAX_STORY_PACKS, MAX_STORY_SAVE_BYTES, getModeSaveKey,
+  MAX_STORY_PACKS, MAX_STORY_SAVE_BYTES, MAX_TRACKED_NODES, MAX_TRACKED_CHOICES, getModeSaveKey,
   createEmptyStoryProgress, createEmptyStoryPack,
   validateStoryProgress, registerStoryPack
 } from '../merge/mode-boundaries.mjs';
+
+
+test('P0 story integration: tracked-node and choice limits are exported without relaxing save validation',()=>{
+  assert.equal(MAX_TRACKED_NODES,512);
+  assert.equal(MAX_TRACKED_CHOICES,256);
+  const base=registerStoryPack(createEmptyStoryProgress(),'core');
+  const nodes=structuredClone(base);
+  nodes.packs.core.completed.main=Array.from({length:MAX_TRACKED_NODES},(_,i)=>'node-'+i);
+  assert.equal(validateStoryProgress(nodes),true);
+  nodes.packs.core.completed.main.push('node-overflow');
+  assert.equal(validateStoryProgress(nodes),false);
+  const choices=structuredClone(base);
+  for(let i=0;i<MAX_TRACKED_CHOICES;i++)choices.packs.core.choices['choice-'+i]='yes';
+  assert.equal(validateStoryProgress(choices),true);
+  choices.packs.core.choices['choice-overflow']='yes';
+  assert.equal(validateStoryProgress(choices),false);
+  assert.equal(getModeSaveKey(GAME_MODES.NORMAL),SAVE_KEY);
+  assert.equal(getModeSaveKey(GAME_MODES.STORY),STORY_SAVE_KEY);
+});
 
 test('P2.12 normal play key is unchanged and story has an entirely distinct namespace',()=>{
   assert.deepEqual(GAME_MODES,{NORMAL:'normal',STORY:'story'});
