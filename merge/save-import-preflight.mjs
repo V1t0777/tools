@@ -5,6 +5,7 @@
  */
 import { SAVE_VERSION, validateSave } from './engine.mjs';
 import { SAVE_KEY, MAX_LOCAL_SAVE_BYTES } from './storage.mjs';
+import {inspectNormalJsonKeys} from './json-key-guard.mjs';
 
 const rejected = reason => Object.freeze({ok:false,reason});
 
@@ -21,6 +22,9 @@ export function previewNormalSaveImport(fileText, storage, {expectedRaw} = {}) {
   if (fileText.length > MAX_LOCAL_SAVE_BYTES)
     return rejected('FILE_TOO_LARGE');
 
+  const keys=inspectNormalJsonKeys(fileText);
+  if(!keys.ok)return rejected('INVALID_JSON');
+  if(keys.hasDuplicateKeys)return rejected('DUPLICATE_JSON_KEYS');
   let candidate;
   try { candidate = JSON.parse(fileText); }
   catch { return rejected('INVALID_JSON'); }
@@ -50,6 +54,8 @@ export function previewNormalSaveImport(fileText, storage, {expectedRaw} = {}) {
         currentRaw.length > MAX_LOCAL_SAVE_BYTES)
       return rejected('CURRENT_SAVE_INVALID');
     try {
+      const currentKeys=inspectNormalJsonKeys(currentRaw);
+      if(!currentKeys.ok||currentKeys.hasDuplicateKeys)return rejected('CURRENT_SAVE_INVALID');
       const current = JSON.parse(currentRaw);
       if (!validateSave(current)) return rejected('CURRENT_SAVE_INVALID');
       currentRevision = current.revision;

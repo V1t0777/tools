@@ -1,5 +1,6 @@
 import { createInitialState, upgradeLegacySave, upgradeV2Save, validateV2Save, validateSave } from './engine.mjs';
 import { validateSave as validateLegacySave } from './legacy-engine.mjs';
+import {inspectNormalJsonKeys} from './json-key-guard.mjs';
 
 export const SAVE_KEY = 'toolbox.merge-isle.local.v1';
 // Reserved for the original bytes preserved before an abnormal confirmed reset.
@@ -8,6 +9,8 @@ export const LEGACY_BACKUP_KEY = `${SAVE_KEY}.backup-v1`;
 export const V2_BACKUP_KEY = `${SAVE_KEY}.backup-v2`;
 // Much larger than a legitimate 56-cell save; bound parsing and writes from untrusted storage.
 export const MAX_LOCAL_SAVE_BYTES = 160_000;
+
+const uniqueJsonKeys=raw=>{const result=inspectNormalJsonKeys(raw);return result.ok&&!result.hasDuplicateKeys;};
 
 const newSession = (now, reason) => ({state:createInitialState(now), recovered:false,
   migrated:false, raw:null, ...(reason ? {blocked:true, reason, volatile:true} : {})});
@@ -23,6 +26,7 @@ export function loadLocal(storage, now = Date.now()) {
   try {
     if (typeof raw !== 'string' || raw.length > MAX_LOCAL_SAVE_BYTES)
       return {...newSession(now, 'CORRUPT_SAVE'),raw};
+    if(!uniqueJsonKeys(raw))return {...newSession(now,'CORRUPT_SAVE'),raw};
     const parsed = JSON.parse(raw);
     if (validateSave(parsed)) return {state:parsed, recovered:true, migrated:false, raw};
     const v1=parsed?.schemaVersion===1 && validateLegacySave(parsed);
@@ -75,6 +79,7 @@ export function peekLocalV3(storage) {
   if(typeof raw!=='string'||raw.length>MAX_LOCAL_SAVE_BYTES)
     return Object.freeze({ok:false,reason:'CORRUPT_SAVE'});
   try {
+    if(!uniqueJsonKeys(raw))return Object.freeze({ok:false,reason:'CORRUPT_SAVE'});
     const state=JSON.parse(raw);
     if(!validateSave(state))
       return Object.freeze({ok:false,reason:'UNSUPPORTED_OR_CORRUPT_SAVE'});
@@ -105,6 +110,7 @@ export function saveLocal(storage, state, {allowReset=false, migrationRaw=null, 
     if (current !== null) {
       if (migrationRaw !== null) {
         if(current!==migrationRaw)return false;
+        if(!uniqueJsonKeys(current))return false;
         const legacy=JSON.parse(current);
         const isV1=legacy?.schemaVersion===1 && validateLegacySave(legacy);
         const isV2=legacy?.schemaVersion===2 && validateV2Save(legacy);
@@ -113,6 +119,7 @@ export function saveLocal(storage, state, {allowReset=false, migrationRaw=null, 
         if(storage.getItem(backupKey)!==migrationRaw)return false;
       } else if (!allowReset) {
         if (typeof current !== 'string' || current.length > MAX_LOCAL_SAVE_BYTES) return false;
+        if(!uniqueJsonKeys(current))return false;
         const previous = JSON.parse(current);
         if (!validateSave(previous) || previous.revision > state.revision) return false;
       }

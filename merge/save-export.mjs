@@ -5,6 +5,7 @@
  */
 import { validateSave } from './engine.mjs';
 import { SAVE_KEY, ABNORMAL_RESET_BACKUP_KEY, MAX_LOCAL_SAVE_BYTES } from './storage.mjs';
+import {inspectNormalJsonKeys} from './json-key-guard.mjs';
 
 // Actual encoded file limit, not a JavaScript UTF-16 code-unit count.
 export const MAX_EXPORT_BYTES = 2_000_000;
@@ -45,7 +46,10 @@ export function prepareLocalSaveExport(storage) {
   }
   let verified=false;
   if(raw.length<=MAX_LOCAL_SAVE_BYTES){
-    try { verified=validateSave(JSON.parse(raw)); }
+    try {
+      const keys=inspectNormalJsonKeys(raw);
+      verified=keys.ok&&!keys.hasDuplicateKeys&&validateSave(JSON.parse(raw));
+    }
     catch { /* Preserve invalid bytes without interpreting or modifying them. */ }
   }
   return Object.freeze({
