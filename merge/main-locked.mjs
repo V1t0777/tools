@@ -14,6 +14,7 @@ import { prepareLocalSaveExport, prepareAbnormalResetBackupExport } from './save
 import { requestBrowserSaveDownload } from './save-download.mjs';
 import { isPreparedExportUnchanged } from './save-export-snapshot.mjs';
 import { createNormalPageRuntime } from './normal-page-runtime.mjs';
+import {bindNormalRenderedAction} from './normal-rendered-action-guard.mjs';
 import { attachNormalPageLifecycle } from './normal-page-lifecycle.mjs';
 import {performNormalSaveImport} from './normal-save-import-flow.mjs';
 import {RESTORE_BACKUP_KEY} from './save-restore-backup.mjs';
@@ -229,18 +230,16 @@ function renderBoard(now = Date.now()) {
   updateBoardScrollControls();
   byId('free-cells').textContent = `空位 ${state.board.filter(i=>!i).length} / ${CELL_COUNT}`;
 }
-// Detached DOM controls can still receive queued events after a storage,
-// BFCache or clock-driven rerender. Bind each generated action to its render.
-// A stale event is never replayed against the newly adopted game state.
-function guardRenderedAction(action){
-  const generation=renderGeneration;
-  return ()=>{
-    if(generation!==renderGeneration){
-      hint('界面已更新，请在最新界面重新操作');
-      return;
-    }
-    action();
-  };
+// A dynamic button may survive BFCache without a rerender. Capture its
+// pointerdown generation, not only its render generation, before allowing a
+// later compatibility click to execute a destructive gameplay action.
+function guardRenderedAction(button,action){
+  bindNormalRenderedAction(button,action,{
+    getRenderGeneration:()=>renderGeneration,
+    getGestureGeneration:()=>persistentGestureGeneration,
+    isUnsafe:()=>pageSuspended()||importPending()||!!saveIssue||runtime.busy,
+    onStale:()=>hint('页面或存档已变化，请在当前界面重新点击')
+  });
 }
 // Persistent buttons survive board rerenders. A pointer begun while the
 // native import chooser is active must not turn into a delayed compatibility
@@ -286,8 +285,8 @@ function renderOrders() {
     const button = document.createElement('button');button.type = 'button';button.className='order-button';
     button.textContent = can ? '交付委托' : '尚缺材料';button.disabled = !can;
     button.classList.toggle('guidance-target', activeGuidance?.orderId === order.id);
-    button.addEventListener('click',guardRenderedAction(
-      ()=>commit(current=>fulfillOrder(current, order.id))));
+    guardRenderedAction(button,
+      ()=>commit(current=>fulfillOrder(current, order.id)));
     card.append(icon,name,prize,button);
     fragment.append(card);
   }
@@ -302,7 +301,7 @@ function actionButton(label, description, action, disabled = false) {
   detail.append(title, text);
   const btn = document.createElement('button'); btn.type = 'button';btn.className='small-action';
   btn.disabled = disabled;btn.textContent = disabled ? '暂不可用' : '解锁 / 升级';
-  if(!disabled)btn.addEventListener('click',guardRenderedAction(action));
+  if(!disabled)guardRenderedAction(btn,action);
   row.append(detail, btn);return row;
 }
 function renderSystems() {
@@ -315,8 +314,8 @@ function renderSystems() {
     btn.title = item ? `取出${getItemName(item)}` : i>=state.warehouse.capacity ? '尚未解锁' : '空位';
     btn.setAttribute('aria-label',btn.title);
     btn.textContent = i>=state.warehouse.capacity?'🔒':item?getItemIcon(item):'＋';
-    if(item)btn.addEventListener('click',guardRenderedAction(
-      ()=>commit(current=>withdrawItem(current,i))));
+    if(item)guardRenderedAction(btn,
+      ()=>commit(current=>withdrawItem(current,i)));
     slots.append(btn);
   });warehouse.append(slots);
   byId('warehouse-count').textContent=`${state.warehouse.slots.filter(Boolean).length}/${state.warehouse.capacity}`;
@@ -400,12 +399,12 @@ function renderSupplies(now=Date.now()) {
     button.dataset.supplyUse=id;
     button.textContent='使用';
     button.setAttribute('aria-label',`使用${def.name}，当前有${owned}个`);
-    button.addEventListener('click',guardRenderedAction(()=>{
+    guardRenderedAction(button,()=>{
       // Snapshot the chosen producer before the asynchronous Web Lock wait.
       // A later selection change must not redirect this already-queued tap.
       const producerId=select.value;
       commit(current=>useSupply(current,id,producerId));
-    }));
+    });
     row.append(details,button);bag.append(row);
 
     const used=state.shop.purchases[id];
@@ -421,8 +420,8 @@ function renderSupplies(now=Date.now()) {
     buy.disabled=remaining<=0||state.coins<def.price;
     buy.textContent=remaining<=0?'已售罄':'兑换';
     buy.setAttribute('aria-label',`用${def.price}金币兑换${def.name}`);
-    buy.addEventListener('click',guardRenderedAction(
-      ()=>commit(current=>purchaseSupply(current,id))));
+    guardRenderedAction(buy,
+      ()=>commit(current=>purchaseSupply(current,id)));
     sale.append(saleDetails,buy);shop.append(sale);
   }
   const milestones=byId('supply-achievements');milestones.replaceChildren();
