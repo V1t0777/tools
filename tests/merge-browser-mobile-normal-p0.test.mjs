@@ -145,6 +145,40 @@ test('P0 mobile Chromium: 320–430px normal mode layout, native touch and save 
           'undersized control '+control.id+' at '+width+': '+control.height);
       }
     }
+    // P2.65 mobile vertical pan: verify the actual game page, not a CSS
+    // fixture. CDP touch emulation is Chromium evidence, not iPhone Safari.
+    for(const width of [376,390,430]){
+      await setViewport(width);
+      const start=await evalFn(()=>{
+        const cell=document.querySelector('#board .cell:not(.filled)');
+        cell.scrollIntoView({behavior:'instant',block:'center',inline:'center'});
+        const rect=cell.getBoundingClientRect();
+        return {x:rect.left+rect.width/2,y:rect.top+rect.height/2,
+          touchAction:getComputedStyle(cell).touchAction,
+          scrollY:window.scrollY,
+          boardScrollLeft:document.getElementById('board-viewport').scrollLeft};
+      });
+      assert.equal(start.touchAction,'pan-y',
+        'empty board cells must permit page vertical pan at '+width);
+      const beforePan=await evalFn(k=>localStorage.getItem(k),KEY);
+      await call('Input.dispatchTouchEvent',
+        {type:'touchStart',touchPoints:[{x:start.x,y:start.y}]},sessionId);
+      for(let step=1;step<=8;step++){
+        await call('Input.dispatchTouchEvent',
+          {type:'touchMove',touchPoints:[{x:start.x,y:start.y-step*14}]},sessionId);
+        await sleep(20);
+      }
+      await call('Input.dispatchTouchEvent',
+        {type:'touchEnd',touchPoints:[]},sessionId);
+      await until(()=>evalFn(y=>window.scrollY>y+20,start.scrollY),
+        'real normal page vertical pan at '+width,4000);
+      assert.equal(await evalFn(k=>localStorage.getItem(k),KEY),beforePan,
+        'vertical pan must not change save bytes at '+width);
+      assert.equal(await evalFn(()=>document.getElementById('board-viewport').scrollLeft),
+        start.boardScrollLeft,'vertical pan must not scroll board sideways at '+width);
+      assert.equal(await evalFn(()=>document.querySelectorAll('.drag-ghost').length),0,
+        'vertical pan must not leave a drag ghost at '+width);
+    }
     await setViewport(320);
     const point=await evalFn(()=>{
       const el=document.querySelector('#board .producer');

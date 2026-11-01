@@ -93,6 +93,11 @@ body{background:radial-gradient(circle at 5% 12%,rgba(221,194,136,.23),transpare
   .board .cell.filled:not(.producer){touch-action:none}
   .board-scroll-controls:not([hidden]){display:flex}
 }
+/* P2.65 mobile vertical pan: at 376–480px, empty cells and producers
+   must not trap page scrolling; draggable materials retain touch-action:none. */
+@media(min-width:376px) and (max-width:480px){
+  .board .cell:not(.filled),.board .cell.producer{touch-action:pan-y}
+}
 
 /* P2.16: accessible, narrow-screen safe manual raw-save backup action. */
 .board-footer{flex-wrap:wrap;gap:6px 10px}
