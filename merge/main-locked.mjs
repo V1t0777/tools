@@ -238,7 +238,7 @@ function guardRenderedAction(button,action){
     getRenderGeneration:()=>renderGeneration,
     getGestureGeneration:()=>persistentGestureGeneration,
     isUnsafe:()=>pageSuspended()||importPending()||!!saveIssue||runtime.busy,
-    onStale:()=>hint('页面或存档已变化，请在当前界面重新点击')
+    onStale:()=>hint('界面已更新，请在最新界面重新操作')
   });
 }
 // Persistent buttons survive board rerenders. A pointer begun while the

@@ -69,7 +69,8 @@ class Element {
       this.parentElement.children=this.parentElement.children.filter(x=>x!==this);
     this.parentElement=null;
   }
-  click(){this.dispatch('click');}
+  // Native HTMLElement.click() dispatches detail=0, not a pointer click.
+  click(){this.dispatch('click',{detail:0});}
   showModal(){this.open=true;}
   close(){this.open=false;}
 }
