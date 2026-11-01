@@ -624,6 +624,66 @@ test('P0 mobile Chromium: 320–430px normal mode layout, native touch and save 
       assert.equal(await evalFn(()=>document.querySelectorAll('.drag-ghost').length),0,
         'vertical pan must not leave a drag ghost at '+width);
     }
+
+    // P2.65 clock/render race: a timed energy refill can replace the board
+    // while a material finger still owns pointer capture. Removing the old
+    // cell does not bubble lostpointercapture to #board; the ghost must be
+    // revoked synchronously before the rerender, without a material move.
+    await setViewport(390);
+    let beforeClock=await evalFn(k=>JSON.parse(localStorage.getItem(k)),KEY);
+    if(beforeClock.energy>=initial.energy){
+      const previousRevision=beforeClock.revision;
+      await tapControl('#board .producer');
+      await until(()=>evalFn((k,rev)=>
+        JSON.parse(localStorage.getItem(k))?.revision===rev+1,
+        KEY,previousRevision),'prepare energy deficit for drag-clock race');
+      beforeClock=await evalFn(k=>JSON.parse(localStorage.getItem(k)),KEY);
+    }
+    assert.ok(beforeClock.energy<initial.energy,'clock test requires missing energy');
+    const beforeClockRaw=await evalFn(k=>localStorage.getItem(k),KEY);
+    const heldMaterial=await evalFn(()=>{
+      const el=document.querySelector('#board .cell.filled:not(.producer)');
+      if(!el)throw Error('clock drag requires a material');
+      el.scrollIntoView({behavior:'instant',block:'center',inline:'center'});
+      const r=el.getBoundingClientRect();
+      return {x:r.left+r.width/2,y:r.top+r.height/2};
+    });
+    await evalFn(()=>new Promise(resolve=>
+      requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    assert.equal(await evalFn(({x,y})=>
+      !!document.elementFromPoint(x,y)?.closest('#board .cell.filled:not(.producer)'),
+      heldMaterial),true,'clock drag must hit a material');
+    await call('Input.dispatchTouchEvent',{type:'touchStart',
+      touchPoints:[{...heldMaterial,id:31}]},sessionId);
+    await sleep(65);
+    await call('Input.dispatchTouchEvent',{type:'touchMove',
+      touchPoints:[{x:heldMaterial.x+22,y:heldMaterial.y+24,id:31}]},sessionId);
+    await until(()=>evalFn(()=>document.querySelectorAll('.drag-ghost').length===1),
+      'material drag ghost before timed clock render');
+    await evalFn(energyAt=>{
+      window.__yunyuRealDateNow=Date.now;
+      const advanced=Math.max(Date.now()+181000,energyAt+181000);
+      Date.now=()=>advanced;
+    },beforeClock.energyAt);
+    await until(()=>evalFn(({raw,energy})=>{
+      const current=localStorage.getItem('toolbox.merge-isle.local.v1');
+      return current!==raw&&JSON.parse(current).energy>energy;
+    },{raw:beforeClockRaw,energy:beforeClock.energy}),
+      'verified clock refill during held material drag',7000);
+    await until(()=>evalFn(()=>document.querySelectorAll('.drag-ghost').length===0),
+      'clock rerender must revoke orphaned drag ghost',2500);
+    await call('Input.dispatchTouchEvent',
+      {type:'touchCancel',touchPoints:[]},sessionId);
+    const afterClock=await evalFn(k=>JSON.parse(localStorage.getItem(k)),KEY);
+    assert.equal(afterClock.revision,beforeClock.revision,
+      'clock refill must not create a gameplay revision');
+    assert.deepEqual(afterClock.board,beforeClock.board,
+      'held material must not move when clock replaces its cell');
+    assert.equal(afterClock.coins,beforeClock.coins);
+    assert.equal(afterClock.xp,beforeClock.xp);
+    await evalFn(()=>{Date.now=window.__yunyuRealDateNow;delete window.__yunyuRealDateNow;});
+    t.diagnostic('390px full-game Chromium: clock refill during held material drag revoked ghost without a gameplay write; not Safari/WeChat.');
+
     t.diagnostic('320px Chromium reset: canceled touch preserved cross-tab save; confirmed touch reset, fresh production and exact JSON download passed. Not iPhone/WeChat.');
 
     t.diagnostic('320px Chromium: B locked UI write while A BFCache; A adopted B, rejected stale chooser, resumed native touch, exact downloaded JSON. Not iPhone/WeChat.');

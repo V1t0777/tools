@@ -44,7 +44,14 @@ const runtime=createNormalPageRuntime({
     // older reviewed save must not become a reset/export/upgrade click after
     // a cross-tab adoption or another committed transaction changes the UI.
     // This does not block a fresh keyboard click (detail === 0).
-    if(changed)persistentGestureGeneration++;
+    if(changed){
+      persistentGestureGeneration++;
+      // A clock refill can replace all board cells while a finger still
+      // holds pointer capture. Detached cells no longer bubble the later
+      // lostpointercapture to #board, leaving a stale drag ghost on screen.
+      // Revoke the active gesture BEFORE replacing the board DOM.
+      cancelStaleGesture();
+    }
     state=next;persistedRaw=raw;saveIssue=null;
     if(kind!=='clock'||changed){
       selected=-1;activeGuidance=null;render();
