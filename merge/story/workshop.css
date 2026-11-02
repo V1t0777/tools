@@ -1,0 +1,37 @@
+.resource-line{display:flex;justify-content:space-between;gap:9px;margin:6px 0 16px;font-size:15px;font-variant-numeric:tabular-nums}.resource-line span{background:#ecf1e8;border-radius:12px;padding:10px;flex:1;text-align:center;color:#315b4e}
+.workshop-board-wrap{max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;border-radius:16px}.workshop-board-wrap:focus-visible{outline:3px solid #6587bb;outline-offset:3px}
+.workshop-board{display:grid;min-width:348px;grid-template-columns:repeat(7,minmax(44px,1fr));gap:4px;background:#dce5d6;padding:8px;border-radius:16px}
+.workshop-cell{aspect-ratio:1;position:relative;display:grid;place-items:center;border:1px solid #b9cab9;background:#fffdf3;border-radius:10px;padding:0;min-width:44px;min-height:44px;touch-action:manipulation}
+.workshop-cell .glyph{font-size:clamp(19px,5vw,32px);line-height:1}.workshop-cell .tier{position:absolute;right:2px;bottom:0;font-size:9px;color:#46645b}
+.workshop-cell.producer{background:#ead9c1}.workshop-cell.selected{outline:3px solid #bf9758;outline-offset:-3px}
+.workshop-cell:disabled{opacity:.6}.workshop-orders{display:grid;gap:9px;margin-top:12px}
+.workshop-order{display:flex;align-items:center;gap:10px;background:#edf2e9;padding:11px;border-radius:12px}
+.workshop-order span{flex:1;font-size:13px}.workshop-order button{min-height:44px;border:0;border-radius:10px;background:var(--accent);color:white;font-weight:700;padding:8px 12px}
+.workshop-order button:disabled{opacity:.45}.workshop #board-notice{font-size:12px;min-height:18px;color:var(--accent)}
+@media(prefers-color-scheme:dark){.resource-line span,.workshop-order{background:#355046;color:var(--ink)}.workshop-board{background:#40594e}.workshop-cell{background:#304a3f;color:var(--ink);border-color:#597568}.workshop-cell.producer{background:#625446}.workshop-cell .tier{color:#bdd5c5}}
+@media(prefers-reduced-motion:reduce){.workshop-cell{transition:none}}
+
+.workshop-build{display:block;width:100%;min-height:48px;border:0;border-radius:12px;background:var(--accent);color:white;font-weight:800;padding:10px 16px}
+.workshop-build:disabled{opacity:.5;cursor:not-allowed}
+
+/* P8: story-only inventory; mobile-first touch targets and horizontal-safe labels. */
+.workshop-warehouse{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}
+.workshop-warehouse-slot{min-width:0;min-height:48px;padding:10px 8px;border:1px solid #a7c2ae;border-radius:12px;background:#f4f7ed;color:#315b4e;font-size:13px;line-height:1.45;overflow-wrap:anywhere;text-align:left;touch-action:manipulation}
+.workshop-warehouse-slot:disabled{opacity:.55;cursor:not-allowed}
+.workshop-warehouse-slot:focus-visible,.workshop-build:focus-visible{outline:3px solid #6587bb;outline-offset:2px}
+@media(min-width:600px){.workshop-warehouse{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(prefers-color-scheme:dark){.workshop-warehouse-slot{background:#355046;color:var(--ink);border-color:#597568}}
+@media(prefers-reduced-motion:reduce){.workshop-warehouse-slot{transition:none}}
+
+/* P74: existing offline supplies in the isolated story workshop. */
+.story-supply-heading{font-size:15px;margin:16px 0 8px;font-family:inherit}
+.story-supply-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.story-supply-cooldowns{display:grid;gap:8px}
+.story-supply-row{display:grid;grid-template-columns:minmax(0,1fr) repeat(2,minmax(0,1fr));gap:8px;align-items:center}
+.story-supply-row span{font-size:13px;overflow-wrap:anywhere}
+.story-supply-action{min-width:0;min-height:48px;padding:10px 8px;border:1px solid var(--line);border-radius:12px;background:#e4ede5;color:#314b44;font-size:13px;font-weight:700;line-height:1.4;overflow-wrap:anywhere;touch-action:manipulation}
+.story-supply-action:disabled{opacity:.5;cursor:not-allowed}
+.story-supply-action:focus-visible{outline:3px solid #6587bb;outline-offset:2px}
+@media(max-width:380px){.story-supply-grid{grid-template-columns:1fr}.story-supply-row{grid-template-columns:1fr 1fr}.story-supply-row span{grid-column:1/-1}}
+@media(prefers-color-scheme:dark){.story-supply-action{background:#355046;color:var(--ink);border-color:#597568}}
+@media(prefers-reduced-motion:reduce){.story-supply-action{transition:none}}

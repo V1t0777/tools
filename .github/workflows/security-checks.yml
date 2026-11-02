@@ -2,7 +2,8 @@ name: Security checks
 
 on:
   push:
-    branches: [main]
+    # Draft story branch: verify every commit without reopening a PR to main.
+    branches: [main, feat/merge-story-v1-candidate-20261023]
   pull_request:
     branches: [main]
   schedule:

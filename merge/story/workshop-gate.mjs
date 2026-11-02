@@ -1,0 +1,62 @@
+/**
+ * Read-only story goals backed by the actual isolated 7x8 workshop state.
+ * No rewards or inventory cross mode boundaries. Missing/corrupt workshop
+ * data is never interpreted as an accomplished goal.
+ */
+import {validateSave} from '../engine.mjs';
+import {readStoryWorkshop} from './workshop-storage.mjs';
+import {validateStoryProgress} from '../mode-boundaries.mjs';
+
+/** Building a garden before meeting Wanhe would break chapter-two causality. */
+export function storyGardenBuildAvailable(storyProgress){
+  return validateStoryProgress(storyProgress)&&
+    storyProgress.packs.core?.completed.main.includes('seed')===true;
+}
+/** Harbor repair follows the apprentice's safety lesson, not just a coin threshold. */
+export function storyHarborBuildAvailable(storyProgress){
+  return validateStoryProgress(storyProgress)&&
+    storyProgress.packs.core?.completed.main.includes('apprentice')===true;
+}
+/** The festival should follow the harbor light scene, with the shopfront ready. */
+export function storyStorefrontBuildAvailable(storyProgress){
+  return validateStoryProgress(storyProgress)&&
+    storyProgress.packs.core?.completed.main.includes('harbor-light')===true;
+}
+
+const GOALS=Object.freeze({
+  'first-order':Object.freeze({target:'orders-goal',type:'orders',goal:1,description:'完成一笔街坊委托'}),
+  'toolbox':Object.freeze({target:'warehouse-goal',type:'warehouse',goal:1,description:'将一件材料收纳进剧情仓库'}),
+  'tea-table':Object.freeze({target:'garden-goal',type:'building',building:'garden',goal:1,description:'修复后院花园'}),
+  'harbor-light':Object.freeze({target:'harbor-goal',type:'building',building:'harbor',goal:1,description:'修缮港湾街角'}),
+  'festival':Object.freeze({target:'storefront-goal',type:'building',building:'storefront',goal:1,description:'修整百物铺门面'})
+});
+/** Route a locked narrative goal to its real, static workshop section. */
+export function storyWorkshopGoalHref(entryId){
+  const spec=Object.hasOwn(GOALS,entryId)?GOALS[entryId]:null;
+  return './story-workshop.html'+(spec?'#'+spec.target:'');
+}
+export function storyWorkshopRequirement(entryId,workshopState){
+  const spec=Object.hasOwn(GOALS,entryId)?GOALS[entryId]:null;
+  if(!spec)return Object.freeze({required:false,met:true,goal:0,current:0,description:''});
+  const valid=validateSave(workshopState);
+  const count=!valid?0:spec.type==='orders'
+    ? workshopState.progress.orders
+    : spec.type==='warehouse'
+      ? workshopState.warehouse.slots.slice(0,workshopState.warehouse.capacity).filter(Boolean).length
+      : workshopState.buildings[spec.building];
+  return Object.freeze({required:true,met:valid&&count>=spec.goal,
+    goal:spec.goal,current:count,description:spec.description});
+}
+/** Project a prerequisite from the same workshop read used for dialogue echoes. */
+export function inspectStoryWorkshopRequirementFromRead(entryId,read){
+  if(!Object.hasOwn(GOALS,entryId))return storyWorkshopRequirement(entryId,null);
+  const blocked=read?.blocked!==false;
+  const gate=blocked
+    ? storyWorkshopRequirement(entryId,null)
+    : storyWorkshopRequirement(entryId,read.state);
+  return Object.freeze({...gate,blocked,reason:blocked?(read?.reason??'STORAGE_UNAVAILABLE'):null});
+}
+export function inspectStoryWorkshopRequirement(entryId,storage){
+  if(!Object.hasOwn(GOALS,entryId))return storyWorkshopRequirement(entryId,null);
+  return inspectStoryWorkshopRequirementFromRead(entryId,readStoryWorkshop(storage));
+}
