@@ -11,7 +11,7 @@ import {peekLocalV3,SAVE_KEY} from './storage.mjs';
 import {isSafeSameRevisionClockUpdate} from './storage-event-policy.mjs';
 import {coordinateNormalSaveRestore} from './save-restore-lock.mjs';
 import {previewNormalSaveImport} from './save-import-preflight.mjs';
-import {validateSave} from './engine.mjs';
+import {validateSave,advanceTime} from './engine.mjs';
 
 const reject=reason=>Object.freeze({ok:false,reason});
 const clone=value=>JSON.parse(JSON.stringify(value));
@@ -86,6 +86,14 @@ export function createNormalPageRuntime({locks,storage,onVerified}={}) {
     get blocked(){return phase==='blocked'||flight.blocked;},
     get reason(){return reason;},
     get raw(){return raw;},
+    // Read-only hint from the verified in-memory state. The page reconciles
+    // the exact storage baseline before asking; due work still runs through
+    // clock() and its shared Web Lock, never through this preview.
+    clockDue(now=Date.now()){
+      if(phase!=='ready'||flight.blocked||state===null)return true;
+      if(!Number.isFinite(now)||now<0)return true;
+      return advanceTime(state,now)!==state;
+    },
     snapshot(){return state===null?null:clone(state);},
 
     async start({now=Date.now(),canStart=()=>true}={}) {

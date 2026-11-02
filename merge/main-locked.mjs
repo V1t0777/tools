@@ -1,4 +1,4 @@
-import { WIDTH, CELL_COUNT, MAX_ENERGY, ENERGY_REGEN_MS, CHAINS, createInitialState, advanceTime,
+import { WIDTH, CELL_COUNT, MAX_ENERGY, ENERGY_REGEN_MS, CHAINS, createInitialState,
   moveOrMerge, produce, fulfillOrder, getItemIcon, getItemName,
   storeItem, withdrawItem, upgradeWarehouse, upgradeProducer, upgradeBuilding,
   getLevelProgress, getMaxOrderTier, getProducerUpgrade, getWarehouseUpgrade,
@@ -1264,15 +1264,13 @@ window.setInterval(async()=>{
   timerPending=true;
   try{
     if(!revalidateResumedSave())return;
-    const now=Date.now();
-    // A no-op second must not take the exclusive save lock and briefly
-    // reject a fresh touch. The preceding reconcile still checks the exact
-    // current bytes; only real regeneration uses the locked clock writer.
-    if(advanceTime(state,now)===state){
-      renderResources(now);refreshSupplyControls();
+    // Keep no-op clock checks read-only in the verified runtime. Only an
+    // actual due regeneration enters the exclusive save-writer flight.
+    if(!runtime.clockDue(Date.now())){
+      renderResources();refreshSupplyControls();
       return;
     }
-    handleTransactionResult(await runtime.clock({now}),'clock');
+    handleTransactionResult(await runtime.clock({now:Date.now()}),'clock');
   }catch{pauseUnsafe('CLOCK_OUTCOME_UNCERTAIN');}
   finally{timerPending=false;}
 },1000);
