@@ -404,3 +404,58 @@ test('P2.65 external storage event during locked write still blocks and preserve
   assert.equal(db.read(),foreign,'foreign bytes must not be overwritten or rolled back');
   bridge.detach();
 });
+
+test('P2.65j duplicate visible event during own locked clock write cannot falsely block',async()=>{
+  const initial={...createInitialState(now),energy:MAX_ENERGY-1};
+  const db=storage(rawOf(initial)),ui=events();
+  const runtime=createNormalPageRuntime({storage:db,locks:locks()});
+  const bridge=attachNormalPageLifecycle({runtime,win:ui.win,doc:ui.doc,storage:db});
+  await runtime.start({now});
+  let injected=false;
+  const originalSet=db.setItem.bind(db);
+  db.setItem=(key,value)=>{
+    originalSet(key,value);
+    if(key===SAVE_KEY&&!injected){
+      injected=true;
+      // A visible notification with no preceding hidden transition is not
+      // evidence that the page left the foreground or lost its save lease.
+      assert.equal(ui.doc.hidden,false);
+      ui.doc.emit('visibilitychange');
+    }
+  };
+  const result=await runtime.clock({now:now+ENERGY_REGEN_MS+1});
+  assert.equal(injected,true);
+  assert.equal(result.ok,true,'own verified write must survive duplicate visible event');
+  assert.equal(runtime.blocked,false);
+  assert.equal(runtime.raw,db.read());
+  ui.doc.emit('visibilitychange');
+  assert.equal(runtime.blocked,false,'post-publication visible event still verifies');
+  bridge.detach();
+});
+
+test('P2.65j duplicate pageshow during own locked clock write cannot falsely block',async()=>{
+  const initial={...createInitialState(now),energy:MAX_ENERGY-1};
+  const db=storage(rawOf(initial)),ui=events();
+  const runtime=createNormalPageRuntime({storage:db,locks:locks()});
+  const bridge=attachNormalPageLifecycle({runtime,win:ui.win,doc:ui.doc,storage:db});
+  await runtime.start({now});
+  let injected=false;
+  const originalSet=db.setItem.bind(db);
+  db.setItem=(key,value)=>{
+    originalSet(key,value);
+    if(key===SAVE_KEY&&!injected){
+      injected=true;
+      // A spurious persisted pageshow without pagehide must not inspect the
+      // intermediate bytes before the transaction publishes its receipt.
+      ui.win.emit('pageshow',{persisted:true});
+    }
+  };
+  const result=await runtime.clock({now:now+ENERGY_REGEN_MS+1});
+  assert.equal(injected,true);
+  assert.equal(result.ok,true);
+  assert.equal(runtime.blocked,false);
+  assert.equal(runtime.raw,db.read());
+  ui.win.emit('pageshow',{persisted:true});
+  assert.equal(runtime.blocked,false,'later pageshow must still reconcile');
+  bridge.detach();
+});

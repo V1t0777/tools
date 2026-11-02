@@ -127,6 +127,12 @@ export function attachNormalPageLifecycle({
         notifyColdStartup();
       }
     } else if(!pageGone||resumePending) {
+      // A duplicate visible notification can arrive during this tab's own
+      // locked write, before its verified UI publication. As with focus,
+      // defer inspection only if there is NO pending hidden/BFCache return.
+      // Real background returns still require reconciliation; foreign
+      // storage events are never skipped.
+      if(runtime.busy&&!visibilitySuspended&&!resumePending)return;
       // Safari may deliver BFCache pageshow while still hidden. A subsequent
       // visibilitychange is the first safe moment to verify the saved bytes.
       // Never unlock a pagehide merely because visibility became visible.
@@ -163,6 +169,10 @@ export function attachNormalPageLifecycle({
       if(pageGone)resumePending=true;
       return;
     }
+    // Some WebViews repeat pageshow without a preceding pagehide. Do not
+    // reconcile an uncommitted snapshot from our own locked write. A real
+    // pagehide or visibility suspension is never exempt from verification.
+    if(runtime.busy&&!pageGone&&!visibilitySuspended)return;
     const before=lifecycleEpoch;
     const result=inspect('bfcache');
     if(result.ok&&runtime.phase==='ready'&&lifecycleEpoch===before&&!doc.hidden) {
