@@ -29,6 +29,11 @@ export function diagnoseBoard(s) {
   const canUpgrade=!!upgrade&&getLevel(s.xp)>=upgrade.minLevel&&s.coins>=upgrade.coins;
   const producerSlots=s.board.flatMap((x,i)=>x?.kind==='producer'&&x.charges>0?[i]:[]);
   const canProduce=free>0&&s.energy>0&&producerSlots.length>0;
+  // When a recovery action frees only one cell, guide toward an active
+  // order instead of repeatedly highlighting the first (tea) producer.
+  const targetProducer=s.orders.slice().sort((a,b)=>a.tier-b.tier)
+    .map(o=>producerSlots.find(i=>s.board[i].chain===o.chain))
+    .find(i=>i!==undefined);
   let hint=null;
   if(readyOrders.length)hint={type:'order',orderId:readyOrders[0].orderId,message:'可以交付现成委托，腾出棋盘空间'};
   else if(merges.length)hint={type:'move',...merges[0],message:'发现可合成物品，合成后可以腾出一格'};
@@ -37,7 +42,8 @@ export function diagnoseBoard(s) {
     const slot=storable.slice().sort((a,b)=>s.board[a].tier-s.board[b].tier||a-b)[0];
     hint={type:'store',slot,message:'棋盘已满，可先将材料收入仓库'};
   } else if(free===0&&canUpgrade&&storable.length)hint={type:'upgradeWarehouse',message:'可先扩容仓库，再存入材料'};
-  else if(canProduce)hint={type:'produce',slot:producerSlots[0],message:'可以使用工坊生产材料'};
+  else if(canProduce)hint={type:'produce',slot:targetProducer??producerSlots[0],
+    message:targetProducer===undefined?'可以使用工坊生产材料':'优先使用当前委托对应的工坊生产材料'};
   else if(free>0)hint={type:'wait',message:s.energy===0?'等待体力恢复':'等待工坊充能'};
   const recovery=free===0?(hint?'recoverable':'hard-deadlock'):
     (!canProduce&&!readyOrders.length&&!merges.length&&!hiddenOrders.length?'waiting':'playable');

@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createInitialState, validateSave, moveOrMerge, fulfillOrder, storeItem,
-  withdrawItem, upgradeWarehouse, CELL_COUNT } from '../merge/engine.mjs';
+  withdrawItem, upgradeWarehouse, produce, CELL_COUNT } from '../merge/engine.mjs';
+import { discardDeadlockedMaterial } from '../merge/deadlock-rescue.mjs';
 import { getBoardGuidance } from '../merge/board-guidance.mjs';
 const start = () => createInitialState(1_000_000);
 const makeItem = (s,chain='tea',tier=6) => ({id:'m'+s.nextId++,kind:'material',chain,tier});
@@ -66,4 +67,59 @@ test('invalid saves rejected rather than fabricated advice',()=>{
 test('suggestions deterministic and contain no executable callbacks',()=>{
   const s=start(),a=getBoardGuidance(s),b=getBoardGuidance(s);
   assert.deepEqual(a,b);assert.ok(!JSON.stringify(a).includes('function'));
+});
+
+
+test('deadlock rescue guidance targets a pending order and enables a real delivery',()=>{
+  const s=fullWarehouse(fillBoard(blockOrder(start())));
+  for(const item of s.board)if(item?.kind==='material')item.tier=6;
+  s.coins=7;s.xp=30;
+  assert.equal(validateSave(s),true);
+  assert.equal(getBoardGuidance(s).recovery,'hard-deadlock');
+  let current=s;
+  const originalCoins=s.coins,originalXp=s.xp;
+  for(let i=0;i<2;i++){
+    const slot=current.board.findIndex(item=>item?.kind==='material'&&item.tier===6);
+    const beforeRevision=current.revision,expectedItemId=current.board[slot].id;
+    const discarded=discardDeadlockedMaterial(current,slot,{confirmed:true,expectedItemId});
+    assert.equal(discarded.ok,true);
+    current=discarded.state;
+    assert.equal(current.revision,beforeRevision+1);
+    assert.equal(current.coins,originalCoins);
+    assert.equal(current.xp,originalXp);
+    const bytes=JSON.stringify(current),guidance=getBoardGuidance(current);
+    assert.equal(guidance.type,'produce');
+    assert.deepEqual(guidance.boardSlots,[44]);
+    assert.match(guidance.message,/当前委托/);
+    assert.equal(JSON.stringify(current),bytes,'guidance must be read-only');
+    const produced=produce(current,44,1_000_000+i*4_000,()=>0.1);
+    assert.equal(produced.ok,true);
+    current=produced.state;
+    assert.equal(validateSave(current),true);
+  }
+  const merge=getBoardGuidance(current);
+  assert.equal(merge.type,'move');
+  const merged=moveOrMerge(current,...merge.boardSlots);
+  assert.equal(merged.kind,'merge');
+  current=merged.state;
+  const ready=getBoardGuidance(current);
+  assert.equal(ready.type,'order');
+  const delivered=fulfillOrder(current,ready.orderId);
+  assert.equal(delivered.ok,true);
+  assert.equal(validateSave(delivered.state),true);
+  assert.ok(delivered.state.coins>originalCoins);
+  assert.ok(delivered.state.xp>originalXp);
+});
+
+test('cooling order producer retains a truthful generic fallback hint',()=>{
+  const s=start();
+  s.board=s.board.map(item=>item?.kind==='producer'?item:null);
+  s.orders.forEach(order=>{order.chain='bakery';order.tier=2;});
+  const bakery=s.board.find(item=>item?.kind==='producer'&&item.chain==='bakery');
+  bakery.charges=0;bakery.cooldownUntil=1_200_000;
+  assert.equal(validateSave(s),true);
+  const hint=getBoardGuidance(s);
+  assert.equal(hint.type,'produce');
+  assert.deepEqual(hint.boardSlots,[42]);
+  assert.doesNotMatch(hint.message,/当前委托/);
 });

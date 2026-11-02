@@ -39,7 +39,7 @@ export function getBoardGuidance(state) {
     case 'upgradeWarehouse':
       return {...root, warehouseUpgrade:true, message:'棋盘和仓库都已满。金币与等级允许扩容，点击标出的仓库升级按钮。'};
     case 'produce':
-      return {...root, boardSlots:itemSlots([hint.slot]), message:'可以点击标出的工坊继续生产。'};
+      return {...root, boardSlots:itemSlots([hint.slot]), message:hint.message};
     case 'wait':
       return {...root, message:hint.message};
     default:
