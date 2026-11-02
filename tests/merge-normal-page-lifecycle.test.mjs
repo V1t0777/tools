@@ -353,3 +353,54 @@ test('P2.65af cold startup callback only fires after safe visible return',()=>{
   assert.deepEqual(db.writes,[],'bridge must not write by itself');
   bridge.detach();
 });
+
+test('P2.65 focus during own locked clock write waits for verified publication',async()=>{
+  const initial={...createInitialState(now),energy:MAX_ENERGY-1};
+  const db=storage(rawOf(initial)),ui=events();
+  const runtime=createNormalPageRuntime({storage:db,locks:locks()});
+  const bridge=attachNormalPageLifecycle({runtime,win:ui.win,doc:ui.doc,storage:db});
+  await runtime.start({now});
+  let injected=false;
+  const originalSet=db.setItem.bind(db);
+  db.setItem=(key,value)=>{
+    originalSet(key,value);
+    if(key===SAVE_KEY&&!injected){
+      injected=true;
+      ui.win.emit('focus');
+    }
+  };
+  const result=await runtime.clock({now:now+ENERGY_REGEN_MS+1});
+  assert.equal(injected,true,'focus fault must occur during the real save write');
+  assert.equal(result.ok,true,'own focus must not turn a verified save into a false conflict');
+  assert.equal(runtime.blocked,false);
+  assert.equal(runtime.raw,db.read());
+  assert.equal(runtime.snapshot().energy,MAX_ENERGY);
+  ui.win.emit('focus');
+  assert.equal(runtime.blocked,false,'later focus must reconcile the published bytes');
+  bridge.detach();
+});
+
+test('P2.65 external storage event during locked write still blocks and preserves foreign bytes',async()=>{
+  const initial={...createInitialState(now),energy:MAX_ENERGY-1};
+  const db=storage(rawOf(initial)),ui=events();
+  const runtime=createNormalPageRuntime({storage:db,locks:locks()});
+  const bridge=attachNormalPageLifecycle({runtime,win:ui.win,doc:ui.doc,storage:db});
+  await runtime.start({now});
+  const foreign=rawOf({...initial,revision:7,coins:initial.coins+100});
+  let injected=false;
+  const originalSet=db.setItem.bind(db);
+  db.setItem=(key,value)=>{
+    originalSet(key,value);
+    if(key===SAVE_KEY&&!injected){
+      injected=true;
+      db.map.set(SAVE_KEY,foreign);
+      ui.win.emit('storage',{key:SAVE_KEY,storageArea:db});
+    }
+  };
+  const result=await runtime.clock({now:now+ENERGY_REGEN_MS+1});
+  assert.equal(injected,true,'foreign replacement must occur during the real save write');
+  assert.equal(result.ok,false,'foreign storage event must not be skipped');
+  assert.equal(runtime.blocked,true,'uncertain concurrent write must fail closed');
+  assert.equal(db.read(),foreign,'foreign bytes must not be overwritten or rolled back');
+  bridge.detach();
+});

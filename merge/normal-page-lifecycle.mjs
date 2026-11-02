@@ -173,6 +173,13 @@ export function attachNormalPageLifecycle({
   };
   const focused=()=>{
     if(detached||doc.hidden||pageGone)return;
+    // A native file chooser may return focus between this tab's locked save
+    // write and its verified UI publication. The persisted bytes can then
+    // differ from runtime.raw solely because of our own in-flight write.
+    // Reconciling that transient state would falsely block a valid save.
+    // The transaction itself verifies its baseline and readback; foreign
+    // storage events still inspect and fail closed during a busy flight.
+    if(runtime.busy)return;
     const before=lifecycleEpoch;
     const result=inspect('focus');
     if(result.ok&&runtime.phase==='ready'&&lifecycleEpoch===before&&!pageGone&&!doc.hidden){
