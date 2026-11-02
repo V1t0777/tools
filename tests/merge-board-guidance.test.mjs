@@ -123,3 +123,47 @@ test('cooling order producer retains a truthful generic fallback hint',()=>{
   assert.deepEqual(hint.boardSlots,[42]);
   assert.doesNotMatch(hint.message,/当前委托/);
 });
+
+test('unrequested tier-six merge is not suggested while an order producer has ample room',()=>{
+  const s=start();
+  s.board=s.board.map(item=>item?.kind==='producer'?item:null);
+  s.board[0]=makeItem(s,'tea',5);s.board[1]=makeItem(s,'tea',5);
+  s.orders.forEach(o=>{o.chain='floral';o.tier=2;});
+  assert.equal(validateSave(s),true);
+  const before=JSON.stringify(s),g=getBoardGuidance(s);
+  assert.equal(g.type,'produce');
+  assert.deepEqual(g.boardSlots,[46]);
+  assert.match(g.message,/当前委托/);
+  assert.equal(JSON.stringify(s),before,'guidance must not alter the inventory');
+});
+
+test('useful lower-tier merge takes priority over an unrequested tier-six merge',()=>{
+  const s=start();
+  s.board=s.board.map(item=>item?.kind==='producer'?item:null);
+  s.board[0]=makeItem(s,'tea',5);s.board[1]=makeItem(s,'tea',5);
+  s.board[2]=makeItem(s,'bakery',1);s.board[3]=makeItem(s,'bakery',1);
+  s.orders.forEach(o=>{o.chain='floral';o.tier=2;});
+  assert.equal(validateSave(s),true);
+  const g=getBoardGuidance(s);
+  assert.equal(g.type,'move');
+  assert.deepEqual(g.boardSlots,[2,3]);
+  assert.doesNotMatch(g.message,/6阶/);
+  assert.equal(moveOrMerge(s,...g.boardSlots).kind,'merge');
+});
+
+test('full board keeps the only tier-six merge available but warns before irreversible action',()=>{
+  const s=fullWarehouse(fillBoard(blockOrder(start())));
+  for(const item of s.board)if(item?.kind==='material')item.tier=6;
+  s.board[0].tier=5;s.board[1].tier=5;
+  assert.equal(validateSave(s),true);
+  const beforeCoins=s.coins,beforeXp=s.xp,g=getBoardGuidance(s);
+  assert.equal(g.type,'move');
+  assert.equal(g.recovery,'recoverable');
+  assert.deepEqual(g.boardSlots,[0,1]);
+  assert.match(g.message,/没有委托消耗的6阶/);
+  const result=moveOrMerge(s,...g.boardSlots);
+  assert.equal(result.kind,'merge');
+  assert.equal(validateSave(result.state),true);
+  assert.equal(result.state.coins,beforeCoins);
+  assert.equal(result.state.xp,beforeXp);
+});

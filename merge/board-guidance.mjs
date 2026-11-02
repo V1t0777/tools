@@ -31,7 +31,10 @@ export function getBoardGuidance(state) {
     case 'order':
       return {...root, orderId:hint.orderId, message:'已有可以交付的委托。请点击标出的「交付委托」按钮腾出一格。'};
     case 'move':
-      return {...root, boardSlots:itemSlots([hint.from,hint.to]), message:'已标出两件能够合成的物品。依次点击它们即可腾出一格。'};
+      return {...root, boardSlots:itemSlots([hint.from,hint.to]),
+        message:hint.topTierUnrequested
+          ? '已标出两件5阶材料：合成会得到目前没有委托消耗的6阶珍藏品。仅在确需腾出棋盘空间时再操作。'
+          : '已标出两件能够合成的物品。依次点击它们即可腾出一格。'};
     case 'withdraw':
       return {...root, warehouseSlot:hint.slot, message:'仓库里有当前委托需要的物品。点击标出的仓库格，取出后交付。'};
     case 'store':

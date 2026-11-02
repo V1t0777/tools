@@ -34,9 +34,19 @@ export function diagnoseBoard(s) {
   const targetProducer=s.orders.slice().sort((a,b)=>a.tier-b.tier)
     .map(o=>producerSlots.find(i=>s.board[i].chain===o.chain))
     .find(i=>i!==undefined);
+  // A top-tier merge is irreversible, and current generated orders stop at tier 5.
+  // With room to work and a matching producer available, prefer order progress
+  // over recommending an unrequested tier-6 collectible.
+  const usefulMerges=merges.filter(({from})=>s.board[from].tier<MAX_TIER-1||
+    s.orders.some(o=>o.chain===s.board[from].chain&&o.tier===MAX_TIER));
+  const mergeChoice=usefulMerges[0]??merges[0];
+  const avoidTopTier=free>3&&canProduce&&targetProducer!==undefined&&usefulMerges.length===0;
   let hint=null;
   if(readyOrders.length)hint={type:'order',orderId:readyOrders[0].orderId,message:'可以交付现成委托，腾出棋盘空间'};
-  else if(merges.length)hint={type:'move',...merges[0],message:'发现可合成物品，合成后可以腾出一格'};
+  else if(merges.length&&!avoidTopTier)hint={type:'move',...mergeChoice,
+    topTierUnrequested:s.board[mergeChoice.from].tier===MAX_TIER-1&&
+      !s.orders.some(o=>o.chain===s.board[mergeChoice.from].chain&&o.tier===MAX_TIER),
+    message:'发现可合成物品，合成后可以腾出一格'};
   else if(free>0&&hiddenOrders.length)hint={type:'withdraw',slot:hiddenOrders[0].warehouseSlot,message:'仓库有委托材料，可取出后交付'};
   else if(free===0&&warehouseFree>0&&storable.length) {
     const slot=storable.slice().sort((a,b)=>s.board[a].tier-s.board[b].tier||a-b)[0];
