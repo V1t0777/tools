@@ -609,13 +609,16 @@ test('P0 real Chromium: two tabs, Web Locks, BFCache navigation and save downloa
   assert.equal(await evalOn(b,'document.querySelectorAll("#board .cell.selected").length'),0,
     'two-tap move must start without stale selection');
   async function narrowTap(slot,id){
-    const p=await evalOn(b,'(()=>{const el=document.querySelectorAll("#board .cell")['+slot+'];el.scrollIntoView({block:"center",inline:"nearest"});const r=el.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};})()');
-    assert.ok(p.x>0&&p.x<320&&p.y>0&&p.y<812,'tap must be on screen');
-    await until(async()=>await evalOn(b,'document.elementFromPoint('+p.x+','+p.y+')?.closest?.("[data-slot]")?.dataset.slot==="'+slot+'"'),
-      '320px hit test after scrolling');
-    await sleep(100);
+    // Capture coordinates only after the native hit target is correct.
+    // The old test verified a point, waited 100ms, then sent touchStart to
+    // stale coordinates while the horizontal scroller could still move.
+    const p=await until(async()=>{
+      const point=await evalOn(b,'(()=>{const el=document.querySelectorAll("#board .cell")['+slot+'];el.scrollIntoView({behavior:"instant",block:"center",inline:"nearest"});const r=el.getBoundingClientRect();const x=r.left+r.width/2,y=r.top+r.height/2;return {x,y,hit:document.elementFromPoint(x,y)?.closest?.("#board .cell")?.dataset.slot};})()');
+      return point.x>0&&point.x<320&&point.y>0&&point.y<812&&
+        point.hit===String(slot)?point:null;
+    },'320px native touch target hit after scrolling');
     await call('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[
-      {...p,id,radiusX:2,radiusY:2,force:1}
+      {x:p.x,y:p.y,id,radiusX:2,radiusY:2,force:1}
     ]},b.sessionId);
     await sleep(75);
     await call('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]},b.sessionId);
