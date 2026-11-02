@@ -1268,6 +1268,11 @@ window.setInterval(async()=>{
     // actual due regeneration enters the exclusive save-writer flight.
     if(!runtime.clockDue(Date.now())){
       renderResources();refreshSupplyControls();
+      // The previous verified no-op clock also refreshed the local-save
+      // status after another tab's adoption. Recheck the exact baseline
+      // before retaining that behavior without taking the write lock.
+      if(revalidateResumedSave()&&!runtime.busy&&!importPending())
+        byId('save-status').textContent='已保存于此浏览器 · 未上传云端';
       return;
     }
     handleTransactionResult(await runtime.clock({now:Date.now()}),'clock');

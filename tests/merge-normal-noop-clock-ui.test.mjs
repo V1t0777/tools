@@ -14,11 +14,12 @@ const end=source.indexOf("byId('save-status').textContent='正在核验",start);
 assert.ok(start>=0&&end>start,'ordinary page timer section must exist');
 const code=source.slice(start,end);
 
-function harness({due=false,stale=false,busy=false,importing=false}={}){
+function harness({due=false,stale=false,secondStale=false,busy=false,importing=false}={}){
   const state=Object.freeze({revision:2,energy:119});
   const calls={revalidate:0,due:0,clock:0,resources:0,supplies:0,
     published:0,blocked:0};
   let tick;
+  const status={textContent:'已同步其他标签页进度 · 未上传云端'};
   const ctx={
     state,saveIssue:null,
     window:{setInterval(fn,ms){assert.equal(ms,1000);tick=fn;}},
@@ -26,7 +27,9 @@ function harness({due=false,stale=false,busy=false,importing=false}={}){
     runtime:{busy,clockDue(now){calls.due++;assert.equal(now,4000);return due;},async clock({now}){assert.equal(now,4000);calls.clock++;
       return {ok:true,changed:true};}},
     Date:{now:()=>4000},
-    revalidateResumedSave(){calls.revalidate++;return !stale;},
+    revalidateResumedSave(){calls.revalidate++;
+      return !stale&&!(secondStale&&calls.revalidate===2);},
+    byId(id){assert.equal(id,'save-status');return status;},
     renderResources(){calls.resources++;},
     refreshSupplyControls(){calls.supplies++;},
     handleTransactionResult(result,kind){assert.equal(kind,'clock');
@@ -35,17 +38,18 @@ function harness({due=false,stale=false,busy=false,importing=false}={}){
   };
   runInNewContext(code,ctx);
   assert.equal(typeof tick,'function');
-  return {tick:()=>tick(),calls,ctx,state};
+  return {tick:()=>tick(),calls,ctx,state,status};
 }
 
 test('P2.65cq ordinary no-op second checks the current baseline without taking a Web Lock',async()=>{
   const h=harness();
   await h.tick();
-  assert.deepEqual(h.calls,{revalidate:1,due:1,clock:0,resources:1,
+  assert.deepEqual(h.calls,{revalidate:2,due:1,clock:0,resources:1,
     supplies:1,published:0,blocked:0});
   await h.tick();
   assert.equal(h.calls.clock,0,'repeated no-op seconds must not occupy the action lock');
-  assert.equal(h.calls.revalidate,2,'no-op must still detect stale cross-tab saves');
+  assert.equal(h.calls.revalidate,4,'no-op must recheck before updating save status');
+  assert.match(h.status.textContent,/已保存于此浏览器/);
   assert.equal(h.ctx.state,h.state);
 });
 
@@ -95,4 +99,12 @@ test('P2.65cq verified runtime detects due regeneration without taking a lock',a
   assert.equal((await runtime.clock({now:at+ENERGY_REGEN_MS})).ok,true);
   assert.equal(lockCalls,before+1,'actual regeneration still uses the lock');
   assert.equal(runtime.snapshot().energy,MAX_ENERGY);
+});
+
+test('P2.65cq no-op status cannot mask a second baseline check failure',async()=>{
+  const h=harness({secondStale:true});
+  await h.tick();
+  assert.equal(h.calls.clock,0);
+  assert.equal(h.calls.revalidate,2);
+  assert.match(h.status.textContent,/已同步其他标签页/);
 });
