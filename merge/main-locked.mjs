@@ -268,8 +268,13 @@ function guardPersistentChooserClick(button,action,{allowDuringImport=false,bind
       pointerGeneration!==persistentGestureGeneration)||
       (bindRenderGeneration&&pointerRenderGeneration!==null&&
        pointerRenderGeneration!==renderGeneration);
+    // Persistent buttons also need a fresh pointerdown on PointerEvent
+    // browsers. A missing lease must not revive a late compatibility click
+    // after import, BFCache, or a save change. Legacy WebViews retain fallback.
+    const missingPointerLease=event.detail!==0&&pointerGeneration===null&&
+      typeof window.PointerEvent==='function';
     stalePointer=false;pointerGeneration=null;pointerRenderGeneration=null;
-    if(expired&&event.detail!==0){
+    if((expired||missingPointerLease)&&event.detail!==0){
       hint('页面或导入状态已变化，请重新点击当前按钮');
       return;
     }
