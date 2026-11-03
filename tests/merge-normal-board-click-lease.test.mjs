@@ -73,3 +73,56 @@ test('blocked pointer lease never turns into a new gameplay action',()=>{
   assert.equal(result.hints.length,1);
   assert.equal(result.ignored,false);
 });
+
+const persistentStart=source.indexOf('function guardPersistentChooserClick(');
+const persistentEnd=source.indexOf('function renderOrders()',persistentStart);
+assert.ok(persistentStart>=0&&persistentEnd>persistentStart,
+  'persistent control click guard must exist');
+const persistentHandler=source.slice(persistentStart,persistentEnd);
+
+function persistentClick({pointerEvents=true,down=false,detail=1,changed=false}={}){
+  const handlers=new Map(),actions=[],hints=[];
+  const context={
+    window:pointerEvents?{PointerEvent:class PointerEvent{}}:{},
+    persistentGestureGeneration:5,renderGeneration:9,
+    importPending:()=>false,hint(message){hints.push(message);}
+  };
+  runInNewContext(persistentHandler,context);
+  context.guardPersistentChooserClick({
+    addEventListener(type,fn){handlers.set(type,fn);}
+  },()=>actions.push('accepted'));
+  if(down)handlers.get('pointerdown')();
+  if(changed)context.persistentGestureGeneration++;
+  handlers.get('click')({detail});
+  return {actions,hints};
+}
+
+test('persistent controls reject missing pointer lease on PointerEvent browsers',()=>{
+  const result=persistentClick();
+  assert.deepEqual(result.actions,[]);
+  assert.equal(result.hints.length,1);
+});
+
+test('persistent controls accept fresh pointerdown lease',()=>{
+  const result=persistentClick({down:true});
+  assert.deepEqual(result.actions,['accepted']);
+  assert.equal(result.hints.length,0);
+});
+
+test('persistent controls accept keyboard activation without pointerdown',()=>{
+  const result=persistentClick({detail:0});
+  assert.deepEqual(result.actions,['accepted']);
+  assert.equal(result.hints.length,0);
+});
+
+test('persistent controls preserve old WebView click fallback',()=>{
+  const result=persistentClick({pointerEvents:false});
+  assert.deepEqual(result.actions,['accepted']);
+  assert.equal(result.hints.length,0);
+});
+
+test('persistent controls reject stale pointer generation after chooser',()=>{
+  const result=persistentClick({down:true,changed:true});
+  assert.deepEqual(result.actions,[]);
+  assert.equal(result.hints.length,1);
+});
