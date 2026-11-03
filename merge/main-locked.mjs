@@ -517,10 +517,15 @@ board.addEventListener('click', event => {
   if (event.detail !== 0) {
     const lease=boardPointerLease;
     boardPointerLease=null;
-    if(lease && (lease.blocked||
+    // In PointerEvent-capable browsers a non-keyboard click needs a fresh
+    // pointerdown lease. A missing lease could otherwise revive a delayed
+    // compatibility click after import cancellation or a BFCache transition.
+    // Keep the click fallback for older WebViews without Pointer Events.
+    if((!lease && typeof window.PointerEvent === 'function') ||
+        (lease && (lease.blocked||
         lease.generation!==persistentGestureGeneration||
         lease.render!==renderGeneration||
-        !cell||Number(cell.dataset.slot)!==lease.slot)) {
+        !cell||Number(cell.dataset.slot)!==lease.slot))) {
       ignoreNextClick=false;
       hint('棋盘触控已过期，请在当前棋盘重新触摸');
       return;
