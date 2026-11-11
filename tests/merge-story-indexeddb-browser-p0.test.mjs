@@ -155,7 +155,9 @@ test('P0 genuine IndexedDB transactions: migration, cross-tab CAS, durable reloa
     await call('Page.enable',{},storySession);
     await call('Runtime.enable',{},storySession);
     await call('Page.addScriptToEvaluateOnNewDocument',{
-      source:"Object.defineProperty(navigator,'locks',{value:undefined,configurable:true});"
+      source:"Object.defineProperty(navigator,'locks',{value:undefined,configurable:true});"+
+        "window.__storyErrors=[];window.addEventListener('error',e=>window.__storyErrors.push(e.message));"+
+        "window.addEventListener('unhandledrejection',e=>window.__storyErrors.push(String(e.reason)));"
     },storySession);
     await call('Target.activateTarget',{targetId:storyTarget});
     const uiEval=async(fn,...args)=>{
@@ -183,8 +185,21 @@ test('P0 genuine IndexedDB transactions: migration, cross-tab CAS, durable reloa
       }finally{db.close();}
     },key);
     await route('story.html');
-    await until(()=>uiEval(()=>document.getElementById('save-state')?.textContent.includes('IndexedDB')&&
-      document.querySelector('#story-list .story-card button')!==null),'no-Web-Locks story UI');
+    try{
+      await until(()=>uiEval(()=>document.getElementById('save-state')?.textContent.includes('IndexedDB')&&
+        document.querySelector('#story-list .story-card button')!==null),'no-Web-Locks story UI');
+    }catch(error){
+      const diagnostic=await uiEval(()=>({
+        location:location.href,ready:document.readyState,
+        status:document.getElementById('save-state')?.textContent,
+        listChildren:document.getElementById('story-list')?.children.length,
+        storyCards:document.querySelectorAll('.story-card').length,
+        locks:typeof navigator.locks,db:typeof indexedDB,
+        marker:localStorage.getItem('toolbox.merge-isle.story.persistence.v2'),
+        errors:window.__storyErrors
+      }));
+      throw Error(error.message+' '+JSON.stringify(diagnostic));
+    }
     assert.equal(await uiEval(()=>navigator.locks===undefined),true);
     const beforeStory=JSON.parse(await readSaved(savedKey));
     assert.equal(await uiEval(()=>{
