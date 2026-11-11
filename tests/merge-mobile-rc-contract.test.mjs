@@ -23,7 +23,8 @@ test('cloud mobile arrows are accessible non-gameplay controls',()=>{
   assert.match(js,/function scrollCloudBoard\(direction\)/);
   assert.match(js,/boardLeft.addEventListener\('click'/);
   assert.match(js,/boardRight.addEventListener\('click'/);
-  assert.doesNotMatch(js,/scrollCloudBoard\([^)]*\)[\s\S]*?session\.enqueue/);
+  const navFunction=js.slice(js.indexOf('function scrollCloudBoard(direction)'),js.indexOf("boardLeft.addEventListener('click'"));
+  assert.doesNotMatch(navFunction,/session\.enqueue|session\.flush/);
 });
 test('private RC never adds the game to public build output or deploys backend',()=>{
   const publicBuild=read('scripts/build-public.sh');
