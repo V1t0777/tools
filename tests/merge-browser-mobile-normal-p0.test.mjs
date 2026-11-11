@@ -649,18 +649,26 @@ test('P0 mobile Chromium: 320–430px normal mode layout, native touch and save 
     }
     assert.ok(beforeClock.energy<initial.energy,'clock test requires missing energy');
     const beforeClockRaw=await evalFn(k=>localStorage.getItem(k),KEY);
-    const heldMaterial=await evalFn(()=>{
-      const el=document.querySelector('#board .cell.filled:not(.producer)');
-      if(!el)throw Error('clock drag requires a material');
-      el.scrollIntoView({behavior:'instant',block:'center',inline:'center'});
-      const r=el.getBoundingClientRect();
-      return {x:r.left+r.width/2,y:r.top+r.height/2};
-    });
-    await evalFn(()=>new Promise(resolve=>
-      requestAnimationFrame(()=>requestAnimationFrame(resolve))));
-    assert.equal(await evalFn(({x,y})=>
-      !!document.elementFromPoint(x,y)?.closest('#board .cell.filled:not(.producer)'),
-      heldMaterial),true,'clock drag must hit a material');
+    // A timed render can move the board between scrollIntoView() and the
+    // subsequent touchStart. Probe the ACTUAL painted target and reacquire
+    // coordinates after layout settles, never synthesize a touch on stale UI.
+    let heldMaterial=null,clockHit=false;
+    for(let attempt=0;attempt<8&&!clockHit;attempt++){
+      heldMaterial=await evalFn(()=>{
+        const el=document.querySelector('#board .cell.filled:not(.producer)');
+        if(!el)throw Error('clock drag requires a material');
+        el.scrollIntoView({behavior:'instant',block:'center',inline:'center'});
+        const r=el.getBoundingClientRect();
+        return {x:r.left+r.width/2,y:r.top+r.height/2};
+      });
+      await evalFn(()=>new Promise(resolve=>
+        requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+      clockHit=await evalFn(({x,y})=>
+        !!document.elementFromPoint(x,y)?.closest('#board .cell.filled:not(.producer)'),
+        heldMaterial);
+      if(!clockHit)await sleep(75);
+    }
+    assert.equal(clockHit,true,'clock drag must hit a material');
     await call('Input.dispatchTouchEvent',{type:'touchStart',
       touchPoints:[{...heldMaterial,id:31}]},sessionId);
     await sleep(65);
