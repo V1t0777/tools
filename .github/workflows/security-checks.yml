@@ -56,6 +56,32 @@ jobs:
       - name: Run security and game regression tests
         run: node --test tests/*.test.mjs scripts/*.test.cjs
 
+  private-review-package:
+    name: Private review ZIP (no public deployment)
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == true }}
+    needs: [static-security, regression-tests, history-secrets]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact candidate SHA without stored credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Build private local-only review package
+        env:
+          YUNYU_SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: bash scripts/build-yunyu-private-review.sh
+      - name: Attach short-lived review ZIP to this Draft CI only
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: yunyu-private-review-${{ github.event.pull_request.head.sha }}
+          path: dist-yunyu-private-review/
+          if-no-files-found: error
+          retention-days: 7
+
   history-secrets:
     name: Security / Full Git history secrets
     runs-on: ubuntu-latest
