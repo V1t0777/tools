@@ -5,7 +5,7 @@ import {normalizeCommand} from './authority.mjs';
 export class CloudAuthError extends Error {
   constructor(code){super(code);this.name='CloudAuthError';this.code=code;}
 }
-const UID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i;
+const UID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function endpoint(projectUrl){
   if(typeof projectUrl!=='string')throw Error('INVALID_CLOUD_PROJECT');
   let uri;
@@ -15,6 +15,9 @@ function endpoint(projectUrl){
      uri.search||uri.hash||uri.origin!==projectUrl.replace(/\/$/,''))
     throw Error('INVALID_CLOUD_PROJECT');
   return uri.origin+'/functions/v1/merge-game';
+}
+export function pinnedSupabaseProjectOrigin(projectUrl){
+  return endpoint(projectUrl).slice(0,-'/functions/v1/merge-game'.length);
 }
 export async function verifyCloudIdentity(auth){
   if(typeof auth?.getSession!=='function'||typeof auth?.getUser!=='function')
