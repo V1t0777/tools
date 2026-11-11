@@ -18,12 +18,18 @@ import {bindNormalRenderedAction} from './normal-rendered-action-guard.mjs';
 import { attachNormalPageLifecycle } from './normal-page-lifecycle.mjs';
 import {performNormalSaveImport} from './normal-save-import-flow.mjs';
 import {RESTORE_BACKUP_KEY} from './save-restore-backup.mjs';
+import {openNormalPersistence} from './normal-indexeddb-persistence.mjs';
 
 const byId = id => document.getElementById(id);
 const board = byId('board');
 const orders = byId('orders');
 const notice = byId('notice');
-const store = (() => { try { return window.localStorage; } catch { return null; } })();
+const legacyStore = (() => { try { return window.localStorage; } catch { return null; } })();
+const persistence = await openNormalPersistence({
+  legacyStorage:legacyStore,nativeLocks:window.navigator?.locks??null,
+  indexedDB:window.indexedDB,Channel:window.BroadcastChannel
+});
+const store=persistence.storage;
 // Read-only original bytes for an explicitly confirmed abnormal reset.
 // The locked reset compares the exact bytes again before any overwrite.
 const initialOriginalRaw=(()=>{try{return store?.getItem(SAVE_KEY)??null;}catch{return null;}})();
@@ -37,7 +43,7 @@ let persistentGestureGeneration=0;
 let boardPointerLease=null;
 let noticeTimer=0,activeGuidance=null,saveIssue='STARTUP_REQUIRED',persistedRaw=null;
 const runtime=createNormalPageRuntime({
-  storage:store,locks:window.navigator?.locks??null,
+  storage:store,locks:persistence.locks,
   onVerified(next,raw,kind){
     const changed=raw!==persistedRaw;
     // Persistent controls survive rerenders. A pointerdown made against an
@@ -62,6 +68,22 @@ const runtime=createNormalPageRuntime({
   }
 });
 let lifecycle=null;
+if(persistence.backend==='indexeddb'){
+  // Cross-tab IDB changes may not produce a native localStorage event.
+  // Refresh under the authoritative database, then reuse the established
+  // normal-page reconcile gate. Never blindly publish a cached snapshot.
+  persistence.subscribe(change=>{
+    if(change.key===SAVE_KEY&&lifecycle&&!document.hidden)
+      lifecycle.inspect('idb-update');
+    if(change.key===null&&runtime.phase==='ready')
+      runtime.block('NORMAL_IDB_UNAVAILABLE');
+  });
+  const refresh=()=>void persistence.refresh().catch(()=>
+    runtime.block('NORMAL_IDB_REFRESH_FAILED'));
+  window.addEventListener('pageshow',refresh);
+  window.addEventListener('focus',refresh);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh()});
+}
 const pageSuspended=()=>document.hidden||lifecycle?.suspended===true;
 // Scroll controls never change the game state or persist a save.
 const boardViewport=byId('board-viewport');

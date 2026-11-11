@@ -18,6 +18,17 @@ const reject = reason => Object.freeze({ok:false,reason});
  */
 export async function withNormalSaveLock(locks, transaction) {
   if (typeof transaction !== 'function') return reject('INVALID_TRANSACTION');
+  // IDB callbacks must stay synchronous inside the live readwrite request
+  // task. The backend commits/aborts all backups and save bytes as ONE unit.
+  if(locks?.isIndexedDBNormalLock===true){
+    if(typeof locks.runNormalTransaction!=='function')
+      return reject('WEB_LOCKS_UNAVAILABLE');
+    try{
+      const outcome=await locks.runNormalTransaction(transaction);
+      return outcome&&typeof outcome.ok==='boolean'
+        ? outcome : reject('INVALID_TRANSACTION_RECEIPT');
+    }catch{return reject('SAVE_TRANSACTION_FAILED')}
+  }
   if (!locks || typeof locks.request !== 'function')
     return reject('WEB_LOCKS_UNAVAILABLE');
   let callbackSeen = false;
