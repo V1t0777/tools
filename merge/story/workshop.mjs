@@ -7,6 +7,7 @@ import {requestBrowserSaveDownload} from '../save-download.mjs';
 import {checkStoryResumeSnapshot} from './resume-guard.mjs';
 import {verifyStoryWorkshopPublication} from './workshop-publication-guard.mjs';
 import {runStoryWriteWithLock} from './write-lock.mjs';
+import {openStoryPersistence} from './indexeddb-persistence.mjs';
 import {createWorkshopRenderedActionGuard} from './render-action-guard.mjs';
 import {resetStoryWorkshopWithLock} from './workshop-reset.mjs';
 import {shouldBlockStoryStorageEvent} from './storage-event-guard.mjs';
@@ -19,8 +20,15 @@ import {nextStoryWorkshopAction,isStoryWorkshopRouteCurrent} from './workshop-ne
 import {guardStoryPersistentGesture} from './persistent-gesture-guard.mjs';
 import {describeStoryWorkshopStall} from './resource-recovery.mjs';
 const $=id=>document.getElementById(id);
-const storage=(()=>{try{return window.localStorage;}catch{return null;}})();
-const webLocks=(()=>{try{return window.navigator?.locks??null;}catch{return null;}})();
+const legacyStore=(()=>{try{return window.localStorage;}catch{return null;}})();
+const nativeLocks=(()=>{try{return window.navigator?.locks??null;}catch{return null;}})();
+const persistence=await openStoryPersistence({
+  legacyStorage:legacyStore,nativeLocks,
+  indexedDB:(()=>{try{return window.indexedDB??null;}catch{return null;}})(),
+  Channel:(()=>{try{return window.BroadcastChannel??null;}catch{return null;}})()
+});
+const storage=persistence.storage;
+const webLocks=persistence.locks;
 const lockUnavailable=webLocks==null||typeof webLocks.request!=='function';
 const loaded=readStoryWorkshop(storage);
 let state=loaded.state,raw=loaded.raw,blocked=loaded.blocked,reason=loaded.reason,selected=-1;
@@ -46,10 +54,12 @@ function status(){
         ? '无法访问浏览器存储，经营操作已暂停。'
         : '检测到存档变化或写入无法确认：本页已停止操作。请勿重复重置，先重新打开页面核对金币、建筑和订单。'
     : lockUnavailable
-      ? '此浏览器不提供安全写入锁：剧情工作台只读，原有存档未修改；请使用支持 Web Locks 的安全浏览器。'
+      ? '无法建立安全存档事务：剧情工作台只读，原有数据未修改；请使用支持 IndexedDB 或 Web Locks 的安全浏览器。'
       : pageSuspended()
       ? '页面已暂停：返回前不会继续经营操作；恢复可见后将核对原始存档。'
-      : '剧情工作台数据只保存在此浏览器，与普通模式金币及背包完全隔离。';
+      : persistence.backend==='indexeddb'
+        ? '剧情工作台已原子保存到此浏览器 IndexedDB；旧版 localStorage 数据仍保留为备份。'
+        : '剧情工作台数据只保存在此浏览器，与普通模式金币及背包完全隔离。';
 }
 function render(){
   renderGeneration++;
@@ -609,6 +619,23 @@ document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState==='hidden')suspendWorkshopPage();
   else if(!pageGone||resumePending)recheckWorkshopOnResume();
 });
+// IndexedDB writes do not emit native localStorage events. Forward only
+// validated same-origin backend change notices into the existing stale-page
+// blocker; all reloads and write transactions recheck current IDB bytes.
+if(persistence.subscribe){
+  persistence.subscribe(change=>{
+    const event=new Event('storage');
+    Object.defineProperties(event,{
+      key:{value:change.key},oldValue:{value:change.oldValue??null},
+      newValue:{value:change.newValue??null},storageArea:{value:storage}
+    });
+    window.dispatchEvent(event);
+  });
+  window.addEventListener('focus',()=>{void persistence.refresh?.();});
+  document.addEventListener('visibilitychange',()=>{
+    if(document.visibilityState==='visible')void persistence.refresh?.();
+  });
+}
 window.addEventListener('storage',event=>{
   if(shouldBlockStoryStorageEvent(event,{key:STORY_WORKSHOP_KEY,storage})){
     storageEpoch++;

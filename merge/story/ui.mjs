@@ -12,6 +12,7 @@ import {adoptConcurrentDailyPinStorageEvent} from './daily-pin-reconcile.mjs';
 import {canKeepDialogueAfterDailyPin} from './daily-pin-reconcile.mjs';
 import {adoptConcurrentDailyPinOnResume,canKeepResumedStoryDialogue} from './daily-pin-reconcile.mjs';
 import {saveStoryDialogueWithLock} from './dialogue-write.mjs';
+import {openStoryPersistence} from './indexeddb-persistence.mjs';
 import {captureStoryWorkshopEvidence,prepareStoryEvidenceDownload,isPreparedStoryEvidenceCurrent} from './save-evidence.mjs';
 import {requestBrowserSaveDownload} from '../save-download.mjs';
 import {checkStoryResumeSnapshot} from './resume-guard.mjs';
@@ -26,8 +27,15 @@ import {nextCoreStoryJourney,nextCoreSideJourney,nextCoreDailyJourney} from './j
 import {createEmptyStoryProgress,STORY_SAVE_KEY} from '../mode-boundaries.mjs';
 
 const $=id=>document.getElementById(id);
-const store=(()=>{try{return window.localStorage;}catch{return null;}})();
-const webLocks=(()=>{try{return window.navigator?.locks??null;}catch{return null;}})();
+const legacyStore=(()=>{try{return window.localStorage;}catch{return null;}})();
+const nativeLocks=(()=>{try{return window.navigator?.locks??null;}catch{return null;}})();
+const persistence=await openStoryPersistence({
+  legacyStorage:legacyStore,nativeLocks,
+  indexedDB:(()=>{try{return window.indexedDB??null;}catch{return null;}})(),
+  Channel:(()=>{try{return window.BroadcastChannel??null;}catch{return null;}})()
+});
+const store=persistence.storage;
+const webLocks=persistence.locks;
 const lockUnavailable=webLocks==null||typeof webLocks.request!=='function';
 const loaded=readStorySave(store);
 let progress=loaded.progress,raw=loaded.raw,blocked=loaded.blocked,reason=loaded.reason;
@@ -138,10 +146,12 @@ function status(){
         ? '浏览器存储不可用：当前只能阅读，无法安全保存剧情。'
         : '存档已被其他标签页改动或写入失败：请重新打开页面核对进度。'
     : lockUnavailable
-      ? '此浏览器不提供安全写入锁：剧情只读，原有存档未修改；请使用支持 Web Locks 的安全浏览器，勿清理浏览器数据。'
+      ? '无法建立安全存档事务：剧情只读，原有记录未修改；请使用支持 IndexedDB 或 Web Locks 的安全浏览器。'
       : pageSuspended()
       ? '剧情页面已暂停：恢复可见后必须核对存档，暂不允许继续阅读提交。'
-      : '剧情进度已保存到此浏览器；不与普通模式共享经济，也不提供云存档。';
+      : persistence.backend==='indexeddb'
+        ? '剧情进度已原子保存到此浏览器 IndexedDB；旧版 localStorage 数据仍保留为备份。'
+        : '剧情进度已保存到此浏览器；不与普通模式共享经济，也不提供云存档。';
 }
 function completed(entry){return !!progress.packs.core?.completed[entry.kind].includes(entry.id);}
 function card(entry,done=false,workshopRead=null){
@@ -723,6 +733,23 @@ document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState==='hidden')suspendStoryPage();
   else if(!pageGone||resumePending)recheckStoryOnResume();
 });
+// IndexedDB writes do not emit native localStorage events. Forward only
+// validated same-origin backend change notices into the existing stale-page
+// blocker; all reloads and write transactions recheck current IDB bytes.
+if(persistence.subscribe){
+  persistence.subscribe(change=>{
+    const event=new Event('storage');
+    Object.defineProperties(event,{
+      key:{value:change.key},oldValue:{value:change.oldValue??null},
+      newValue:{value:change.newValue??null},storageArea:{value:store}
+    });
+    window.dispatchEvent(event);
+  });
+  window.addEventListener('focus',()=>{void persistence.refresh?.();});
+  document.addEventListener('visibilitychange',()=>{
+    if(document.visibilityState==='visible')void persistence.refresh?.();
+  });
+}
 window.addEventListener('storage',event=>{
   if(shouldBlockStoryStorageEvent(event,{key:STORY_SAVE_KEY,storage:store})){
     // Passive tabs may safely accept only the identical deterministic pin,
