@@ -3,13 +3,16 @@
  */
 import { createInitialState, validateSave, advanceTime, moveOrMerge, produce,
   fulfillOrder, storeItem, withdrawItem, upgradeWarehouse, upgradeProducer,
-  upgradeBuilding } from '../engine.mjs';
+  upgradeBuilding, useSupply, purchaseSupply, SUPPLY_ITEMS } from '../engine.mjs';
+import {discardDeadlockedMaterial} from '../deadlock-rescue.mjs';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ALLOWED = Object.freeze({
   move: ['from', 'to'], produce: ['slot'], order: ['orderId'], store: ['slot'],
   withdraw: ['slot'], upgradeWarehouse: [], upgradeProducer: ['producerId'],
-  upgradeBuilding: ['buildingId']
+  upgradeBuilding: ['buildingId'],
+  useSupply: ['itemId','producerId'], purchaseSupply: ['itemId'],
+  discard: ['slot','expectedItemId']
 });
 const own = (o,k) => Object.prototype.hasOwnProperty.call(o,k);
 const plain = v => v !== null && typeof v === 'object' && !Array.isArray(v) &&
@@ -34,6 +37,15 @@ export function normalizeCommand(raw) {
   if (type === 'order' && (typeof args.orderId !== 'string' || !/^o\d{1,14}$/.test(args.orderId))) return null;
   if (type === 'upgradeProducer' && (typeof args.producerId !== 'string' || !/^m[1-9]\d{0,13}$/.test(args.producerId))) return null;
   if (type === 'upgradeBuilding' && !['storefront','garden','harbor'].includes(args.buildingId)) return null;
+  if (type === 'useSupply' || type === 'purchaseSupply') {
+    if (typeof args.itemId !== 'string' || !Object.hasOwn(SUPPLY_ITEMS,args.itemId)) return null;
+    if (type === 'useSupply' && args.producerId !== null &&
+        (typeof args.producerId !== 'string' || !/^m[1-9]\d{0,13}$/.test(args.producerId))) return null;
+  }
+  if (type === 'discard' &&
+      (!Number.isInteger(args.slot) || args.slot < 0 || args.slot > 55 ||
+       typeof args.expectedItemId !== 'string' ||
+       !/^m[1-9]\d{0,13}$/.test(args.expectedItemId))) return null;
   return { operationId: raw.operationId.toLowerCase(), expectedRevision: raw.expectedRevision,
     action: {type,...args} };
 }
@@ -53,6 +65,10 @@ export function planTrustedTransition(state, command, {now, rng}) {
     case 'upgradeWarehouse': result = upgradeWarehouse(current); break;
     case 'upgradeProducer': result = upgradeProducer(current, action.producerId); break;
     case 'upgradeBuilding': result = upgradeBuilding(current, action.buildingId); break;
+    case 'useSupply': result = useSupply(current,action.itemId,action.producerId,now); break;
+    case 'purchaseSupply': result = purchaseSupply(current,action.itemId); break;
+    case 'discard': result = discardDeadlockedMaterial(current,action.slot,
+      {confirmed:true,expectedItemId:action.expectedItemId}); break;
     default: throw Error('Unrecognized trusted action');
   }
   if (result.ok && (!validateSave(result.state) || result.state.revision !== state.revision + 1))

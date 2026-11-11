@@ -142,7 +142,13 @@ export function createOfflineCommandQueue({ uid, storage, transport, clock = () 
   async function readRemote() {
     let reply;
     try { reply=await transport.read(); }
-    catch {phase='offline'; return {ok:false,code:'NETWORK_UNAVAILABLE',...status()};}
+    catch(error) {
+      if(error?.code==='CLOUD_ACCESS_DENIED'||error?.code==='CLOUD_AUTH_UNVERIFIED'){
+        phase='blocked';
+        return {ok:false,code:error.code,...status()};
+      }
+      phase='offline';return {ok:false,code:'NETWORK_UNAVAILABLE',...status()};
+    }
     if (!validSnapshot(reply) || reply.ok !== true || reply.status !== 'ok') {
       phase='protocol-error';return {ok:false,code:'INVALID_SNAPSHOT',...status()};
     }

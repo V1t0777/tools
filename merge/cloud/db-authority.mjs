@@ -4,6 +4,7 @@
  */
 import { createInitialState, validateSave } from '../engine.mjs';
 import { normalizeCommand, planTrustedTransition, secureRandom } from './authority.mjs';
+import {auditEconomyTransition} from './economy-audit.mjs';
 
 const UID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export async function hashOperation(command) {
@@ -47,6 +48,7 @@ export function createDatabaseAuthority(repository, {clock=()=>Date.now(),rng=se
       if (current.revision!==command.expectedRevision)
         return {status:'conflict',ok:false,code:'REVISION_CONFLICT',revision:current.revision,state:current.state};
       const result=planTrustedTransition(current.state,command,{now,rng});
+      auditEconomyTransition(current.state,command,result);
       // Atomic CAS in SQL rechecks both revision AND duplicate ID after row lock.
       const committed=await repository.commit({uid:verifiedUid,command,hash,result,now});
       if (!committed || !validateSave(committed.state) || committed.revision!==committed.state.revision)

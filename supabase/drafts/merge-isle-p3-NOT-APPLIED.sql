@@ -1,5 +1,5 @@
 -- REVIEW DRAFT ONLY: DO NOT APPLY TO ANY LIVE PROJECT WITHOUT EXPLICIT APPROVAL.
--- P3 server-side CAS protocol (PostgreSQL 17 / Supabase). P2 JSON save remains schemaVersion=2.
+-- P3 server-side CAS protocol (PostgreSQL 17 / Supabase). Engine V3 requires schemaVersion=3.
 -- API RPC functions remain PUBLIC-schema but EXECUTE is strictly service_role-only.
 -- The trusted Edge Function validates JWT and derives p_user_id from auth.getUser(jwt).
 BEGIN;
@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS public.merge_saves (
   state jsonb NOT NULL CHECK (jsonb_typeof(state) = 'object'),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CHECK ((state->>'revision')::bigint = revision),
-  CHECK (octet_length(state::text) <= 65536)
+  CHECK (octet_length(state::text) <= 640000)
 );
 CREATE TABLE IF NOT EXISTS public.merge_operations (
   user_id uuid NOT NULL REFERENCES public.merge_saves(user_id) ON DELETE CASCADE,
@@ -38,11 +38,11 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 DECLARE v_row public.merge_saves%ROWTYPE;
 BEGIN
   IF p_user_id IS NULL OR p_seed IS NULL OR
-     p_seed->>'schemaVersion' IS DISTINCT FROM '2' OR
+     p_seed->>'schemaVersion' IS DISTINCT FROM '3' OR
      p_seed->>'revision' IS DISTINCT FROM '0' OR
      (p_seed->>'coins')::bigint IS DISTINCT FROM 0 OR
      (p_seed->>'xp')::bigint IS DISTINCT FROM 0 OR
-     pg_catalog.octet_length(p_seed::text) > 65536 THEN
+     pg_catalog.octet_length(p_seed::text) > 640000 THEN
     RAISE EXCEPTION 'invalid trusted initial state';
   END IF;
   INSERT INTO public.merge_saves(user_id, revision, state)
@@ -68,7 +68,7 @@ BEGIN
      p_code IS NULL OR pg_catalog.length(p_code) > 40 OR
      pg_catalog.jsonb_typeof(p_next_state) IS DISTINCT FROM 'object' OR
      pg_catalog.jsonb_typeof(p_response) IS DISTINCT FROM 'object' OR
-     pg_catalog.octet_length(p_next_state::text) > 65536 THEN
+     pg_catalog.octet_length(p_next_state::text) > 640000 THEN
     RAISE EXCEPTION 'invalid operation envelope';
   END IF;
   -- Serialize per-player commits and duplicate-operation checks in one DB transaction.
@@ -90,7 +90,7 @@ BEGIN
   END IF;
   v_increment := CASE WHEN p_status='applied' THEN 1 ELSE 0 END;
   IF (p_next_state->>'revision')::bigint IS DISTINCT FROM p_expected_revision+v_increment OR
-     (p_next_state->>'schemaVersion')::int IS DISTINCT FROM 2 THEN
+     (p_next_state->>'schemaVersion')::int IS DISTINCT FROM 3 THEN
     RAISE EXCEPTION 'invalid state revision transition';
   END IF;
   UPDATE public.merge_saves SET state=p_next_state, revision=p_expected_revision+v_increment,

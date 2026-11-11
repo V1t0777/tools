@@ -1,9 +1,16 @@
 /** P3.7 offline-only reward audit; NOT a deployed security boundary. */
-import {validateSave} from '../engine.mjs';
+import {validateSave,SUPPLY_ITEMS} from '../engine.mjs';
 import {BUILDINGS,getProducerUpgrade,getWarehouseUpgrade} from '../economy.mjs';
 const KNOWN=new Set(['move','produce','order','store','withdraw',
-  'upgradeProducer','upgradeWarehouse','upgradeBuilding']);
+  'upgradeProducer','upgradeWarehouse','upgradeBuilding',
+  'useSupply','purchaseSupply','discard']);
 function expected(s,a){
+  if(a.type==='purchaseSupply'){
+    const item=SUPPLY_ITEMS[a.itemId];
+    if(!item)throw Error('Reward audit: unknown supply');
+    return {coins:-item.price,xp:0};
+  }
+
   if(a.type==='order'){
     const o=s.orders.find(x=>x.id===a.orderId);
     if(!o)throw Error('Reward audit: missing pre-operation order');
