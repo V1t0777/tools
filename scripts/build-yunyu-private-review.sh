@@ -28,7 +28,7 @@ a.card:focus-visible,a.card:hover{outline:3px solid #7296a9}
 <body>
 <p><b>PRIVATE REVIEW · NOT DEPLOYED</b></p>
 <h1>云屿百物铺</h1>
-<p>本地验收候选版 · 2026年11月11日</p>
+<p>移动端 RC 验收候选版 · 2026年11月12日</p>
 <a class="card" href="./merge/index.html"><b>🏝 普通经营</b><br>56 格棋盘、订单、仓库、补给、离线存档、导入/重置/恢复</a>
 <a class="card" href="./merge/story.html"><b>📖 剧情模式</b><br>第一卷剧情交互与工作台，独立保存本地进度</a>
 <a class="card" href="./merge/cloud-preview.html"><b>☁ 四账号云存档研发版</b><br>迪、晨、钊、test 的限定权限与同步界面；后台尚未部署，不能真正跨设备云同步</a>
@@ -69,7 +69,7 @@ chmod +x "$OUT/START-MAC-LINUX.sh"
 cat > "$OUT/README-验收说明.md" <<'MD'
 # 云屿百物铺｜私下本地验收候选版
 
-本 ZIP 来自未合并的 Draft PR #58，提供普通经营、剧情模式和云存档研发界面，不代表正式发布。
+本 ZIP 来自未合并的 Draft PR #58，提供普通经营、剧情模式和四账号云存档研发界面，不代表正式发布。本轮重点针对320/375/390/430px移动屏幕、iOS安全区、44px点击区域、棋盘横向按钮、对白滚动和存档恢复。
 
 ## 启动方式
 Windows：解压全部文件，双击 START-WINDOWS.bat，在 Chrome 打开 http://127.0.0.1:8765/。
@@ -84,6 +84,13 @@ iPhone 联调需要另外建立受控私有局域网环境，本包默认不开�
 4. 云存档研发界面：只检查 UI 和身份访问逻辑。数据库、Edge Function 尚未部署时云端读写失败是预期现象，绝不表示已同步。
 5. 旧本地存档上云需要管理员审核与一次性授权，不能将本地金币或物品直接当作云端权威奖励。
 
+## 移动端操作与验收条件
+- 页面已按320、375、390、430px进行代码适配；Android Chromium模拟不等于真实iPhone Safari或微信WebView验收。
+- 普通经营的小屏棋盘可用左右按钮查看边缘；剧情工作台和云存档研发棋盘新增左右按钮（必要时仍可横向滑动）。
+- iPhone用户不能直接访问Windows电脑的127.0.0.1地址；这是默认的安全隔离。真正的iOS设备验收需要另行搭建仅测试设备可访问的、受控HTTPS私有环境，不得直接上传公共站点。
+- 在Safari/微信WebView上分别核对：竖向滚动不误触游戏格；每个按钮可操作、登录键盘不引起页面异常放大；对白弹窗可从头滚到尾；切到后台返回后旧触控不可写档；断网和重进页面后不会丢失唯一存档。
+- 以上真实设备、真实Edge与数据库测试尚未完成时只能标记为「移动端RC候选」，不得标为正式可上线完成版。
+
 ## 尚未验收／禁止操作
 - 未完成真实隔离 PostgreSQL RLS、CAS 和 Edge JWT 联调；未完成 iPhone Safari／微信 WebView 的多设备故障恢复。
 - 没有执行任何生产数据库迁移、Edge 部署、GitHub Pages 或 Cloudflare Pages 发布。
@@ -91,7 +98,7 @@ iPhone 联调需要另外建立受控私有局域网环境，本包默认不开�
 MD
 
 printf '%s\n' "$YUNYU_SOURCE_SHA" > "$OUT/SOURCE-SHA.txt"
-printf '%s\n' 'PRIVATE REVIEW ONLY' 'CLOUD DATABASE: NOT DEPLOYED' 'CLOUD EDGE: NOT DEPLOYED' 'PUBLIC SITE: UNCHANGED' > "$OUT/DELIVERY-STATUS.txt"
+printf '%s\n' 'PRIVATE MOBILE RC CANDIDATE ONLY' 'IPHONE SAFARI QA: PENDING' 'CLOUD DATABASE: NOT DEPLOYED' 'CLOUD EDGE: NOT DEPLOYED' 'PUBLIC SITE: UNCHANGED' > "$OUT/DELIVERY-STATUS.txt"
 
 # Only the game runtime and the small explicit shared dependency subset.
 # Check that every displayed entrypoint exists, with no symlinks or secrets.
