@@ -106,8 +106,18 @@ function initialize(db,original,legacyStorage){
  */
 export async function openNormalPersistence({legacyStorage,nativeLocks,indexedDB,Channel}={}){
   const mode=legacyMode(legacyStorage);
-  const legacy={backend:'legacy',storage:legacyStorage,locks:nativeLocks??null};
-  if(mode===null&&typeof nativeLocks?.request==='function')return legacy;
+  if(mode===null&&typeof nativeLocks?.request==='function'){
+    // A second, updated tab can migrate this origin to IDB while an older
+    // native-Web-Locks page remains open. Recheck the migration fence INSIDE
+    // every acquired Web Lock, before any localStorage write can begin.
+    const guarded={
+      request(name,options,callback){
+        return nativeLocks.request(name,options,lock=>
+          callback(legacyMode(legacyStorage)===null?lock:null));
+      }
+    };
+    return {backend:'legacy',storage:legacyStorage,locks:guarded};
+  }
   const readonly={backend:'read-only',storage:legacyStorage,locks:null};
   if(mode!=='unavailable'&&mode!==null&&mode!==NORMAL_IDB_MODE)return readonly;
   if(mode==='unavailable'||typeof indexedDB?.open!=='function')return readonly;
