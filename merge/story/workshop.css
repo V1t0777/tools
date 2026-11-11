@@ -36,6 +36,7 @@
 @media(prefers-color-scheme:dark){.story-supply-action{background:#355046;color:var(--ink);border-color:#597568}}
 @media(prefers-reduced-motion:reduce){.story-supply-action{transition:none}}
 
+
 /* Mobile RC: preserve 44px workshop cells and swipe region, while preventing
  * status labels and grouped supplies from expanding the entire document. */
 .resource-line{min-width:0;flex-wrap:wrap}
@@ -51,3 +52,13 @@
   .resource-line span{font-size:12px;padding:8px 5px}
   .workshop-order button{flex:1 1 110px}
 }
+
+
+/* Mobile RC: reachable full-width buttons for the 7-column story board. */
+.workshop-board-navigation{display:flex;gap:8px;margin:8px 0}
+.workshop-board-navigation[hidden]{display:none!important}
+.workshop-board-navigation button{flex:1 1 50%;min-height:44px;min-width:44px;
+  padding:9px;border:1px solid var(--line);border-radius:12px;
+  background:var(--card);color:var(--ink);font-weight:800;touch-action:manipulation}
+.workshop-board-navigation button:disabled{opacity:.55;cursor:not-allowed}
+.workshop-board-navigation button:focus-visible{outline:3px solid #6587bb;outline-offset:2px}
