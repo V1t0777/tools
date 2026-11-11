@@ -25,3 +25,9 @@ import_map = "./functions/blackjack-game/deno.json"
 [functions.merge-game]
 verify_jwt = true
 entrypoint = "./functions/merge-game/index.ts"
+
+# Private story progress and independent story workshop: never anonymous.
+# Draft-only until separate production deployment approval.
+[functions.merge-story]
+verify_jwt = true
+entrypoint = "./functions/merge-story/index.ts"
