@@ -11,6 +11,7 @@ import ipaddress
 import mimetypes
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
+from urllib.parse import urlsplit
 
 LAN_RANGES = tuple(ipaddress.ip_network(x) for x in (
     "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"
@@ -50,6 +51,14 @@ def main() -> None:
         def deny_if_needed(self) -> bool:
             if not self.allowed():
                 self.send_error(403, "NOT_AN_APPROVED_LOCAL_DEVICE")
+                return True
+            route = urlsplit(self.path).path
+            # A LAN HTTP listener cannot safely carry account passwords or
+            # Supabase auth tokens. Private phone QA is deliberately offline.
+            if (route.startswith("/merge/cloud") or
+                    route.startswith("/shared/toolbox-auth") or
+                    route.startswith("/shared/vendor/supabase")):
+                self.send_error(403, "CLOUD_AUTH_REQUIRES_PRIVATE_HTTPS")
                 return True
             return False
 
