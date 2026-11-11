@@ -105,7 +105,7 @@ test('SQL/Edge draft requires admin, four-account access, single use and row loc
   for(const x of ['DO NOT APPLY','merge_normal_migration_grants',
     'approved_by uuid NOT NULL','ENABLE ROW LEVEL SECURITY',
     'GRANT SELECT,INSERT,UPDATE ON public.merge_normal_migration_grants TO service_role',
-    'p_source_sha256','FOR UPDATE','CLOUD_ALREADY_PLAYED','consumed_at',
+    'p_source_sha256 IS NULL','FOR UPDATE','CLOUD_ALREADY_PLAYED','consumed_at',
     'merge_operations','merge_cloud_allowlist',
     'GRANT EXECUTE ON FUNCTION public.merge_claim_approved_normal_save'])
     assert.ok(sql.includes(x),x);
