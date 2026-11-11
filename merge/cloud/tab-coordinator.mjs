@@ -51,7 +51,7 @@ export function createCoordinatedCloudQueue({uid, storage, transport,
     // Newly detected journal corruption outranks an older network/lock failure.
     // Otherwise the status view could hide the need to preserve local bytes.
     return { ...result, verified,
-      phase:storageDamaged ? result.phase :
+      phase:storageDamaged ? result.phase : !legacyAllowed() ? 'blocked' :
         verified ? lastPhase : lastFailure?.phase ?? result.phase,
       ...(!storageDamaged && lastFailure?.code ? {code:lastFailure.code} : {}),
       lockAvailable:capable };
