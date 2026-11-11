@@ -101,6 +101,16 @@ Deno.serve(async request => {
       result=await game.read(data.user.id);
     } else if(exactKeys(body,['mode','command']) && body.mode==='command') {
       result=await game.execute(data.user.id,body.command);
+    } else if(exactKeys(body,['mode','confirmed','sourceSha256']) &&
+      body.mode==='claim' && body.confirmed===true &&
+      typeof body.sourceSha256==='string'&&/^[0-9a-f]{64}$/.test(body.sourceSha256)) {
+      // Server returns ONLY a previously administrator-approved snapshot.
+      // The request contains no candidate wallet, item, or local game state.
+      const claimed=await admin.rpc('merge_claim_approved_normal_save',{
+        p_user_id:data.user.id,p_source_sha256:body.sourceSha256,p_confirmed:true
+      });
+      if(claimed.error)throw Error('Approved migration service unavailable');
+      result=claimed.data;
     } else if(exactKeys(body,['mode','operationId']) && body.mode==='receipt') {
       result=await receiptLookup.read(data.user.id,body.operationId);
     } else return response({code:'BAD_COMMAND'},400);

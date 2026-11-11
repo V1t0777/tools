@@ -76,6 +76,11 @@ export function createAuthenticatedMergeTransport({
   }
   return Object.freeze({
     read(options){return send({mode:'read'},options)},
+    claimApproved(sourceSha256,options){
+      if(typeof sourceSha256!=='string'||!/^[0-9a-f]{64}$/.test(sourceSha256))
+        return Promise.reject(Error('INVALID_MIGRATION_HASH'));
+      return send({mode:'claim',confirmed:true,sourceSha256},options);
+    },
     execute(command,options){
       if(!normalizeCommand(command))return Promise.reject(Error('BAD_CLOUD_COMMAND'));
       return send({mode:'command',command},options);

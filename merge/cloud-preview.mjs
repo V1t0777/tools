@@ -2,12 +2,15 @@ import {CHAINS,getItemIcon,getItemName,validateSave,SUPPLY_ITEMS} from './engine
 import {openToolboxPrivateCloudSession,adaptToolboxCloudAuth} from './cloud/toolbox-auth-adapter.mjs';
 import {openPrivateStoryCloudSession} from './cloud/story-private-sync.mjs';
 import {openStoryPersistence} from './story/indexeddb-persistence.mjs';
+import {openNormalPersistence} from './normal-indexeddb-persistence.mjs';
+import {createNormalMigrationManifest} from './cloud/normal-migration-review.mjs';
 
 const $=id=>document.getElementById(id);
 const auth=window.ToolboxAuth;
 const game=$('game'),cloud=$('cloud'),story=$('story');
 let session=null,storySession=null,storyBackend=null,busy=false;
 let selected=-1,reviewedLocal=null,reviewedRemote=null,backedUpRaw=null;
+let migrationReview=null,migrationStore=null;
 const identity=()=>auth?adaptToolboxCloudAuth(auth):null;
 const message=(id,value)=>{$(id).textContent=String(value)};
 const confirmed=()=>session?.preview()?.verified===true;
@@ -18,6 +21,9 @@ function toggleControls(){
   for(const button of game.querySelectorAll('button'))button.disabled=!ready||!confirmed()||
     (session.preview().pending>0);
   $('story-init').disabled=!ready;
+  $('migration-export').disabled=!ready;
+  $('migration-claim').disabled=!ready||!migrationReview||!confirmed()||
+    session.preview().pending>0;
   for(const id of ['story-read','story-backup','story-upload','story-retry','story-restore'])
     $(id).disabled=!storySession||busy;
 }
@@ -171,8 +177,52 @@ $('review').addEventListener('click',()=>void run(async()=>{
   if(!window.confirm(question))return;
   stateStatus(await session.discardConflicted({confirmedByUser:true}));
 }));
+$('migration-export').addEventListener('click',()=>void run(async()=>{
+  const backend=await openNormalPersistence({
+    legacyStorage:localStorage,nativeLocks:navigator.locks,
+    indexedDB,Channel:BroadcastChannel
+  });
+  if(backend.backend==='read-only'){
+    message('migration-status','本地存档不可安全读取，已停止。请保留所有原始数据。');
+    return;
+  }
+  const manifest=await createNormalMigrationManifest(backend.storage);
+  if(!manifest.ok){
+    message('migration-status','本地旧档校验失败：'+manifest.code);return;
+  }
+  const downloaded=JSON.stringify({...manifest,uid:session.uid,
+    createdAt:new Date().toISOString()});
+  const blob=new Blob([downloaded],{type:'application/json;charset=utf-8'});
+  const url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download='yunyu-normal-review-'+manifest.sha256.slice(0,12)+'.json';
+  a.hidden=true;document.body.append(a);
+  try{
+    a.click();migrationReview=manifest;migrationStore=backend.storage;
+    message('migration-status','已发起本地下载。请确认文件保存，交由管理员独立核对；SHA-256：'+manifest.sha256);
+  }finally{a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000)}
+}));
+$('migration-claim').addEventListener('click',()=>void run(async()=>{
+  if(!migrationReview||!migrationStore||session.preview().pending>0||
+     session.preview().verified!==true){
+    message('migration-status','云端或本地存档尚未核验');return;
+  }
+  const again=await createNormalMigrationManifest(migrationStore);
+  if(!again.ok||again.sha256!==migrationReview.sha256||
+     again.raw!==migrationReview.raw){
+    message('migration-status','本地原始进度已变化，必须重新审核并下载');return;
+  }
+  if(!window.confirm('只有管理员预先审核且批准的云档才可领取。确认原文件已经另行备份，且领取后云端使用管理员批准的存档吗？'))return;
+  const result=await session.claimApproved({
+    sourceSha256:again.sha256,confirmedByUser:true
+  });
+  message('migration-status',result.ok
+    ?'服务器已确认一次性审核迁移，云端版本 '+result.revision
+    :'未获得迁移许可或操作结果未确认：'+result.code+'。本地旧档保持不变。');
+  if(result.ok){selected=-1;render();stateStatus(result)}
+}));
 $('sign-out').addEventListener('click',()=>void run(async()=>{
   await auth.signOut();session=null;storySession=null;
+  migrationReview=null;migrationStore=null;
   cloud.hidden=true;story.hidden=true;game.hidden=true;$('login').hidden=false;
   message('login-status','已退出，未删除云端或本地存档');
 }));

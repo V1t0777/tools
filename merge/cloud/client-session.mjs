@@ -29,6 +29,18 @@ export async function openPrivateCloudSession({
     connect:()=>queue.connect(),
     enqueue:action=>queue.enqueue(action),
     flush:options=>queue.flush(options),
+    async claimApproved({sourceSha256,confirmedByUser=false}={}){
+      if(!confirmedByUser)return {ok:false,code:'MIGRATION_CONFIRMATION_REQUIRED'};
+      const snapshot=queue.preview();
+      if(snapshot.verified!==true||snapshot.pending!==0)
+        return {ok:false,code:'MIGRATION_CLOUD_REVIEW_REQUIRED'};
+      const reply=await http.claimApproved(sourceSha256);
+      if(reply.ok!==true||!['applied','replayed'].includes(reply.status))
+        return {ok:false,code:reply.code??'MIGRATION_REJECTED'};
+      const refreshed=await queue.connect();
+      if(!refreshed.ok)return {ok:false,code:'MIGRATION_REFRESH_UNCERTAIN'};
+      return {ok:true,status:reply.status,revision:refreshed.revision};
+    },
     inspectConflict:()=>queue.inspectConflict(),
     discardUnsent:()=>queue.discardUnsent(),
     discardConflicted:options=>queue.discardConflicted(options),

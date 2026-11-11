@@ -38,6 +38,15 @@
       <button id="sign-out" type="button">退出登录</button>
     </div>
     <p id="cloud-status" class="status" role="status" aria-live="polite">正在确认账号</p>
+    <section class="panel" aria-labelledby="migration-title">
+      <h3 id="migration-title">已有普通经营本地进度：人工审核迁移</h3>
+      <p>云端不会直接相信本地金币和道具。先下载旧档及 SHA-256 审核文件，由管理员独立验证后配置一次性授权，之后本人确认领取已批准的存档。领取不会删除本地文件。</p>
+      <div class="actions">
+        <button id="migration-export" type="button">下载旧档供审核（不上传）</button>
+        <button id="migration-claim" type="button" disabled>领取管理员已批准的旧档</button>
+      </div>
+      <p id="migration-status" class="status" role="status" aria-live="polite">未提交审核</p>
+    </section>
     <div id="game" hidden>
       <div class="resources"><strong id="coins">金币 0</strong><strong id="energy">体力 0</strong>
         <strong id="xp">经验 0</strong><strong id="revision">版本 0</strong></div>
