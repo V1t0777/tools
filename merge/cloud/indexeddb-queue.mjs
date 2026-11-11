@@ -114,6 +114,7 @@ export async function openIndexedDBCloudQueue({
       throw Error('CLOUD_IDB_MIGRATION_UNVERIFIED');
   }catch(error){db.close();throw error}
   let cacheRaw,invalid=false,verifiedToken=null,phase='unverified';
+  let channel=null;
   const metaKey=journalKey+'.migration';
   const safe=()=>{
     try{return !invalid&&legacyStorage.getItem(markerKey)===MODE&&
@@ -176,12 +177,14 @@ export async function openIndexedDBCloudQueue({
       firstOperationId:j.pending[0]?.operationId??null,
       nextRetryAt:j.pending[0]?.nextRetryAt??0};
   };
-  function mutate(fn){
+  async function mutate(fn){
     verifiedToken=null;
-    return transact('readwrite',old=>{
+    const outcome=await transact('readwrite',old=>{
       const result=fn(old);
       return result?.next===undefined?{reply:result?.reply??result}:result;
     });
+    try{channel?.postMessage({kind:'cloud-journal-updated'})}catch{}
+    return outcome;
   }
   async function connect(){
     verifiedToken=null;
@@ -223,6 +226,9 @@ export async function openIndexedDBCloudQueue({
   async function flush({force=false}={}){
     const connected=await connect();
     if(!connected.ok)return connected;
+    // Bind the success badge to a snapshot actually authenticated by this
+    // session; an intervening local journal transaction must not forge proof.
+    let lastProof=serverToken(pending());
     for(let i=0;i<MAX_PENDING;i++){
       let step;
       try{
@@ -244,7 +250,10 @@ export async function openIndexedDBCloudQueue({
         });
       }catch{phase='storage-error';return reject('STORAGE_ERROR')}
       if(!step.ok)return step;
-      if(step.done){phase='synced';return {ok:true,...preview()}}
+      if(step.done){
+        verifiedToken=lastProof;
+        phase='synced';return {ok:true,...preview()};
+      }
       let response;
       try{response=await transport.execute(step.command)}
       catch{
@@ -284,6 +293,7 @@ export async function openIndexedDBCloudQueue({
           return {next:j,reply:reject('INVALID_RESPONSE')};
         });
         if(!outcome.ok){phase='blocked';return outcome}
+        lastProof=JSON.stringify({revision:response.revision,state:response.state});
       }catch{phase='storage-error';return reject('STORAGE_ERROR')}
     }
     return reject('QUEUE_FULL');
@@ -341,6 +351,8 @@ export async function openIndexedDBCloudQueue({
           return {reply:reject('FOLLOWING_OUTCOME_UNKNOWN')};
         if(j.pending.length>1&&!discardFollowing)
           return {reply:reject('FOLLOWING_ACTIONS_NEED_REVIEW')};
+        if(j.pending.some(x=>x.operationId.toLowerCase()===newId))
+          return {reply:reject('INVALID_ID')};
         j.pending=[{operationId:newId,expectedRevision:null,
           action:copy(newAction),attempts:0,nextRetryAt:0}];
         j.blocked=null;
@@ -349,7 +361,6 @@ export async function openIndexedDBCloudQueue({
     }catch{return reject('STORAGE_ERROR')}
   }
   // Send only invalidation signals, never raw snapshots or credentials.
-  let channel=null;
   try{
     if(typeof Channel==='function'){
       channel=new Channel('yunyu-normal-cloud-journal-v1');
@@ -360,8 +371,6 @@ export async function openIndexedDBCloudQueue({
   db.onversionchange=()=>{invalid=true;verifiedToken=null;db.close()};
   // Notifications are best-effort; every actual operation rereads the
   // authoritative IDB record under its own readwrite transaction.
-  const wrappedMutate=mutate;
-  void wrappedMutate;
   return Object.freeze({backend:'indexeddb',key:journalKey,
     preview,connect,enqueue,flush,inspectConflict,replaceConflicted,
     discardUnsent,discardConflicted});

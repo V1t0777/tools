@@ -4,6 +4,7 @@
  * with localStorage alone across simultaneous browser tabs.
  */
 import { createOfflineCommandQueue, queueStorageKey } from './offline-queue.mjs';
+import {cloudQueueIdbMarkerKey} from './indexeddb-queue.mjs';
 
 export const cloudQueueLockName = uid => `toolbox.merge-isle.cloud-lock.${queueStorageKey(uid)}`;
 
@@ -23,6 +24,11 @@ export function createCoordinatedCloudQueue({uid, storage, transport,
   const create = () => createOfflineCommandQueue({uid, storage, transport, clock, makeId, maxPending});
   create();
   const name = cloudQueueLockName(uid);
+  const markerKey=cloudQueueIdbMarkerKey(uid);
+  const legacyAllowed=()=>{
+    try{return storage.getItem(markerKey)===null}
+    catch{return false}
+  };
   const capable = !!locks && typeof locks.request === 'function';
   let active = null;
   // An in-memory, session-only proof of the EXACT remote-confirmed snapshot.
@@ -40,7 +46,7 @@ export function createCoordinatedCloudQueue({uid, storage, transport,
     // A persisted cache, or another tab's same-revision update, is unverified.
     // Never show a green "synced" status during an unfinished lock operation.
     const storageDamaged = result.phase === 'storage-error';
-    const verified = capable && !storageDamaged && active === null &&
+    const verified = capable && legacyAllowed() && !storageDamaged && active === null &&
       verifiedSnapshot !== null && verifiedSnapshot === snapshotToken(result);
     // Newly detected journal corruption outranks an older network/lock failure.
     // Otherwise the status view could hide the need to preserve local bytes.
@@ -54,7 +60,7 @@ export function createCoordinatedCloudQueue({uid, storage, transport,
     phase:'blocked',...{pending:preview().pending}});
 
   async function exclusive(callback) {
-    if (!capable) {
+    if (!capable || !legacyAllowed()) {
       verifiedSnapshot = null;
       return unavailable();
     }
@@ -72,7 +78,9 @@ export function createCoordinatedCloudQueue({uid, storage, transport,
     let operation;
     try {
       operation = Promise.resolve(locks.request(name,{mode:'exclusive'}, async () => {
-        // IMPORTANT: never reuse an instance created before waiting for lock.
+        // A newer tab may have activated IDB during this Web Lock wait.
+        // The old localStorage writer must not resurrect a second journal.
+        if(!legacyAllowed())return unavailable();
         const queue = create();
         const response = await callback(queue);
         const snapshot = queue.preview();
