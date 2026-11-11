@@ -1,3 +1,4 @@
+import {createStoryTestLocks} from './merge-story-fixture-locks.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createEmptyStoryProgress,STORY_SAVE_KEY} from '../merge/mode-boundaries.mjs';
@@ -55,9 +56,9 @@ test('P80 a stale confirmed reset cannot overwrite a peer save even at higher re
   const f=fixture(peer);
   assert.equal(writeStorySave(f.storage,progress(10),
     {expectedRaw:old,confirmedReset:true}),false);
-  const result=await saveStoryDialogueWithLock(null,f.storage,progress(10),
+  const result=await saveStoryDialogueWithLock(createStoryTestLocks(),f.storage,progress(10),
     {expectedRaw:old,confirmedReset:true});
-  assert.deepEqual(result,{ok:true,mode:'cas-fallback',value:false});
+  assert.deepEqual(result,{ok:true,mode:'web-lock',value:false});
   assert.equal(f.data.get(STORY_SAVE_KEY),peer);
   assert.deepEqual(f.writes,[]);
 });

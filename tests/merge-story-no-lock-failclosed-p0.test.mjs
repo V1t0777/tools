@@ -51,6 +51,8 @@ test('P0 read-only protection is visible in both pages; reset and workshop actio
   }
   assert.ok(story.includes("pageSuspended()||lockUnavailable||reason==='STORAGE_UNAVAILABLE'"));
   assert.ok(story.includes('if(pageSuspended()||lockUnavailable)return false;'));
+  assert.ok(story.includes("finish.disabled=saving||(!done&&(lockUnavailable||blocked"));
+  assert.ok(story.includes("$('complete-story').disabled=lockUnavailable||blocked"));
   assert.ok(workshop.includes('const disabled=blocked||saving||pageSuspended()||lockUnavailable;'));
   assert.ok(workshop.includes('if(saving||pageSuspended()||lockUnavailable)return;'));
 });

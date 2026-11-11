@@ -429,14 +429,14 @@ function open(entry){
         selectedChoice=choice.id;
         $('dialog-choices').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));
         $('dialog-reply').textContent=choice.reply;
-        $('complete-story').disabled=blocked||!inspectStoryWorkshopRequirementFromRead(entry.id,workshopAtOpen).met;
+        $('complete-story').disabled=lockUnavailable||blocked||!inspectStoryWorkshopRequirementFromRead(entry.id,workshopAtOpen).met;
       });
       $('dialog-choices').append(button);
     }
   }
   const finish=$('complete-story');
   finish.textContent=done?'已阅读 · 关闭':entry.choices.length?'确认选择并继续':'完成阅读并继续';
-  finish.disabled=saving||lockUnavailable||(!done&&(blocked||!requirement.met||entry.choices.length>0));
+  finish.disabled=saving||(!done&&(lockUnavailable||blocked||!requirement.met||entry.choices.length>0));
   // A peer may change either save while dialogue text/choices are being
   // constructed, before the corresponding StorageEvent reaches this tab.
   // Check workshop -> story -> workshop after DOM construction. This is a

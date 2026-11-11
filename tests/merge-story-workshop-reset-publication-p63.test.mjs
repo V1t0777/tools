@@ -1,3 +1,4 @@
+import {createStoryTestLocks} from './merge-story-fixture-locks.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -29,7 +30,7 @@ const verify=(f,raw,epoch=7,currentEpoch=7)=>verifyStoryWorkshopPublication(f.st
 
 test('P63 confirmed reset publishes only after two exact read-only checks',async()=>{
   const f=fixture(),original=f.map.get(STORY_WORKSHOP_KEY);
-  const result=await resetStoryWorkshopWithLock(null,f.storage,{expectedRaw:original,now:1000001});
+  const result=await resetStoryWorkshopWithLock(createStoryTestLocks(),f.storage,{expectedRaw:original,now:1000001});
   assert.equal(result.ok,true);
   assert.ok(validateSave(result.value));
   const raw=JSON.stringify(result.value);
@@ -58,7 +59,7 @@ test('P63 another tab replacing reset save after Web Lock release blocks success
 
 test('P63 reset publication catches an ABA storage event despite identical bytes',async()=>{
   const f=fixture(),original=f.map.get(STORY_WORKSHOP_KEY);
-  const result=await resetStoryWorkshopWithLock(null,f.storage,{expectedRaw:original,now:1000001});
+  const result=await resetStoryWorkshopWithLock(createStoryTestLocks(),f.storage,{expectedRaw:original,now:1000001});
   const raw=JSON.stringify(result.value);
   assert.equal(verify(f,raw,7,8).reason,'WRITE_CONFLICT');
   assert.deepEqual(verify(f,raw,8,8),{ok:true,reason:null});

@@ -1,3 +1,4 @@
+import {createStoryTestLocks} from './merge-story-fixture-locks.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -52,7 +53,7 @@ async function mount(state,confirm=()=>true){
     addEventListener(){}
   };
   const windowEvents=new Map();
-  const window={localStorage:storage,navigator:{locks:null},confirm,
+  const window={localStorage:storage,navigator:{locks:createStoryTestLocks()},confirm,
     addEventListener(type,fn){
       const handlers=windowEvents.get(type)??[];
       handlers.push(fn);windowEvents.set(type,handlers);

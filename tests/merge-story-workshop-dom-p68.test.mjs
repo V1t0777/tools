@@ -1,3 +1,4 @@
+import {createStoryTestLocks} from './merge-story-fixture-locks.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -48,7 +49,7 @@ async function mountWorkshop({makeLocks}={}){
   };
   const window={
     localStorage:storage,
-    navigator:{locks:makeLocks?makeLocks(map):null},
+    navigator:{locks:makeLocks?makeLocks(map):createStoryTestLocks()},
     confirm(){return true;},
     addEventListener(){},
     setTimeout(){}

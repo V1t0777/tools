@@ -1,3 +1,4 @@
+import {createStoryTestLocks} from './merge-story-fixture-locks.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createEmptyStoryProgress,STORY_SAVE_KEY} from '../merge/mode-boundaries.mjs';
@@ -57,7 +58,7 @@ async function mount({makeLocks}={}){
     body:new Node()
   };
   const window={
-    localStorage:storage,navigator:{locks:makeLocks?makeLocks(data):null},
+    localStorage:storage,navigator:{locks:makeLocks?makeLocks(data):createStoryTestLocks()},
     location:{hash:''},confirm:()=>true,setInterval(){},setTimeout(){},
     requestAnimationFrame(){},
     addEventListener:(...args)=>winEvents.addEventListener(...args),

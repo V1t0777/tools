@@ -1,3 +1,4 @@
+import {createStoryTestLocks} from './merge-story-fixture-locks.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createInitialState,produce,validateSave,PRODUCER_CHARGES} from '../merge/engine.mjs';
@@ -19,7 +20,7 @@ function initial({coins=600,cooldown=false}={}){
   assert.equal(validateSave(state),true);
   return state;
 }
-async function mount(state,{locks=null,confirm=()=>true}={}){
+async function mount(state,{locks=createStoryTestLocks(),confirm=()=>true}={}){
   const data=new Map([[STORY_WORKSHOP_KEY,JSON.stringify(state)],
     [STORY_SAVE_KEY,null],[SAVE_KEY,'normal-sentinel']]);
   const writes=[];

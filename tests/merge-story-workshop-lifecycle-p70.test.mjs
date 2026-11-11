@@ -1,3 +1,4 @@
+import {createStoryTestLocks} from './merge-story-fixture-locks.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {STORY_WORKSHOP_KEY} from '../merge/story/workshop-storage.mjs';
@@ -59,7 +60,7 @@ async function mount({makeLocks,corruptWorkshop=false}={}){
     body:new Node()
   };
   const window={
-    localStorage:storage,navigator:{locks:makeLocks?makeLocks(data):null},
+    localStorage:storage,navigator:{locks:makeLocks?makeLocks(data):createStoryTestLocks()},
     confirm:()=>true,setTimeout(){},
     addEventListener:(...args)=>winEvents.addEventListener(...args),
     emit:(...args)=>winEvents.fire(...args)
