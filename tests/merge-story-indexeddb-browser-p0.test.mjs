@@ -58,7 +58,7 @@ test('P0 genuine IndexedDB transactions: migration, cross-tab CAS, durable reloa
       if(!file.startsWith(root+sep)){res.writeHead(403).end();return;}
       try{
         const bytes=await readFile(file);
-        res.writeHead(200,{'Content-Type':{'.mjs':'text/javascript','.js':'text/javascript','.json':'application/json'}[extname(file)]??'application/octet-stream','Cache-Control':'no-store'}).end(bytes);
+        res.writeHead(200,{'Content-Type':{'.mjs':'text/javascript','.js':'text/javascript','.json':'application/json','.css':'text/css'}[extname(file)]??'application/octet-stream','Cache-Control':'no-store'}).end(bytes);
       }catch{res.writeHead(404).end('not found');}
     });
     await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
@@ -95,10 +95,16 @@ test('P0 genuine IndexedDB transactions: migration, cross-tab CAS, durable reloa
       }};
     }
     const A=await page(),B=await page();
-    const baseline='{"revision":9,"chapter":"legacy"}';
     const savedKey='toolbox.merge-isle.story.local.v1';
     const shopKey='toolbox.merge-isle.story.workshop.local.v1';
-    await A.evaluate((key,original)=>localStorage.setItem(key,original),savedKey,baseline);
+    const baseline=await A.evaluate(async key=>{
+      const {createEmptyStoryProgress}=await import('/merge/mode-boundaries.mjs');
+      const {startCoreStory}=await import('/merge/story/runtime.mjs');
+      const {CORE_STORY_PACK}=await import('/merge/story/core-pack.mjs');
+      const raw=JSON.stringify(startCoreStory(createEmptyStoryProgress(),CORE_STORY_PACK));
+      localStorage.setItem(key,raw);
+      return raw;
+    },savedKey);
     const initialize=async P=>P.evaluate(async()=>{
       const m=await import('/merge/story/indexeddb-persistence.mjs');
       window.__backend=await m.openStoryPersistence({
@@ -138,6 +144,81 @@ test('P0 genuine IndexedDB transactions: migration, cross-tab CAS, durable reloa
     const D=await page(),initD=await initialize(D);
     assert.equal(initD.story,winner,'failed multi-key transaction rolled back');
     assert.equal(await D.evaluate(()=>window.__backend.storage.getItem('toolbox.merge-isle.story.workshop.local.v1')),null);
+    // End-to-end UI check in a clean browser context with navigator.locks
+    // deliberately unavailable. Both genuine story pages must still write
+    // through IndexedDB, not through the legacy localStorage keys.
+    const {browserContextId}=await call('Target.createBrowserContext',{});
+    const {targetId:storyTarget}=await call('Target.createTarget',
+      {url:'about:blank',browserContextId});
+    const {sessionId:storySession}=await call('Target.attachToTarget',
+      {targetId:storyTarget,flatten:true});
+    await call('Page.enable',{},storySession);
+    await call('Runtime.enable',{},storySession);
+    await call('Page.addScriptToEvaluateOnNewDocument',{
+      source:"Object.defineProperty(navigator,'locks',{value:undefined,configurable:true});"
+    },storySession);
+    await call('Target.activateTarget',{targetId:storyTarget});
+    const uiEval=async(fn,...args)=>{
+      const expression='('+fn.toString()+')('+args.map(JSON.stringify).join(',')+')';
+      const r=await call('Runtime.evaluate',
+        {expression,returnByValue:true,awaitPromise:true,userGesture:true},storySession);
+      if(r.exceptionDetails)throw Error('Story UI error '+JSON.stringify(r.exceptionDetails));
+      return r.result.value;
+    };
+    const route=async routeName=>call('Page.navigate',
+      {url:'http://127.0.0.1:'+server.address().port+'/merge/'+routeName},storySession);
+    const readSaved=async key=>uiEval(async k=>{
+      const request=indexedDB.open('yunyu-story-offline-v1',1);
+      const db=await new Promise((resolve,reject)=>{
+        request.onsuccess=()=>resolve(request.result);
+        request.onerror=()=>reject(request.error);
+      });
+      try{
+        return await new Promise((resolve,reject)=>{
+          const tx=db.transaction('story-records','readonly');
+          const q=tx.objectStore('story-records').get(k);
+          q.onsuccess=()=>resolve(q.result??null);
+          q.onerror=()=>reject(q.error);
+        });
+      }finally{db.close();}
+    },key);
+    await route('story.html');
+    await until(()=>uiEval(()=>document.getElementById('save-state')?.textContent.includes('IndexedDB')&&
+      document.querySelector('#story-list .story-card button')!==null),'no-Web-Locks story UI');
+    assert.equal(await uiEval(()=>navigator.locks===undefined),true);
+    const beforeStory=JSON.parse(await readSaved(savedKey));
+    assert.equal(await uiEval(()=>{
+      const button=document.querySelector('#story-list .story-card button');
+      button.click();
+      const choice=document.querySelector('#dialog-choices button');
+      if(choice)choice.click();
+      const done=document.getElementById('complete-story');
+      if(!done.disabled)done.click();
+      return !done.disabled;
+    }),true,'story choice remains writable without Web Locks');
+    await until(async()=>JSON.parse(await readSaved(savedKey))?.packs?.core?.completed?.main?.length>
+      beforeStory.packs.core.completed.main.length,
+      'no-lock story dialogue completed and persisted to IndexedDB');
+    assert.equal(await uiEval(k=>localStorage.getItem(k),savedKey),null,
+      'no duplicated localStorage dialogue writes after IDB migration');
+    await route('story-workshop.html');
+    await until(()=>uiEval(()=>document.getElementById('workshop-status')?.textContent.includes('IndexedDB')&&
+      document.querySelector('#workshop-board .producer')!==null),
+      'no-Web-Locks workshop UI');
+    assert.equal(await uiEval(()=>navigator.locks===undefined),true);
+    const producer=await uiEval(()=>{
+      const el=document.querySelector('#workshop-board .producer');
+      return {disabled:el.disabled,slot:el.dataset.slot};
+    });
+    assert.equal(producer.disabled,false,'story workshop stays writable through IndexedDB');
+    await uiEval(slot=>document.querySelector('#workshop-board .producer[data-slot="'+slot+'"]').click(),producer.slot);
+    await until(async()=>JSON.parse(await readSaved(shopKey))?.revision>=1,
+      'no-lock workshop action persisted to IndexedDB');
+    assert.equal(await uiEval(k=>localStorage.getItem(k),shopKey),null,
+      'story workshop must not write a parallel legacy snapshot');
+    assert.equal(await uiEval(k=>localStorage.getItem(k),'toolbox.merge-isle.local.v1'),null,
+      'normal-mode save remains untouched by story and workshop');
+    await call('Target.disposeBrowserContext',{browserContextId});
     await D.evaluate((key)=>localStorage.setItem(key,'legacy-tab-changed'),savedKey);
     assert.equal(await D.evaluate(async()=>{
       const p=window.__backend,key='toolbox.merge-isle.story.local.v1';
