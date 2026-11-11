@@ -40,7 +40,10 @@ test('P2.64f actual HTML loads exactly the reviewed locked page, never legacy CA
 test('P2.64f active page delegates startup, actions, clock and reset to one runtime',()=>{
   assert.match(locked,/import \{ createNormalPageRuntime \} from '\.\/normal-page-runtime\.mjs'/);
   assert.match(locked,/const runtime=createNormalPageRuntime\(/);
-  assert.match(locked,/locks:window\.navigator\?\.locks\?\?null/);
+  assert.match(locked,/locks:persistence\\.locks/);
+  assert.match(locked,/openNormalPersistence\\(\\{/);
+  assert.match(lock,/isIndexedDBNormalLock===true/);
+  assert.match(lock,/runNormalTransaction\\(transaction\\)/);
   for(const name of ['start','action','clock','reset'])
     assert.match(locked,new RegExp('runtime\\.'+name+'\\('));
   assert.match(locked,/attachNormalPageLifecycle\(\{/);

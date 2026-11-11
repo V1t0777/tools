@@ -146,17 +146,25 @@ test('P0 mobile Chromium: 320–430px normal mode layout, native touch and save 
       }
     }
     await setViewport(320);
-    const point=await evalFn(()=>{
-      const el=document.querySelector('#board .producer');
-      el.scrollIntoView({behavior:'instant',block:'center',inline:'center'});
-      const r=el.getBoundingClientRect();
-      return {x:r.left+r.width/2,y:r.top+r.height/2};
-    });
-    await sleep(100);
-    assert.equal(await evalFn(({x,y})=>{
-      const hit=document.elementFromPoint(x,y);
-      return !!hit?.closest('#board .producer');
-    },point),true,'emulated touch must hit the producer');
+    // The 320px board scrolls within its own viewport. Re-evaluate the
+    // painted target after scrolling; a preceding resize may still be laying
+    // out controls when the first point is captured. Do not emit a touch if
+    // the actual point is obscured or out of the viewport.
+    let point=null,hit=false;
+    for(let attempt=0;attempt<8&&!hit;attempt++){
+      point=await evalFn(()=>{
+        const el=document.querySelector('#board .producer');
+        el.scrollIntoView({behavior:'instant',block:'center',inline:'center'});
+        const r=el.getBoundingClientRect();
+        return {x:r.left+r.width/2,y:r.top+r.height/2};
+      });
+      await sleep(100);
+      hit=await evalFn(({x,y})=>{
+        const hit=document.elementFromPoint(x,y);
+        return !!hit?.closest('#board .producer');
+      },point);
+    }
+    assert.equal(hit,true,'emulated touch must hit the producer at a visible painted point');
     await call('Input.dispatchTouchEvent',
       {type:'touchStart',touchPoints:[{x:point.x,y:point.y}]},sessionId);
     await call('Input.dispatchTouchEvent',

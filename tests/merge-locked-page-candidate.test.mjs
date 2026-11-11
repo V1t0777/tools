@@ -20,7 +20,11 @@ test('P2.64b startup, action, clock and reset use one exclusive page runtime',()
   assert.match(candidate,/const runtime=createNormalPageRuntime\(/);
   for(const writer of ['start','action','clock','reset'])
     assert.match(candidate,new RegExp('runtime\\.'+writer+'\\('),writer);
-  assert.match(candidate,/locks:window\.navigator\?\.locks\?\?null/);
+  assert.match(candidate,/locks:persistence\\.locks/);
+  assert.match(candidate,/openNormalPersistence\\(\\{/);
+  const idb=read('normal-indexeddb-persistence.mjs');
+  assert.match(idb,/isIndexedDBNormalLock:true/);
+  assert.match(idb,/runNormalTransaction:lockedWrite/);
   for(const unsafe of ['loadLocal(store)','prepareNormalStartup(loaded,store)',
     'commitNormalSnapshot(store,','persist(result.state)',
     'persist(resetState','advanceTime(state,now)','setItem('])
@@ -31,9 +35,14 @@ test('P2.64b lifecycle is read-only and drops stale gestures',()=>{
   assert.match(candidate,/attachNormalPageLifecycle\(\{/);
   assert.match(candidate,/runtime\.reconcile\(\)/);
   assert.match(candidate,/cancelStaleGesture\(\)/);
-  for(const oldHandler of ["window.addEventListener('storage'",
-    "window.addEventListener('pageshow'","window.addEventListener('focus'"])
-    assert.equal(candidate.includes(oldHandler),false,oldHandler);
+  // The ordinary lifecycle owns native storage event handling. The new
+  // IndexedDB adapter may ONLY subscribe to refresh events, never write from
+  // a page resume, BFCache or focus notification.
+  assert.equal(candidate.includes("window.addEventListener('storage'"),false);
+  assert.match(candidate,/persistence\\.subscribe\\(/);
+  assert.match(candidate,/persistence\\.refresh\\(\\)/);
+  assert.doesNotMatch(candidate,/addEventListener\\('pageshow'[^\n]*setItem/);
+  assert.doesNotMatch(candidate,/addEventListener\\('focus'[^\n]*setItem/);
 });
 
 test('P2.64b startup and UI interactions fail closed during asynchronous writes',()=>{
