@@ -46,3 +46,21 @@ dialog{border:1px solid var(--line);border-radius:22px;max-width:min(560px,calc(
 /* P60: optional daily event shortcut uses the existing 44px touch target;
    no sticky overlays, no unsafe motion, and both color schemes inherit. */
 #journey-daily-read{min-height:44px;overflow-wrap:anywhere}
+
+/* Mobile RC: safe-area dialogs, accessible primary actions and no forced
+ * horizontal scrolling of the page or scene cards at 320px. */
+html{-webkit-text-size-adjust:100%}
+.story-shell,.story-card,.notice-panel,.progress,.stories{min-width:0}
+.top{flex-wrap:wrap}
+.top .eyebrow{min-width:0;overflow-wrap:anywhere}
+.notice-panel .back,.foot-actions a{max-width:100%;min-height:44px;overflow-wrap:anywhere}
+dialog{max-height:calc(100dvh - max(14px,env(safe-area-inset-top)) - max(20px,env(safe-area-inset-bottom)))}
+.dialog-inner{max-height:calc(100dvh - max(14px,env(safe-area-inset-top)) - max(20px,env(safe-area-inset-bottom)));padding-bottom:max(20px,env(safe-area-inset-bottom));overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.dialog-choices button{min-height:48px;overflow-wrap:anywhere;touch-action:manipulation}
+@media(max-width:375px){
+  .tabs{gap:5px}
+  .tabs button{min-width:0;overflow-wrap:anywhere;padding:8px 4px}
+  .foot-actions{align-items:stretch}
+  .foot-actions>*{min-height:44px}
+  .dialog-inner{padding-inline:14px}
+}
