@@ -58,7 +58,7 @@ test('P0 genuine IndexedDB transactions: migration, cross-tab CAS, durable reloa
       if(!file.startsWith(root+sep)){res.writeHead(403).end();return;}
       try{
         const bytes=await readFile(file);
-        res.writeHead(200,{'Content-Type':{'.mjs':'text/javascript','.js':'text/javascript','.json':'application/json','.css':'text/css'}[extname(file)]??'application/octet-stream','Cache-Control':'no-store'}).end(bytes);
+        res.writeHead(200,{'Content-Type':{'.html':'text/html','.mjs':'text/javascript','.js':'text/javascript','.json':'application/json','.css':'text/css'}[extname(file)]??'application/octet-stream','Cache-Control':'no-store'}).end(bytes);
       }catch{res.writeHead(404).end('not found');}
     });
     await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
@@ -187,7 +187,7 @@ test('P0 genuine IndexedDB transactions: migration, cross-tab CAS, durable reloa
     await route('story.html');
     try{
       await until(()=>uiEval(()=>document.getElementById('save-state')?.textContent.includes('IndexedDB')&&
-        document.querySelector('#story-list .story-card button')!==null),'no-Web-Locks story UI');
+        document.querySelector('#story-list .story-card button:not([disabled])')!==null),'no-Web-Locks story UI');
     }catch(error){
       const diagnostic=await uiEval(()=>({
         location:location.href,ready:document.readyState,

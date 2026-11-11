@@ -59,18 +59,29 @@ function initialize(db,legacy,storage){
     store.get(META).onsuccess=event=>{
       const stored=event.target.result;
       if(stored!==undefined){
-        if(!Array.isArray(stored?.legacy)||stored.legacy.length!==KEYS.length||
-           !same(stored.legacy,legacy)){fail();return;}
+        if(stored?.version!==1||!Array.isArray(stored?.legacy)||
+           stored.legacy.length!==KEYS.length||!same(stored.legacy,legacy)){
+          fail();return;
+        }
         baseline=stored.legacy;
         return;
       }
-      try{
-        if(!same(readLegacy(storage),legacy)){fail();return;}
-        for(let i=0;i<KEYS.length;i++)
-          if(legacy[i]!==null)store.put(legacy[i],KEYS[i]);
-        store.put({legacy,version:1},META);
-        baseline=legacy;
-      }catch{fail();}
+      // A database with records but missing migration metadata must never
+      // be silently reinitialized from an older localStorage backup.
+      const prior=KEYS.map(key=>store.get(key));
+      let pending=prior.length,occupied=false;
+      prior.forEach(request=>{request.onsuccess=()=>{
+        if(request.result!==undefined)occupied=true;
+        if(--pending!==0)return;
+        if(occupied){fail();return;}
+        try{
+          if(!same(readLegacy(storage),legacy)){fail();return;}
+          for(let i=0;i<KEYS.length;i++)
+            if(legacy[i]!==null)store.put(legacy[i],KEYS[i]);
+          store.put({legacy,version:1},META);
+          baseline=legacy;
+        }catch{fail();}
+      };});
     };
     tx.oncomplete=()=>resolve(baseline);
     tx.onerror=()=>reject(tx.error??Error('Migration failed'));
@@ -160,11 +171,16 @@ export async function openStoryPersistence({
         try{
           tx=db.transaction(TABLE,'readwrite');
           store=tx.objectStore(TABLE);
-          const requests=KEYS.map(key=>store.get(key));
-          let pending=requests.length;
+          const requests=[...KEYS.map(key=>store.get(key)),store.get(META)];
+          let pending=requests.length,metadata;
           requests.forEach((request,i)=>{request.onsuccess=()=>{
-            views[i]=request.result??null;
+            if(i<KEYS.length)views[i]=request.result??null;
+            else metadata=request.result;
             if(--pending!==0)return;
+            // The metadata is part of the same serializable transaction.
+            // Missing/replaced migration records must never authorize writes.
+            if(metadata?.version!==1||!Array.isArray(metadata.legacy)||
+              !same(metadata.legacy,baseline)){try{tx.abort();}catch{}return;}
             // Re-read under the serialized transaction. A stale tab never
             // commits a write derived from a different stored snapshot.
             if(!safe()){try{tx.abort();}catch{}return;}
