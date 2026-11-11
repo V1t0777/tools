@@ -21,6 +21,7 @@ import {describeStoryWorkshopStall} from './resource-recovery.mjs';
 const $=id=>document.getElementById(id);
 const storage=(()=>{try{return window.localStorage;}catch{return null;}})();
 const webLocks=(()=>{try{return window.navigator?.locks??null;}catch{return null;}})();
+const lockUnavailable=webLocks==null||typeof webLocks.request!=='function';
 const loaded=readStoryWorkshop(storage);
 let state=loaded.state,raw=loaded.raw,blocked=loaded.blocked,reason=loaded.reason,selected=-1;
 let saving=false;
@@ -44,7 +45,9 @@ function status(){
       : reason==='STORAGE_UNAVAILABLE'
         ? '无法访问浏览器存储，经营操作已暂停。'
         : '检测到存档变化或写入无法确认：本页已停止操作。请勿重复重置，先重新打开页面核对金币、建筑和订单。'
-    : pageSuspended()
+    : lockUnavailable
+      ? '此浏览器不提供安全写入锁：剧情工作台只读，原有存档未修改；请使用支持 Web Locks 的安全浏览器。'
+      : pageSuspended()
       ? '页面已暂停：返回前不会继续经营操作；恢复可见后将核对原始存档。'
       : '剧情工作台数据只保存在此浏览器，与普通模式金币及背包完全隔离。';
 }
@@ -59,7 +62,7 @@ function render(){
   // story save is being read. The newer render owns the DOM; the old one
   // must not paint outdated building eligibility over it.
   if(currentRender!==renderGeneration)return;
-  const disabled=blocked||saving||pageSuspended();
+  const disabled=blocked||saving||pageSuspended()||lockUnavailable;
   // Project elapsed energy/cooldown on return from a long mobile suspension.
   // This is strictly read-only: the persisted raw snapshot and write CAS stay
   // unchanged until an explicit engine action advances time and commits.
@@ -282,7 +285,7 @@ function render(){
       ? '先读完《海雾里的灯》，再为居民们准备开张庆典。'
       : '修整门面'+describeStoryConstructionResources(state,storefront);
   $('build-storefront').disabled=disabled||storefrontBuilt||!storefrontStoryReady||level<storefront.minLevel||state.coins<storefront.coins;
-  $('reset-workshop').disabled=saving||pageSuspended()||reason==='STORAGE_UNAVAILABLE';
+  $('reset-workshop').disabled=saving||pageSuspended()||lockUnavailable||reason==='STORAGE_UNAVAILABLE';
   $('export-corrupt-workshop').disabled=saving||pageSuspended()||reason!=='CORRUPT_SAVE'||typeof raw!=='string';
 }
 // A committed write can be superseded before the user reads its feedback.
@@ -297,7 +300,7 @@ function blockWorkshopWithNotice(nextReason,notice){
 // computing an operation or selecting a slot; the later Web Lock/CAS still
 // protects against changes between this read and the eventual write.
 function revalidateWorkshopBeforeInteraction(){
-  if(blocked||saving||pageSuspended())return false;
+  if(blocked||saving||pageSuspended()||lockUnavailable)return false;
   const check=checkStoryResumeSnapshot(storage,{key:STORY_WORKSHOP_KEY,expectedRaw:raw});
   if(check.ok)return true;
   storageEpoch++;blocked=true;reason=check.reason;selected=-1;
@@ -509,7 +512,7 @@ $('export-corrupt-workshop').addEventListener('click',()=>{
   }
 });
 $('reset-workshop').addEventListener('click',async()=>{
-  if(saving||pageSuspended())return;
+  if(saving||pageSuspended()||lockUnavailable)return;
   // A queued click must not bypass the disabled reset button on storage failure.
   if(reason==='STORAGE_UNAVAILABLE')return;
   // Both dialogs belong to one uninterrupted visible-page interaction.

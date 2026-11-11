@@ -28,6 +28,7 @@ import {createEmptyStoryProgress,STORY_SAVE_KEY} from '../mode-boundaries.mjs';
 const $=id=>document.getElementById(id);
 const store=(()=>{try{return window.localStorage;}catch{return null;}})();
 const webLocks=(()=>{try{return window.navigator?.locks??null;}catch{return null;}})();
+const lockUnavailable=webLocks==null||typeof webLocks.request!=='function';
 const loaded=readStorySave(store);
 let progress=loaded.progress,raw=loaded.raw,blocked=loaded.blocked,reason=loaded.reason;
 let saving=false,storageEpoch=0;
@@ -57,7 +58,7 @@ async function save(next,reset=false,commitGuard=()=>true,pinDay=null){
   // completion and explicitly confirmed reset; exact-raw CAS stays mandatory.
   if(blocked&&!reset)return false;
   if(saving)return false;
-  if(pageSuspended())return false;
+  if(pageSuspended()||lockUnavailable)return false;
   const expectedRaw=raw,expectedEpoch=storageEpoch;
   // Preserve the original cross-save guard and also reject hidden callbacks.
   const originalCommitGuard=commitGuard;
@@ -136,7 +137,9 @@ function status(){
       : reason==='STORAGE_UNAVAILABLE'
         ? '浏览器存储不可用：当前只能阅读，无法安全保存剧情。'
         : '存档已被其他标签页改动或写入失败：请重新打开页面核对进度。'
-    : pageSuspended()
+    : lockUnavailable
+      ? '此浏览器不提供安全写入锁：剧情只读，原有存档未修改；请使用支持 Web Locks 的安全浏览器，勿清理浏览器数据。'
+      : pageSuspended()
       ? '剧情页面已暂停：恢复可见后必须核对存档，暂不允许继续阅读提交。'
       : '剧情进度已保存到此浏览器；不与普通模式共享经济，也不提供云存档。';
 }
@@ -275,7 +278,7 @@ function render(){
     empty.textContent=kind==='side'?'暂时没有新支线。继续主线后，居民会带来新的故事。':'故事已全部读完，或者还未满足事件前置条件。';
     list.append(empty);
   }
-  $('reset-story').disabled=saving||pageSuspended()||reason==='STORAGE_UNAVAILABLE';
+  $('reset-story').disabled=saving||pageSuspended()||lockUnavailable||reason==='STORAGE_UNAVAILABLE';
   $('export-corrupt-story').disabled=saving||pageSuspended()||reason!=='CORRUPT_SAVE'||typeof raw!=='string';
   // Claim the first eligible event even while the mainline tab is selected:
   // later chapter unlocks must not silently reroll today's event.
@@ -433,7 +436,7 @@ function open(entry){
   }
   const finish=$('complete-story');
   finish.textContent=done?'已阅读 · 关闭':entry.choices.length?'确认选择并继续':'完成阅读并继续';
-  finish.disabled=saving||(!done&&(blocked||!requirement.met||entry.choices.length>0));
+  finish.disabled=saving||lockUnavailable||(!done&&(blocked||!requirement.met||entry.choices.length>0));
   // A peer may change either save while dialogue text/choices are being
   // constructed, before the corresponding StorageEvent reaches this tab.
   // Check workshop -> story -> workshop after DOM construction. This is a

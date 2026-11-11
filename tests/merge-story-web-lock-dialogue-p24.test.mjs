@@ -103,7 +103,9 @@ test('P24 confirmed corrupt reset is isolated; malformed/rejecting locks never s
     assert.equal(storage.getItem(STORY_SAVE_KEY),expectedRaw);
   }
   const nextReset=fresh();nextReset.revision=readStorySave(storage).progress.revision+1;
-  assert.equal((await saveStoryDialogueWithLock(null,storage,nextReset,{expectedRaw,confirmedReset:true})).mode,'cas-fallback');
+  const noLock=await saveStoryDialogueWithLock(null,storage,nextReset,{expectedRaw,confirmedReset:true});
+  assert.deepEqual(noLock,{ok:false,mode:'lock-unavailable',value:false});
+  assert.equal(storage.getItem(STORY_SAVE_KEY),expectedRaw);
 });
 test('P24 invalidated page aborts a queued write before touching localStorage',async()=>{
   const storage=sharedStorage(),locks=exclusiveLocks();

@@ -95,14 +95,16 @@ test('P23 storage invalidation while lock is queued aborts reset before write',a
   assert.equal(storage.getItem(STORY_WORKSHOP_KEY),expectedRaw);
   assert.equal(storage.writes.length,1);
 });
-test('P23 browsers without Web Locks retain exact-raw CAS for confirmed reset',async()=>{
+test('P23 browsers without Web Locks cannot reset or erase an existing workshop',async()=>{
   const storage=sharedStorage(),initial=createInitialState(1000000);
   assert.equal(writeStoryWorkshop(storage,initial,{expectedRaw:null}),true);
   const expectedRaw=storage.getItem(STORY_WORKSHOP_KEY);
-  const result=await resetStoryWorkshopWithLock(null,storage,{expectedRaw,now:1001000});
-  assert.equal(result.mode,'cas-fallback');assert.equal(result.ok,true);
-  assert.equal(storage.getItem(STORY_WORKSHOP_KEY),JSON.stringify(result.value));
-  assert.equal((await resetStoryWorkshopWithLock(null,storage,{expectedRaw,now:1001001})).value,null);
+  for(const locks of [null,undefined]){
+    const result=await resetStoryWorkshopWithLock(locks,storage,{expectedRaw,now:1001000});
+    assert.deepEqual(result,{ok:false,mode:'lock-unavailable',value:false});
+    assert.equal(storage.getItem(STORY_WORKSHOP_KEY),expectedRaw);
+  }
+  assert.deepEqual(storage.writes,[STORY_WORKSHOP_KEY]);
 });
 test('P23 UI confirms before lock, disables actions, and never bypasses CAS',()=>{
   const ui=readFileSync(new URL('../merge/story/workshop.mjs',import.meta.url),'utf8');

@@ -4,13 +4,14 @@ import {readFileSync} from 'node:fs';
 
 const read=path=>readFileSync(new URL(path,import.meta.url),'utf8');
 
-test('P127 320px native pan and 44px board coexist with the story entry link',()=>{
+test('P127 320–375px scroll-button board and 44px cells coexist with the story entry link',()=>{
   const css=read('../merge/style.css');
   const html=read('../merge/index.html');
-  assert.match(css,/\/\* P2\.65bf: 320px fallback/);
-  assert.ok(css.includes('.board-section{overflow-x:auto;overscroll-behavior-x:contain}'));
-  assert.ok(css.includes('.board{width:max-content;grid-template-columns:repeat(7,44px);touch-action:auto}'));
-  assert.ok(css.includes('.board .cell{touch-action:auto}'));
+  assert.match(css,/\/\* P2\.65bu: 320–375px compact iPhone layout/);
+  assert.ok(css.includes('.board-viewport{max-width:100%;min-width:0;overflow-x:auto'));
+  assert.ok(css.includes('.board{width:max-content;grid-template-columns:repeat(7,44px);touch-action:pan-y}'));
+  assert.ok(css.includes('.board-scroll-controls:not([hidden]){display:flex}'));
+  assert.ok(html.includes('id="board-scroll-left"')&&html.includes('id="board-scroll-right"'));
   assert.ok(css.includes('.story-entry-link{display:inline-flex;align-items:center;justify-content:center;min-height:44px'));
   assert.ok(css.includes('@media(prefers-color-scheme:dark){.story-entry-link'));
   assert.ok(html.includes('<a class="story-entry-link" href="./story.html">'));

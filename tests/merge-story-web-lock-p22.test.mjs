@@ -49,12 +49,15 @@ test('P22 two participating tabs serialize workshop writes and stale tab loses s
   assert.equal(locks.calls[0].name,locks.calls[1].name);
   assert.ok(locks.calls.every(call=>call.mode==='exclusive'));
 });
-test('P22 absent Web Locks uses the existing CAS writer and returns an explicit fallback mode',async()=>{
+test('P22 absent Web Locks refuses write before callback or storage access',async()=>{
   const store=sharedStorage(),state=createInitialState(1000000);
+  let called=0;
   const result=await runStoryWriteWithLock(undefined,STORY_WORKSHOP_KEY,
-    ()=>writeStoryWorkshop(store,state,{expectedRaw:null}));
-  assert.deepEqual(result,{ok:true,mode:'cas-fallback',value:true});
-  assert.equal(store.getItem(STORY_WORKSHOP_KEY),JSON.stringify(state));
+    ()=>{called++;return writeStoryWorkshop(store,state,{expectedRaw:null});});
+  assert.deepEqual(result,{ok:false,mode:'lock-unavailable',value:false});
+  assert.equal(called,0);
+  assert.equal(store.getItem(STORY_WORKSHOP_KEY),null);
+  assert.deepEqual(store.writes,[]);
 });
 test('P22 malformed/rejecting Web Locks fail closed, never retry writes outside the lock',async()=>{
   let writes=0;
