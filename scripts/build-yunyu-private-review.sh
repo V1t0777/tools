@@ -8,6 +8,7 @@ mkdir -p "$OUT/merge" "$OUT/shared/vendor" "$OUT/games"
 cp -R merge/. "$OUT/merge/"
 cp shared/toolbox-auth.js shared/toolbox-ui.js shared/toolbox-ui.css shared/toolbox-motion.css "$OUT/shared/"
 cp shared/vendor/supabase-2.57.4.min.js shared/vendor/supabase-LICENSE "$OUT/shared/vendor/"
+cp scripts/yunyu-local-mobile-server.py "$OUT/PRIVATE-IPHONE-LAN-SERVER.py"
 
 cat > "$OUT/index.html" <<'HTML'
 <!doctype html>
@@ -57,6 +58,28 @@ if %errorlevel%==0 (
 )
 BAT
 
+cat > "$OUT/START-IPHONE-PRIVATE-LAN.bat" <<'BAT'
+@echo off
+setlocal
+cd /d "%~dp0"
+echo ==== YUNYU PRIVATE IPHONE REVIEW: OFFLINE GAME ONLY ====
+echo Only run on trusted private home Wi-Fi, never on hospital or public networks.
+echo Find PC IPv4 using ipconfig; find iPhone IPv4 in Wi-Fi settings.
+set /p "PC_IP=PC local IPv4 (e.g. 192.168.1.10): "
+set /p "PHONE_IP=iPhone local IPv4 (e.g. 192.168.1.11): "
+if "%PC_IP%"=="" exit /b 1
+if "%PHONE_IP%"=="" exit /b 1
+echo On iPhone Safari visit: http://%PC_IP%:8766/
+echo If Windows Firewall prompts, permit Private networks only.
+where py >nul 2>nul
+if %errorlevel%==0 (
+  py -3 "PRIVATE-IPHONE-LAN-SERVER.py" --bind-ip "%PC_IP%" --phone-ip "%PHONE_IP%" --port 8766
+) else (
+  python "PRIVATE-IPHONE-LAN-SERVER.py" --bind-ip "%PC_IP%" --phone-ip "%PHONE_IP%" --port 8766
+)
+endlocal
+BAT
+
 cat > "$OUT/START-MAC-LINUX.sh" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -87,7 +110,8 @@ iPhone 联调需要另外建立受控私有局域网环境，本包默认不开�
 ## 移动端操作与验收条件
 - 页面已按320、375、390、430px进行代码适配；Android Chromium模拟不等于真实iPhone Safari或微信WebView验收。
 - 普通经营的小屏棋盘可用左右按钮查看边缘；剧情工作台和云存档研发棋盘新增左右按钮（必要时仍可横向滑动）。
-- iPhone用户不能直接访问Windows电脑的127.0.0.1地址；这是默认的安全隔离。真正的iOS设备验收需要另行搭建仅测试设备可访问的、受控HTTPS私有环境，不得直接上传公共站点。
+- iPhone无法访问电脑的127.0.0.1。若只想私下验收布局和离线游戏，可在同一个可信的家庭Wi-Fi中双击 START-IPHONE-PRIVATE-LAN.bat，输入电脑与iPhone各自的局域网IPv4，在Safari打开电脑显示的 http://电脑IPv4:8766/；此脚本只允许填写的iPhone IP访问。务必仅允许Windows防火墙的“专用网络”，不要对公网开放端口、不要在医院或公共网络运行；退出时关闭该脚本窗口。
+- 注意：上述局域网HTTP非安全上下文，仅供离线手机界面、触控及存档初步测试，不能据此验收Web Locks/加密、真实Supabase账号/云同步。完整iOS安全/云存档联调仍需要可信证书的受控私有HTTPS环境。
 - 在Safari/微信WebView上分别核对：竖向滚动不误触游戏格；每个按钮可操作、登录键盘不引起页面异常放大；对白弹窗可从头滚到尾；切到后台返回后旧触控不可写档；断网和重进页面后不会丢失唯一存档。
 - 以上真实设备、真实Edge与数据库测试尚未完成时只能标记为「移动端RC候选」，不得标为正式可上线完成版。
 
@@ -108,7 +132,7 @@ for path in \
   merge/cloud-preview.html merge/cloud-preview.mjs \
   merge/cloud/client-session.mjs merge/cloud/story-private-sync.mjs \
   shared/toolbox-auth.js shared/vendor/supabase-2.57.4.min.js \
-  START-WINDOWS.bat START-MAC-LINUX.sh README-验收说明.md
+  START-WINDOWS.bat START-MAC-LINUX.sh START-IPHONE-PRIVATE-LAN.bat PRIVATE-IPHONE-LAN-SERVER.py README-验收说明.md
 do
   test -s "$OUT/$path" || { echo "Missing runtime: $path" >&2; exit 1; }
 done
