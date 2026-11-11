@@ -33,3 +33,31 @@ input{display:block;border:1px solid var(--edge);background:#111d2e;border-radiu
 [hidden]{display:none!important}
 @media(max-width:380px){.panel{padding:11px}.board{gap:3px}.board button{font-size:15px}.actions button{flex:1 1 125px}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+
+
+/* Private mobile RC. Do not expose this page in production build allowlists. */
+html{-webkit-text-size-adjust:100%}
+main,.panel,#game,.items>*{min-width:0}
+.panel,#account-label,.resources strong{overflow-wrap:anywhere}
+input{font-size:16px;min-width:0} /* Safari must not zoom on login focus */
+.board-help{font-size:13px;line-height:1.5}
+.board-scroll{-webkit-overflow-scrolling:touch;scroll-padding-inline:10px}
+.board-scroll:focus-visible{outline:3px solid #f9cf7b;outline-offset:3px}
+.board button{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;touch-action:manipulation;min-height:48px}
+.board-navigation{display:flex;gap:8px;margin:8px 0}
+.board-navigation[hidden]{display:none!important}
+.board-navigation button{flex:1 1 50%;min-height:44px}
+#cloud-status,#story-status,#migration-status{overflow-wrap:anywhere}
+@media(max-width:380px){
+  .panel>.panel{margin-inline:0;padding:10px}
+  .actions{gap:8px}
+  .resources{gap:5px}
+  .resources strong{padding:7px 5px;font-size:12px;min-width:0}
+  .board-scroll .board{grid-template-columns:repeat(7,44px);width:max-content;min-width:0}
+  .board-scroll .board button{width:44px;min-width:44px}
+  .items>*{flex-basis:100%;min-width:0}
+}
+@media(max-width:480px){
+  .actions>button{flex:1 1 136px}
+  .board-scroll{overscroll-behavior-x:contain}
+}

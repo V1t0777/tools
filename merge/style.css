@@ -111,3 +111,26 @@ body{background:radial-gradient(circle at 5% 12%,rgba(221,194,136,.23),transpare
 .story-entry-link{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:8px 17px;margin:2px 0 15px;background:#ebf1e9;border:1px solid #bccfc2;border-radius:13px;color:#3b675a;font-size:13px;font-weight:800;text-decoration:none}
 .story-entry-link:focus-visible{outline:3px solid #547ec4;outline-offset:3px}
 @media(prefers-color-scheme:dark){.story-entry-link{background:#25443a;border-color:#628c7a;color:#e8f3e9}}
+
+
+/* Mobile RC: avoid viewport zoom and accidental horizontal document overflow.
+ * Never change board cell hit geometry or the existing drag/pointer leases. */
+html{-webkit-text-size-adjust:100%}
+.shell,.board-section,.management-section,.stories{min-width:0}
+.story-entry-link{max-width:100%;overflow-wrap:anywhere;text-align:center}
+@media(max-width:480px){
+  .resource-bar{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+  .resource{flex-wrap:wrap;align-content:center;min-height:54px}
+  .resource strong{overflow-wrap:anywhere}
+  .board-viewport{-webkit-overflow-scrolling:touch;scroll-padding-inline:8px}
+  .dialog{max-height:calc(100dvh - max(20px,env(safe-area-inset-top)) - max(20px,env(safe-area-inset-bottom)))}
+  .dialog-inner{max-height:calc(100dvh - max(20px,env(safe-area-inset-top)) - max(20px,env(safe-area-inset-bottom)));overflow-y:auto;overscroll-behavior:contain}
+}
+@media(max-width:360px){
+  .story-entry-link{display:flex;width:100%;margin-bottom:9px}
+  .resource{padding:7px 5px;gap:4px}
+  .resource .resource-symbol{width:24px;height:24px}
+  .resource strong{font-size:12px}
+  .section-heading{flex-wrap:wrap}
+  .capacity{white-space:normal}
+}

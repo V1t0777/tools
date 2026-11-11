@@ -15,6 +15,28 @@ const identity=()=>auth?adaptToolboxCloudAuth(auth):null;
 const message=(id,value)=>{$(id).textContent=String(value)};
 const confirmed=()=>session?.preview()?.verified===true;
 const current=()=>confirmed()?session.preview().state:null;
+const boardViewport=$('cloud-board-viewport');
+const boardControls=$('cloud-board-controls');
+const boardLeft=$('cloud-board-left');
+const boardRight=$('cloud-board-right');
+function updateCloudBoardNavigation(){
+  const max=Math.max(0,boardViewport.scrollWidth-boardViewport.clientWidth);
+  boardControls.hidden=max<=1||game.hidden;
+  boardLeft.disabled=max<=1||boardViewport.scrollLeft<=1;
+  boardRight.disabled=max<=1||boardViewport.scrollLeft>=max-1;
+}
+function scrollCloudBoard(direction){
+  const step=Math.max(44,Math.floor(boardViewport.clientWidth*.7));
+  const max=Math.max(0,boardViewport.scrollWidth-boardViewport.clientWidth);
+  boardViewport.scrollLeft=Math.max(0,Math.min(max,boardViewport.scrollLeft+direction*step));
+  updateCloudBoardNavigation();
+}
+boardLeft.addEventListener('click',()=>scrollCloudBoard(-1));
+boardRight.addEventListener('click',()=>scrollCloudBoard(1));
+boardViewport.addEventListener('scroll',updateCloudBoardNavigation,{passive:true});
+window.addEventListener('resize',updateCloudBoardNavigation,{passive:true});
+window.addEventListener('pageshow',updateCloudBoardNavigation);
+
 function toggleControls(){
   const ready=!!session&&!busy;
   for(const id of ['connect','retry','review'])$(id).disabled=!ready;
@@ -54,7 +76,10 @@ function button(title,cb,disabled=false){
 function render(){
   const s=current(),ready=!!s&&!busy;
   game.hidden=!s||!validateSave(s);
-  if(!s||!validateSave(s)){toggleControls();return}
+  if(!s||!validateSave(s)){
+    updateCloudBoardNavigation();
+    toggleControls();return;
+  }
   message('coins','金币 '+s.coins);message('energy','体力 '+s.energy);
   message('xp','经验 '+s.xp);message('revision','版本 '+s.revision);
   const selectedItem=s.board[selected];
@@ -109,6 +134,9 @@ function render(){
     supply.append(el);
   }
   toggleControls();
+  // After Safari/WebView layout settles, reveal keyboard-accessible arrows
+  // only if the board actually overflows its scroll region.
+  requestAnimationFrame(updateCloudBoardNavigation);
 }
 async function run(task){
   if(busy)return;

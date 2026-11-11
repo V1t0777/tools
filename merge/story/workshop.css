@@ -35,3 +35,20 @@
 @media(max-width:380px){.story-supply-grid{grid-template-columns:1fr}.story-supply-row{grid-template-columns:1fr 1fr}.story-supply-row span{grid-column:1/-1}}
 @media(prefers-color-scheme:dark){.story-supply-action{background:#355046;color:var(--ink);border-color:#597568}}
 @media(prefers-reduced-motion:reduce){.story-supply-action{transition:none}}
+
+
+/* Mobile RC: preserve 44px workshop cells and swipe region, while preventing
+ * status labels and grouped supplies from expanding the entire document. */
+.resource-line{min-width:0;flex-wrap:wrap}
+.resource-line span{min-width:0;overflow-wrap:anywhere}
+.workshop-board-wrap{touch-action:pan-x pan-y;scroll-padding-inline:10px}
+.workshop-board{width:max-content}
+.workshop-cell{touch-action:manipulation}
+.workshop-order{min-width:0;flex-wrap:wrap}
+.workshop-order span{min-width:0;overflow-wrap:anywhere}
+.workshop-order button{min-height:48px}
+@media(max-width:375px){
+  .resource-line{gap:5px}
+  .resource-line span{font-size:12px;padding:8px 5px}
+  .workshop-order button{flex:1 1 110px}
+}

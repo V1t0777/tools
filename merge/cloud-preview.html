@@ -51,7 +51,14 @@
       <div class="resources"><strong id="coins">金币 0</strong><strong id="energy">体力 0</strong>
         <strong id="xp">经验 0</strong><strong id="revision">版本 0</strong></div>
       <p id="selection">未选择材料</p>
-      <div id="cloud-board" class="board" role="group" aria-label="云端经营 56 格棋盘"></div>
+      <p id="cloud-board-help" class="board-help">手机可以横向滑动棋盘，或使用左右按钮移动；轻点材料后再选目标格。</p>
+      <div id="cloud-board-controls" class="board-navigation" role="group" aria-label="棋盘横向移动" hidden>
+        <button id="cloud-board-left" type="button" aria-controls="cloud-board-viewport">← 向左</button>
+        <button id="cloud-board-right" type="button" aria-controls="cloud-board-viewport">向右 →</button>
+      </div>
+      <div id="cloud-board-viewport" class="board-scroll" role="region" tabindex="0" aria-label="可横向滚动的云端经营棋盘" aria-describedby="cloud-board-help">
+        <div id="cloud-board" class="board" role="group" aria-label="云端经营 56 格棋盘"></div>
+      </div>
       <div class="actions">
         <button id="store-selected" type="button">收纳选中材料</button>
         <button id="upgrade-producer" type="button">升级选中工坊</button>
