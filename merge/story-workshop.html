@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="./story/story.css">
   <link rel="stylesheet" href="./story/workshop.css">
   <script type="module" src="./story/workshop.mjs"></script>
+  <script type="module" src="./story/workshop-mobile-navigation.mjs"></script>
 </head>
 <body>
 <div class="story-shell">
@@ -42,7 +43,11 @@
       <div class="resource-line"><span>⚡ <strong id="energy"></strong></span><span>◈ <strong id="coins"></strong></span><span>✦ <strong id="xp"></strong></span></div>
       <h2>七列八行合成台</h2>
       <p class="muted">点击 🧺 工坊生产材料；依次点击两个相同物品即可合成。物品可移动或交换。小屏幕可左右滑动棋盘。</p>
-      <div class="workshop-board-wrap" role="region" aria-label="可横向滚动的合成棋盘" tabindex="0">
+      <div id="workshop-board-controls" class="workshop-board-navigation" role="group" aria-label="剧情工作台棋盘左右移动" hidden>
+        <button id="workshop-board-left" type="button" aria-controls="workshop-board-viewport">← 向左</button>
+        <button id="workshop-board-right" type="button" aria-controls="workshop-board-viewport">向右 →</button>
+      </div>
+      <div id="workshop-board-viewport" class="workshop-board-wrap" role="region" aria-label="可横向滚动的合成棋盘" tabindex="0">
         <div id="workshop-board" class="workshop-board" role="group" aria-label="七列八行的剧情合成棋盘"></div>
       </div>
       <p id="board-notice" role="status" aria-live="polite">请选择一个物品，或点击工坊生产。</p>
