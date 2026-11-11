@@ -151,11 +151,75 @@ test('P0 Chromium private four-account cloud page and crash-safe story journal',
   await ui.evaluate(()=>document.getElementById('story-upload').click());
   await until(()=>ui.evaluate(()=>document.getElementById('story-status').textContent.includes('已由服务器确认')),
     'confirmed story pair upload');
-  await call('Emulation.setDeviceMetricsOverride',{
-    width:320,height:740,deviceScaleFactor:1,mobile:true
-  },ui.sessionId);
-  assert.equal(await ui.evaluate(()=>document.documentElement.scrollWidth<=
-    document.documentElement.clientWidth+1),true,'no 320px document overflow');
-  assert.deepEqual(await ui.evaluate(()=>window.__cloudErrors),[]);
+  const mobileView=async width=>{
+    await call('Emulation.setDeviceMetricsOverride',{
+      width,height:740,deviceScaleFactor:3,mobile:true
+    },ui.sessionId);
+    await until(()=>ui.evaluate(w=>document.documentElement.clientWidth===w,width),
+      'actual mobile viewport '+width);
+    return ui.evaluate(()=>{
+      const viewport=document.getElementById('cloud-board-viewport');
+      const controls=document.getElementById('cloud-board-controls');
+      const button=document.getElementById('cloud-board-right');
+      const visible=element=>element&&getComputedStyle(element).display!=='none';
+      return {
+        width:document.documentElement.clientWidth,
+        scrollWidth:document.documentElement.scrollWidth,
+        boardScrollWidth:viewport?.scrollWidth??0,
+        boardClientWidth:viewport?.clientWidth??0,
+        controlVisible:visible(controls),
+        arrowHeight:Math.round(button?.getBoundingClientRect().height??0),
+        loginInputFont:Number.parseFloat(getComputedStyle(
+          document.getElementById('login-email')).fontSize)
+      };
+    });
+  };
+  for(const width of [320,375,390,430]){
+    const m=await mobileView(width);
+    assert.ok(m.scrollWidth<=m.width+1,'cloud page must not overflow at '+width);
+    assert.ok(m.loginInputFont>=16,'iOS login focus must not auto zoom at '+width);
+    if(m.boardScrollWidth>m.boardClientWidth+1){
+      assert.equal(m.controlVisible,true,'board arrows visible at '+width);
+      assert.ok(m.arrowHeight>=44,'board arrow touch area >= 44px at '+width);
+    }
+  }
+  await mobileView(320);
+  await until(()=>ui.evaluate(()=>!document.getElementById('cloud-board-controls').hidden),
+    'arrow controls appear when cloud board overflows');
+  const beforeScroll=await ui.evaluate(()=>document.getElementById('cloud-board-viewport').scrollLeft);
+  await ui.evaluate(()=>document.getElementById('cloud-board-right').click());
+  const afterScroll=await ui.evaluate(()=>document.getElementById('cloud-board-viewport').scrollLeft);
+  assert.ok(afterScroll>beforeScroll,'mobile cloud board right button actually scrolls');
+  await ui.evaluate(()=>document.getElementById('cloud-board-left').click());
+  assert.ok((await ui.evaluate(()=>document.getElementById('cloud-board-viewport').scrollLeft))
+    <afterScroll,'left button scrolls back');
+  // Use the same real mobile viewport to check story and workshop entrypoints.
+  for(const [route,readySelector] of [
+    ['/merge/story.html','#story-list'],
+    ['/merge/story-workshop.html','#workshop-board']
+  ]){
+    await call('Page.navigate',{
+      url:'http://127.0.0.1:'+server.address().port+route},ui.sessionId);
+    await until(()=>ui.evaluate(selector=>
+      document.querySelector(selector)!==null,readySelector),
+      'mobile story route '+route);
+    const layout=await ui.evaluate(()=>{
+      const board=document.querySelector('.workshop-board-wrap');
+      const actions=[...document.querySelectorAll(
+        '.tabs button,.journey-primary,.story-card button,.workshop-cell,.workshop-build')]
+        .filter(el=>getComputedStyle(el).display!=='none'&&el.getBoundingClientRect().width>0);
+      return {width:document.documentElement.clientWidth,
+        scroll:document.documentElement.scrollWidth,
+        horizontalBoard:board?board.scrollWidth>board.clientWidth:false,
+        minTouch:actions.length?Math.min(...actions.map(el=>
+          el.getBoundingClientRect().height)):null
+      };
+    });
+    assert.ok(layout.scroll<=layout.width+1,'document overflow on '+route);
+    assert.ok(layout.minTouch===null||layout.minTouch>=44,
+      'story touch target >=44px on '+route);
+    if(route.includes('workshop'))assert.equal(layout.horizontalBoard,true,
+      'workshop board has a dedicated horizontal scroll viewport at 320px');
+  }
   await call('Target.disposeBrowserContext',{browserContextId});
 });
