@@ -218,8 +218,19 @@ test('P0 Chromium private four-account cloud page and crash-safe story journal',
     assert.ok(layout.scroll<=layout.width+1,'document overflow on '+route);
     assert.ok(layout.minTouch===null||layout.minTouch>=44,
       'story touch target >=44px on '+route);
-    if(route.includes('workshop'))assert.equal(layout.horizontalBoard,true,
-      'workshop board has a dedicated horizontal scroll viewport at 320px');
+    if(route.includes('workshop')){
+      assert.equal(layout.horizontalBoard,true,
+        'workshop board has a dedicated horizontal scroll viewport at 320px');
+      await until(()=>ui.evaluate(()=>!document.getElementById('workshop-board-controls').hidden),
+        'story workshop arrows visible on iPhone-sized viewport');
+      const left=await ui.evaluate(()=>document.getElementById('workshop-board-viewport').scrollLeft);
+      await ui.evaluate(()=>document.getElementById('workshop-board-right').click());
+      const right=await ui.evaluate(()=>document.getElementById('workshop-board-viewport').scrollLeft);
+      assert.ok(right>left,'story board right arrow scrolls without a gameplay action');
+      await ui.evaluate(()=>document.getElementById('workshop-board-left').click());
+      assert.ok((await ui.evaluate(()=>document.getElementById('workshop-board-viewport').scrollLeft))<right,
+        'story board left arrow scrolls back');
+    }
   }
   await call('Target.disposeBrowserContext',{browserContextId});
 });
