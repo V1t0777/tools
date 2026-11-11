@@ -20,8 +20,8 @@ test('P2.64b startup, action, clock and reset use one exclusive page runtime',()
   assert.match(candidate,/const runtime=createNormalPageRuntime\(/);
   for(const writer of ['start','action','clock','reset'])
     assert.match(candidate,new RegExp('runtime\\.'+writer+'\\('),writer);
-  assert.match(candidate,/locks:persistence\\.locks/);
-  assert.match(candidate,/openNormalPersistence\\(\\{/);
+  assert.match(candidate,/locks:persistence\.locks/);
+  assert.match(candidate,/openNormalPersistence\(\{/);
   const idb=read('normal-indexeddb-persistence.mjs');
   assert.match(idb,/isIndexedDBNormalLock:true/);
   assert.match(idb,/runNormalTransaction:lockedWrite/);
@@ -39,10 +39,10 @@ test('P2.64b lifecycle is read-only and drops stale gestures',()=>{
   // IndexedDB adapter may ONLY subscribe to refresh events, never write from
   // a page resume, BFCache or focus notification.
   assert.equal(candidate.includes("window.addEventListener('storage'"),false);
-  assert.match(candidate,/persistence\\.subscribe\\(/);
-  assert.match(candidate,/persistence\\.refresh\\(\\)/);
-  assert.doesNotMatch(candidate,/addEventListener\\('pageshow'[^\n]*setItem/);
-  assert.doesNotMatch(candidate,/addEventListener\\('focus'[^\n]*setItem/);
+  assert.match(candidate,/persistence\.subscribe\(/);
+  assert.match(candidate,/persistence\.refresh\(\)/);
+  assert.doesNotMatch(candidate,/addEventListener\('pageshow'[^\n]*setItem/);
+  assert.doesNotMatch(candidate,/addEventListener\('focus'[^\n]*setItem/);
 });
 
 test('P2.64b startup and UI interactions fail closed during asynchronous writes',()=>{
