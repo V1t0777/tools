@@ -208,8 +208,12 @@ test('P0 genuine IndexedDB transactions: migration, cross-tab CAS, durable reloa
       const choice=document.querySelector('#dialog-choices button');
       if(choice)choice.click();
       const done=document.getElementById('complete-story');
-      if(!done.disabled)done.click();
-      return !done.disabled;
+      // A valid click immediately disables the button while the IndexedDB
+      // transaction is pending. Check pre-click authorization here; the
+      // following assertion separately awaits the durable database commit.
+      const authorized=!done.disabled;
+      if(authorized)done.click();
+      return authorized;
     }),true,'story choice remains writable without Web Locks');
     await until(async()=>JSON.parse(await readSaved(savedKey))?.packs?.core?.completed?.main?.length>
       beforeStory.packs.core.completed.main.length,
