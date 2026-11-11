@@ -7,6 +7,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 import { createDatabaseAuthority } from '../../../merge/cloud/db-authority.mjs';
 import { createReceiptLookupService } from '../../../merge/cloud/receipt-lookup.mjs';
 import { readBoundedJson } from '../../../merge/cloud/bounded-json.mjs';
+import { authorizeFourAccountCloudSave } from '../../../merge/cloud/private-access.mjs';
 
 const URL = Deno.env.get('SUPABASE_URL');
 const PUBLIC_KEY = Deno.env.get('SUPABASE_ANON_KEY');
@@ -78,6 +79,18 @@ Deno.serve(async request => {
   try {
     const {data,error}=await anon.auth.getUser(bearer);
     if(error||!data.user?.id)return response({code:'AUTH_REQUIRED'},401);
+    // Private P3 cloud saves: only four individually approved, email-verified
+    // Auth identities. Do not authorize by nickname or user_metadata.
+    // A missing allowlist table fails CLOSED (503), never open to all members.
+    const access=await authorizeFourAccountCloudSave(data.user,async uid=>{
+      const {data:row,error:allowError}=await admin.from('merge_cloud_allowlist')
+        .select('user_id').eq('user_id',uid).maybeSingle();
+      if(allowError)throw Error('Cloud allowlist unavailable');
+      return row?.user_id===uid;
+    });
+    if(!access.ok)return response({code:access.code},
+      access.code==='CLOUD_ACCESS_UNAVAILABLE'?503:
+        access.code==='AUTH_REQUIRED'?401:403);
     // Stream and enforce the 4 KiB limit BEFORE materializing/parsing JSON.
     // A missing or forged Content-Length never bypasses byte counting.
     const parsed=await readBoundedJson(request);
