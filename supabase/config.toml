@@ -19,3 +19,15 @@ import_map = "./functions/pictionary-game/deno.json"
 verify_jwt = true
 entrypoint = "./functions/blackjack-game/index.ts"
 import_map = "./functions/blackjack-game/deno.json"
+
+# Draft-only merge game endpoint: never permit anonymous cloud-save access.
+# Deployment remains prohibited without a separate security/release approval.
+[functions.merge-game]
+verify_jwt = true
+entrypoint = "./functions/merge-game/index.ts"
+
+# Private story progress and independent story workshop: never anonymous.
+# Draft-only until separate production deployment approval.
+[functions.merge-story]
+verify_jwt = true
+entrypoint = "./functions/merge-story/index.ts"

@@ -56,6 +56,28 @@ jobs:
       - name: Run security and game regression tests
         run: node --test tests/*.test.mjs scripts/*.test.cjs
 
+      # Private build is attached to THIS independent regression lane; it
+      # cannot bypass the existing three independent security gates.
+      - name: Checkout exact private review candidate
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == true }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Build local-only review bundle
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == true }}
+        env:
+          YUNYU_SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: bash scripts/build-yunyu-private-review.sh
+      - name: Upload short-lived private review archive (not deploy)
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == true }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: yunyu-private-review-${{ github.event.pull_request.head.sha }}
+          path: dist-yunyu-private-review/
+          if-no-files-found: error
+          retention-days: 7
+
   history-secrets:
     name: Security / Full Git history secrets
     runs-on: ubuntu-latest

@@ -1,0 +1,436 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createInitialState,MAX_ENERGY,ENERGY_REGEN_MS,moveOrMerge} from '../merge/engine.mjs';
+import {createInitialState as legacyInitial} from '../merge/legacy-engine.mjs';
+import {SAVE_KEY,LEGACY_BACKUP_KEY,ABNORMAL_RESET_BACKUP_KEY} from '../merge/storage.mjs';
+import {STORY_SAVE_KEY} from '../merge/mode-boundaries.mjs';
+import {NORMAL_SAVE_LOCK_NAME} from '../merge/normal-save-lock.mjs';
+import {RESTORE_BACKUP_KEY} from '../merge/save-restore-backup.mjs';
+import {createNormalPageRuntime} from '../merge/normal-page-runtime.mjs';
+
+const now=1000,encoded=value=>JSON.stringify(value);
+const error=reason=>({ok:false,reason});
+function memory(save=null) {
+  const map=new Map(),writes=[];
+  if(save!==null)map.set(SAVE_KEY,save);
+  map.set(STORY_SAVE_KEY,'story-untouched');
+  return {map,writes,
+    getItem(key){return map.has(key)?map.get(key):null;},
+    setItem(key,value){writes.push(key);map.set(key,value);},
+    read(key){return map.has(key)?map.get(key):null;}
+  };
+}
+function locks() {
+  let held=false;
+  return {request(name,opts,callback) {
+    assert.equal(name,NORMAL_SAVE_LOCK_NAME);
+    assert.deepEqual(opts,{mode:'exclusive',ifAvailable:true});
+    if(held)return Promise.resolve(callback(null));
+    held=true;
+    return Promise.resolve().then(()=>callback({name,mode:'exclusive'}))
+      .finally(()=>{held=false;});
+  }};
+}
+
+test('P2.61w startup, real gameplay, no-op clock and reset have one verified lifecycle',async()=>{
+  const db=memory(),events=[];
+  const r=createNormalPageRuntime({storage:db,locks:locks(),
+    onVerified:(state,raw,kind)=>events.push([kind,state.revision,raw])});
+  assert.equal(r.snapshot(),null);
+  assert.equal((await r.start({now})).ok,true);
+  assert.equal(r.phase,'ready');
+  const external=r.snapshot();
+  external.coins=999999;
+  assert.notEqual(r.snapshot().coins,999999);
+  assert.equal((await r.action(s=>moveOrMerge(s,0,2))).ok,true);
+  assert.equal(r.snapshot().revision,1);
+  assert.equal((await r.clock({now})).ok,true);
+  assert.equal(r.raw,db.read(SAVE_KEY));
+  assert.deepEqual(await r.reset({confirmed:true,now:now+5}),
+    {ok:true,status:'RESET_PUBLISHED',backupVerified:false});
+  assert.equal(r.snapshot().revision,0);
+  assert.equal(r.raw,db.read(SAVE_KEY));
+  assert.equal(db.read(STORY_SAVE_KEY),'story-untouched');
+  assert.deepEqual(events.map(x=>x[0]),['startup','action','clock','reset']);
+  assert.deepEqual(db.writes,[SAVE_KEY,SAVE_KEY,SAVE_KEY]);
+});
+
+test('P2.61w legacy backup and migration are both executed under one lock',async()=>{
+  const raw=encoded(legacyInitial(now)),db=memory(raw);
+  const r=createNormalPageRuntime({locks:locks(),storage:db});
+  assert.equal((await r.start({now})).ok,true);
+  assert.equal(db.read(LEGACY_BACKUP_KEY),raw);
+  assert.equal(db.read(SAVE_KEY),r.raw);
+  assert.deepEqual(db.writes,[LEGACY_BACKUP_KEY,SAVE_KEY]);
+  assert.equal(db.read(STORY_SAVE_KEY),'story-untouched');
+});
+
+test('P2.61w no Web Locks never falls back to unguarded startup or action',async()=>{
+  const db=memory(),r=createNormalPageRuntime({locks:null,storage:db});
+  assert.deepEqual(await r.start({now}),error('WEB_LOCKS_UNAVAILABLE'));
+  assert.equal(r.phase,'cold');
+  assert.equal(r.snapshot(),null);
+  assert.deepEqual(db.writes,[]);
+  assert.deepEqual(await r.action(s=>moveOrMerge(s,0,2)),
+    error('STARTUP_REQUIRED'));
+});
+
+test('P2.61w two tabs sharing lock reject a stale action and never replay it',async()=>{
+  const db=memory(),lock=locks();
+  const a=createNormalPageRuntime({locks:lock,storage:db});
+  const b=createNormalPageRuntime({locks:lock,storage:db});
+  assert.equal((await a.start({now})).ok,true);
+  assert.equal((await b.start({now})).ok,true);
+  assert.equal((await a.action(s=>moveOrMerge(s,0,2))).ok,true);
+  assert.deepEqual(await b.action(s=>moveOrMerge(s,0,2)),
+    error('STALE_BASELINE'));
+  assert.equal(b.blocked,true);
+  assert.equal(b.snapshot().revision,0);
+  assert.notEqual(b.raw,db.read(SAVE_KEY));
+  assert.deepEqual(await b.clock({now}),error('UI_SAVE_BLOCKED'));
+});
+
+test('P2.61w verified clock-only cross-tab update can be adopted read-only',async()=>{
+  const initial={...createInitialState(now),energy:MAX_ENERGY-1};
+  const db=memory(encoded(initial)),events=[];
+  const r=createNormalPageRuntime({locks:locks(),storage:db,
+    onVerified:(_s,_b,kind)=>events.push(kind)});
+  assert.equal((await r.start({now})).ok,true);
+  db.setItem(SAVE_KEY,encoded({...initial,energy:MAX_ENERGY,
+    energyAt:now+ENERGY_REGEN_MS}));
+  assert.deepEqual(r.reconcile(),{ok:true,changed:true});
+  assert.equal(r.snapshot().energy,MAX_ENERGY);
+  assert.equal(r.raw,db.read(SAVE_KEY));
+  assert.deepEqual(events,['startup','external']);
+});
+
+test('P2.61w same-revision economic fork blocks without changing UI snapshot',async()=>{
+  const initial=createInitialState(now),db=memory(encoded(initial));
+  const r=createNormalPageRuntime({locks:locks(),storage:db});
+  await r.start({now});
+  db.setItem(SAVE_KEY,encoded({...initial,coins:initial.coins+200}));
+  assert.deepEqual(r.reconcile(),error('CURRENT_SAVE_CHANGED'));
+  assert.equal(r.blocked,true);
+  assert.equal(r.snapshot().coins,initial.coins);
+  assert.equal(db.read(STORY_SAVE_KEY),'story-untouched');
+});
+
+test('P2.61w corrupt storage on resume blocks all subsequent writes',async()=>{
+  const db=memory(encoded(createInitialState(now)));
+  const r=createNormalPageRuntime({locks:locks(),storage:db});
+  await r.start({now});
+  db.setItem(SAVE_KEY,'{broken');
+  assert.deepEqual(r.reconcile(),error('CORRUPT_SAVE'));
+  assert.equal(r.blocked,true);
+  const before=db.writes.length;
+  assert.deepEqual(await r.action(s=>moveOrMerge(s,0,2)),
+    error('UI_SAVE_BLOCKED'));
+  assert.equal(db.writes.length,before);
+});
+
+test('P2.61w pending action is single-flight and invalidation suppresses stale publish',async()=>{
+  const db=memory(encoded(createInitialState(now))),base=locks();
+  let release,entered,delay=false;
+  const gate=new Promise(resolve=>{release=resolve;});
+  const started=new Promise(resolve=>{entered=resolve;});
+  const slow={request(name,opts,cb){
+    if(!delay)return base.request(name,opts,cb);
+    return base.request(name,opts,async lock=>{
+      entered();await gate;return cb(lock);
+    });
+  }};
+  const events=[];
+  const r=createNormalPageRuntime({locks:slow,storage:db,
+    onVerified:(_s,_b,kind)=>events.push(kind)});
+  await r.start({now});
+  delay=true;
+  const pending=r.action(s=>moveOrMerge(s,0,2));
+  await started;
+  assert.equal(r.busy,true);
+  assert.deepEqual(await r.action(s=>moveOrMerge(s,0,2)),
+    error('UI_TRANSACTION_BUSY'));
+  assert.deepEqual(await r.clock({now}),error('UI_TRANSACTION_BUSY'));
+  assert.deepEqual(await r.reset({confirmed:true,now}),
+    error('UI_TRANSACTION_BUSY'));
+  r.invalidate();
+  release();
+  assert.deepEqual(await pending,error('UI_SAVE_BLOCKED'));
+  assert.equal(r.blocked,true);
+  assert.deepEqual(events,['startup']);
+});
+
+test('P2.61w corrupted save can reset only after explicit original backup',async()=>{
+  const original='{broken',db=memory(original);
+  const r=createNormalPageRuntime({locks:locks(),storage:db});
+  assert.deepEqual(await r.start({now}),error('CORRUPT_SAVE'));
+  assert.equal(r.blocked,true);
+  assert.deepEqual(await r.reset(),error('RESET_NOT_CONFIRMED'));
+  assert.deepEqual(await r.reset({confirmed:true,now}),
+    error('NO_TRUSTED_BASELINE'));
+  assert.deepEqual(await r.reset({confirmed:true,expectedRaw:original,now}),
+    {ok:true,status:'RESET_PUBLISHED',backupVerified:true});
+  assert.equal(db.read(ABNORMAL_RESET_BACKUP_KEY),original);
+  assert.equal(db.read(STORY_SAVE_KEY),'story-untouched');
+  assert.equal(r.phase,'ready');
+  assert.equal((await r.action(s=>moveOrMerge(s,0,2))).ok,true);
+});
+
+test('P2.61w action rejected before write may retry without losing baseline',async()=>{
+  const db=memory(encoded(createInitialState(now)));
+  const r=createNormalPageRuntime({locks:locks(),storage:db});
+  await r.start({now});
+  assert.deepEqual(await r.action(()=>({ok:false,reason:'NO_ENERGY'})),
+    error('ACTION_REJECTED'));
+  assert.equal(r.blocked,false);
+  assert.equal((await r.action(s=>moveOrMerge(s,0,2))).ok,true);
+});
+
+test('P2.61w async publication hook fails closed and is never claimed successful',async()=>{
+  const db=memory();
+  const r=createNormalPageRuntime({locks:locks(),storage:db,
+    onVerified:async()=>{}});
+  assert.deepEqual(await r.start({now}),error('UI_PUBLISH_FAILED'));
+  assert.equal(r.blocked,true);
+  assert.deepEqual(await r.start({now}),error('STARTUP_ALREADY_ATTEMPTED'));
+});
+
+test('P2.61w reset rejects another tab changing the trusted baseline',async()=>{
+  const db=memory(encoded(createInitialState(now)));
+  const r=createNormalPageRuntime({locks:locks(),storage:db});
+  await r.start({now});
+  db.setItem(SAVE_KEY,encoded({...createInitialState(now),revision:9}));
+  assert.deepEqual(await r.reset({confirmed:true,now}),
+    error('STALE_BASELINE'));
+  assert.equal(r.blocked,true);
+});
+
+
+test('P2.65h confirmed restore uses shared lock, exact bytes and preserved original',async()=>{
+  const original=encoded({...createInitialState(now),revision:4,coins:125});
+  const incoming=encoded(createInitialState(now));
+  const db=memory(original),events=[];
+  const r=createNormalPageRuntime({storage:db,locks:locks(),
+    onVerified:(_s,_raw,kind)=>events.push(kind)});
+  assert.equal((await r.start({now})).ok,true);
+  assert.deepEqual(await r.restore(incoming,{expectedRaw:original,confirmed:true}),
+    error('DOWNGRADE_CONFIRMATION_REQUIRED'));
+  assert.equal(db.read(SAVE_KEY),original);
+  assert.deepEqual(await r.restore(incoming,
+    {expectedRaw:original,confirmed:true,allowDowngrade:true}),
+    {ok:true,status:'UI_PUBLISHED'});
+  assert.equal(db.read(SAVE_KEY),incoming);
+  assert.equal(db.read(RESTORE_BACKUP_KEY),original);
+  assert.equal(db.read(STORY_SAVE_KEY),'story-untouched');
+  assert.equal(r.raw,incoming);
+  assert.equal(r.snapshot().revision,0);
+  assert.deepEqual(events,['startup','restore']);
+});
+
+test('P2.65h unconfirmed, stale and story restores reject without writing',async()=>{
+  const original=encoded(createInitialState(now));
+  const incoming=encoded({...createInitialState(now),revision:3,coins:50});
+  const db=memory(original),r=createNormalPageRuntime({storage:db,locks:locks()});
+  await r.start({now});
+  const count=db.writes.length;
+  assert.deepEqual(await r.restore(incoming,{expectedRaw:original}),
+    error('CONFIRMATION_REQUIRED'));
+  assert.deepEqual(await r.restore(incoming,
+    {expectedRaw:'stale',confirmed:true}),error('STALE_BASELINE'));
+  assert.deepEqual(await r.restore('{"mode":"story"}',
+    {expectedRaw:original,confirmed:true}),error('STORY_MODE_FILE'));
+  assert.equal(db.writes.length,count);
+  assert.equal(r.blocked,false);
+});
+
+test('P2.65h lock contention is a definite no-write and permits retry',async()=>{
+  const original=encoded(createInitialState(now));
+  const incoming=encoded({...createInitialState(now),revision:2,coins:50});
+  const db=memory(original),base=locks();
+  let busy=false;
+  const gate={request(name,opts,callback){
+    return busy?Promise.resolve(callback(null)):base.request(name,opts,callback);
+  }};
+  const r=createNormalPageRuntime({storage:db,locks:gate});
+  await r.start({now});
+  busy=true;
+  assert.deepEqual(await r.restore(incoming,
+    {expectedRaw:original,confirmed:true}),error('LOCK_BUSY'));
+  assert.equal(r.blocked,false);
+  assert.equal(db.read(SAVE_KEY),original);
+  busy=false;
+  assert.equal((await r.restore(incoming,
+    {expectedRaw:original,confirmed:true})).ok,true);
+  assert.equal(db.read(SAVE_KEY),incoming);
+});
+
+test('P2.65h unrelated backup slot blocks overwrite and preserves story',async()=>{
+  const original=encoded(createInitialState(now));
+  const incoming=encoded({...createInitialState(now),revision:2,coins:50});
+  const db=memory(original);
+  db.setItem(RESTORE_BACKUP_KEY,'older-backup');
+  const r=createNormalPageRuntime({storage:db,locks:locks()});
+  await r.start({now});
+  assert.deepEqual(await r.restore(incoming,
+    {expectedRaw:original,confirmed:true}),error('BACKUP_SLOT_CONFLICT'));
+  assert.equal(r.blocked,false,'occupied backup slot is a definite no-write rejection');
+  assert.equal(db.read(SAVE_KEY),original);
+  assert.equal(db.read(RESTORE_BACKUP_KEY),'older-backup');
+  assert.equal(db.read(STORY_SAVE_KEY),'story-untouched');
+  assert.equal((await r.action(s=>moveOrMerge(s,0,2))).ok,true,
+    'ordinary play remains available after refused import');
+});
+
+test('P2.65n second restore cannot replace earlier evidence or lock ordinary play',async()=>{
+  const original=encoded(createInitialState(now));
+  const first=encoded({...createInitialState(now),revision:1,coins:37});
+  const second=encoded({...createInitialState(now),revision:2,coins:83});
+  const db=memory(original),r=createNormalPageRuntime({storage:db,locks:locks()});
+  assert.equal((await r.start({now})).ok,true);
+  assert.equal((await r.restore(first,{expectedRaw:original,confirmed:true})).ok,true);
+  assert.equal(db.read(RESTORE_BACKUP_KEY),original);
+  const writes=db.writes.length;
+  assert.deepEqual(await r.restore(second,{expectedRaw:first,confirmed:true}),
+    error('BACKUP_SLOT_CONFLICT'));
+  assert.equal(r.blocked,false);
+  assert.equal(db.writes.length,writes,'failed second restore must not write');
+  assert.equal(db.read(SAVE_KEY),first);
+  assert.equal(db.read(RESTORE_BACKUP_KEY),original);
+  assert.equal(db.read(STORY_SAVE_KEY),'story-untouched');
+  assert.equal((await r.action(s=>moveOrMerge(s,0,2))).ok,true);
+});
+
+
+test('P2.65q BFCache invalidation while awaiting restore lock writes no backup',async()=>{
+  const old=encoded(createInitialState(now));
+  const next=encoded({...createInitialState(now),revision:2,coins:57});
+  const db=memory(old),base=locks();
+  let delay=false,release,entered;
+  const gate=new Promise(resolve=>{release=resolve;});
+  const waiting=new Promise(resolve=>{entered=resolve;});
+  const slow={request(name,opts,callback){
+    if(!delay)return base.request(name,opts,callback);
+    return base.request(name,opts,async lock=>{
+      entered();await gate;return callback(lock);
+    });
+  }};
+  const r=createNormalPageRuntime({storage:db,locks:slow});
+  assert.equal((await r.start({now})).ok,true);
+  delay=true;
+  const writes=db.writes.length;
+  const pending=r.restore(next,{expectedRaw:old,confirmed:true});
+  await waiting;r.invalidate();release();
+  assert.equal((await pending).ok,false);
+  assert.equal(r.blocked,true);
+  assert.equal(db.writes.length,writes);
+  assert.equal(db.read(SAVE_KEY),old);
+  assert.equal(db.read(RESTORE_BACKUP_KEY),null);
+  assert.equal(db.read(STORY_SAVE_KEY),'story-untouched');
+});
+
+test('P2.65q aborted file-read permission while awaiting lock can safely retry',async()=>{
+  const old=encoded(createInitialState(now));
+  const next=encoded({...createInitialState(now),revision:2,coins:57});
+  const db=memory(old),base=locks();
+  let delay=false,release,entered;
+  const gate=new Promise(resolve=>{release=resolve;});
+  const waiting=new Promise(resolve=>{entered=resolve;});
+  const slow={request(name,opts,callback){
+    if(!delay)return base.request(name,opts,callback);
+    return base.request(name,opts,async lock=>{
+      entered();await gate;return callback(lock);
+    });
+  }};
+  const r=createNormalPageRuntime({storage:db,locks:slow});
+  await r.start({now});delay=true;
+  const controller=new AbortController();
+  const writes=db.writes.length;
+  const pending=r.restore(next,{expectedRaw:old,confirmed:true,
+    signal:controller.signal});
+  await waiting;controller.abort();release();
+  assert.deepEqual(await pending,error('RESTORE_CANCELLED_BEFORE_WRITE'));
+  assert.equal(r.blocked,false);
+  assert.equal(db.writes.length,writes);
+  assert.equal(db.read(RESTORE_BACKUP_KEY),null);
+  delay=false;
+  assert.equal((await r.restore(next,{expectedRaw:old,confirmed:true})).ok,true);
+  assert.equal(db.read(SAVE_KEY),next);
+});
+
+
+for(const kind of ['action','clock','reset']){
+  test('P2.65r pagehide while waiting for '+kind+' lock never writes stale progress',async()=>{
+    const original=encoded(createInitialState(now)),db=memory(original),base=locks();
+    let delayed=false,release,entered;
+    const gate=new Promise(resolve=>{release=resolve;});
+    const waiting=new Promise(resolve=>{entered=resolve;});
+    const slow={request(name,opts,callback){
+      if(!delayed)return base.request(name,opts,callback);
+      return base.request(name,opts,async lock=>{
+        entered();await gate;return callback(lock);
+      });
+    }};
+    const events=[];
+    const r=createNormalPageRuntime({storage:db,locks:slow,
+      onVerified:(_s,_raw,event)=>events.push(event)});
+    assert.equal((await r.start({now})).ok,true);
+    delayed=true;
+    const writes=db.writes.length;
+    const pending=kind==='action'?r.action(s=>moveOrMerge(s,0,2)):
+      kind==='clock'?r.clock({now:now+ENERGY_REGEN_MS}):
+        r.reset({confirmed:true,now:now+10});
+    await waiting;
+    r.invalidate(); // pagehide/BFCache lifecycle bridge
+    release();
+    assert.equal((await pending).ok,false);
+    assert.equal(r.blocked,true);
+    assert.equal(db.writes.length,writes,'no write after revoked UI permission');
+    assert.equal(db.read(SAVE_KEY),original);
+    assert.equal(db.read(ABNORMAL_RESET_BACKUP_KEY),null);
+    assert.equal(db.read(STORY_SAVE_KEY),'story-untouched');
+    assert.deepEqual(events,['startup']);
+  });
+}
+
+test('P2.65ad pagehide while startup awaits Web Lock cannot create or publish save',async()=>{
+  const db=memory(),events=[];
+  let release;
+  const gate={request(name,options,callback){
+    assert.equal(name,NORMAL_SAVE_LOCK_NAME);
+    assert.deepEqual(options,{mode:'exclusive',ifAvailable:true});
+    return new Promise(resolve=>{
+      release=()=>resolve(callback({name,mode:'exclusive'}));
+    });
+  }};
+  const r=createNormalPageRuntime({locks:gate,storage:db,
+    onVerified:(_s,_raw,kind)=>events.push(kind)});
+  const pending=r.start({now});
+  assert.equal(r.busy,true);
+  r.invalidate(); // pagehide before lock acquisition
+  release();
+  const result=await pending;
+  assert.equal(result.ok,false);
+  assert.equal(r.blocked,true);
+  assert.equal(r.snapshot(),null);
+  assert.deepEqual(db.writes,[]);
+  assert.equal(db.read(SAVE_KEY),null);
+  assert.deepEqual(events,[]);
+});
+
+test('P2.65ad reentrant pagehide during initial storage read blocks regeneration',async()=>{
+  const base=memory();let runtime,first=true;
+  const db={
+    getItem(key){
+      const value=base.getItem(key);
+      if(key===SAVE_KEY&&first){first=false;runtime.invalidate();}
+      return value;
+    },
+    setItem:(key,value)=>base.setItem(key,value)
+  };
+  runtime=createNormalPageRuntime({locks:locks(),storage:db});
+  const result=await runtime.start({now});
+  assert.equal(result.ok,false);
+  assert.equal(runtime.blocked,true);
+  assert.equal(runtime.snapshot(),null);
+  assert.deepEqual(base.writes,[]);
+  assert.equal(base.read(SAVE_KEY),null);
+});
