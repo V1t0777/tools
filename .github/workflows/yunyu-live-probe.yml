@@ -1,0 +1,56 @@
+name: One-time Yunyu cloud live URL verification
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect-live-cloud:
+    name: Secure Cloudflare and Edge unauthenticated smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Verify secure host rollout without any credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          host="https://zhao-toolbox-secure.pages.dev"
+          ok=0
+          for attempt in {1..15}; do
+            status=$(curl -sS -L --max-time 15 -o /tmp/yunyu-cloud.html -w '%{http_code}' "$host/merge/cloud-preview.html" || true)
+            if [[ "$status" == "200" ]] && grep -Fq 'PRIVATE CLOUD · FOUR VERIFIED ACCOUNTS' /tmp/yunyu-cloud.html; then
+              ok=1
+              echo "Cloudflare live HTML verified at attempt $attempt"
+              break
+            fi
+            echo "Cloudflare not yet deployed: attempt $attempt status $status"
+            sleep 10
+          done
+          [[ "$ok" == "1" ]] || { echo "::error::New Cloudflare cloud HTML was not live";exit 1; }
+          for asset in \
+             /merge/cloud-preview.mjs \
+             /merge/cloud/client-session.mjs \
+             /merge/cloud/story-private-sync.mjs \
+             /shared/toolbox-auth.js; do
+            status=$(curl -sS -L --max-time 15 -o /dev/null -w '%{http_code}' "$host$asset" || true)
+            [[ "$status" == "200" ]] || { echo "::error::Missing secure runtime $asset: $status"; exit 1; }
+          done
+          echo "All secure game assets served HTTP 200"
+      - name: Test Edge JWT barrier and CORS preflight without account secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="https://tmxpueakxibsaakdyusn.supabase.co/functions/v1"
+          for name in merge-game merge-story; do
+            status=$(curl -sS --max-time 20 -X POST -o /tmp/"$name".json -w '%{http_code}' \
+                -H 'Content-Type: application/json' --data '{"mode":"read"}' "$root/$name" || true)
+            [[ "$status" == "401" ]] || { echo "::error::$name allowed unauthenticated request or unavailable: $status";exit 1; }
+            status=$(curl -sS --max-time 20 -X OPTIONS -o /tmp/"$name".options -w '%{http_code}' \
+                -H 'Origin: https://zhao-toolbox-secure.pages.dev' \
+                -H 'Access-Control-Request-Method: POST' \
+                -H 'Access-Control-Request-Headers: authorization, apikey, content-type' \
+                "$root/$name" || true)
+            [[ "$status" == "204" ]] || { echo "::error::$name CORS preflight status $status";exit 1; }
+          done
+          echo "Both Edge endpoints enforce JWT and answer CORS preflight"
