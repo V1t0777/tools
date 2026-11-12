@@ -3,6 +3,7 @@
 // A future private cloud module can NEVER enter the artifact by wildcard.
 import {readFileSync,copyFileSync,existsSync,mkdirSync,lstatSync} from 'node:fs';
 import {dirname,resolve,join,posix} from 'node:path';
+import {auditOfflineHtml} from './merge-html-audit.mjs';
 const root=resolve(import.meta.dirname,'..');
 const out=join(root,'dist-public');
 const manifest=readFileSync(join(root,'scripts/merge-public-files.txt'),'utf8');
@@ -34,14 +35,7 @@ for(const path of files){
     for(const item of body.matchAll(/\b(?:from\s*|import\s*)['"](\.[^'"]+)['"]/g))
       relativeTo(path,item[1]);
   }
-  if(path.endsWith('.html')){
-    for(const item of body.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/g))
-      relativeTo(path,item[1]);
-    for(const item of body.matchAll(/<link\b[^>]*rel="stylesheet"[^>]*href="([^"]+)"/g))
-      relativeTo(path,item[1]);
-    if(/<script\b[^>]*>[^<\s]/.test(body))
-      throw Error('Unexpected inline script in published game: '+path);
-  }
+  if(path.endsWith('.html'))auditOfflineHtml(body,path,relativeTo);
   mkdirSync(dirname(destination),{recursive:true});
   copyFileSync(src,destination);
 }

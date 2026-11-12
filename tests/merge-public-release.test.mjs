@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync,existsSync} from 'node:fs';
 import {resolve,join,posix} from 'node:path';
 import {execFileSync} from 'node:child_process';
+import {auditOfflineHtml} from '../scripts/merge-html-audit.mjs';
 const root=resolve(import.meta.dirname,'..');
 const source=path=>readFileSync(join(root,path),'utf8');
 const files=source('scripts/merge-public-files.txt').trim().split(/\r?\n/);
@@ -30,10 +31,8 @@ test('every offline JS import, HTML script and local CSS path is in public manif
       assert.doesNotMatch(body,/\bimport\s*\(/,file);
       for(const match of body.matchAll(/\b(?:from\s*|import\s*)['"](\.[^'"]+)['"]/g))refs.push([file,match[1]]);
     }
-    if(file.endsWith('.html')){
-      for(const match of body.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/g))refs.push([file,match[1]]);
-      for(const match of body.matchAll(/<link\b[^>]*rel="stylesheet"[^>]*href="([^"]+)"/g))refs.push([file,match[1]]);
-    }
+    if(file.endsWith('.html'))
+      auditOfflineHtml(body,file,(path,relative)=>refs.push([path,relative]));
   }
   for(const [from,relative] of refs){
     assert.ok(relative.startsWith('.'),'unexpected remote dependency in '+from);
@@ -47,4 +46,24 @@ test('public build contains offline beta and never includes private cloud source
   for(const path of ['merge/cloud','merge/cloud-preview.html','merge/cloud-preview.mjs','merge/cloud-preview.css',
     'shared/toolbox-auth.js','shared/vendor/supabase-2.57.4.min.js'])
     assert.equal(existsSync(join(root,'dist-public',path)),false,path);
+});
+
+test('public HTML script audit is case-insensitive and forbids executable inline tags',()=>{
+  const seen=[];
+  const valid='<SCRIPT TYPE="MODULE" SRC="./main-locked.mjs"></SCRIPT>'+
+    '<LINK REL="STYLESHEET" HREF="./style.css">'+
+    '<LINK REL="STYLESHEET" HREF="./mobile-quick-nav.css">';
+  auditOfflineHtml(valid,'merge/index.html',(path,resource)=>seen.push(resource));
+  assert.deepEqual(seen,['./main-locked.mjs','./style.css','./mobile-quick-nav.css']);
+  for(const injected of [
+    '<SCRIPT>alert(1)</SCRIPT>',
+    '<script type="module" src="./main-locked.mjs" onload="alert(1)"></script>',
+    '<script type="module" src="https://evil.invalid/main.mjs"></script>',
+    '<script type="module" src="./main-locked.mjs">alert(1)</script>',
+    '<script type="module" src="./main-locked.mjs"></script>'+
+      '<SCRIPT TYPE="MODULE" SRC="./evil.mjs"></SCRIPT>'
+  ])assert.throws(()=>auditOfflineHtml(injected+
+    '<link rel="stylesheet" href="./style.css">'+
+    '<link rel="stylesheet" href="./mobile-quick-nav.css">',
+    'merge/index.html',()=>{}));
 });
