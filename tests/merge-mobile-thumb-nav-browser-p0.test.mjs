@@ -182,6 +182,26 @@ test('real Chromium 320–430px thumb navigation, keyboard/dialog avoid and no g
     await until(()=>evaluate(()=>!document.querySelector('.mobile-quick-nav').hidden),
       'nav reappears after input focus');
 
+    // The source status is near the foot of a long page; a passive mobile
+    // mirror must make its text visible without duplicating aria-live output.
+    await evaluate(()=>{
+      document.getElementById('notice').textContent='手机提示：请先选择物品';
+    });
+    await until(()=>evaluate(()=>
+      document.getElementById('mobile-action-feedback').textContent==='手机提示：请先选择物品'),
+      'mobile notice is mirrored');
+    const toast=await evaluate(()=>{
+      const item=document.getElementById('mobile-action-feedback');
+      return {hidden:item.hidden,aria:item.getAttribute('aria-hidden'),
+        pointer:getComputedStyle(item).pointerEvents};
+    });
+    assert.equal(toast.hidden,false);
+    assert.equal(toast.aria,'true','screen reader should only hear original aria-live notice');
+    assert.equal(toast.pointer,'none','toast cannot steal gameplay touches');
+    await evaluate(()=>{document.getElementById('notice').textContent=''});
+    await until(()=>evaluate(()=>document.getElementById('mobile-action-feedback').hidden),
+      'toast dismisses when original status clears');
+
     await evaluate(()=>document.getElementById('how-to').click());
     await until(()=>evaluate(()=>document.getElementById('guide').open),
       'native guide modal is open');

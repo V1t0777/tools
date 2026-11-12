@@ -40,8 +40,14 @@ window.addEventListener('pageshow',updateCloudBoardNavigation);
 function toggleControls(){
   const ready=!!session&&!busy;
   for(const id of ['connect','retry','review'])$(id).disabled=!ready;
-  for(const button of game.querySelectorAll('button'))button.disabled=!ready||!confirmed()||
-    (session.preview().pending>0);
+  for(const button of game.querySelectorAll('button')){
+    // A user with an unconfirmed command must still be able to inspect
+    // their last verified board. Scrolling is read-only and never sends a
+    // command or bypasses the blocked economic action gate.
+    if(button.id==='cloud-board-left'||button.id==='cloud-board-right')continue;
+    button.disabled=!ready||!confirmed()||(session.preview().pending>0);
+  }
+  updateCloudBoardNavigation();
   $('story-init').disabled=!ready;
   $('migration-export').disabled=!ready;
   $('migration-claim').disabled=!ready||!migrationReview||!confirmed()||
