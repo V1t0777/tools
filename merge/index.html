@@ -8,9 +8,11 @@
   <title>云屿百物铺 · 开发预览</title>
   <link rel="stylesheet" href="./style.css">
   <script type="module" src="./main-locked.mjs"></script>
+  <link rel="stylesheet" href="./mobile-quick-nav.css">
+  <script type="module" src="./mobile-quick-nav.mjs"></script>
 </head>
 <body>
-  <div class="shell">
+  <div class="shell" id="mobile-top-anchor">
     <header class="topbar">
       <a href="../games/" class="back-link" aria-label="返回小游戏目录">← 小游戏</a>
       <div class="eyebrow">ISLE & OBJECTS <span class="alpha-mark">P2.9 PREVIEW</span></div>
@@ -95,6 +97,12 @@
       <div id="notice" class="notice" role="status" aria-live="polite"></div>
     </main>
     <footer>云屿百物铺 · 原创游戏开发原型 · 本地存档 · 非正式版本</footer>
+    <nav class="mobile-quick-nav" aria-label="手机快速导航">
+      <button type="button" data-mobile-target="board-title">▦ <span>工作台</span></button>
+      <button type="button" data-mobile-target="orders-title">◈ <span>委托</span></button>
+      <button type="button" data-mobile-target="supply-title">⚡ <span>补给</span></button>
+      <button type="button" data-mobile-target="mobile-top-anchor">↑ <span>顶部</span></button>
+    </nav>
   </div>
   <dialog id="guide" class="dialog" aria-labelledby="guide-title">
     <div class="dialog-inner"><h2 id="guide-title">如何游玩</h2>

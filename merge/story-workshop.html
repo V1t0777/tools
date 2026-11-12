@@ -9,9 +9,11 @@
   <link rel="stylesheet" href="./story/workshop.css">
   <script type="module" src="./story/workshop.mjs"></script>
   <script type="module" src="./story/workshop-mobile-navigation.mjs"></script>
+  <link rel="stylesheet" href="./mobile-quick-nav.css">
+  <script type="module" src="./mobile-quick-nav.mjs"></script>
 </head>
 <body>
-<div class="story-shell">
+<div class="story-shell" id="mobile-top-anchor">
   <header class="top">
     <a class="back" href="./story.html">← 返回剧情</a>
     <span class="eyebrow">STORY WORKSHOP · OFFLINE</span>
@@ -41,7 +43,7 @@
     </section>
     <section class="stories workshop" aria-label="剧情合成棋盘">
       <div class="resource-line"><span>⚡ <strong id="energy"></strong></span><span>◈ <strong id="coins"></strong></span><span>✦ <strong id="xp"></strong></span></div>
-      <h2>七列八行合成台</h2>
+      <h2 id="workshop-board-title">七列八行合成台</h2>
       <p class="muted">点击 🧺 工坊生产材料；依次点击两个相同物品即可合成。物品可移动或交换。小屏幕可左右滑动棋盘。</p>
       <div id="workshop-board-controls" class="workshop-board-navigation" role="group" aria-label="剧情工作台棋盘左右移动" hidden>
         <button id="workshop-board-left" type="button" aria-controls="workshop-board-viewport">← 向左</button>
@@ -77,7 +79,7 @@
       <p class="muted">每种补给的购买上限保存在当前剧情工作台，重开页面不会刷新；不会影响普通模式背包或商店。</p>
     </section>
     <section class="stories">
-      <h2>街坊委托</h2>
+      <h2 id="workshop-orders-title">街坊委托</h2>
       <div id="workshop-orders" class="workshop-orders"></div>
     </section>
     <section class="stories story-goal-target" id="garden-goal" tabindex="-1" aria-labelledby="garden-title">
@@ -112,6 +114,12 @@
     </div>
   </main>
   <footer>剧情经营垂直切片 · 本地试玩 · 尚非发行版本</footer>
+  <nav class="mobile-quick-nav" aria-label="手机快速导航">
+    <button type="button" data-mobile-target="workshop-board-title">▦ <span>棋盘</span></button>
+    <button type="button" data-mobile-target="workshop-orders-title">◈ <span>委托</span></button>
+    <button type="button" data-mobile-target="workshop-next-guidance">✧ <span>下一步</span></button>
+    <button type="button" data-mobile-target="mobile-top-anchor">↑ <span>顶部</span></button>
+  </nav>
 </div>
 </body>
 </html>
