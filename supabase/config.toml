@@ -19,3 +19,12 @@ import_map = "./functions/pictionary-game/deno.json"
 verify_jwt = true
 entrypoint = "./functions/blackjack-game/index.ts"
 import_map = "./functions/blackjack-game/deno.json"
+
+# Yunyu cloud: authenticated four-account private endpoints only.
+[functions.merge-game]
+verify_jwt = true
+entrypoint = "./functions/merge-game/index.ts"
+
+[functions.merge-story]
+verify_jwt = true
+entrypoint = "./functions/merge-story/index.ts"

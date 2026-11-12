@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="theme-color" content="#0e1829">
+  <title>云屿百物铺｜四账号私有云存档 Beta</title>
+  <link rel="stylesheet" href="./cloud-preview.css">
+  <script src="../shared/toolbox-auth.js" defer></script>
+  <script type="module" src="./cloud-preview.mjs"></script>
+</head>
+<body>
+<main>
+  <header>
+    <a href="./index.html" class="back">返回离线试玩</a>
+    <p class="eyebrow">PRIVATE CLOUD · FOUR VERIFIED ACCOUNTS</p>
+    <h1>云屿百物铺</h1>
+    <p>仅迪、晨、钊、test 四个已验证账号。这里使用与离线模式完全独立的云端经营档案。云端操作由服务器保存，不会自动覆盖本地旧档。</p>
+  </header>
+  <section id="login" class="panel" aria-labelledby="login-title">
+    <h2 id="login-title">工具箱登录</h2>
+    <p>使用现有 Supabase 账号；云存档还需服务端白名单授权。登录不代表已有云端存档。</p>
+    <form id="login-form">
+      <label>邮箱<input id="login-email" type="email" required autocomplete="username"></label>
+      <label>密码<input id="login-password" type="password" required autocomplete="current-password"></label>
+      <button type="submit">验证登录</button>
+    </form>
+    <p id="login-status" role="status" aria-live="polite"></p>
+  </section>
+  <section id="cloud" class="panel" hidden>
+    <div class="heading"><h2>普通经营｜独立云档</h2><span id="account-label"></span></div>
+    <p>云端操作由服务器计算奖励。旧版普通经营本地存档绝不自动转成云端金币、体力或道具。</p>
+    <div class="actions">
+      <button id="connect" type="button">读取服务器存档</button>
+      <button id="retry" type="button">重试原编号的未确认操作</button>
+      <button id="review" type="button">查看并处理已确认冲突</button>
+      <button id="sign-out" type="button">退出登录</button>
+    </div>
+    <p id="cloud-status" class="status" role="status" aria-live="polite">正在确认账号</p>
+    <section class="panel" aria-labelledby="migration-title" hidden>
+      <h3 id="migration-title">已有普通经营本地进度：人工审核迁移</h3>
+      <p>云端不会直接相信本地金币和道具。先下载旧档及 SHA-256 审核文件，由管理员独立验证后配置一次性授权，之后本人确认领取已批准的存档。领取不会删除本地文件。</p>
+      <div class="actions">
+        <button id="migration-export" type="button">下载旧档供审核（不上传）</button>
+        <button id="migration-claim" type="button" disabled>领取管理员已批准的旧档</button>
+      </div>
+      <p id="migration-status" class="status" role="status" aria-live="polite">未提交审核</p>
+    </section>
+    <div id="game" hidden>
+      <div class="resources"><strong id="coins">金币 0</strong><strong id="energy">体力 0</strong>
+        <strong id="xp">经验 0</strong><strong id="revision">版本 0</strong></div>
+      <p id="selection">未选择材料</p>
+      <p id="cloud-board-help" class="board-help">手机可以横向滑动棋盘，或使用左右按钮移动；轻点材料后再选目标格。</p>
+      <div id="cloud-board-controls" class="board-navigation" role="group" aria-label="棋盘横向移动" hidden>
+        <button id="cloud-board-left" type="button" aria-controls="cloud-board-viewport">← 向左</button>
+        <button id="cloud-board-right" type="button" aria-controls="cloud-board-viewport">向右 →</button>
+      </div>
+      <div id="cloud-board-viewport" class="board-scroll" role="region" tabindex="0" aria-label="可横向滚动的云端经营棋盘" aria-describedby="cloud-board-help">
+        <div id="cloud-board" class="board" role="group" aria-label="云端经营 56 格棋盘"></div>
+      </div>
+      <div class="actions">
+        <button id="store-selected" type="button">收纳选中材料</button>
+        <button id="upgrade-producer" type="button">升级选中工坊</button>
+        <button id="upgrade-warehouse" type="button">扩容仓库</button>
+        <button id="discard-selected" type="button">确认死局弃置</button>
+      </div>
+      <h3>仓库</h3><div id="cloud-warehouse" class="slots"></div>
+      <h3>委托订单</h3><div id="cloud-orders" class="items"></div>
+      <h3>建筑升级</h3><div id="cloud-buildings" class="actions"></div>
+      <h3>背包补给 / 限购商店</h3>
+      <p>先选中需要加速的工坊，再使用冷却卡。金币与道具均由云端验证。</p>
+      <div id="cloud-supplies" class="items"></div>
+    </div>
+  </section>
+  <section id="story" class="panel" hidden>
+    <h2>剧情进度＋工作台｜双档云端备份</h2>
+    <p>剧情进度和工作台以一组快照提交，不与普通经营经济互通。首次绑定、覆盖和恢复都必须由本人确认。异常上传保留原操作编号。</p>
+    <div class="actions">
+      <button id="story-init" type="button">核对本地双档并启用安全存储</button>
+      <button id="story-read" type="button" disabled>查看云端剧情档</button>
+      <button id="story-backup" type="button" disabled>先下载本地双档备份</button>
+      <button id="story-upload" type="button" disabled>确认上传两份本地档</button>
+      <button id="story-retry" type="button" disabled>恢复未确认的原编号上传</button>
+      <button id="story-restore" type="button" disabled>确认用云档恢复本机双档</button>
+    </div>
+    <p id="story-status" class="status" aria-live="polite" role="status">尚未读取存档</p>
+  </section>
+  <footer>仅四个经过核验的账号可用。普通经营采用独立云档，剧情双档为本人确认的手动备份；旧版经营档案自动迁移暂不开放。</footer>
+</main>
+</body>
+</html>

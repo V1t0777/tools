@@ -91,6 +91,12 @@ required_paths=(
   dist-secure/shared/toolbox-auth.js
   dist-secure/shared/toolbox-mfa.js
   dist-secure/shared/vendor/supabase-2.57.4.min.js
+  dist-secure/merge/index.html
+  dist-secure/merge/cloud-preview.html
+  dist-secure/merge/cloud-preview.mjs
+  dist-secure/merge/cloud/client-session.mjs
+  dist-secure/merge/story.html
+  dist-secure/merge/story-workshop.html
   dist-secure/_headers
   dist-secure/robots.txt
 )

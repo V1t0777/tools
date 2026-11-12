@@ -3,8 +3,10 @@
 import {readFileSync} from 'node:fs';
 import {resolve,dirname,extname} from 'node:path';
 const root=resolve(import.meta.dirname,'..');
-const pages=['cloudflare-secure/index.html','admin-night-shift/index.html','night-shift/index.html','beads/index.html','dinner/index.html','pictionary/index.html','blackjack/index.html','flappy/index.html','stack/index.html','games/index.html'];
-const scripts=['shared/toolbox-ui.js','shared/toolbox-auth.js','shared/toolbox-mfa.js','beads/app.js','beads/mard-palette.js','dinner/app.js','pictionary/app.js','pictionary/perf.js','blackjack/app.js'];
+const pages=['cloudflare-secure/index.html','admin-night-shift/index.html','night-shift/index.html','beads/index.html','dinner/index.html','pictionary/index.html','blackjack/index.html','flappy/index.html','stack/index.html','games/index.html','merge/index.html','merge/story.html','merge/story-workshop.html','merge/cloud-preview.html'];
+const scripts=['shared/toolbox-ui.js','shared/toolbox-auth.js','shared/toolbox-mfa.js','beads/app.js','beads/mard-palette.js','dinner/app.js','pictionary/app.js','pictionary/perf.js','blackjack/app.js','merge/cloud-preview.mjs',
+  'merge/main-locked.mjs','merge/story/ui.mjs','merge/story/workshop.mjs',
+  'merge/story/workshop-mobile-navigation.mjs'];
 const allowedSinks=new Map([['beads/app.js',4],['pictionary/app.js',6],['flappy/index.html',6],['stack/index.html',9],['shared/toolbox-ui.js',1]]);
 let failed=false;
 function reject(path,message){process.stderr.write('::error file='+path+'::'+message+'\n');failed=true;}
@@ -22,7 +24,7 @@ for(const path of [...pages,...scripts]){
      if(/^(?:https?:|\/\/|data:|javascript:)/i.test(uri)||uri.startsWith('/'))
        {reject(path,'Script must be bundled from reviewed local paths.');continue;}
      const absolute=resolve(dirname(resolve(root,path)),uri);
-     if(!absolute.startsWith(root+'/')||!/\.js$/.test(absolute)||!scripts.some(p=>resolve(root,p)===absolute)&&!absolute.includes('/shared/vendor/'))
+     if(!absolute.startsWith(root+'/')||!/\.m?js$/.test(absolute)||!scripts.some(p=>resolve(root,p)===absolute)&&!absolute.includes('/shared/vendor/'))
        reject(path,'Unreviewed script source: '+uri);
    }
  }
