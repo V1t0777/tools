@@ -7,7 +7,8 @@
  */
 // Tiny DOM regression harnesses have no querySelector; navigation remains an
 // optional browser-only enhancement loaded by the single game runtime entry.
-const bar=typeof document!=='undefined'&&typeof document.querySelector==='function'
+const bar=typeof document!=='undefined'&&document.documentElement&&
+  typeof document.querySelector==='function'
   ?document.querySelector('.mobile-quick-nav'):null;
 if(bar){
   const buttons=[...bar.querySelectorAll('button[data-mobile-target]')];
