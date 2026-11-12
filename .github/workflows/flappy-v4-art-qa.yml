@@ -1,0 +1,986 @@
+name: Flappy V4 visual evidence (draft only)
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'flappy/**'
+      - '.github/workflows/flappy-v4-art-qa.yml'
+permissions:
+  contents: read
+jobs:
+  screenshot-draft:
+    # Generate reproducible evidence, never deploy or publish.
+    if: github.event.pull_request.draft && github.event.pull_request.number == 57
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout without saved credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify original V4 art exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          for theme in warm slate; do
+            for layer in sky far mid mist near; do
+              test -s "flappy/assets/v4/$theme/$layer.svg"
+            done
+          done
+          test -s flappy/review-v4.html
+          test -s flappy/assets/v4/masters/warm/far-master-pilot.svg
+          test -s flappy/assets/v4/pilot/warm/far.svg
+          test -s flappy/assets/v4/masters/slate/far-master-pilot.svg
+          test -s flappy/assets/v4/pilot/slate/far.svg
+          test -s flappy/assets/v4/masters/warm/mid-master-pilot.svg
+          test -s flappy/assets/v4/pilot/warm/mid.svg
+          test -s flappy/assets/v4/masters/slate/mid-master-pilot.svg
+          test -s flappy/assets/v4/pilot/slate/mid.svg
+          test -s flappy/assets/v4/masters/warm/mist-master-pilot.svg
+          test -s flappy/assets/v4/pilot/warm/mist.svg
+          test -s flappy/assets/v4/masters/slate/mist-master-pilot.svg
+          test -s flappy/assets/v4/pilot/slate/mist.svg
+          test -s flappy/assets/v4/masters/warm/sky-master-pilot.svg
+          test -s flappy/assets/v4/pilot/warm/sky.svg
+          test -s flappy/assets/v4/masters/slate/sky-master-pilot.svg
+          test -s flappy/assets/v4/pilot/slate/sky.svg
+          test -s flappy/assets/v4/masters/warm/near-master-pilot.svg
+          test -s flappy/assets/v4/pilot/warm/near.svg
+          test -s flappy/assets/v4/masters/slate/near-master-pilot.svg
+          test -s flappy/assets/v4/pilot/slate/near.svg
+          test -s flappy/assets/v4/masters/warm/near-master-alpha29.svg
+          test -s flappy/assets/v4/masters/slate/near-master-alpha29.svg
+          test -s flappy/assets/v4/pilot/warm/near-alpha29.svg
+          test -s flappy/assets/v4/pilot/slate/near-alpha29.svg
+      - name: Generate offline alpha-accurate original raster pigment candidates (QA only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Scoped virtual environment; no production or application dependencies.
+          python3 -m venv .alpha31-art-venv
+          .alpha31-art-venv/bin/python -m pip install --disable-pip-version-check --no-input             'CairoSVG==2.8.2' 'Pillow==11.3.0' 'websocket-client==1.8.0'
+          .alpha31-art-venv/bin/python tests/flappy-v4-raster-pigment.py
+          mkdir -p v4-art-qa/alpha31-raster
+          cp flappy/assets/v4/pilot/warm/near-raster-alpha31.png             v4-art-qa/alpha31-raster/warm-near-rgba-1600x1000.png
+          cp flappy/assets/v4/pilot/slate/near-raster-alpha31.png             v4-art-qa/alpha31-raster/slate-near-rgba-1600x1000.png
+          .alpha31-art-venv/bin/python tests/flappy-v4-directional-paint.py
+          mkdir -p v4-art-qa/alpha32-directional
+          for theme in warm slate; do
+            cp "flappy/assets/v4/pilot/$theme/near-raster-alpha32.png" "v4-art-qa/alpha32-directional/$theme-near-rgba-1600x1000.png"
+          done
+          # Alpha33: use original tree-path masks and original ridge, no runtime PNG.
+          .alpha31-art-venv/bin/python tests/flappy-v4-local-material.py
+          mkdir -p v4-art-qa/alpha33-masked
+          for theme in warm slate; do
+            cp "flappy/assets/v4/pilot/$theme/near-raster-alpha33.png" "v4-art-qa/alpha33-masked/$theme-near-rgba-1600x1000.png"
+          done
+          # Alpha34: newly authored per-tree 2x editable SVG paint art, offline only.
+          .alpha31-art-venv/bin/python tests/flappy-v4-editorial-gouache.py
+          mkdir -p v4-art-qa/alpha34-editorial
+          for theme in warm slate; do
+            cp "flappy/assets/v4/pilot/$theme/near-raster-alpha34.png" "v4-art-qa/alpha34-editorial/$theme-near-rgba-1600x1000.png"
+          done
+          # Alpha35 slate: a separate authored internal conifer branch-value structure.
+          .alpha31-art-venv/bin/python tests/flappy-v4-conifer-structure.py
+          mkdir -p v4-art-qa/alpha35-structure
+          cp flappy/assets/v4/pilot/slate/near-raster-alpha35.png v4-art-qa/alpha35-structure/slate-near-rgba-1600x1000.png
+          # Alpha36: two independently authored positive/negative outer sky
+          # contour edits. These PNGs stay in short-lived Draft QA only.
+          .alpha31-art-venv/bin/python tests/flappy-v4-outline-paint.py
+          mkdir -p v4-art-qa/alpha36-outline
+          for theme in warm slate; do
+            cp "flappy/assets/v4/pilot/$theme/near-raster-alpha36.png" "v4-art-qa/alpha36-outline/$theme-near-rgba-1600x1000.png"
+          done
+          # Alpha37: two independent 2x editable natural mountain paintings,
+          # each with synchronized ridge silhouette/clip/highlight.
+          .alpha31-art-venv/bin/python tests/flappy-v4-natural-midrange.py
+          mkdir -p v4-art-qa/alpha37-midrange
+          for theme in warm slate; do
+            cp "flappy/assets/v4/pilot/$theme/mid-raster-alpha37.png" "v4-art-qa/alpha37-midrange/$theme-mid-rgba-1600x1000.png"
+          done
+          # Alpha38 distant authored art is composed only into short-lived
+          # transparent QA PNGs and never copied to the game runtime.
+          .alpha31-art-venv/bin/python tests/flappy-v4-natural-far.py
+          mkdir -p v4-art-qa/alpha38-far
+          for theme in warm slate; do
+            cp "flappy/assets/v4/pilot/$theme/far-raster-alpha38.png" "v4-art-qa/alpha38-far/$theme-far-rgba-1600x1000.png"
+          done
+          # Alpha39 original irregular rock strata are CI-only painterly RGBA.
+          .alpha31-art-venv/bin/python tests/flappy-v4-rock-strata.py
+          mkdir -p v4-art-qa/alpha39-rock
+          for theme in warm slate; do
+            cp "flappy/assets/v4/pilot/$theme/far-raster-alpha39.png" "v4-art-qa/alpha39-rock/$theme-far-rgba-1600x1000.png"
+          done
+          # Alpha40: major source-authored broad-value paint replacement
+          # for both original far/mid silhouettes, QA only.
+          .alpha31-art-venv/bin/python tests/flappy-v4-whole-landscape.py
+          mkdir -p v4-art-qa/alpha40-landscape
+          for theme in warm slate; do
+            for depth in far mid; do
+              cp "flappy/assets/v4/pilot/$theme/$depth-raster-alpha40.png" "v4-art-qa/alpha40-landscape/$theme-$depth-rgba-1600x1000.png"
+            done
+          done
+          # Alpha41 overlays independently authored editable optical-distance
+          # and original broken geological pigments (4 sites x far/mid).
+          .alpha31-art-venv/bin/python tests/flappy-v4-atmospheric-depth.py
+          mkdir -p v4-art-qa/alpha41-atmosphere
+          for theme in warm slate; do
+            for depth in far mid; do
+              cp "flappy/assets/v4/pilot/$theme/$depth-raster-alpha41.png" "v4-art-qa/alpha41-atmosphere/$theme-$depth-rgba-1600x1000.png"
+            done
+          done
+          # Alpha42: truly edited original slate middle-mountain silhouette,
+          # synchronized source crop + rim, independent authored material.
+          .alpha31-art-venv/bin/python tests/flappy-v4-organic-midrange.py
+          mkdir -p v4-art-qa/alpha42-organic
+          cp flappy/assets/v4/pilot/slate/mid-raster-alpha42.png v4-art-qa/alpha42-organic/slate-mid-original-1600x1000.png
+          # Alpha43 two complete editable original far source repaints,
+          # only output within short-lived original-art reviewer QA.
+          .alpha31-art-venv/bin/python tests/flappy-v4-organic-far.py
+          mkdir -p v4-art-qa/alpha43-far-natural
+          for theme in warm slate; do
+            cp "flappy/assets/v4/pilot/$theme/far-raster-alpha43.png" "v4-art-qa/alpha43-far-natural/$theme-far-rgba-1600x1000.png"
+          done
+          # Alpha44: six original far/mid/near tonal harmony PNGs from
+          # two independent editable 2x source SVGs (Draft/CI ONLY).
+          .alpha31-art-venv/bin/python tests/flappy-v4-depth-cohesion.py
+          mkdir -p v4-art-qa/alpha44-cohesion
+          for theme in warm slate; do
+            for depth in far mid near; do
+              cp "flappy/assets/v4/pilot/$theme/$depth-raster-alpha44.png" "v4-art-qa/alpha44-cohesion/$theme-$depth-1600x1000.png"
+            done
+          done
+          test -s v4-art-qa/alpha44-cohesion-metrics.json
+          test -s v4-art-qa/alpha43-far-organic-metrics.json
+          test -s v4-art-qa/alpha42-slate-organic-metrics.json
+          test -s v4-art-qa/alpha41-atmospheric-metrics.json
+          test -s v4-art-qa/alpha40-landscape-metrics.json
+          test -s v4-art-qa/alpha39-authored-rock-metrics.json
+          test -s v4-art-qa/alpha38-far-source-metrics.json
+          test -s v4-art-qa/alpha37-natural-midrange-metrics.json
+          test -s v4-art-qa/alpha36-original-outline-metrics.json
+          test -s v4-art-qa/alpha35-structural-art-metrics.json
+          test -s v4-art-qa/alpha34-editorial-composition-metrics.json
+          test -s v4-art-qa/alpha33-local-material-metrics.json
+          test -s v4-art-qa/alpha32-directional-paint-metrics.json
+          test -s v4-art-qa/alpha31-pigment-study-metrics.json
+      - name: Capture isolated Chrome-process first-tap audio A/B
+        shell: bash
+        run: |
+          set -euo pipefail
+          if command -v google-chrome >/dev/null; then
+            export CHROME="$(command -v google-chrome)"
+          elif command -v chromium >/dev/null; then
+            export CHROME="$(command -v chromium)"
+          else
+            echo "Missing browser for fresh-profile A/B" >&2
+            exit 1
+          fi
+          node --check tests/flappy-v4-game-browser.mjs
+          # Every invocation starts its OWN Chrome process and clean profile.
+          # Order interleaves treatment/control; keep QA-only browser artifact isolated.
+          # Alternate sound state and skin to reduce fixed test-order bias.
+          for spec in \
+            "warm:off:1:prime" "warm:on:1:control" "warm:on:1:prime" "warm:off:1:control" \
+            "slate:on:1:prime" "slate:off:1:control" "slate:on:1:control" "slate:off:1:prime" \
+            "slate:off:2:prime" "slate:on:2:control" "slate:on:2:prime" "slate:off:2:control" \
+            "warm:on:2:prime" "warm:off:2:control" "warm:on:2:control" "warm:off:2:prime"; do
+            directory="${spec//:/-}"
+            V4_COLD_CASE="$spec" node tests/flappy-v4-game-browser.mjs "v4-cold-qa/$directory"
+          done
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path("v4-cold-qa")
+          files=sorted(root.glob("*/cold-firsttap.json"))
+          assert len(files)==16, f"Expected 16 independent cold-process reports, found {len(files)}"
+          cases=[json.loads(p.read_text()) for p in files]
+          combinations={(c['theme'],c['sound'],c['repetition'],c['variant']) for c in cases}
+          assert len(combinations)==16
+          assert len({c['processId'] for c in cases})>=1
+          for item in cases:
+              assert item['clicks']==1 and item['starts']>=1
+              assert item['sceneStatus']=='ready' and item['loadedLayers']==5
+              assert item['firstInput']['pointerToPhysicsMs']>=0
+              assert item['firstInput']['pointerToDrawMs']>=item['firstInput']['pointerToPhysicsMs']
+              if item['sound']=='on':
+                  assert item['audioCalls']>=1
+              else:
+                  assert item['audioCalls']==0 and not item['primeSuccess']
+              if item['variant']=='control':
+                  assert not item['primeSuccess']
+              filename=root/("-".join([item['theme'],item['sound'],str(item['repetition']),item['variant']])) / (
+                  f"first-tap-{item['theme']}-{item['sound']}-rep{item['repetition']}-{item['variant']}.png")
+              assert filename.is_file() and filename.stat().st_size>12000
+              print("FRESH FIRST TAP",item['theme'],item['sound'],item['repetition'],item['variant'],
+                    "appliedPhysicsMs",item['firstInput']['pointerToPhysicsMs'],
+                    "drawMs",item['firstInput']['pointerToDrawMs'],
+                    "audioMs",item['firstAudioInitMs'])
+          (root/"cold-process-summary.json").write_text(
+              json.dumps({"method":"16 individual Chrome processes and clean profiles: idle-prime on/off crossed with sound on/off, shared runner OS",
+                          "cases":cases},ensure_ascii=False,indent=2)+"\n")
+          PY
+      - name: Capture actual Flappy game Canvas (not the static art reviewer)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if command -v google-chrome >/dev/null; then
+            export CHROME="$(command -v google-chrome)"
+          else
+            export CHROME="$(command -v chromium)"
+          fi
+          node --check tests/flappy-v4-game-browser.mjs
+          node tests/flappy-v4-game-browser.mjs v4-game-qa
+          test -s v4-game-qa/headless-game-metrics.json
+          test -s v4-game-qa/headless-live-input-metrics.json
+          test -s v4-game-qa/headless-endurance-metrics.json
+          test -s v4-game-qa/headless-multiround-metrics.json
+          test -s v4-game-qa/headless-audio-ab-metrics.json
+          test -s v4-game-qa/headless-seam-metrics.json
+          test -s v4-game-qa/headless-narrow-readability.json
+          test "$(find v4-game-qa -maxdepth 1 -name 'seam-game-*.png' | wc -l)" -eq 18
+          test "$(find v4-game-qa -maxdepth 1 -name 'game-*.png' | wc -l)" -eq 12
+          test "$(find v4-game-qa -maxdepth 1 -name 'live-*.png' | wc -l)" -eq 2
+          # Real game and QA-only color evidence must cover the narrow layout;
+          # RGB deltas are diagnostic values, never interpreted as WCAG grades.
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('v4-game-qa')
+          report=json.loads((root/'headless-narrow-readability.json').read_text())
+          captures=report['captures']
+          assert len(captures)==12
+          assert sorted({row['viewport'] for row in captures})==['320x568','360x600','390x844']
+          assert len([row for row in captures if row['viewport']=='320x568'])==4
+          for row in captures:
+              assert row['originalAtlasDecoded'] and row['birdAtlasReady']
+              assert row['nominalBirdDiameterCssPx']>=26
+              for field in ('centerRgbDelta','breastRgbDelta'):
+                  assert isinstance(row[field],(float,int)) and 0<=row[field]<=255
+              assert (root/row['filename']).is_file()
+              for field in ('centerLinearLuminance','underCenterLinearLuminance',
+                            'breastLinearLuminance','underBreastLinearLuminance',
+                            'centerLinearLuminanceGap','breastLinearLuminanceGap'):
+                  assert isinstance(row[field],(float,int)) and 0<=row[field]<=1,(row['theme'],row['viewport'],field,row.get(field))
+          assert len(json.loads((root/'headless-seam-metrics.json').read_text())['results'])==18
+          summaries=report['luminanceSummary']
+          assert {entry['theme'] for entry in summaries}=={'warm','slate'}
+          for entry in summaries:
+              assert entry['positions']==6
+              assert 0<=entry['minCenterGap']<=entry['maxCenterGap']<=1
+          print('Alpha 22: 12 luminance + RGB sample pairs across two scenes and three viewports verified')
+          print('Alpha 20: 12 true Canvas captures, 18 layer joins, 4 narrow-layout records verified')
+          PY
+      - name: Render responsive draft evidence with installed headless Chrome
+        shell: bash
+        run: |
+          set -euo pipefail
+          if command -v google-chrome >/dev/null; then
+            CHROME="$(command -v google-chrome)"
+          elif command -v chromium >/dev/null; then
+            CHROME="$(command -v chromium)"
+          else
+            echo "Neither Chrome nor Chromium is present on this runner." >&2
+            exit 1
+          fi
+          mkdir -p v4-art-qa
+          python3 -m http.server 8765 --bind 127.0.0.1 >v4-art-qa/server.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          python3 - <<'PY'
+          import time
+          import urllib.request
+          url="http://127.0.0.1:8765/flappy/review-v4.html"
+          for attempt in range(30):
+              try:
+                  with urllib.request.urlopen(url,timeout=1) as response:
+                      if response.status==200:
+                          break
+              except Exception:
+                  time.sleep(.3)
+          else:
+              raise SystemExit("local visual review server did not start")
+          PY
+          for theme in warm slate; do
+            for view in scene seam; do
+              fragment="$theme"
+              if [[ "$view" == seam ]]; then fragment="$theme-seam"; fi
+              for shape in "360 600" "390 844" "420 740" "320 568"; do
+                read -r W H <<<"$shape"
+                png="v4-art-qa/$view-$theme-$W"x"$H.png"
+                "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+                  --hide-scrollbars --force-device-scale-factor=1 \
+                  --virtual-time-budget=2200 --window-size="$W,$H" \
+                  "--screenshot=$png" \
+                  "http://127.0.0.1:8765/flappy/review-v4.html#$fragment" \
+                  >/dev/null 2>v4-art-qa/chrome.log
+                test -s "$png"
+              done
+            done
+          done
+          # Alpha 23: compare ORIGINAL atlas frames 0/6/12/18 in the same art scene.
+          # Frame 0 is captured by scene-theme-{320,390} already; this adds 6/12/18.
+          # Every fragment is a CSS-only :target selector. No page JavaScript.
+          for theme in warm slate; do
+            for phase in power recovery glide; do
+              for shape in "320 568" "390 844"; do
+                read -r W H <<<"$shape"
+                png="v4-art-qa/pose-$theme-$phase-$W"x"$H.png"
+                "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+                  --hide-scrollbars --force-device-scale-factor=1 \
+                  --virtual-time-budget=2200 --window-size="$W,$H" \
+                  "--screenshot=$png" \
+                  "http://127.0.0.1:8765/flappy/review-v4.html#$theme-$phase" \
+                  >/dev/null 2>v4-art-qa/chrome.log
+                test -s "$png"
+              done
+            done
+          done
+          # Alpha 25: both original 3200x2000 source-painted masters remain
+          # QA-only. For each theme, change *only* the far painting in CSS.
+          # Keep the warm-specific probe to preserve Alpha 24's reviewer route.
+          for theme in warm slate; do
+            for shape in "320 568" "390 844"; do
+              read -r W H <<<"$shape"
+              png="v4-art-qa/pilot-$theme-far-$W"x"$H.png"
+              "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+                --hide-scrollbars --force-device-scale-factor=1 \
+                --virtual-time-budget=2200 --window-size="$W,$H" \
+                "--screenshot=$png" \
+                "http://127.0.0.1:8765/flappy/review-v4.html#$theme-pilot" \
+                >/dev/null 2>v4-art-qa/chrome.log
+              test -s "$png"
+              ! cmp -s "$png" "v4-art-qa/scene-$theme-$W"x"$H.png"
+            done
+            "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+              --hide-scrollbars --force-device-scale-factor=1 \
+              --virtual-time-budget=2200 --window-size="3200,2000" \
+              "--screenshot=v4-art-qa/master-$theme-far-3200x2000.png" \
+              "http://127.0.0.1:8765/flappy/assets/v4/masters/$theme/far-master-pilot.svg" \
+              >/dev/null 2>v4-art-qa/chrome.log
+            test -s "v4-art-qa/master-$theme-far-3200x2000.png"
+            # One full painterly-far repeat seam screenshot for each theme,
+            # in addition to the real-game 18 dynamic joins of existing assets.
+            "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+              --hide-scrollbars --force-device-scale-factor=1 \
+              --virtual-time-budget=2200 --window-size="320,568" \
+              "--screenshot=v4-art-qa/pilot-seam-$theme-320x568.png" \
+              "http://127.0.0.1:8765/flappy/review-v4.html#$theme-pilot-seam" \
+              >/dev/null 2>v4-art-qa/chrome.log
+            test -s "v4-art-qa/pilot-seam-$theme-320x568.png"
+          done
+          # Alpha 26: mid-only A/B distinguishes painterly mid terrain from
+          # unmodified far; paired stack A/B checks far+mid value grouping.
+          # Both remain CSS-only QA, with NO in-game runtime asset overrides.
+          for theme in warm slate; do
+            for kind in mid stack; do
+              for shape in "320 568" "390 844"; do
+                read -r W H <<<"$shape"
+                png="v4-art-qa/pilot-$kind-$theme-$W"x"$H.png"
+                "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+                  --hide-scrollbars --force-device-scale-factor=1 \
+                  --virtual-time-budget=2200 --window-size="$W,$H" \
+                  "--screenshot=$png" \
+                  "http://127.0.0.1:8765/flappy/review-v4.html#$theme-$kind-pilot" \
+                  >/dev/null 2>v4-art-qa/chrome.log
+                test -s "$png"
+                ! cmp -s "$png" "v4-art-qa/scene-$theme-$W"x"$H.png"
+              done
+            done
+            "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+              --hide-scrollbars --force-device-scale-factor=1 \
+              --virtual-time-budget=2200 --window-size="3200,2000" \
+              "--screenshot=v4-art-qa/master-$theme-mid-3200x2000.png" \
+              "http://127.0.0.1:8765/flappy/assets/v4/masters/$theme/mid-master-pilot.svg" \
+              >/dev/null 2>v4-art-qa/chrome.log
+            test -s "v4-art-qa/master-$theme-mid-3200x2000.png"
+            "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+              --hide-scrollbars --force-device-scale-factor=1 \
+              --virtual-time-budget=2200 --window-size="320,568" \
+              "--screenshot=v4-art-qa/pilot-mid-seam-$theme-320x568.png" \
+              "http://127.0.0.1:8765/flappy/review-v4.html#$theme-mid-pilot-seam" \
+              >/dev/null 2>v4-art-qa/chrome.log
+            test -s "v4-art-qa/pilot-mid-seam-$theme-320x568.png"
+          done
+          # Alpha 27: original mist only and far+mid+mist atmosphere as a stack.
+          # These CSS-only routes are never loaded from flappy/index.html.
+          for theme in warm slate; do
+            for kind in mist atmo; do
+              for shape in "320 568" "390 844"; do
+                read -r W H <<<"$shape"
+                png="v4-art-qa/pilot-$kind-$theme-$W"x"$H.png"
+                "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+                  --hide-scrollbars --force-device-scale-factor=1 \
+                  --virtual-time-budget=2200 --window-size="$W,$H" \
+                  "--screenshot=$png" \
+                  "http://127.0.0.1:8765/flappy/review-v4.html#$theme-$kind-pilot" \
+                  >/dev/null 2>v4-art-qa/chrome.log
+                test -s "$png"
+                ! cmp -s "$png" "v4-art-qa/scene-$theme-$W"x"$H.png"
+              done
+            done
+            "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+              --hide-scrollbars --force-device-scale-factor=1 \
+              --virtual-time-budget=2200 --window-size="3200,2000" \
+              "--screenshot=v4-art-qa/master-$theme-mist-3200x2000.png" \
+              "http://127.0.0.1:8765/flappy/assets/v4/masters/$theme/mist-master-pilot.svg" \
+              >/dev/null 2>v4-art-qa/chrome.log
+            test -s "v4-art-qa/master-$theme-mist-3200x2000.png"
+            "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+              --hide-scrollbars --force-device-scale-factor=1 \
+              --virtual-time-budget=2200 --window-size="320,568" \
+              "--screenshot=v4-art-qa/pilot-mist-seam-$theme-320x568.png" \
+              "http://127.0.0.1:8765/flappy/review-v4.html#$theme-mist-pilot-seam" \
+              >/dev/null 2>v4-art-qa/chrome.log
+            test -s "v4-art-qa/pilot-mist-seam-$theme-320x568.png"
+          done
+          # Alpha 28: sky-only change and four-layer luminous A/B with identical
+          # bird, pipes and 320/390 crop; sky remains non-repeated, no sky seam.
+          for theme in warm slate; do
+            for kind in sky light; do
+              for shape in "320 568" "390 844"; do
+                read -r W H <<<"$shape"
+                png="v4-art-qa/pilot-$kind-$theme-$W"x"$H.png"
+                "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+                  --hide-scrollbars --force-device-scale-factor=1 \
+                  --virtual-time-budget=2200 --window-size="$W,$H" \
+                  "--screenshot=$png" \
+                  "http://127.0.0.1:8765/flappy/review-v4.html#$theme-$kind-pilot" \
+                  >/dev/null 2>v4-art-qa/chrome.log
+                test -s "$png"
+                ! cmp -s "$png" "v4-art-qa/scene-$theme-$W"x"$H.png"
+              done
+            done
+            "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+              --hide-scrollbars --force-device-scale-factor=1 \
+              --virtual-time-budget=2200 --window-size="3200,2000" \
+              "--screenshot=v4-art-qa/master-$theme-sky-3200x2000.png" \
+              "http://127.0.0.1:8765/flappy/assets/v4/masters/$theme/sky-master-pilot.svg" \
+              >/dev/null 2>v4-art-qa/chrome.log
+            test -s "v4-art-qa/master-$theme-sky-3200x2000.png"
+          done
+          # Alpha 29: near-only foreground study and complete five-layer
+          # original source-paint scene, no runtime resource substitution.
+          for theme in warm slate; do
+            for kind in near full; do
+              for shape in "320 568" "390 844"; do
+                read -r W H <<<"$shape"
+                png="v4-art-qa/pilot-$kind-$theme-$W"x"$H.png"
+                "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+                  --hide-scrollbars --force-device-scale-factor=1 \
+                  --virtual-time-budget=2200 --window-size="$W,$H" \
+                  "--screenshot=$png" \
+                  "http://127.0.0.1:8765/flappy/review-v4.html#$theme-$kind-pilot" \
+                  >/dev/null 2>v4-art-qa/chrome.log
+                test -s "$png"
+                ! cmp -s "$png" "v4-art-qa/scene-$theme-$W"x"$H.png"
+              done
+            done
+            "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+              --hide-scrollbars --force-device-scale-factor=1 \
+              --virtual-time-budget=2200 --window-size="3200,2000" \
+              "--screenshot=v4-art-qa/master-$theme-near-3200x2000.png" \
+              "http://127.0.0.1:8765/flappy/assets/v4/masters/$theme/near-master-pilot.svg" \
+              >/dev/null 2>v4-art-qa/chrome.log
+            test -s "v4-art-qa/master-$theme-near-3200x2000.png"
+            "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+              --hide-scrollbars --force-device-scale-factor=1 \
+              --virtual-time-budget=2200 --window-size="320,568" \
+              "--screenshot=v4-art-qa/pilot-near-seam-$theme-320x568.png" \
+              "http://127.0.0.1:8765/flappy/review-v4.html#$theme-near-pilot-seam" \
+              >/dev/null 2>v4-art-qa/chrome.log
+            test -s "v4-art-qa/pilot-near-seam-$theme-320x568.png"
+          done
+          # Alpha 30 frozen Alpha 29 original-pilot reference, same page and
+          # scene layers except historical near artwork. Keep all earlier QA.
+          for theme in warm slate; do
+            for shape in "320 568" "390 844"; do
+              read -r W H <<<"$shape"
+              oldpng="v4-art-qa/alpha29-near-$theme-$W"x"$H.png"
+              "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+                --hide-scrollbars --force-device-scale-factor=1 \
+                --virtual-time-budget=2200 --window-size="$W,$H" \
+                "--screenshot=$oldpng" \
+                "http://127.0.0.1:8765/flappy/review-v4.html#$theme-near-alpha29" \
+                >/dev/null 2>v4-art-qa/chrome.log
+              test -s "$oldpng"
+              ! cmp -s "$oldpng" "v4-art-qa/pilot-near-$theme-$W"x"$H.png"
+            done
+          done
+          # Alpha 31 true PNG RGBA raster paint prototypes (not SVG-only styling):
+          # source PNGs generated in the isolated offline build step above.
+          for theme in warm slate; do
+            for shape in "320 568" "390 844"; do
+              read -r W H <<<"$shape"
+              png="v4-art-qa/alpha31-raster-$theme-$W"x"$H.png"
+              "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+                --hide-scrollbars --force-device-scale-factor=1 \
+                --virtual-time-budget=2200 --window-size="$W,$H" \
+                "--screenshot=$png" \
+                "http://127.0.0.1:8765/flappy/review-v4.html#$theme-raster-alpha31" \
+                >/dev/null 2>v4-art-qa/chrome.log
+              test -s "$png"
+              ! cmp -s "$png" "v4-art-qa/pilot-near-$theme-$W"x"$H.png"
+            done
+            "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+              --hide-scrollbars --force-device-scale-factor=1 \
+              --virtual-time-budget=2200 --window-size="320,568" \
+              "--screenshot=v4-art-qa/alpha31-raster-seam-$theme-320x568.png" \
+              "http://127.0.0.1:8765/flappy/review-v4.html#$theme-raster-alpha31-seam" \
+              >/dev/null 2>v4-art-qa/chrome.log
+            test -s "v4-art-qa/alpha31-raster-seam-$theme-320x568.png"
+          done
+          # Alpha32: both mobile widths per theme plus independent raster join.
+          for theme in warm slate; do
+            for shape in "320 568" "390 844"; do
+              read -r W H <<<"$shape"
+              png="v4-art-qa/alpha32-raster-$theme-$W"x"$H.png"
+              "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+                --hide-scrollbars --force-device-scale-factor=1 \
+                --virtual-time-budget=2200 --window-size="$W,$H" \
+                "--screenshot=$png" \
+                "http://127.0.0.1:8765/flappy/review-v4.html#$theme-raster-alpha32" \
+                >/dev/null 2>v4-art-qa/chrome.log
+              test -s "$png"
+              ! cmp -s "$png" "v4-art-qa/alpha31-raster-$theme-$W"x"$H.png"
+            done
+            "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+              --hide-scrollbars --force-device-scale-factor=1 \
+              --virtual-time-budget=2200 --window-size="320,568" \
+              "--screenshot=v4-art-qa/alpha32-raster-seam-$theme-320x568.png" \
+              "http://127.0.0.1:8765/flappy/review-v4.html#$theme-raster-alpha32-seam" \
+              >/dev/null 2>v4-art-qa/chrome.log
+            test -s "v4-art-qa/alpha32-raster-seam-$theme-320x568.png"
+          done
+          # Alpha33 separate PNG comparison at both viewports, plus actual seam.
+          for theme in warm slate; do
+            for shape in "320 568" "390 844"; do
+              read -r W H <<<"$shape"
+              png="v4-art-qa/alpha33-raster-$theme-$W"x"$H.png"
+              "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+                --hide-scrollbars --force-device-scale-factor=1 \
+                --virtual-time-budget=2200 --window-size="$W,$H" \
+                "--screenshot=$png" \
+                "http://127.0.0.1:8765/flappy/review-v4.html#$theme-raster-alpha33" \
+                >/dev/null 2>v4-art-qa/chrome.log
+              test -s "$png"
+              ! cmp -s "$png" "v4-art-qa/alpha32-raster-$theme-$W"x"$H.png"
+            done
+            "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+              --hide-scrollbars --force-device-scale-factor=1 \
+              --virtual-time-budget=2200 --window-size="320,568" \
+              "--screenshot=v4-art-qa/alpha33-raster-seam-$theme-320x568.png" \
+              "http://127.0.0.1:8765/flappy/review-v4.html#$theme-raster-alpha33-seam" \
+              >/dev/null 2>v4-art-qa/chrome.log
+            test -s "v4-art-qa/alpha33-raster-seam-$theme-320x568.png"
+          done
+          # Alpha34 original composed artwork: 4 A/B phone frames and 2 seams.
+          for theme in warm slate; do
+            for shape in "320 568" "390 844"; do
+              read -r W H <<<"$shape"
+              png="v4-art-qa/alpha34-raster-$theme-$W"x"$H.png"
+              "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+                --hide-scrollbars --force-device-scale-factor=1 \
+                --virtual-time-budget=2200 --window-size="$W,$H" \
+                "--screenshot=$png" \
+                "http://127.0.0.1:8765/flappy/review-v4.html#$theme-raster-alpha34" \
+                >/dev/null 2>v4-art-qa/chrome.log
+              test -s "$png"
+              ! cmp -s "$png" "v4-art-qa/alpha33-raster-$theme-$W"x"$H.png"
+            done
+            "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+              --hide-scrollbars --force-device-scale-factor=1 \
+              --virtual-time-budget=2200 --window-size="320,568" \
+              "--screenshot=v4-art-qa/alpha34-raster-seam-$theme-320x568.png" \
+              "http://127.0.0.1:8765/flappy/review-v4.html#$theme-raster-alpha34-seam" \
+              >/dev/null 2>v4-art-qa/chrome.log
+            test -s "v4-art-qa/alpha34-raster-seam-$theme-320x568.png"
+          done
+          # Alpha35 slate A/B: two actual viewport snapshots, one tiled seam.
+          # The following Pillow check rejects invisible/detached CSS image routes.
+          for shape in "320 568" "390 844"; do
+            read -r W H <<<"$shape"
+            png="v4-art-qa/alpha35-raster-slate-$W"x"$H.png"
+            "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+              --hide-scrollbars --force-device-scale-factor=1 \
+              --virtual-time-budget=2200 --window-size="$W,$H" \
+              "--screenshot=$png" \
+              "http://127.0.0.1:8765/flappy/review-v4.html#slate-raster-alpha35" \
+              >/dev/null 2>v4-art-qa/chrome.log
+            test -s "$png"
+          done
+          .alpha31-art-venv/bin/python tests/flappy-v4-conifer-structure.py --verify-screens
+          "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+            --hide-scrollbars --force-device-scale-factor=1 \
+            --virtual-time-budget=2200 --window-size="320,568" \
+            "--screenshot=v4-art-qa/alpha35-raster-seam-slate-320x568.png" \
+            "http://127.0.0.1:8765/flappy/review-v4.html#slate-raster-alpha35-seam" \
+            >/dev/null 2>v4-art-qa/chrome.log
+          test -s v4-art-qa/alpha35-raster-seam-slate-320x568.png
+          # Alpha36 genuine altered RGBA alpha: four Chrome mobile screenshots,
+          # two repeated original-source bitmap join screenshot proofs.
+          for theme in warm slate; do
+            for shape in "320 568" "390 844"; do
+              read -r W H <<<"$shape"
+              png="v4-art-qa/alpha36-raster-$theme-$W"x"$H.png"
+              "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+                --hide-scrollbars --force-device-scale-factor=1 \
+                --virtual-time-budget=2200 --window-size="$W,$H" \
+                "--screenshot=$png" \
+                "http://127.0.0.1:8765/flappy/review-v4.html#$theme-raster-alpha36" \
+                >/dev/null 2>v4-art-qa/chrome.log
+              test -s "$png"
+            done
+            "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+              --hide-scrollbars --force-device-scale-factor=1 \
+              --virtual-time-budget=2200 --window-size="320,568" \
+              "--screenshot=v4-art-qa/alpha36-raster-seam-$theme-320x568.png" \
+              "http://127.0.0.1:8765/flappy/review-v4.html#$theme-raster-alpha36-seam" \
+              >/dev/null 2>v4-art-qa/chrome.log
+            test -s "v4-art-qa/alpha36-raster-seam-$theme-320x568.png"
+          done
+          .alpha31-art-venv/bin/python tests/flappy-v4-outline-paint.py --verify-screens
+          # Alpha37: compare actual 320/390 Chrome scenes against existing
+          # independent pilot-mid screenshot (already checked above). Capture
+          # full far/mid/mist/near36 film-world proof and both true tile joins.
+          for theme in warm slate; do
+            for shape in "320 568" "390 844"; do
+              read -r W H <<<"$shape"
+              png="v4-art-qa/alpha37-mid-$theme-$W"x"$H.png"
+              "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+                --hide-scrollbars --force-device-scale-factor=1 \
+                --virtual-time-budget=2200 --window-size="$W,$H" \
+                "--screenshot=$png" \
+                "http://127.0.0.1:8765/flappy/review-v4.html#$theme-mid-alpha37" \
+                >/dev/null 2>v4-art-qa/chrome.log
+              test -s "$png"
+            done
+            "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+              --hide-scrollbars --force-device-scale-factor=1 \
+              --virtual-time-budget=2200 --window-size="320,568" \
+              "--screenshot=v4-art-qa/alpha37-world-$theme-320x568.png" \
+              "http://127.0.0.1:8765/flappy/review-v4.html#$theme-world-alpha37" \
+              >/dev/null 2>v4-art-qa/chrome.log
+            test -s "v4-art-qa/alpha37-world-$theme-320x568.png"
+            "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+              --hide-scrollbars --force-device-scale-factor=1 \
+              --virtual-time-budget=2200 --window-size="320,568" \
+              "--screenshot=v4-art-qa/alpha37-mid-seam-$theme-320x568.png" \
+              "http://127.0.0.1:8765/flappy/review-v4.html#$theme-mid-alpha37-seam" \
+              >/dev/null 2>v4-art-qa/chrome.log
+            test -s "v4-art-qa/alpha37-mid-seam-$theme-320x568.png"
+          done
+          .alpha31-art-venv/bin/python tests/flappy-v4-natural-midrange.py --verify-screens
+          # Alpha38: capture four far-only mobile A/B and two integrated
+          # cinematic scene compositions; audit two real repeated-far PNG joins.
+          for theme in warm slate; do
+            for shape in "320 568" "390 844"; do
+              read -r W H <<<"$shape"
+              png="v4-art-qa/alpha38-far-$theme-$W"x"$H.png"
+              "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+                --hide-scrollbars --force-device-scale-factor=1 \
+                --virtual-time-budget=2200 --window-size="$W,$H" \
+                "--screenshot=$png" \
+                "http://127.0.0.1:8765/flappy/review-v4.html#$theme-far-alpha38" \
+                >/dev/null 2>v4-art-qa/chrome.log
+              test -s "$png"
+            done
+            "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+              --hide-scrollbars --force-device-scale-factor=1 \
+              --virtual-time-budget=2200 --window-size="320,568" \
+              "--screenshot=v4-art-qa/alpha38-world-$theme-320x568.png" \
+              "http://127.0.0.1:8765/flappy/review-v4.html#$theme-world-alpha38" \
+              >/dev/null 2>v4-art-qa/chrome.log
+            test -s "v4-art-qa/alpha38-world-$theme-320x568.png"
+            "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+              --hide-scrollbars --force-device-scale-factor=1 \
+              --virtual-time-budget=2200 --window-size="320,568" \
+              "--screenshot=v4-art-qa/alpha38-far-seam-$theme-320x568.png" \
+              "http://127.0.0.1:8765/flappy/review-v4.html#$theme-far-alpha38-seam" \
+              >/dev/null 2>v4-art-qa/chrome.log
+            test -s "v4-art-qa/alpha38-far-seam-$theme-320x568.png"
+          done
+          .alpha31-art-venv/bin/python tests/flappy-v4-natural-far.py --verify-screens
+          # Alpha42: all 8 Alpha39, 14 Alpha40, 14 Alpha41, 4 Alpha42
+          # actual Chrome screenshots in one loopback browser (40 frames).
+          # Historical 135 independent snapshots remain fully retained.
+          # The earlier 135 static shots are still independently captured.
+          .alpha31-art-venv/bin/python tests/flappy-v4-batch-chrome.py \
+            --chrome "$CHROME" \
+            --base-url http://127.0.0.1:8765/flappy/review-v4.html \
+            --stage recent \
+            --output v4-art-qa
+          .alpha31-art-venv/bin/python tests/flappy-v4-rock-strata.py --verify-screens
+          .alpha31-art-venv/bin/python tests/flappy-v4-whole-landscape.py --verify-screens
+          .alpha31-art-venv/bin/python tests/flappy-v4-atmospheric-depth.py --verify-screens
+          .alpha31-art-venv/bin/python tests/flappy-v4-organic-midrange.py --verify-screens
+          .alpha31-art-venv/bin/python tests/flappy-v4-organic-far.py --verify-screens
+          .alpha31-art-venv/bin/python tests/flappy-v4-depth-cohesion.py --verify-screens
+          .alpha31-art-venv/bin/python tests/flappy-v4-foreground-readability.py
+          # Alpha45 checks all four actual 24-frame atlas poses in two
+          # phone viewports/worlds against true no-bird background controls.
+          .alpha31-art-venv/bin/python tests/flappy-v4-four-pose-readability.py
+          test -s v4-art-qa/alpha45-actual-wing-readability.json
+          for stage in alpha39 alpha40 alpha41 alpha42 alpha43 alpha44 alpha45; do
+            test -s "v4-art-qa/$stage-batch-chrome-metrics.json"
+          done
+          test -s v4-art-qa/recent-batch-chrome-metrics.json
+          test -s v4-art-qa/alpha42-slate-mobile-ab.json
+          test -s v4-art-qa/alpha43-far-mobile-ab.json
+          test -s v4-art-qa/alpha44-real-world-ab.json
+          test -s v4-art-qa/alpha44-real-chrome-readability.json
+          # Unchanged warm route is exercised by the loop above:
+          # http://127.0.0.1:8765/flappy/review-v4.html#warm-pilot
+          # pilot-warm-far-$W, master-warm-far-3200x2000.png
+          python3 - <<'PY'
+          from pathlib import Path
+          import struct
+          for path in sorted(Path("v4-art-qa").glob("*.png")):
+              b=path.read_bytes()
+              if b[:8]!=b"\x89PNG\r\n\x1a\n":
+                  raise SystemExit(f"Invalid PNG signature: {path}; size={len(b)}")
+              # Alpha 27 mist-only proofs are mostly transparent; expected to
+              # compress better than fully-painted screenshots. Keep a strict
+              # nonempty threshold, PNG CRC/signature, dimensions and RGB seam QA.
+              min_bytes=12000 if path.name.startswith(("pilot-mist-seam-", "pilot-near-seam-", "alpha37-mid-seam-", "alpha38-far-seam-", "alpha40-far-seam-", "alpha40-mid-seam-", "alpha42-mid-seam-", "alpha43-far-seam-", "alpha44-far-seam-", "alpha44-mid-seam-", "alpha44-near-seam-")) else 20000
+              if len(b)<min_bytes:
+                  raise SystemExit(f"Suspiciously small screenshot: {path}; size={len(b)}; minimum={min_bytes}")
+              width,height=struct.unpack(">II",b[16:24])
+              label=path.stem.split("-")[-1]
+              expected_width,expected_height=map(int,label.split("x"))
+              if (width,height)!=(expected_width,expected_height):
+                  raise SystemExit(f"Wrong mobile capture dimensions: {path} {width}x{height}")
+              print(f"{path}: {width}x{height}, {len(b)} bytes")
+          scene_count=len(list(Path("v4-art-qa").glob("scene-*.png")))
+          seam_count=len(list(Path("v4-art-qa").glob("seam-*.png")))
+          pose_count=len(list(Path("v4-art-qa").glob("pose-*.png")))
+          pilot_count=sum(len(list(Path("v4-art-qa").glob(f"pilot-{theme}-far-*.png"))) for theme in ("warm","slate"))
+          pilot_seam_count=len(list(Path("v4-art-qa").glob("pilot-seam-*.png")))
+          mid_count=len(list(Path("v4-art-qa").glob("pilot-mid-*.png")))-len(list(Path("v4-art-qa").glob("pilot-mid-seam-*.png")))
+          stack_count=len(list(Path("v4-art-qa").glob("pilot-stack-*.png")))
+          mid_seam_count=len(list(Path("v4-art-qa").glob("pilot-mid-seam-*.png")))
+          mist_count=len(list(Path("v4-art-qa").glob("pilot-mist-*.png")))-len(list(Path("v4-art-qa").glob("pilot-mist-seam-*.png")))
+          atmo_count=len(list(Path("v4-art-qa").glob("pilot-atmo-*.png")))
+          mist_seam_count=len(list(Path("v4-art-qa").glob("pilot-mist-seam-*.png")))
+          sky_count=len(list(Path("v4-art-qa").glob("pilot-sky-*.png")))
+          light_count=len(list(Path("v4-art-qa").glob("pilot-light-*.png")))
+          near_count=len(list(Path("v4-art-qa").glob("pilot-near-*.png")))-len(list(Path("v4-art-qa").glob("pilot-near-seam-*.png")))
+          full_count=len(list(Path("v4-art-qa").glob("pilot-full-*.png")))
+          near_seam_count=len(list(Path("v4-art-qa").glob("pilot-near-seam-*.png")))
+          alpha29_ref_count=len(list(Path("v4-art-qa").glob("alpha29-near-*.png")))
+          alpha31_raster_count=len(list(Path("v4-art-qa").glob("alpha31-raster-*.png")))-len(list(Path("v4-art-qa").glob("alpha31-raster-seam-*.png")))
+          alpha31_raster_seam_count=len(list(Path("v4-art-qa").glob("alpha31-raster-seam-*.png")))
+          alpha32_raster_count=len(list(Path("v4-art-qa").glob("alpha32-raster-*.png")))-len(list(Path("v4-art-qa").glob("alpha32-raster-seam-*.png")))
+          alpha32_raster_seam_count=len(list(Path("v4-art-qa").glob("alpha32-raster-seam-*.png")))
+          alpha33_raster_count=len(list(Path("v4-art-qa").glob("alpha33-raster-*.png")))-len(list(Path("v4-art-qa").glob("alpha33-raster-seam-*.png")))
+          alpha33_raster_seam_count=len(list(Path("v4-art-qa").glob("alpha33-raster-seam-*.png")))
+          alpha34_raster_count=len(list(Path("v4-art-qa").glob("alpha34-raster-*.png")))-len(list(Path("v4-art-qa").glob("alpha34-raster-seam-*.png")))
+          alpha34_raster_seam_count=len(list(Path("v4-art-qa").glob("alpha34-raster-seam-*.png")))
+          alpha35_raster_count=len(list(Path("v4-art-qa").glob("alpha35-raster-*.png")))-len(list(Path("v4-art-qa").glob("alpha35-raster-seam-*.png")))
+          alpha35_raster_seam_count=len(list(Path("v4-art-qa").glob("alpha35-raster-seam-*.png")))
+          alpha36_raster_count=len(list(Path("v4-art-qa").glob("alpha36-raster-*.png")))-len(list(Path("v4-art-qa").glob("alpha36-raster-seam-*.png")))
+          alpha36_raster_seam_count=len(list(Path("v4-art-qa").glob("alpha36-raster-seam-*.png")))
+          alpha37_mid_count=len(list(Path("v4-art-qa").glob("alpha37-mid-*.png")))-len(list(Path("v4-art-qa").glob("alpha37-mid-seam-*.png")))
+          alpha37_mid_seam_count=len(list(Path("v4-art-qa").glob("alpha37-mid-seam-*.png")))
+          alpha37_world_count=len(list(Path("v4-art-qa").glob("alpha37-world-*.png")))
+          alpha38_far_count=len(list(Path("v4-art-qa").glob("alpha38-far-*.png")))-len(list(Path("v4-art-qa").glob("alpha38-far-seam-*.png")))
+          alpha38_far_seam_count=len(list(Path("v4-art-qa").glob("alpha38-far-seam-*.png")))
+          alpha38_world_count=len(list(Path("v4-art-qa").glob("alpha38-world-*.png")))
+          alpha39_far_count=len(list(Path("v4-art-qa").glob("alpha39-far-*.png")))-len(list(Path("v4-art-qa").glob("alpha39-far-seam-*.png")))
+          alpha39_far_seam_count=len(list(Path("v4-art-qa").glob("alpha39-far-seam-*.png")))
+          alpha39_world_count=len(list(Path("v4-art-qa").glob("alpha39-world-*.png")))
+          alpha40_far_count=len(list(Path("v4-art-qa").glob("alpha40-far-*.png")))-len(list(Path("v4-art-qa").glob("alpha40-far-seam-*.png")))
+          alpha40_mid_count=len(list(Path("v4-art-qa").glob("alpha40-mid-*.png")))-len(list(Path("v4-art-qa").glob("alpha40-mid-seam-*.png")))
+          alpha40_far_seam_count=len(list(Path("v4-art-qa").glob("alpha40-far-seam-*.png")))
+          alpha40_mid_seam_count=len(list(Path("v4-art-qa").glob("alpha40-mid-seam-*.png")))
+          alpha40_world_count=len(list(Path("v4-art-qa").glob("alpha40-world-*.png")))
+          alpha41_far_count=len(list(Path("v4-art-qa").glob("alpha41-far-*.png")))-len(list(Path("v4-art-qa").glob("alpha41-far-seam-*.png")))
+          alpha41_mid_count=len(list(Path("v4-art-qa").glob("alpha41-mid-*.png")))-len(list(Path("v4-art-qa").glob("alpha41-mid-seam-*.png")))
+          alpha41_far_seam_count=len(list(Path("v4-art-qa").glob("alpha41-far-seam-*.png")))
+          alpha41_mid_seam_count=len(list(Path("v4-art-qa").glob("alpha41-mid-seam-*.png")))
+          alpha41_world_count=len(list(Path("v4-art-qa").glob("alpha41-world-*.png")))
+          alpha42_mid_count=len(list(Path("v4-art-qa").glob("alpha42-mid-*.png")))-len(list(Path("v4-art-qa").glob("alpha42-mid-seam-*.png")))
+          alpha42_mid_seam_count=len(list(Path("v4-art-qa").glob("alpha42-mid-seam-*.png")))
+          alpha42_world_count=len(list(Path("v4-art-qa").glob("alpha42-world-*.png")))
+          alpha43_far_count=len(list(Path("v4-art-qa").glob("alpha43-far-*.png")))-len(list(Path("v4-art-qa").glob("alpha43-far-seam-*.png")))
+          alpha43_far_seam_count=len(list(Path("v4-art-qa").glob("alpha43-far-seam-*.png")))
+          alpha43_world_count=len(list(Path("v4-art-qa").glob("alpha43-world-*.png")))
+          alpha44_far_count=len(list(Path("v4-art-qa").glob("alpha44-far-*.png")))-len(list(Path("v4-art-qa").glob("alpha44-far-seam-*.png")))
+          alpha44_mid_count=len(list(Path("v4-art-qa").glob("alpha44-mid-*.png")))-len(list(Path("v4-art-qa").glob("alpha44-mid-seam-*.png")))
+          alpha44_near_count=len(list(Path("v4-art-qa").glob("alpha44-near-*.png")))-len(list(Path("v4-art-qa").glob("alpha44-near-seam-*.png")))
+          alpha44_far_seam_count=len(list(Path("v4-art-qa").glob("alpha44-far-seam-*.png")))
+          alpha44_mid_seam_count=len(list(Path("v4-art-qa").glob("alpha44-mid-seam-*.png")))
+          alpha44_near_seam_count=len(list(Path("v4-art-qa").glob("alpha44-near-seam-*.png")))
+          alpha44_world_count=len(list(Path("v4-art-qa").glob("alpha44-world-*.png")))
+          alpha45_actor_count=len(list(Path("v4-art-qa").glob("alpha45-actor-*.png")))
+          master_count=len(list(Path("v4-art-qa").glob("master-*.png")))
+          if (scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count,alpha32_raster_count,alpha32_raster_seam_count,alpha33_raster_count,alpha33_raster_seam_count,alpha34_raster_count,alpha34_raster_seam_count,alpha35_raster_count,alpha35_raster_seam_count,alpha36_raster_count,alpha36_raster_seam_count,alpha37_mid_count,alpha37_mid_seam_count,alpha37_world_count,alpha38_far_count,alpha38_far_seam_count,alpha38_world_count,alpha39_far_count,alpha39_far_seam_count,alpha39_world_count,alpha40_far_count,alpha40_mid_count,alpha40_far_seam_count,alpha40_mid_seam_count,alpha40_world_count,alpha41_far_count,alpha41_mid_count,alpha41_far_seam_count,alpha41_mid_seam_count,alpha41_world_count,alpha42_mid_count,alpha42_mid_seam_count,alpha42_world_count,alpha43_far_count,alpha43_far_seam_count,alpha43_world_count,alpha44_far_count,alpha44_mid_count,alpha44_near_count,alpha44_far_seam_count,alpha44_mid_seam_count,alpha44_near_seam_count,alpha44_world_count,alpha45_actor_count)!=(8,8,12,4,10,2,4,4,2,4,4,2,4,4,4,4,2,4,4,2,4,2,4,2,4,2,2,1,4,2,4,2,2,4,2,2,4,2,2,4,4,2,2,2,4,4,2,2,2,2,1,1,4,2,2,2,2,2,2,2,2,4,20):
+              raise SystemExit(f"Alpha 45 expected 219 static art screenshots: got {(scene_count,seam_count,pose_count,pilot_count,master_count,pilot_seam_count,mid_count,stack_count,mid_seam_count,mist_count,atmo_count,mist_seam_count,sky_count,light_count,near_count,full_count,near_seam_count,alpha29_ref_count,alpha31_raster_count,alpha31_raster_seam_count,alpha32_raster_count,alpha32_raster_seam_count,alpha33_raster_count,alpha33_raster_seam_count,alpha34_raster_count,alpha34_raster_seam_count,alpha35_raster_count,alpha35_raster_seam_count,alpha36_raster_count,alpha36_raster_seam_count,alpha37_mid_count,alpha37_mid_seam_count,alpha37_world_count,alpha38_far_count,alpha38_far_seam_count,alpha38_world_count,alpha39_far_count,alpha39_far_seam_count,alpha39_world_count,alpha40_far_count,alpha40_mid_count,alpha40_far_seam_count,alpha40_mid_seam_count,alpha40_world_count,alpha41_far_count,alpha41_mid_count,alpha41_far_seam_count,alpha41_mid_seam_count,alpha41_world_count,alpha42_mid_count,alpha42_mid_seam_count,alpha42_world_count,alpha43_far_count,alpha43_far_seam_count,alpha43_world_count,alpha44_far_count,alpha44_mid_count,alpha44_near_count,alpha44_far_seam_count,alpha44_mid_seam_count,alpha44_near_seam_count,alpha44_world_count,alpha45_actor_count)}")
+          PY
+          # Alpha 26: use actual decompressed Chrome PNG pixels, not file counts,
+          # to reject a bright repeat-border stroke like the Alpha 25 defect.
+          python3 tests/flappy-v4-pilot-seam-check.py v4-art-qa
+      - name: Keep isolated cold-audio A/B screenshots and measurements
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: flappy-v4-draft-cold-audio-pr57
+          path: |
+            v4-cold-qa/**/*.png
+            v4-cold-qa/**/*.json
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Keep actual-game screenshots and headless metrics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: flappy-v4-draft-real-game-pr57
+          path: |
+            v4-game-qa/*.png
+            v4-game-qa/headless-game-metrics.json
+            v4-game-qa/headless-live-input-metrics.json
+            v4-game-qa/headless-endurance-metrics.json
+            v4-game-qa/headless-multiround-metrics.json
+            v4-game-qa/headless-audio-ab-metrics.json
+            v4-game-qa/headless-seam-metrics.json
+            v4-game-qa/headless-narrow-readability.json
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Alpha46 source-tree 320px and 390px A/B browser evidence (Draft-only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if command -v google-chrome >/dev/null; then
+            CHROME="$(command -v google-chrome)"
+          elif command -v chromium >/dev/null; then
+            CHROME="$(command -v chromium)"
+          else
+            exit 1
+          fi
+          python3 -m http.server 8766 --bind 127.0.0.1 >v4-art-qa/alpha46-server.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 25); do
+            if curl -fsS "http://127.0.0.1:8766/flappy/review-v4.html" >/dev/null; then break; fi
+            sleep .25
+          done
+          .alpha31-art-venv/bin/python tests/flappy-v4-batch-chrome.py \
+            --chrome "$CHROME" \
+            --base-url "http://127.0.0.1:8766/flappy/review-v4.html" \
+            --output v4-art-qa/alpha46-trees --stage alpha46
+          .alpha31-art-venv/bin/python - <<'PY'
+          import json, pathlib, xml.etree.ElementTree as ET
+          from PIL import Image
+          out=pathlib.Path("v4-art-qa/alpha46-trees")
+          pngs=sorted(out.glob("*.png"))
+          assert len(pngs)==8, ("missing alpha46 browser captures",len(pngs))
+          data=json.loads((out/"alpha46-batch-chrome-metrics.json").read_text())
+          assert data["independent_capture_count"]==8
+          for path in pngs:
+              with Image.open(path) as im:
+                  assert im.size in ((320,568),(390,844))
+          for theme in ("warm","slate"):
+              src=pathlib.Path(f"flappy/assets/v4/masters/{theme}/near-structure-alpha46.svg")
+              root=ET.parse(src).getroot()
+              assert root.attrib["viewBox"]=="0 0 3200 2000"
+              trees=[e for e in root.iter() if "data-alpha46-tree" in e.attrib]
+              assert len(trees)==9
+              assert src.stat().st_size<=260000
+          print("Alpha46 Draft original 8 Chrome captures and editable source checked")
+          PY
+          # Additional Alpha46A botanical candidate: independently captured,
+          # does not silently replace the earlier Alpha46 screenshots.
+          .alpha31-art-venv/bin/python tests/flappy-v4-batch-chrome.py \
+            --chrome "$CHROME" \
+            --base-url "http://127.0.0.1:8766/flappy/review-v4.html" \
+            --output v4-art-qa/alpha46a-botanical --stage alpha46a
+          .alpha31-art-venv/bin/python - <<'PY'
+          import json, pathlib, xml.etree.ElementTree as ET
+          from PIL import Image, ImageChops
+          folder=pathlib.Path("v4-art-qa/alpha46a-botanical")
+          pngs=sorted(folder.glob("*.png"))
+          assert len(pngs)==8, ("Alpha46A screenshots missing",len(pngs))
+          metrics=json.loads((folder/"alpha46a-batch-chrome-metrics.json").read_text())
+          assert metrics["independent_capture_count"]==8
+          previous=pathlib.Path("v4-art-qa/alpha46-trees")
+          for theme in ("warm","slate"):
+              fn=f"alpha46a-world-{theme}-320x568.png"
+              old=previous/f"alpha46-world-{theme}-320x568.png"
+              with Image.open(folder/fn).convert("RGB") as a, Image.open(old).convert("RGB") as b:
+                  delta=ImageChops.difference(a,b)
+                  assert delta.getbbox() is not None, f"{theme} new art looks identical to Alpha46"
+              src=pathlib.Path(f"flappy/assets/v4/masters/{theme}/near-botanical-alpha46a.svg")
+              root=ET.parse(src).getroot()
+              trees=[el for el in root.iter() if el.get("data-alpha46-tree")]
+              masks=[el for el in root.iter() if el.tag.endswith("mask")]
+              saplings=[el for el in root.iter() if el.get("data-understory")]
+              assert len(trees)==9 and len(masks)==9 and len(saplings)==6
+              assert src.stat().st_size<290000
+              assert all(x.attrib.get("maskUnits")=="userSpaceOnUse" for x in masks)
+          print("Alpha46A botany A/B images, true alpha masks and budget: PASS")
+          PY
+      - name: Keep 219 browser artwork shots, true wing-pose backgrounds, thirty-four original RGBA studies
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: flappy-v4-draft-visual-pr57
+          path: |
+            v4-art-qa/*.png
+            v4-art-qa/alpha31-raster/*.png
+            v4-art-qa/alpha31-pigment-study-metrics.json
+            v4-art-qa/alpha32-directional/*.png
+            v4-art-qa/alpha32-directional-paint-metrics.json
+            v4-art-qa/alpha33-masked/*.png
+            v4-art-qa/alpha33-local-material-metrics.json
+            v4-art-qa/alpha34-editorial/*.png
+            v4-art-qa/alpha34-editorial-composition-metrics.json
+            v4-art-qa/alpha35-structure/*.png
+            v4-art-qa/alpha35-structural-art-metrics.json
+            v4-art-qa/alpha35-browser-art-diff.json
+            v4-art-qa/alpha36-outline/*.png
+            v4-art-qa/alpha36-original-outline-metrics.json
+            v4-art-qa/alpha36-actual-chrome-ab-diffs.json
+            v4-art-qa/alpha37-midrange/*.png
+            v4-art-qa/alpha37-natural-midrange-metrics.json
+            v4-art-qa/alpha37-browser-mountain-diff.json
+            v4-art-qa/alpha38-far/*.png
+            v4-art-qa/alpha38-far-source-metrics.json
+            v4-art-qa/alpha38-far-browser-diff.json
+            v4-art-qa/alpha39-rock/*.png
+            v4-art-qa/alpha39-authored-rock-metrics.json
+            v4-art-qa/alpha39-real-chrome-rock-diff.json
+            v4-art-qa/alpha39-batch-chrome-metrics.json
+            v4-art-qa/alpha40-landscape/*.png
+            v4-art-qa/alpha40-landscape-metrics.json
+            v4-art-qa/alpha40-batch-chrome-metrics.json
+            v4-art-qa/alpha40-real-browser-ab.json
+            v4-art-qa/alpha41-atmosphere/*.png
+            v4-art-qa/alpha41-atmospheric-metrics.json
+            v4-art-qa/alpha41-real-chrome-ab.json
+            v4-art-qa/alpha41-batch-chrome-metrics.json
+            v4-art-qa/recent-batch-chrome-metrics.json
+            v4-art-qa/alpha42-organic/*.png
+            v4-art-qa/alpha42-slate-organic-metrics.json
+            v4-art-qa/alpha42-slate-mobile-ab.json
+            v4-art-qa/alpha42-batch-chrome-metrics.json
+            v4-art-qa/alpha43-far-natural/*.png
+            v4-art-qa/alpha43-far-organic-metrics.json
+            v4-art-qa/alpha43-far-mobile-ab.json
+            v4-art-qa/alpha43-batch-chrome-metrics.json
+            v4-art-qa/alpha44-cohesion/*.png
+            v4-art-qa/alpha44-cohesion-metrics.json
+            v4-art-qa/alpha44-real-world-ab.json
+            v4-art-qa/alpha44-real-chrome-readability.json
+            v4-art-qa/alpha44-batch-chrome-metrics.json
+            v4-art-qa/alpha45-batch-chrome-metrics.json
+            v4-art-qa/alpha45-actual-wing-readability.json
+            v4-art-qa/alpha46-trees/*.png
+            v4-art-qa/alpha46-trees/*.json
+            v4-art-qa/alpha46a-botanical/*.png
+            v4-art-qa/alpha46a-botanical/*.json
+            v4-art-qa/headless-painted-pilot-seams.json
+            v4-art-qa/server.log
+            v4-art-qa/chrome.log
+          retention-days: 7
+          # Preserve the actual Chrome exception as the cause if capture stopped early.
+          if-no-files-found: warn

@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3200" height="2000" viewBox="0 0 3200 2000" role="img" aria-label="Dawn Valley, hand-composed far mountain painting pilot — editable 3200x2000 master">
+<title>Alpha 40 — warm far independently edited broad atmospheric material composition</title>
+<desc>Editable 3200 by 2000 original landscape painting study. Replaces rigid triangular gouache and digital facets with asymmetric broad soft gradients and value masses; still a Draft vector-painted study, not professionally approved hand-painted native raster master.</desc>
+<defs><linearGradient id="alpha40-atmos-sun" x1="0" y1="0" x2="0.86" y2="1">
+<stop stop-color="#fcebcf" stop-opacity=".7"/>
+<stop offset=".53" stop-color="#c2c3a4" stop-opacity=".35"/>
+<stop offset="1" stop-color="#45645d" stop-opacity="0"/>
+</linearGradient>
+<linearGradient id="alpha40-atmos-shade" x1="1" y1="0" x2=".13" y2="1">
+<stop stop-color="#244f4b" stop-opacity=".78"/>
+<stop offset=".66" stop-color="#537971" stop-opacity=".34"/>
+<stop offset="1" stop-color="#94ac99" stop-opacity="0"/>
+</linearGradient>
+
+<linearGradient id="dawn-rock-bed" x1="0" y1="0" x2="0" y2="1">
+<stop stop-color="#b1bdaf"/><stop offset=".28" stop-color="#8ca9a0"/><stop offset=".69" stop-color="#708e83"/><stop offset="1" stop-color="#506d66"/>
+</linearGradient>
+<linearGradient id="dawn-shadow" x1="0" y1="0" x2="0" y2="1">
+<stop stop-color="#789c98" stop-opacity=".26"/><stop offset=".54" stop-color="#355b5c" stop-opacity=".43"/><stop offset="1" stop-color="#1e4b4c" stop-opacity=".18"/>
+</linearGradient>
+<linearGradient id="dawn-wash" x1="0" y1="0" x2="0" y2="1">
+<stop stop-color="#f9edda" stop-opacity=".16"/><stop offset=".46" stop-color="#fae8d4" stop-opacity=".21"/><stop offset="1" stop-color="#e1dbbc" stop-opacity=".055"/>
+</linearGradient>
+<clipPath id="far-painted-terrain"><path d="M0 1194 C53 1194 117 1169 198 1143 Q260 1124 300 1133 C356 1140 388 1096 460 1071 Q538 1052 582 1024 C636 1001 675 1078 743 1094 Q789 1083 848 1052 C905 1023 941 988 994 988 C1065 994 1097 1067 1162 1058 Q1198 1040 1226 1026 C1280 1002 1317 1022 1368 1046 Q1429 1082 1483 1067 C1553 1054 1609 1022 1657 1012 C1735 998 1777 1072 1845 1078 Q1890 1054 1915 1012 C1955 956 1976 957 2015 996 Q2089 1055 2141 1037 C2212 1017 2217 985 2267 996 Q2347 1023 2407 1060 C2468 1089 2520 1063 2576 1025 Q2628 993 2672 1019 C2732 1050 2766 1082 2808 1089 Q2847 1063 2900 1062 C2962 1075 2992 1127 3060 1150 C3116 1179 3157 1194 3200 1194 L3200 2000 L0 2000Z"/></clipPath>
+</defs>
+<path id="far-painted-base" d="M0 1194 C53 1194 117 1169 198 1143 Q260 1124 300 1133 C356 1140 388 1096 460 1071 Q538 1052 582 1024 C636 1001 675 1078 743 1094 Q789 1083 848 1052 C905 1023 941 988 994 988 C1065 994 1097 1067 1162 1058 Q1198 1040 1226 1026 C1280 1002 1317 1022 1368 1046 Q1429 1082 1483 1067 C1553 1054 1609 1022 1657 1012 C1735 998 1777 1072 1845 1078 Q1890 1054 1915 1012 C1955 956 1976 957 2015 996 Q2089 1055 2141 1037 C2212 1017 2217 985 2267 996 Q2347 1023 2407 1060 C2468 1089 2520 1063 2576 1025 Q2628 993 2672 1019 C2732 1050 2766 1082 2808 1089 Q2847 1063 2900 1062 C2962 1075 2992 1127 3060 1150 C3116 1179 3157 1194 3200 1194 L3200 2000 L0 2000Z" fill="url(#dawn-rock-bed)"/>
+<g id="large-gouache-landforms" clip-path="url(#far-painted-terrain)">
+<g id="alpha40-edited-composition"><path data-alpha40-landform="1" d="M76 1328 C221 1177 342 1145 470 1136 C551 1101 652 1125 723 1168 C588 1193 524 1273 451 1352 C324 1393 195 1423 76 1328Z" fill="#f1d5af" fill-opacity=".24"/>
+<path data-alpha40-landform="2" d="M448 1458 C565 1310 666 1214 784 1200 C862 1193 922 1213 1012 1238 C901 1313 812 1386 752 1487 C610 1531 536 1517 448 1458Z" fill="#4e706a" fill-opacity=".22"/>
+<path data-alpha40-landform="3" d="M758 1255 C853 1133 966 1011 1026 1024 C1122 1088 1245 1176 1271 1275 C1159 1281 1021 1328 943 1430 C844 1424 789 1348 758 1255Z" fill="#dec9a7" fill-opacity=".26"/>
+<path data-alpha40-landform="4" d="M1091 1508 C1184 1339 1286 1165 1408 1127 C1478 1112 1544 1138 1614 1155 C1514 1280 1464 1405 1317 1527Z" fill="#5e867b" fill-opacity=".24"/>
+<path data-alpha40-landform="5" d="M1464 1306 C1582 1208 1708 1076 1796 1109 C1866 1140 1923 1184 1988 1230 C1854 1314 1761 1412 1650 1446 C1549 1441 1484 1392 1464 1306Z" fill="#f5dfbe" fill-opacity=".22"/>
+<path data-alpha40-landform="6" d="M1812 1483 C1891 1301 1947 1057 2024 1035 C2115 1121 2196 1153 2281 1203 C2214 1298 2138 1422 2067 1568Z" fill="#486e68" fill-opacity=".26"/>
+<path data-alpha40-landform="7" d="M2211 1360 C2319 1214 2399 1169 2523 1158 C2615 1174 2718 1231 2761 1300 C2644 1389 2572 1464 2451 1503Z" fill="#b2b5a0" fill-opacity=".24"/>
+<path data-alpha40-landform="8" d="M2625 1440 C2711 1273 2875 1149 2962 1168 C3061 1187 3110 1216 3166 1244 L3190 1548 Q2921 1542 2625 1440Z" fill="#426661" fill-opacity=".22"/>
+<path data-alpha40-landform="9" d="M127 1637 C405 1524 624 1579 837 1651 C1125 1742 1364 1551 1598 1618 C1879 1722 2141 1534 2419 1637 C2687 1709 2934 1631 3120 1771 L3120 1918 Q2720 1816 2298 1909 C1782 1811 1400 1932 1057 1834 C710 1786 443 1849 127 1751Z" fill="#d9bf9e" fill-opacity=".17"/>
+<path data-alpha40-softlight="1" d="M76 1328 C221 1177 342 1145 470 1136 C551 1101 652 1125 723 1168 C588 1193 524 1273 451 1352 C324 1393 195 1423 76 1328Z" fill="url(#alpha40-atmos-sun)" fill-opacity=".28"/>
+<path data-alpha40-softlight="2" d="M448 1458 C565 1310 666 1214 784 1200 C862 1193 922 1213 1012 1238 C901 1313 812 1386 752 1487 C610 1531 536 1517 448 1458Z" fill="url(#alpha40-atmos-shade)" fill-opacity=".19"/>
+<path data-alpha40-softlight="3" d="M758 1255 C853 1133 966 1011 1026 1024 C1122 1088 1245 1176 1271 1275 C1159 1281 1021 1328 943 1430 C844 1424 789 1348 758 1255Z" fill="url(#alpha40-atmos-sun)" fill-opacity=".28"/>
+<path data-alpha40-softlight="4" d="M1091 1508 C1184 1339 1286 1165 1408 1127 C1478 1112 1544 1138 1614 1155 C1514 1280 1464 1405 1317 1527Z" fill="url(#alpha40-atmos-shade)" fill-opacity=".19"/>
+<path data-alpha40-softlight="5" d="M1464 1306 C1582 1208 1708 1076 1796 1109 C1866 1140 1923 1184 1988 1230 C1854 1314 1761 1412 1650 1446 C1549 1441 1484 1392 1464 1306Z" fill="url(#alpha40-atmos-sun)" fill-opacity=".28"/>
+<path data-alpha40-softlight="6" d="M1812 1483 C1891 1301 1947 1057 2024 1035 C2115 1121 2196 1153 2281 1203 C2214 1298 2138 1422 2067 1568Z" fill="url(#alpha40-atmos-shade)" fill-opacity=".19"/></g></g>
+
+
+<path id="dawn-ridge-edge" d="M0 1194 C53 1194 117 1169 198 1143 Q260 1124 300 1133 C356 1140 388 1096 460 1071 Q538 1052 582 1024 C636 1001 675 1078 743 1094 Q789 1083 848 1052 C905 1023 941 988 994 988 C1065 994 1097 1067 1162 1058 Q1198 1040 1226 1026 C1280 1002 1317 1022 1368 1046 Q1429 1082 1483 1067 C1553 1054 1609 1022 1657 1012 C1735 998 1777 1072 1845 1078 Q1890 1054 1915 1012 C1955 956 1976 957 2015 996 Q2089 1055 2141 1037 C2212 1017 2217 985 2267 996 Q2347 1023 2407 1060 C2468 1089 2520 1063 2576 1025 Q2628 993 2672 1019 C2732 1050 2766 1082 2808 1089 Q2847 1063 2900 1062 C2962 1075 2992 1127 3060 1150 C3116 1179 3157 1194 3200 1194" fill="none" stroke="#fff1d7" stroke-width="5" stroke-opacity=".10"/>
+</svg>

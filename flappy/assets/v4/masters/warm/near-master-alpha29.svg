@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3200" height="2000" viewBox="0 0 3200 2000" role="img" aria-label="Dawn Valley editable original close foreground woods pilot"><title>Alpha 29 — Dawn Valley original near-forest painting pilot</title>
+<desc>Editable foreground woodland silhouette, individual hand-composed canopy/tree masses, sparse translucent gouache valley pigments; QA-only original source. Not approved final native handpainted raster master.</desc>
+<defs><linearGradient id="foreground-bed" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4a7463"/><stop offset="0.5" stop-color="#325d50"/><stop offset="1" stop-color="#244a40"/></linearGradient>
+<linearGradient id="foreground-volume" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#bed1a4" stop-opacity=".08"/><stop offset=".65" stop-color="#25463e" stop-opacity=".1"/><stop offset="1" stop-color="#25463e" stop-opacity=".28"/></linearGradient>
+<clipPath id="foreground-ground-clip"><path d="M0 1586 C54 1586 103 1550 163 1542 Q314 1487 446 1508 T784 1500 T1116 1479 T1455 1518 T1777 1454 T2112 1518 T2440 1468 T2774 1510 Q2958 1532 3064 1568 C3116 1586 3158 1586 3200 1586 L3200 2000 L0 2000Z"/></clipPath></defs>
+<g id="foreground-tree-canopy-forms"><g data-tree="1" fill="#315b4d">
+<path data-wood="trunk" d="M196 1612 Q192 1525 209 1426.4 L219 1426.4 Q215 1523 217 1612Z" fill="#25463e"/>
+<path data-foliage="primary" d="M146.86 1477.6 Q133.18 1439.2 171.94 1432.8 Q154.84 1396 191.32 1397.6 Q195.88 1366 218.68 1380 Q258.58 1394.4 248.32 1432.8 Q272.26 1448.8 263.14 1477.6 Q257.44 1514.4 233.5 1504.8 Q215.26 1530.4 193.6 1504.8 Q162.82 1516 146.86 1477.6Z"/>
+<path data-foliage="wash" d="M169.66 1440.8 Q173.07999999999998 1389.6 203.86 1399.2 Q228.94 1397.6 232.36 1436 Q199.3 1458.4 169.66 1440.8Z" fill="#25463e" opacity=".24"/>
+</g>
+<g data-tree="2" fill="#315b4d">
+<path data-wood="trunk" d="M426 1575 Q422 1488 439 1407.88 L449 1407.88 Q445 1486 447 1575Z" fill="#25463e"/>
+<path data-foliage="primary" d="M383.49 1450.12 Q371.37 1418.44 405.71 1413.16 Q390.56 1382.8 422.88 1384.12 Q426.92 1357 447.12 1371 Q482.47 1381.48 473.38 1413.16 Q494.59 1426.36 486.51 1450.12 Q481.46 1480.48 460.25 1472.56 Q444.09 1493.68 424.9 1472.56 Q397.63 1481.8 383.49 1450.12Z"/>
+<path data-foliage="wash" d="M403.69 1419.76 Q406.72 1377.52 433.99 1385.44 Q456.21 1384.12 459.24 1415.8 Q429.95 1434.28 403.69 1419.76Z" fill="#25463e" opacity=".24"/>
+</g>
+<g data-tree="3" fill="#315b4d">
+<path data-wood="trunk" d="M700 1597 Q696 1510 713 1404.8 L723 1404.8 Q719 1508 721 1597Z" fill="#25463e"/>
+<path data-foliage="primary" d="M644.23 1459.2 Q628.99 1418.4 672.17 1411.6 Q653.12 1372.5 693.76 1374.2 Q698.84 1341 724.24 1355 Q768.69 1370.8 757.26 1411.6 Q783.93 1428.6 773.77 1459.2 Q767.42 1498.3 740.75 1488.1 Q720.43 1515.3 696.3 1488.1 Q662.01 1500 644.23 1459.2Z"/>
+<path data-foliage="wash" d="M669.63 1420.1 Q673.44 1365.7 707.73 1375.9 Q735.67 1374.2 739.48 1415 Q702.65 1438.8 669.63 1420.1Z" fill="#25463e" opacity=".24"/>
+</g>
+<g data-tree="4" fill="#315b4d">
+<path data-wood="trunk" d="M955 1583 Q951 1496 968 1411.26 L978 1411.26 Q974 1494 976 1583Z" fill="#25463e"/>
+<path data-foliage="primary" d="M915.55 1455.74 Q904.15 1422.38 936.45 1416.82 Q922.2 1384.85 952.6 1386.24 Q956.4 1358 975.4 1372 Q1008.65 1383.46 1000.1 1416.82 Q1020.0500000000001 1430.72 1012.45 1455.74 Q1007.7 1487.71 987.75 1479.37 Q972.55 1501.61 954.5 1479.37 Q928.85 1489.1 915.55 1455.74Z"/>
+<path data-foliage="wash" d="M934.55 1423.77 Q937.4 1379.29 963.05 1387.63 Q983.95 1386.24 986.8 1419.6 Q959.25 1439.06 934.55 1423.77Z" fill="#25463e" opacity=".24"/>
+</g>
+<g data-tree="5" fill="#315b4d">
+<path data-wood="trunk" d="M1221 1555 Q1217 1468 1234 1360.82 L1244 1360.82 Q1240 1466 1242 1555Z" fill="#25463e"/>
+<path data-foliage="primary" d="M1164.72 1416.18 Q1149.36 1374.66 1192.88 1367.74 Q1173.68 1327.95 1214.64 1329.68 Q1219.76 1296 1245.36 1310 Q1290.16 1326.22 1278.64 1367.74 Q1305.52 1385.04 1295.28 1416.18 Q1288.88 1455.97 1262 1445.59 Q1241.52 1473.27 1217.2 1445.59 Q1182.64 1457.7 1164.72 1416.18Z"/>
+<path data-foliage="wash" d="M1190.32 1376.39 Q1194.16 1321.03 1228.72 1331.41 Q1256.88 1329.68 1260.72 1371.2 Q1223.6 1395.42 1190.32 1376.39Z" fill="#25463e" opacity=".24"/>
+</g>
+<g data-tree="6" fill="#315b4d">
+<path data-wood="trunk" d="M1525 1580 Q1521 1493 1538 1414.2 L1548 1414.2 Q1544 1491 1546 1580Z" fill="#25463e"/>
+<path data-foliage="primary" d="M1480.45 1455.8 Q1467.85 1424.6 1503.55 1419.4 Q1487.8 1389.5 1521.4 1390.8 Q1525.6 1364 1546.6 1378 Q1583.35 1388.2 1573.9 1419.4 Q1595.95 1432.4 1587.55 1455.8 Q1582.3 1485.7 1560.25 1477.9 Q1543.45 1498.7 1523.5 1477.9 Q1495.15 1487 1480.45 1455.8Z"/>
+<path data-foliage="wash" d="M1501.45 1425.9 Q1504.6 1384.3 1532.95 1392.1 Q1556.05 1390.8 1559.2 1422 Q1528.75 1440.2 1501.45 1425.9Z" fill="#25463e" opacity=".24"/>
+</g>
+<g data-tree="7" fill="#315b4d">
+<path data-wood="trunk" d="M1804 1534 Q1800 1447 1817 1338.5 L1827 1338.5 Q1823 1445 1825 1534Z" fill="#25463e"/>
+<path data-foliage="primary" d="M1741.6 1394.5 Q1724.8 1352.5 1772.4 1345.5 Q1751.4 1305.25 1796.2 1307 Q1801.8 1273 1829.8 1287 Q1878.8 1303.5 1866.2 1345.5 Q1895.6000000000001 1363 1884.4 1394.5 Q1877.4 1434.75 1848 1424.25 Q1825.6 1452.25 1799 1424.25 Q1761.2 1436.5 1741.6 1394.5Z"/>
+<path data-foliage="wash" d="M1769.6 1354.25 Q1773.8 1298.25 1811.6 1308.75 Q1842.4 1307 1846.6 1349 Q1806 1373.5 1769.6 1354.25Z" fill="#25463e" opacity=".24"/>
+</g>
+<g data-tree="8" fill="#315b4d">
+<path data-wood="trunk" d="M2077 1589 Q2073 1502 2090 1415.28 L2100 1415.28 Q2096 1500 2098 1589Z" fill="#25463e"/>
+<path data-foliage="primary" d="M2039.08 1460.72 Q2028.04 1426.64 2059.32 1420.96 Q2045.52 1388.3 2074.96 1389.72 Q2078.64 1361 2097.04 1375 Q2129.24 1386.88 2120.96 1420.96 Q2140.28 1435.16 2132.92 1460.72 Q2128.32 1493.38 2109 1484.86 Q2094.28 1507.58 2076.8 1484.86 Q2051.96 1494.8 2039.08 1460.72Z"/>
+<path data-foliage="wash" d="M2057.48 1428.06 Q2060.24 1382.62 2085.08 1391.14 Q2105.32 1389.72 2108.08 1423.8 Q2081.4 1443.68 2057.48 1428.06Z" fill="#25463e" opacity=".24"/>
+</g>
+<g data-tree="9" fill="#315b4d">
+<path data-wood="trunk" d="M2364 1560 Q2360 1473 2377 1379.68 L2387 1379.68 Q2383 1471 2385 1560Z" fill="#25463e"/>
+<path data-foliage="primary" d="M2312.31 1428.32 Q2298.03 1391.84 2338.49 1385.76 Q2320.64 1350.8 2358.72 1352.32 Q2363.48 1322 2387.28 1336 Q2428.93 1349.28 2418.22 1385.76 Q2443.21 1400.96 2433.69 1428.32 Q2427.74 1463.28 2402.75 1454.16 Q2383.71 1478.48 2361.1 1454.16 Q2328.97 1464.8 2312.31 1428.32Z"/>
+<path data-foliage="wash" d="M2336.11 1393.3600000000001 Q2339.68 1344.72 2371.81 1353.84 Q2397.99 1352.32 2401.56 1388.8 Q2367.05 1410.08 2336.11 1393.3600000000001Z" fill="#25463e" opacity=".24"/>
+</g>
+<g data-tree="10" fill="#315b4d">
+<path data-wood="trunk" d="M2651 1601 Q2647 1514 2664 1421.34 L2674 1421.34 Q2670 1512 2672 1601Z" fill="#25463e"/>
+<path data-foliage="primary" d="M2608.49 1469.66 Q2596.37 1433.42 2630.71 1427.38 Q2615.56 1392.65 2647.88 1394.16 Q2651.92 1364 2672.12 1378 Q2707.47 1391.14 2698.38 1427.38 Q2719.59 1442.48 2711.51 1469.66 Q2706.46 1504.39 2685.25 1495.33 Q2669.09 1519.49 2649.9 1495.33 Q2622.63 1505.9 2608.49 1469.66Z"/>
+<path data-foliage="wash" d="M2628.69 1434.93 Q2631.72 1386.61 2658.99 1395.67 Q2681.21 1394.16 2684.24 1430.4 Q2654.95 1451.54 2628.69 1434.93Z" fill="#25463e" opacity=".24"/>
+</g>
+<g data-tree="11" fill="#315b4d">
+<path data-wood="trunk" d="M2961 1622 Q2957 1535 2974 1448.28 L2984 1448.28 Q2980 1533 2982 1622Z" fill="#25463e"/>
+<path data-foliage="primary" d="M2915.94 1493.72 Q2903.22 1459.64 2939.26 1453.96 Q2923.36 1421.3 2957.28 1422.72 Q2961.52 1394 2982.72 1408 Q3019.82 1419.88 3010.28 1453.96 Q3032.54 1468.16 3024.06 1493.72 Q3018.76 1526.38 2996.5 1517.86 Q2979.54 1540.58 2959.4 1517.86 Q2930.78 1527.8 2915.94 1493.72Z"/>
+<path data-foliage="wash" d="M2937.14 1461.06 Q2940.32 1415.62 2968.94 1424.14 Q2992.26 1422.72 2995.44 1456.8 Q2964.7 1476.68 2937.14 1461.06Z" fill="#25463e" opacity=".24"/>
+</g></g>
+<path id="foreground-ground-base" d="M0 1586 C54 1586 103 1550 163 1542 Q314 1487 446 1508 T784 1500 T1116 1479 T1455 1518 T1777 1454 T2112 1518 T2440 1468 T2774 1510 Q2958 1532 3064 1568 C3116 1586 3158 1586 3200 1586 L3200 2000 L0 2000Z" fill="url(#foreground-bed)"/>
+<g id="foreground-gouache-below-ridge" clip-path="url(#foreground-ground-clip)">
+<path data-foreground-wash="1" d="M130 1591 q115 -45 232 -16 q75 30 119 77 q-151 45 -331 78Z" fill="#afae87" fill-opacity="0.075"/>
+<path data-foreground-wash="2" d="M633 1623 q115 -45 232 -16 q75 30 119 77 q-151 45 -331 78Z" fill="#8fa889" fill-opacity="0.095"/>
+<path data-foreground-wash="3" d="M1136 1655 q115 -45 232 -16 q75 30 119 77 q-151 45 -331 78Z" fill="#c0b792" fill-opacity="0.115"/>
+<path data-foreground-wash="4" d="M1639 1591 q115 -45 232 -16 q75 30 119 77 q-151 45 -331 78Z" fill="#446e60" fill-opacity="0.075"/>
+<path data-foreground-wash="5" d="M2142 1623 q115 -45 232 -16 q75 30 119 77 q-151 45 -331 78Z" fill="#a6b58e" fill-opacity="0.095"/>
+<path data-foreground-wash="6" d="M2645 1655 q115 -45 232 -16 q75 30 119 77 q-151 45 -331 78Z" fill="#365d54" fill-opacity="0.115"/>
+<path d="M0 1708 Q417 1666 761 1730 Q1181 1763 1596 1682 Q2124 1689 2540 1741 Q2860 1759 3200 1708 L3200 2000 L0 2000Z" fill="url(#foreground-volume)" opacity=".44"/>
+<path data-foreground-brush="1" d="M176 1741 Q454 1660 731 1725" fill="none" stroke="#bed1a4" stroke-width="18" stroke-opacity="0.045" stroke-linecap="round"/>
+<path data-foreground-brush="2" d="M812 1828 Q1123 1773 1441 1834" fill="none" stroke="#bed1a4" stroke-width="25" stroke-opacity="0.065" stroke-linecap="round"/>
+<path data-foreground-brush="3" d="M1455 1686 Q1731 1609 2030 1663" fill="none" stroke="#bed1a4" stroke-width="18" stroke-opacity="0.085" stroke-linecap="round"/>
+<path data-foreground-brush="4" d="M2240 1809 Q2624 1717 2920 1834" fill="none" stroke="#bed1a4" stroke-width="25" stroke-opacity="0.045" stroke-linecap="round"/>
+<path data-foreground-brush="5" d="M306 1909 Q749 1867 1017 1933" fill="none" stroke="#bed1a4" stroke-width="18" stroke-opacity="0.065" stroke-linecap="round"/>
+<path data-foreground-brush="6" d="M1790 1944 Q2240 1888 2560 1947" fill="none" stroke="#bed1a4" stroke-width="25" stroke-opacity="0.085" stroke-linecap="round"/>
+</g>
+<path id="foreground-ridge-open-highlight" d="M0 1586 C54 1586 103 1550 163 1542 Q314 1487 446 1508 T784 1500 T1116 1479 T1455 1518 T1777 1454 T2112 1518 T2440 1468 T2774 1510 Q2958 1532 3064 1568 C3116 1586 3158 1586 3200 1586" fill="none" stroke="#bed1a4" stroke-opacity=".09" stroke-width="5"/>
+</svg>

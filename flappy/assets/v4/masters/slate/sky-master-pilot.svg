@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3200" height="2000" viewBox="0 0 3200 2000" role="img" aria-label="Blue Hour Range original hand composed sky master study"><title>Alpha 28 — original Blue Hour Range cinematic hand-composed sky study</title><desc>Unrepeated opaque original editable vector-paint sky study; single sun or moon anchor; no active content; not approved finished master.</desc><defs><linearGradient id="sky-pigment-bed" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#142948"/><stop offset="0.25" stop-color="#253d5c"/><stop offset="0.5" stop-color="#4b5d78"/><stop offset="0.75" stop-color="#767b90"/><stop offset="1" stop-color="#a08d9a"/></linearGradient><radialGradient id="sky-light-glaze"><stop stop-color="#ecedf3" stop-opacity=".56"/><stop offset=".24" stop-color="#c4d2e8" stop-opacity=".32"/><stop offset=".64" stop-color="#a4a9cc" stop-opacity=".12"/><stop offset="1" stop-color="#a4a9cc" stop-opacity="0"/></radialGradient><linearGradient id="sky-cloud-pigment" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#a9b8d0" stop-opacity="0"/><stop offset=".22" stop-color="#a9b8d0" stop-opacity=".14"/><stop offset=".66" stop-color="#a9b8d0" stop-opacity=".09"/><stop offset="1" stop-color="#a9b8d0" stop-opacity="0"/></linearGradient><linearGradient id="sky-horizon-backwash" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#b7a8bc" stop-opacity="0"/><stop offset=".57" stop-color="#b7a8bc" stop-opacity=".07"/><stop offset="1" stop-color="#b7a8bc" stop-opacity=".24"/></linearGradient></defs>
+<g id="original-painted-sky-field"><path d="M0 0H3200V2000H0Z" fill="url(#sky-pigment-bed)"/>
+<path d="M0 950H3200V2000H0Z" fill="url(#sky-horizon-backwash)"/></g>
+<g id="sky-soft-original-backscatter"><ellipse data-glaze="light-halo" cx="2460" cy="416" rx="765" ry="674" fill="url(#sky-light-glaze)"/>
+<ellipse data-glaze="lower-light" cx="2320" cy="1170" rx="895" ry="360" fill="url(#sky-light-glaze)" opacity=".30"/></g>
+<g id="sky-original-light-source"><circle data-source="moon-disc" cx="2460" cy="416" r="51" fill="#e3e5e9" opacity=".83"/>
+<path d="M2442 406 q19 11 10 29 M2475 424 q-14 -9 -7 -20" fill="none" stroke="#8c9bb5" stroke-opacity=".12" stroke-width="4"/></g>
+<g id="sky-broad-cloud-banks" fill="none" stroke="url(#sky-cloud-pigment)" stroke-linecap="round"><path data-cloud-bank="1" d="M104 570 Q350 548 580 574 Q839 613 1063 567 Q1300 535 1520 576" stroke-width="78" opacity="0.71"/>
+<path data-cloud-bank="2" d="M875 733 Q1144 701 1393 738 Q1636 773 1896 721 Q2140 679 2442 729 Q2676 755 3054 716" stroke-width="112" opacity="0.57"/>
+<path data-cloud-bank="3" d="M130 930 Q418 896 694 932 Q993 980 1254 923 Q1440 907 1679 944" stroke-width="64" opacity="0.45"/>
+<path data-cloud-bank="4" d="M1630 1068 Q1953 1018 2295 1065 Q2628 1109 2985 1058" stroke-width="92" opacity="0.41"/></g>
+<g id="sky-drybrush-air" fill="none" stroke="#a9b8d0" stroke-linecap="round"><path data-cloud-stroke="1" d="M275 412 Q504 398 671 414" stroke-width="22" stroke-opacity="0.075"/>
+<path data-cloud-stroke="2" d="M721 544 Q914 527 1103 537" stroke-width="17" stroke-opacity="0.1"/>
+<path data-cloud-stroke="3" d="M1122 335 Q1329 315 1565 336" stroke-width="20" stroke-opacity="0.07"/>
+<path data-cloud-stroke="4" d="M1600 791 Q1856 767 2014 786" stroke-width="25" stroke-opacity="0.055"/>
+<path data-cloud-stroke="5" d="M2030 497 Q2288 465 2440 497" stroke-width="18" stroke-opacity="0.07"/>
+<path data-cloud-stroke="6" d="M2570 628 Q2834 609 3036 618" stroke-width="16" stroke-opacity="0.06"/>
+<path data-cloud-stroke="7" d="M432 962 Q700 931 960 955" stroke-width="26" stroke-opacity="0.043"/>
+<path data-cloud-stroke="8" d="M2220 1120 Q2628 1090 2915 1104" stroke-width="21" stroke-opacity="0.05"/></g>
+<g id="sky-sparse-pigment-facets"><path data-atmos-facet="1" d="M230 728 Q470 696 690 732 L820 754 Q496 748 230 759Z" fill="#cdd4e6" fill-opacity="0.055"/>
+<path data-atmos-facet="2" d="M1018 1002 Q1280 971 1508 1017 L1707 1051 Q1343 1037 1018 1042Z" fill="#bac4dc" fill-opacity="0.045"/>
+<path data-atmos-facet="3" d="M1807 812 Q2072 784 2253 805 L2395 824 Q2067 834 1807 846Z" fill="#9cabc4" fill-opacity="0.037"/>
+<path data-atmos-facet="4" d="M2510 1200 Q2782 1180 3010 1209 L3150 1247 Q2832 1223 2510 1248Z" fill="#7489a6" fill-opacity="0.04"/></g>
+<g id="sky-isolated-star-pigments" fill="#d4deed"><circle data-star="1" cx="238" cy="244" r="1.8" opacity=".45"/><circle data-star="2" cx="617" cy="390" r="1.5" opacity=".45"/><circle data-star="3" cx="985" cy="205" r="1.7" opacity=".45"/><circle data-star="4" cx="1540" cy="340" r="1.9" opacity=".45"/><circle data-star="5" cx="1955" cy="211" r="1.3" opacity=".45"/><circle data-star="6" cx="2875" cy="286" r="1.7" opacity=".45"/></g></svg>

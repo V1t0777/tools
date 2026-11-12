@@ -315,7 +315,9 @@
   var score=0,best=0,newRecord=false;
   var lastTime=0,raf=0,elapsed=0,scroll=0,prevGapY=null;
   var hitSlowUntil=0,groundHitAt=0;
-  var audioCtx=null,noiseBuffer=null,soundOn=true;
+  var audioCtx=null,noiseBuffer=null,soundOn=true,audioConstructionFailed=false;
+  // Experimental V4: Chrome-only, no-sound idle allocation (NO resume until user gesture).
+  var AUDIO_IDLE_PRIME=true;
   var SOUND_KEY='zhaoFlappySound.v1';
   try{soundOn=localStorage.getItem(SOUND_KEY)!=='off';}catch(e){}
   var BEST_KEY='zhaoFlappyBest.v1';
@@ -350,6 +352,150 @@
   };
 
   var skyCache=null,skyCacheKey='',cloudSprite=null,pipeMaterials=null;
+
+  // V4 Alpha 1: warm-world technical art sample. Never blend partially loaded scenery.
+  // Slate uses the proven V3 procedural scene until its own complete art is approved.
+  var CINEMATIC_LAYERS=[
+    {id:'sky',speed:0},
+    {id:'far',speed:.045},
+    {id:'mid',speed:.12},
+    {id:'mist',speed:.19},
+    {id:'near',speed:.28}
+  ];
+  var cinematicWorlds={
+    warm:{status:'idle',layers:{},remaining:0},
+    slate:{status:'idle',layers:{},remaining:0}
+  };
+  // A round selects its visual presentation exactly once, before play starts.
+  // A late asset completion must never swap the scenery mid-flight.
+  var cinematicSession=null;
+  // Limit retained decoded scene textures to the currently selected world.
+  // 5 x 1600 x 1000 RGBA may occupy ~30.5 MiB on the GPU per full world.
+  // Replace the old session object so late decode callbacks cannot resurrect it.
+  function releaseInactiveCinematicWorld(activeSkin){
+    var names=['warm','slate'];
+    for(var i=0;i<names.length;i++){
+      var skin=names[i];
+      if(skin===activeSkin)continue;
+      var old=cinematicWorlds[skin];
+      if(old.status==='idle')continue;
+      old.status='evicted';
+      var keys=Object.keys(old.layers);
+      for(var j=0;j<keys.length;j++){
+        var image=old.layers[keys[j]];
+        if(image){image.onload=null;image.onerror=null;}
+      }
+      old.layers={};
+      old.remaining=0;
+      cinematicWorlds[skin]={status:'idle',layers:{},remaining:0};
+      if(cinematicSession===skin)cinematicSession=null;
+    }
+  }
+  // Keep visual quality independent of obstacle speed, player inputs and scoring.
+  // Memory hints are advisory; runtime downgrade is conservative and one-way.
+  var deviceMemory=typeof navigator.deviceMemory==='number'?navigator.deviceMemory:8;
+  var netHints=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
+  var sceneryQuality=reduceMotion||(netHints&&netHints.saveData)||deviceMemory<=2?'low':deviceMemory<=4?'medium':'high';
+  var sceneryWarmup=0,scenerySamples=0,scenerySlowFrames=0;
+  function observeSceneryFrame(rawSeconds){
+    if(!cinematicSession||state!=='running'||sceneryQuality==='low'||rawSeconds<=0||rawSeconds>.12)return;
+    if(sceneryWarmup<120){sceneryWarmup++;return;}
+    scenerySamples++;
+    if(rawSeconds>.023)scenerySlowFrames++;
+    if(scenerySamples>=90){
+      if(scenerySlowFrames>=40)sceneryQuality='low';
+      else if(scenerySlowFrames>=22&&sceneryQuality==='high')sceneryQuality='medium';
+      scenerySamples=0;scenerySlowFrames=0;
+    }
+  }
+  function preloadCinematicWorld(skin){
+    var world=cinematicWorlds[skin];
+    if(!world||world.status!=='idle'||typeof Image!=='function')return;
+    world.status='loading';
+    world.remaining=CINEMATIC_LAYERS.length;
+    for(var i=0;i<CINEMATIC_LAYERS.length;i++){
+      (function(id){
+        var picture=new Image();
+        world.layers[id]=picture;
+        function failImage(){
+          if(world.status!=='loading')return;
+          world.status='failed';
+          if(cinematicSession===skin)cinematicSession=null;
+        }
+        function markDecoded(){
+          // Image decode may settle after a world has been discarded or changed.
+          if(world.status!=='loading')return;
+          world.remaining--;
+          if(world.remaining===0){
+            world.status='ready';
+            if(state==='ready'&&birdSkin===skin)cinematicSession=skin;
+          }
+        }
+        picture.onload=function(){
+          if(world.status!=='loading')return;
+          if(picture.naturalWidth!==1600||picture.naturalHeight!==1000){failImage();return;}
+          // onload may precede image decoding; avoid a first-frame SVG raster stall.
+          // Browsers without decode() use the tested legacy onload fallback.
+          if(typeof picture.decode==='function'){
+            try{
+              var pending=picture.decode();
+              if(pending&&typeof pending.then==='function'){
+                pending.then(markDecoded,failImage);
+                return;
+              }
+            }catch(error){failImage();return;}
+          }
+          markDecoded();
+        };
+        picture.onerror=failImage;
+        picture.src='./assets/v4/'+skin+'/'+id+'.svg';
+      })(CINEMATIC_LAYERS[i].id);
+    }
+  }
+  function drawCinematicLayer(layer,world,drift){
+    var image=world.layers[layer.id];
+    if(layer.id==='sky'){
+      // Keep the sun and moon circular on narrow screens; crop instead of stretching.
+      var sw=Math.min(1600,W*1000/H),anchor=birdSkin==='warm'?1170:1230;
+      var sx=Math.max(0,Math.min(1600-sw,anchor-sw*.89));
+      ctx.drawImage(image,sx,0,sw,1000,0,0,W,H);
+      return;
+    }
+    var tileWidth=H*1.6;
+    var dx=((scroll*layer.speed+(drift||0))%tileWidth+tileWidth)%tileWidth;
+    // Cover the subpixel anti-alias boundary of adjacent images without changing
+    // the world scroll factor or introducing a visible stretched seam.
+    var overlap=.75/dpr;
+    for(var x=-dx;x<W;x+=tileWidth)ctx.drawImage(image,x,0,tileWidth+overlap,H);
+  }
+  function drawCinematicWorld(){
+    var world=cinematicWorlds[birdSkin];
+    if(cinematicSession!==birdSkin||!world||world.status!=='ready')return false;
+    try{
+      drawCinematicLayer(CINEMATIC_LAYERS[0],world);
+      if(!reduceMotion&&sceneryQuality!=='low')drawClouds();
+      drawCinematicLayer(CINEMATIC_LAYERS[1],world);
+      drawCinematicLayer(CINEMATIC_LAYERS[2],world);
+      // Restrained slow fog: two subtly different scroll phases, no billboards,
+      // particles or flashes. Motion is disabled by reduced-motion/low detail.
+      if(!reduceMotion&&sceneryQuality!=='low'){
+        ctx.save();
+        ctx.globalAlpha=.66+.045*Math.sin(elapsed*.38);
+        drawCinematicLayer(CINEMATIC_LAYERS[3],world,elapsed*1.3);
+        if(sceneryQuality==='high'){
+          ctx.globalAlpha=.09;
+          drawCinematicLayer(CINEMATIC_LAYERS[3],world,H*.27-elapsed*.8);
+        }
+        ctx.restore();
+      }
+      drawCinematicLayer(CINEMATIC_LAYERS[4],world);
+      return true;
+    }catch(error){
+      world.status='failed';
+      cinematicSession=null;
+      return false;
+    }
+  }
   // V3: transparent, same-rig 24-frame animation atlases. Fail closed to the tested
   // Canvas bird if the browser cannot load or decode the external art assets.
   var flightAtlases={warm:null,slate:null};
@@ -592,13 +738,59 @@
   }
   function retryPendingSubmission(){pendingRuns.slice().forEach(function(run){if(!run.busy&&run.attempts<2)sendRun(run);});}
 
+  function primeAudioAtIdle(){
+    // Never start sound or resume a context outside an explicit user gesture.
+    // Safari/WebKit are excluded until actual first-tap audio is device-tested.
+    if(!AUDIO_IDLE_PRIME||!soundOn||audioCtx||audioConstructionFailed||state!=='ready')return;
+    if(document.hidden||!window.requestIdleCallback)return;
+    var brands=navigator.userAgentData&&navigator.userAgentData.brands;
+    var chromiumBrand=brands&&brands.some(function(entry){return entry.brand==='Chromium';});
+    // Headless/mobile emulation can omit userAgentData even on Chromium.
+    // Restrict fallback to Chromium/Chrome tokens; CriOS/other iOS WebKit is excluded.
+    var chromiumUa=/(?:Chrome|Chromium|HeadlessChrome)\/\d+/.test(navigator.userAgent||'')&&!/CriOS|EdgiOS|FxiOS/.test(navigator.userAgent||'');
+    if(!chromiumBrand&&!chromiumUa)return;
+    if(navigator.connection&&navigator.connection.saveData)return;
+    if(typeof navigator.deviceMemory==='number'&&navigator.deviceMemory<=2)return;
+    var AC=window.AudioContext||window.webkitAudioContext;
+    if(!AC)return;
+    var budgetRetries=0;
+    function primeOnIdle(deadline){
+      if(!soundOn||audioCtx||state!=='ready'||document.hidden)return;
+      // Animated Canvas rarely leaves 10ms idle, even on a fast runner.
+      // Give three additional idle slices a chance, without forcing a timeout.
+      if(deadline&&typeof deadline.timeRemaining==='function'&&deadline.timeRemaining()<5){
+        if(budgetRetries++<3)window.requestIdleCallback(primeOnIdle);
+        return;
+      }
+      try{audioCtx=new AC();}
+      catch(error){
+        // Idle-time creation may be denied by policy; retry inside a real tap.
+        // Unlike a failed user-triggered initialization, do NOT latch failure.
+      }
+    }
+    window.requestIdleCallback(primeOnIdle);
+  }
   function initAudio(){
-    if(!soundOn)return null;
+    if(!soundOn||audioConstructionFailed)return null;
     if(!audioCtx){
       var AC=window.AudioContext||window.webkitAudioContext;
-      if(AC)audioCtx=new AC();
+      if(AC){
+        try{audioCtx=new AC();}
+        catch(error){
+          // Audio must never prevent a click from starting or moving the bird.
+          // Retry on a later explicit sound-enable gesture.
+          audioConstructionFailed=true;
+          return null;
+        }
+      }
     }
-    if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();
+    if(audioCtx&&audioCtx.state==='suspended'){
+      try{
+        var pendingResume=audioCtx.resume();
+        if(pendingResume&&typeof pendingResume.catch==='function')
+          pendingResume.catch(function(){});
+      }catch(error){/* A later user gesture may be allowed to resume audio. */}
+    }
     return audioCtx;
   }
   function tone(freq,dur,type,vol,endFreq){
@@ -645,10 +837,13 @@
   }
 
   function pickBirdSkin(){
-    birdSkin=Math.random()<.5?'warm':'slate';
+    var nextSkin=Math.random()<.5?'warm':'slate';
+    releaseInactiveCinematicWorld(nextSkin);
+    birdSkin=nextSkin;
     if(document.body&&document.body.setAttribute)document.body.setAttribute('data-flight-skin',birdSkin);
     if(sceneLabel)sceneLabel.textContent=birdSkin==='warm'?'晨曦山谷 · 暖棕旅鸟':'暮蓝远山 · 板岩夜鸟';
     ensureFlightAtlas(birdSkin);
+    preloadCinematicWorld(birdSkin);
     skyCache=null;skyCacheKey='';pipeMaterials=null;
   }
 
@@ -657,6 +852,7 @@
     pipes=[];score=0;newRecord=false;elapsed=0;scroll=0;prevGapY=null;hitSlowUntil=0;groundHitAt=0;
     bird.x=W*.28;bird.y=H*.45;bird.vy=0;bird.rot=0;bird.wing=0;bird.squash=0;bird.flapAge=1;bird.tailLag=0;
     bird.wingPhase=0;bird.wingActive=false;bird.wingQueued=false;bird.wingTempo=0;
+    cinematicSession=cinematicWorlds[birdSkin].status==='ready'?birdSkin:null;
     scoreEl.textContent='0';scoreEl.classList.add('hidden');newBestEl.classList.remove('show');
     resultLayer.classList.remove('active','personal-best');pauseLayer.classList.remove('active');
     pauseBtn.disabled=true;pauseBtn.textContent='Ⅱ';pauseBtn.classList.remove('active');
@@ -846,9 +1042,11 @@
     if(state==='falling'&&now<hitSlowUntil&&!reduceMotion){
       var force=clamp((hitSlowUntil-now)/250,0,1);ctx.translate(Math.sin(now*.095)*1.6*force,Math.cos(now*.073)*.8*force);
     }
-    drawBackground();
-    drawClouds();
-    drawRidges();
+    if(!drawCinematicWorld()){
+      drawBackground();
+      drawClouds();
+      drawRidges();
+    }
     drawPipes();
     drawGround();
     drawAirflow();
@@ -1031,6 +1229,12 @@
     ctx.fillRect(w*.09,1,Math.max(1,w*.06),Math.max(0,h-2));
     ctx.fillStyle='rgba(6,20,27,.19)';
     ctx.fillRect(w*.88,1,w*.12,Math.max(0,h-2));
+    // Alpha 19: one narrow light-facing edge and an opposing inner occlusion.
+    // Both are INSIDE the pre-existing obstacle silhouette (no hitbox changes).
+    ctx.fillStyle=warm?'rgba(250,232,193,.23)':'rgba(219,232,241,.24)';
+    ctx.fillRect(1.2,1,Math.min(1.6,w*.029),Math.max(0,h-2));
+    ctx.fillStyle=warm?'rgba(29,38,34,.25)':'rgba(13,31,47,.29)';
+    ctx.fillRect(w-2.8,1,1.6,Math.max(0,h-2));
     ctx.restore();
     // Within-width end cap keeps optical edge aligned with the existing hitbox.
     ctx.fillStyle=style.cap;roundedRect(0,capY,w,capH,6);ctx.fill();
@@ -1038,6 +1242,9 @@
     roundedRect(2,capY+2,w-4,Math.min(3,capH*.16),1.4);ctx.fill();
     ctx.fillStyle='rgba(15,25,28,.29)';
     roundedRect(1,capY+capH-4,w-2,3,1);ctx.fill();
+    // Quiet inset cap rim: no glow, external outline or unfair visual width.
+    ctx.strokeStyle=warm?'rgba(250,233,195,.21)':'rgba(210,228,241,.22)';
+    ctx.lineWidth=.85;roundedRect(.65,capY+.65,w-1.3,capH-1.3,5.3);ctx.stroke();
     ctx.strokeStyle=warm?'rgba(62,66,52,.45)':'rgba(24,43,57,.50)';
     ctx.lineWidth=.8;ctx.beginPath();ctx.moveTo(w*.3,capY+5);ctx.lineTo(w*.33,capY+capH-5);
     ctx.moveTo(w*.68,capY+6);ctx.lineTo(w*.69,capY+capH-5);ctx.stroke();
@@ -1248,14 +1455,18 @@
 
   function frame(t){
     if(!lastTime)lastTime=t;
-    var dt=Math.min(.033,(t-lastTime)/1000);lastTime=t;
+    var rawDt=(t-lastTime)/1000;
+    var dt=Math.min(.033,rawDt);lastTime=t;
+    observeSceneryFrame(rawDt);
     update(dt,t);draw(t);raf=requestAnimationFrame(frame);
   }
 
   function handleAction(e){
     if(e&&e.target&&e.target.closest&&e.target.closest('button,a'))return;
     if(e)e.preventDefault();
-    initAudio();
+    // Give the bird its physics impulse before costly Web Audio cold-start.
+    // flap() still initializes sound synchronously within this pointer gesture,
+    // preserving iOS Safari's user-activation requirements.
     if(state==='ready'||state==='over')startGame();
     else if(state==='running')flap();
   }
@@ -1269,7 +1480,10 @@
   soundBtn.addEventListener('click',function(e){
     e.stopPropagation();soundOn=!soundOn;soundBtn.textContent=soundOn?'♪':'×';soundBtn.classList.toggle('active',!soundOn);
     try{localStorage.setItem(SOUND_KEY,soundOn?'on':'off');}catch(error){}
-    if(soundOn){initAudio();tone(520,.05,'sine',.02);}
+    if(soundOn){
+      audioConstructionFailed=false;
+      tone(520,.05,'sine',.02);
+    }
   });
   leaderboardBtn.addEventListener('click',function(e){e.stopPropagation();openLeaderboard();});
   leaderboardClose.addEventListener('click',closeLeaderboard);
@@ -1300,7 +1514,8 @@
     if(e.target.closest&&e.target.closest('input,textarea,button,a,[contenteditable]'))return;
     if(e.key==='p'||e.key==='P'||e.key==='Escape'){e.preventDefault();togglePause();return;}
     if(e.key===' '||e.key==='ArrowUp'||e.key==='w'||e.key==='W'){
-      e.preventDefault();initAudio();
+      // Keyboard flight has the same physics-first behavior as pointer input.
+      e.preventDefault();
       if(state==='ready'||state==='over')startGame();
       else if(state==='running')flap();
     }
@@ -1319,6 +1534,7 @@
   loadBest();loadPendingBest();restorePendingRuns();resetGame(true);state='ready';readyLayer.classList.remove('hidden');
   refreshLeaderboard(true).then(retryPendingSubmission);
   requestAnimationFrame(resize);raf=requestAnimationFrame(frame);
+  primeAudioAtIdle();
 })();
 </script>
 

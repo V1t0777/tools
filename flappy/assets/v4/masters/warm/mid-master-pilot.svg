@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3200" height="2000" viewBox="0 0 3200 2000" role="img" aria-label="Dawn Valley authored midrange mountain painting"><title>Alpha 26 — Dawn Valley independently painted midrange mountain master pilot</title>
+<desc>Original editable vector-paint study, not final raster production master or shipped texture.</desc>
+<defs><linearGradient id="mid-bed" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7c9c91"/><stop offset="0.3333333333333333" stop-color="#60857d"/><stop offset="0.6666666666666666" stop-color="#496e69"/><stop offset="1" stop-color="#305a57"/></linearGradient>
+<linearGradient id="mid-shadow" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#305a57" stop-opacity=".13"/><stop offset="1" stop-color="#305a57" stop-opacity=".59"/></linearGradient>
+<clipPath id="mid-painted-clip"><path d="M0 1416 C48 1416 94 1392 154 1370 L248 1312 L328 1334 L418 1231 L493 1294 L579 1227 L661 1336 L754 1281 L841 1201 L927 1242 L1018 1310 L1113 1268 L1185 1304 L1307 1209 L1388 1257 L1479 1287 L1584 1221 L1692 1345 L1777 1283 L1901 1197 L1982 1251 L2070 1318 L2174 1259 L2263 1302 L2383 1226 L2475 1278 L2570 1341 L2681 1273 L2796 1317 L2910 1354 L3052 1396 C3111 1408 3155 1416 3200 1416 L3200 2000 L0 2000Z"/></clipPath></defs>
+<path id="mid-painted-base" d="M0 1416 C48 1416 94 1392 154 1370 L248 1312 L328 1334 L418 1231 L493 1294 L579 1227 L661 1336 L754 1281 L841 1201 L927 1242 L1018 1310 L1113 1268 L1185 1304 L1307 1209 L1388 1257 L1479 1287 L1584 1221 L1692 1345 L1777 1283 L1901 1197 L1982 1251 L2070 1318 L2174 1259 L2263 1302 L2383 1226 L2475 1278 L2570 1341 L2681 1273 L2796 1317 L2910 1354 L3052 1396 C3111 1408 3155 1416 3200 1416 L3200 2000 L0 2000Z" fill="url(#mid-bed)"/>
+<g id="mid-gouache-form" clip-path="url(#mid-painted-clip)">
+<path data-wash="1" d="M126 1450 Q291 1275 434 1304 Q520 1341 631 1485 L360 1614Z" fill="#dbc6a1" fill-opacity=".20"/>
+<path data-wash="2" d="M587 1443 Q740 1254 840 1225 Q902 1245 1044 1400 Q877 1467 781 1600Z" fill="#f4dfb9" fill-opacity=".20"/>
+<path data-wash="3" d="M1032 1398 Q1187 1274 1322 1220 Q1429 1298 1553 1422 Q1331 1480 1171 1630Z" fill="#9cb09b" fill-opacity=".20"/>
+<path data-wash="4" d="M1265 1364 L1307 1209 L1390 1260 Q1450 1350 1508 1448 L1377 1559Z" fill="#ba9c83" fill-opacity=".20"/>
+<path data-wash="5" d="M1595 1494 Q1766 1315 1913 1212 Q2025 1256 2158 1398 Q1900 1490 1744 1639Z" fill="#e9d3b0" fill-opacity=".20"/>
+<path data-wash="6" d="M1901 1197 Q1989 1333 2130 1434 L1988 1665 Q1934 1472 1821 1334Z" fill="#486f6e" fill-opacity=".20"/>
+<path data-wash="7" d="M2290 1450 Q2440 1240 2543 1321 Q2712 1364 2818 1488 L2524 1652Z" fill="#efdbb7" fill-opacity=".20"/>
+<path data-wash="8" d="M2640 1430 Q2770 1344 2913 1378 Q3030 1427 3098 1564 L2764 1701Z" fill="#8cae98" fill-opacity=".20"/>
+<path data-wash="9" d="M124 1656 Q471 1544 894 1634 Q1333 1702 1693 1599 Q2130 1545 2571 1684 L3093 1733 L3019 1908 Q2476 1827 2110 1957 Q1619 1863 1193 1947Z" fill="#e6d9b7" fill-opacity=".20"/>
+<path data-facet="1" d="M417 1231 L493 1294 L553 1382 L463 1453 L370 1381Z" fill="#305a57" fill-opacity="0.09"/>
+<path data-facet="2" d="M827 1212 L922 1252 L999 1315 L877 1463 L803 1365Z" fill="#305a57" fill-opacity="0.125"/>
+<path data-facet="3" d="M1307 1209 L1388 1257 L1434 1330 L1312 1461 L1246 1398Z" fill="#305a57" fill-opacity="0.16"/>
+<path data-facet="4" d="M1901 1197 L1982 1251 L2055 1322 L1954 1477 L1866 1386Z" fill="#305a57" fill-opacity="0.09"/>
+<path data-facet="5" d="M2383 1226 L2475 1278 L2520 1384 L2395 1514 L2310 1381Z" fill="#305a57" fill-opacity="0.125"/>
+<path data-facet="6" d="M2796 1317 L2910 1354 L3012 1400 L2913 1540 L2815 1442Z" fill="#305a57" fill-opacity="0.16"/>
+<path d="M0 1714 Q367 1622 747 1738 Q1157 1781 1588 1668 Q2194 1629 2629 1754 Q2989 1764 3200 1714 L3200 2000 L0 2000Z" fill="url(#mid-shadow)" opacity=".23"/>
+</g>
+<g id="mid-drybrush" clip-path="url(#mid-painted-clip)" fill="none" stroke-linecap="round">
+<path data-brush="1" d="M364 1386 Q431 1290 494 1318" stroke="#f5e3bf" stroke-opacity="0.12" stroke-width="19"/>
+<path data-brush="2" d="M710 1408 Q790 1314 853 1275" stroke="#f5e3bf" stroke-opacity="0.12" stroke-width="19"/>
+<path data-brush="3" d="M1188 1445 Q1261 1342 1333 1304" stroke="#f5e3bf" stroke-opacity="0.12" stroke-width="19"/>
+<path data-brush="4" d="M1595 1440 Q1743 1324 1872 1297" stroke="#f5e3bf" stroke-opacity="0.12" stroke-width="19"/>
+<path data-brush="5" d="M2031 1521 Q2118 1430 2231 1441" stroke="#f5e3bf" stroke-opacity="0.12" stroke-width="19"/>
+<path data-brush="6" d="M2409 1444 Q2494 1392 2597 1431" stroke="#f5e3bf" stroke-opacity="0.12" stroke-width="19"/>
+<path data-brush="7" d="M2748 1531 Q2841 1450 2914 1491" stroke="#f5e3bf" stroke-opacity="0.12" stroke-width="19"/>
+<path data-brush="8" d="M330 1701 Q761 1642 1134 1753" stroke="#f5e3bf" stroke-opacity="0.068" stroke-width="30"/>
+<path data-brush="9" d="M1656 1764 Q2111 1714 2566 1772" stroke="#f5e3bf" stroke-opacity="0.068" stroke-width="30"/>
+</g>
+<path id="mid-crest-highlight" d="M0 1416 C48 1416 94 1392 154 1370 L248 1312 L328 1334 L418 1231 L493 1294 L579 1227 L661 1336 L754 1281 L841 1201 L927 1242 L1018 1310 L1113 1268 L1185 1304 L1307 1209 L1388 1257 L1479 1287 L1584 1221 L1692 1345 L1777 1283 L1901 1197 L1982 1251 L2070 1318 L2174 1259 L2263 1302 L2383 1226 L2475 1278 L2570 1341 L2681 1273 L2796 1317 L2910 1354 L3052 1396 C3111 1408 3155 1416 3200 1416" fill="none" stroke="#f5e3bf" stroke-opacity=".12" stroke-width="4"/>
+</svg>

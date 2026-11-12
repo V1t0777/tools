@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3200" height="2000" viewBox="0 0 3200 2000" role="img" aria-label="Dawn Valley, hand-composed far mountain painting pilot — editable 3200x2000 master">
+<title>Alpha43 warm completely recomposed organic far rock painting source</title>
+<desc>Editable 3200 by 2000 original distant mountain source with a changed natural far ridgeline and synchronized clip/rim, eight individually curved landforms, six changing-direction light/shadow glazes and six broken mineral strata. This is an art-direction study, NOT professional final hand-painted raster.</desc>
+<defs><linearGradient id="alpha43-bloom" x1="0" x2=".9" y1="0" y2="1"><stop stop-color="#f4e2c6" stop-opacity=".82"/><stop offset=".51" stop-color="#76938a" stop-opacity=".24"/><stop offset="1" stop-color="#c4cdba" stop-opacity="0"/></linearGradient>
+<linearGradient id="alpha43-fold" x1="1" x2=".1" y1="0" y2="1"><stop stop-color="#315b57" stop-opacity=".09"/><stop offset=".58" stop-color="#406c64" stop-opacity=".54"/><stop offset="1" stop-color="#315b57" stop-opacity=".62"/></linearGradient><linearGradient id="alpha40-atmos-sun" x1="0" y1="0" x2="0.86" y2="1">
+<stop stop-color="#fcebcf" stop-opacity=".7"/>
+<stop offset=".53" stop-color="#c2c3a4" stop-opacity=".35"/>
+<stop offset="1" stop-color="#45645d" stop-opacity="0"/>
+</linearGradient>
+<linearGradient id="alpha40-atmos-shade" x1="1" y1="0" x2=".13" y2="1">
+<stop stop-color="#244f4b" stop-opacity=".78"/>
+<stop offset=".66" stop-color="#537971" stop-opacity=".34"/>
+<stop offset="1" stop-color="#94ac99" stop-opacity="0"/>
+</linearGradient>
+
+<linearGradient id="dawn-rock-bed" x1="0" y1="0" x2="0" y2="1">
+<stop stop-color="#b1bdaf"/><stop offset=".28" stop-color="#8ca9a0"/><stop offset=".69" stop-color="#708e83"/><stop offset="1" stop-color="#506d66"/>
+</linearGradient>
+<linearGradient id="dawn-shadow" x1="0" y1="0" x2="0" y2="1">
+<stop stop-color="#789c98" stop-opacity=".26"/><stop offset=".54" stop-color="#355b5c" stop-opacity=".43"/><stop offset="1" stop-color="#1e4b4c" stop-opacity=".18"/>
+</linearGradient>
+<linearGradient id="dawn-wash" x1="0" y1="0" x2="0" y2="1">
+<stop stop-color="#f9edda" stop-opacity=".16"/><stop offset=".46" stop-color="#fae8d4" stop-opacity=".21"/><stop offset="1" stop-color="#e1dbbc" stop-opacity=".055"/>
+</linearGradient>
+<clipPath id="far-painted-terrain"><path d="M0 1194 C93 1191 158 1161 235 1145 C295 1139 345 1136 416 1099 C477 1068 519 1040 571 1030 C625 1027 677 1084 735 1104 C802 1107 862 1051 927 1026 C975 1005 1005 1015 1048 1033 C1111 1071 1156 1083 1220 1050 C1289 1024 1324 1035 1384 1068 C1459 1104 1513 1066 1576 1035 C1649 1002 1703 1018 1753 1056 C1815 1092 1857 1070 1907 1021 C1949 984 1989 980 2024 1002 C2095 1048 2131 1057 2202 1036 C2266 1016 2310 1022 2372 1053 C2438 1086 2498 1074 2562 1042 C2627 1012 2674 1021 2727 1058 C2790 1101 2834 1073 2900 1079 C2979 1096 3032 1158 3100 1178 C3140 1190 3170 1194 3200 1194 L3200 2000 L0 2000Z"/></clipPath>
+</defs>
+<path id="far-painted-base" d="M0 1194 C93 1191 158 1161 235 1145 C295 1139 345 1136 416 1099 C477 1068 519 1040 571 1030 C625 1027 677 1084 735 1104 C802 1107 862 1051 927 1026 C975 1005 1005 1015 1048 1033 C1111 1071 1156 1083 1220 1050 C1289 1024 1324 1035 1384 1068 C1459 1104 1513 1066 1576 1035 C1649 1002 1703 1018 1753 1056 C1815 1092 1857 1070 1907 1021 C1949 984 1989 980 2024 1002 C2095 1048 2131 1057 2202 1036 C2266 1016 2310 1022 2372 1053 C2438 1086 2498 1074 2562 1042 C2627 1012 2674 1021 2727 1058 C2790 1101 2834 1073 2900 1079 C2979 1096 3032 1158 3100 1178 C3140 1190 3170 1194 3200 1194 L3200 2000 L0 2000Z" fill="url(#dawn-rock-bed)"/>
+<g id="large-gouache-landforms" clip-path="url(#far-painted-terrain)">
+<g id="alpha43-original-curvilinear-masses">
+<path data-alpha43-far-mass="1" d="M94 1392 C241 1308 359 1195 525 1167 C627 1151 697 1219 768 1261 C617 1289 535 1342 464 1429 C327 1459 194 1486 94 1392Z" fill="#e7d5b8" fill-opacity=".32"/>
+<path data-alpha43-far-mass="2" d="M465 1504 C556 1355 681 1198 816 1191 C902 1188 973 1280 1054 1334 C942 1390 838 1501 707 1531 C619 1561 534 1541 465 1504Z" fill="#406c64" fill-opacity=".36"/>
+<path data-alpha43-far-mass="3" d="M788 1387 C886 1185 1028 1053 1158 1070 C1277 1100 1313 1192 1437 1262 C1300 1398 1227 1474 1094 1515 C948 1558 855 1477 788 1387Z" fill="#c4bd9f" fill-opacity=".32"/>
+<path data-alpha43-far-mass="4" d="M1143 1546 C1253 1403 1378 1154 1553 1124 C1663 1103 1746 1212 1848 1314 C1716 1416 1584 1519 1412 1605 C1309 1611 1215 1603 1143 1546Z" fill="#315b57" fill-opacity=".36"/>
+<path data-alpha43-far-mass="5" d="M1623 1441 C1720 1261 1872 1080 2004 1035 C2122 1060 2190 1151 2304 1209 C2184 1395 2063 1466 1916 1540 C1791 1548 1702 1492 1623 1441Z" fill="#e7dac2" fill-opacity=".32"/>
+<path data-alpha43-far-mass="6" d="M1968 1597 C2097 1466 2200 1278 2353 1204 C2462 1169 2561 1259 2651 1335 C2552 1452 2450 1576 2299 1658 C2177 1673 2055 1632 1968 1597Z" fill="#57796c" fill-opacity=".36"/>
+<path data-alpha43-far-mass="7" d="M2390 1511 C2527 1329 2645 1173 2767 1158 C2891 1148 3043 1297 3159 1371 L3192 1566 C2933 1580 2658 1564 2390 1511Z" fill="#cab99f" fill-opacity=".32"/>
+<path data-alpha43-far-mass="8" d="M135 1739 C440 1593 651 1657 936 1721 C1183 1658 1420 1665 1644 1735 C1907 1644 2105 1737 2401 1740 C2643 1671 2907 1697 3167 1794 L3183 1924 C2858 1831 2580 1903 2317 1861 C1955 1919 1665 1850 1336 1934 C913 1865 501 1910 146 1851Z" fill="#456960" fill-opacity=".36"/>
+<path data-alpha43-far-softlight="1" d="M94 1392 C241 1308 359 1195 525 1167 C627 1151 697 1219 768 1261 C617 1289 535 1342 464 1429 C327 1459 194 1486 94 1392Z" fill="url(#alpha43-bloom)" fill-opacity=".42"/>
+<path data-alpha43-far-softlight="2" d="M465 1504 C556 1355 681 1198 816 1191 C902 1188 973 1280 1054 1334 C942 1390 838 1501 707 1531 C619 1561 534 1541 465 1504Z" fill="url(#alpha43-fold)" fill-opacity=".31"/>
+<path data-alpha43-far-softlight="3" d="M788 1387 C886 1185 1028 1053 1158 1070 C1277 1100 1313 1192 1437 1262 C1300 1398 1227 1474 1094 1515 C948 1558 855 1477 788 1387Z" fill="url(#alpha43-bloom)" fill-opacity=".42"/>
+<path data-alpha43-far-softlight="4" d="M1143 1546 C1253 1403 1378 1154 1553 1124 C1663 1103 1746 1212 1848 1314 C1716 1416 1584 1519 1412 1605 C1309 1611 1215 1603 1143 1546Z" fill="url(#alpha43-fold)" fill-opacity=".31"/>
+<path data-alpha43-far-softlight="5" d="M1623 1441 C1720 1261 1872 1080 2004 1035 C2122 1060 2190 1151 2304 1209 C2184 1395 2063 1466 1916 1540 C1791 1548 1702 1492 1623 1441Z" fill="url(#alpha43-bloom)" fill-opacity=".42"/>
+<path data-alpha43-far-softlight="6" d="M1968 1597 C2097 1466 2200 1278 2353 1204 C2462 1169 2561 1259 2651 1335 C2552 1452 2450 1576 2299 1658 C2177 1673 2055 1632 1968 1597Z" fill="url(#alpha43-fold)" fill-opacity=".31"/>
+<path data-alpha43-far-strata="1" d="M274 1407 C390 1353 508 1337 611 1364" fill="none" stroke="#315b57" stroke-opacity=".16" stroke-width="18" stroke-linecap="round"/>
+<path data-alpha43-far-strata="2" d="M787 1412 C895 1359 980 1361 1060 1379" fill="none" stroke="#f4e2c6" stroke-opacity=".14" stroke-width="11" stroke-linecap="round"/>
+<path data-alpha43-far-strata="3" d="M1245 1479 C1322 1411 1424 1397 1539 1428" fill="none" stroke="#315b57" stroke-opacity=".16" stroke-width="18" stroke-linecap="round"/>
+<path data-alpha43-far-strata="4" d="M1681 1496 C1822 1443 1888 1453 1991 1498" fill="none" stroke="#f4e2c6" stroke-opacity=".14" stroke-width="11" stroke-linecap="round"/>
+<path data-alpha43-far-strata="5" d="M2149 1547 C2225 1497 2329 1503 2431 1541" fill="none" stroke="#315b57" stroke-opacity=".16" stroke-width="18" stroke-linecap="round"/>
+<path data-alpha43-far-strata="6" d="M2679 1559 C2805 1502 2924 1555 3063 1571" fill="none" stroke="#f4e2c6" stroke-opacity=".14" stroke-width="11" stroke-linecap="round"/>
+</g></g>
+
+
+<path id="dawn-ridge-edge" d="M0 1194 C93 1191 158 1161 235 1145 C295 1139 345 1136 416 1099 C477 1068 519 1040 571 1030 C625 1027 677 1084 735 1104 C802 1107 862 1051 927 1026 C975 1005 1005 1015 1048 1033 C1111 1071 1156 1083 1220 1050 C1289 1024 1324 1035 1384 1068 C1459 1104 1513 1066 1576 1035 C1649 1002 1703 1018 1753 1056 C1815 1092 1857 1070 1907 1021 C1949 984 1989 980 2024 1002 C2095 1048 2131 1057 2202 1036 C2266 1016 2310 1022 2372 1053 C2438 1086 2498 1074 2562 1042 C2627 1012 2674 1021 2727 1058 C2790 1101 2834 1073 2900 1079 C2979 1096 3032 1158 3100 1178 C3140 1190 3170 1194 3200 1194" fill="none" stroke="#fff1d7" stroke-width="5" stroke-opacity=".10"/>
+</svg>

@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3200" height="2000" viewBox="0 0 3200 2000" role="img" aria-label="Blue Hour Range editable original close foreground woods pilot"><title>Alpha 29 — Blue Hour Range original near-forest painting pilot</title>
+<desc>Editable foreground woodland silhouette, individual hand-composed canopy/tree masses, sparse translucent gouache valley pigments; QA-only original source. Not approved final native handpainted raster master.</desc>
+<defs><linearGradient id="foreground-bed" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#305469"/><stop offset="0.5" stop-color="#213d54"/><stop offset="1" stop-color="#162d42"/></linearGradient>
+<linearGradient id="foreground-volume" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#9bb9cf" stop-opacity=".08"/><stop offset=".65" stop-color="#142e43" stop-opacity=".1"/><stop offset="1" stop-color="#142e43" stop-opacity=".28"/></linearGradient>
+<clipPath id="foreground-ground-clip"><path d="M0 1636 C60 1636 112 1605 174 1574 Q334 1532 457 1554 T790 1536 T1141 1560 T1467 1514 T1790 1555 T2116 1502 T2469 1557 T2804 1569 Q3010 1598 3068 1620 C3120 1636 3160 1636 3200 1636 L3200 2000 L0 2000Z"/></clipPath></defs>
+<g id="foreground-tree-canopy-forms"><g data-tree="1">
+<path data-wood="trunk" d="M181 1619 L183 1393 L194 1393 L197 1619Z" fill="#142e43"/>
+<path data-foliage="primary" d="M188 1339 L166.16 1416.33 L179.6 1410.06 L149.36 1468.58 L165.32 1462.31 L140.95999999999998 1525.01 Q173.72 1510.38 188 1531.28 Q206.48 1510.38 235.04000000000002 1525.01 L210.68 1462.31 L226.64 1468.58 L196.4 1410.06 L209.84 1416.33Z" fill="#25465b"/>
+<path data-foliage="wash" d="M190 1364 L203.96 1439.32 L213.2 1472.76 L195 1493.66Z" fill="#142e43" opacity=".27"/>
+</g>
+<g data-tree="2">
+<path data-wood="trunk" d="M403 1642 L405 1433 L416 1433 L419 1642Z" fill="#142e43"/>
+<path data-foliage="primary" d="M410 1379 L384.52 1450.04 L400.2 1444.28 L364.92 1498.04 L383.54 1492.28 L355.12 1549.88 Q393.34 1536.44 410 1555.64 Q431.56 1536.44 464.88 1549.88 L436.46 1492.28 L455.08 1498.04 L419.8 1444.28 L435.48 1450.04Z" fill="#25465b"/>
+<path data-foliage="wash" d="M412 1404 L428.62 1471.16 L439.4 1501.88 L417 1521.08Z" fill="#142e43" opacity=".27"/>
+</g>
+<g data-tree="3">
+<path data-wood="trunk" d="M662 1602 L664 1345 L675 1345 L678 1602Z" fill="#142e43"/>
+<path data-foliage="primary" d="M669 1291 L645.86 1379.8 L660.1 1372.6 L628.06 1439.8 L644.97 1432.6 L619.16 1504.6 Q653.87 1487.8 669 1511.8 Q688.58 1487.8 718.84 1504.6 L693.03 1432.6 L709.94 1439.8 L677.9 1372.6 L692.14 1379.8Z" fill="#25465b"/>
+<path data-foliage="wash" d="M671 1316 L685.91 1406.2 L695.7 1444.6 L676 1468.6Z" fill="#142e43" opacity=".27"/>
+</g>
+<g data-tree="4">
+<path data-wood="trunk" d="M939 1587 L941 1361 L952 1361 L955 1587Z" fill="#142e43"/>
+<path data-foliage="primary" d="M946 1307 L918.96 1384.33 L935.6 1378.06 L898.16 1436.58 L917.92 1430.31 L887.76 1493.01 Q928.32 1478.38 946 1499.28 Q968.88 1478.38 1004.24 1493.01 L974.08 1430.31 L993.84 1436.58 L956.4 1378.06 L973.04 1384.33Z" fill="#25465b"/>
+<path data-foliage="wash" d="M948 1332 L965.76 1407.32 L977.2 1440.76 L953 1461.66Z" fill="#142e43" opacity=".27"/>
+</g>
+<g data-tree="5">
+<path data-wood="trunk" d="M1217 1638 L1219 1424 L1230 1424 L1233 1638Z" fill="#142e43"/>
+<path data-foliage="primary" d="M1224 1370 L1200.6 1442.89 L1215 1436.98 L1182.6 1492.14 L1199.7 1486.23 L1173.6 1545.33 Q1208.7 1531.54 1224 1551.24 Q1243.8 1531.54 1274.4 1545.33 L1248.3 1486.23 L1265.4 1492.14 L1233 1436.98 L1247.4 1442.89Z" fill="#25465b"/>
+<path data-foliage="wash" d="M1226 1395 L1241.1 1464.56 L1251 1496.08 L1231 1515.78Z" fill="#142e43" opacity=".27"/>
+</g>
+<g data-tree="6">
+<path data-wood="trunk" d="M1508 1593 L1510 1333 L1521 1333 L1524 1593Z" fill="#142e43"/>
+<path data-foliage="primary" d="M1515 1279 L1489.52 1368.91 L1505.2 1361.62 L1469.92 1429.66 L1488.54 1422.37 L1460.12 1495.27 Q1498.34 1478.26 1515 1502.56 Q1536.56 1478.26 1569.88 1495.27 L1541.46 1422.37 L1560.08 1429.66 L1524.8 1361.62 L1540.48 1368.91Z" fill="#25465b"/>
+<path data-foliage="wash" d="M1517 1304 L1533.62 1395.64 L1544.4 1434.52 L1522 1458.82Z" fill="#142e43" opacity=".27"/>
+</g>
+<g data-tree="7">
+<path data-wood="trunk" d="M1796 1567 L1798 1325 L1809 1325 L1812 1567Z" fill="#142e43"/>
+<path data-foliage="primary" d="M1803 1271 L1773.1 1354.25 L1791.5 1347.5 L1750.1 1410.5 L1771.95 1403.75 L1738.6 1471.25 Q1783.45 1455.5 1803 1478 Q1828.3 1455.5 1867.4 1471.25 L1834.05 1403.75 L1855.9 1410.5 L1814.5 1347.5 L1832.9 1354.25Z" fill="#25465b"/>
+<path data-foliage="wash" d="M1805 1296 L1824.85 1379 L1837.5 1415 L1810 1437.5Z" fill="#142e43" opacity=".27"/>
+</g>
+<g data-tree="8">
+<path data-wood="trunk" d="M2065 1602 L2067 1369 L2078 1369 L2081 1602Z" fill="#142e43"/>
+<path data-foliage="primary" d="M2072 1315 L2049.64 1394.92 L2063.4 1388.44 L2032.44 1448.92 L2048.78 1442.44 L2023.84 1507.24 Q2057.38 1492.12 2072 1513.72 Q2090.92 1492.12 2120.16 1507.24 L2095.22 1442.44 L2111.56 1448.92 L2080.6 1388.44 L2094.36 1394.92Z" fill="#25465b"/>
+<path data-foliage="wash" d="M2074 1340 L2088.34 1418.68 L2097.8 1453.24 L2079 1474.84Z" fill="#142e43" opacity=".27"/>
+</g>
+<g data-tree="9">
+<path data-wood="trunk" d="M2349 1581 L2351 1326 L2362 1326 L2365 1581Z" fill="#142e43"/>
+<path data-foliage="primary" d="M2356 1272 L2330.52 1360.06 L2346.2 1352.92 L2310.92 1419.56 L2329.54 1412.42 L2301.12 1483.82 Q2339.34 1467.16 2356 1490.96 Q2377.56 1467.16 2410.88 1483.82 L2382.46 1412.42 L2401.08 1419.56 L2365.8 1352.92 L2381.48 1360.06Z" fill="#25465b"/>
+<path data-foliage="wash" d="M2358 1297 L2374.62 1386.24 L2385.4 1424.32 L2363 1448.12Z" fill="#142e43" opacity=".27"/>
+</g>
+<g data-tree="10">
+<path data-wood="trunk" d="M2678 1625 L2680 1417 L2691 1417 L2694 1625Z" fill="#142e43"/>
+<path data-foliage="primary" d="M2685 1363 L2660.82 1433.67 L2675.7 1427.94 L2642.22 1481.42 L2659.89 1475.69 L2632.92 1532.99 Q2669.19 1519.62 2685 1538.72 Q2705.46 1519.62 2737.08 1532.99 L2710.11 1475.69 L2727.78 1481.42 L2694.3 1427.94 L2709.18 1433.67Z" fill="#25465b"/>
+<path data-foliage="wash" d="M2687 1388 L2702.67 1454.68 L2712.9 1485.24 L2692 1504.34Z" fill="#142e43" opacity=".27"/>
+</g>
+<g data-tree="11">
+<path data-wood="trunk" d="M2975 1667 L2977 1450 L2988 1450 L2991 1667Z" fill="#142e43"/>
+<path data-foliage="primary" d="M2982 1396 L2960.42 1470 L2973.7 1464 L2943.82 1520 L2959.59 1514 L2935.52 1574 Q2967.89 1560 2982 1580 Q3000.26 1560 3028.48 1574 L3004.41 1514 L3020.18 1520 L2990.3 1464 L3003.58 1470Z" fill="#25465b"/>
+<path data-foliage="wash" d="M2984 1421 L2997.77 1492 L3006.9 1524 L2989 1544Z" fill="#142e43" opacity=".27"/>
+</g></g>
+<path id="foreground-ground-base" d="M0 1636 C60 1636 112 1605 174 1574 Q334 1532 457 1554 T790 1536 T1141 1560 T1467 1514 T1790 1555 T2116 1502 T2469 1557 T2804 1569 Q3010 1598 3068 1620 C3120 1636 3160 1636 3200 1636 L3200 2000 L0 2000Z" fill="url(#foreground-bed)"/>
+<g id="foreground-gouache-below-ridge" clip-path="url(#foreground-ground-clip)">
+<path data-foreground-wash="1" d="M130 1591 q115 -45 232 -16 q75 30 119 77 q-151 45 -331 78Z" fill="#6d8595" fill-opacity="0.075"/>
+<path data-foreground-wash="2" d="M633 1623 q115 -45 232 -16 q75 30 119 77 q-151 45 -331 78Z" fill="#476f83" fill-opacity="0.095"/>
+<path data-foreground-wash="3" d="M1136 1655 q115 -45 232 -16 q75 30 119 77 q-151 45 -331 78Z" fill="#7794a2" fill-opacity="0.115"/>
+<path data-foreground-wash="4" d="M1639 1591 q115 -45 232 -16 q75 30 119 77 q-151 45 -331 78Z" fill="#183952" fill-opacity="0.075"/>
+<path data-foreground-wash="5" d="M2142 1623 q115 -45 232 -16 q75 30 119 77 q-151 45 -331 78Z" fill="#a0aabd" fill-opacity="0.095"/>
+<path data-foreground-wash="6" d="M2645 1655 q115 -45 232 -16 q75 30 119 77 q-151 45 -331 78Z" fill="#294b69" fill-opacity="0.115"/>
+<path d="M0 1758 Q417 1716 761 1780 Q1181 1813 1596 1732 Q2124 1739 2540 1791 Q2860 1809 3200 1758 L3200 2000 L0 2000Z" fill="url(#foreground-volume)" opacity=".44"/>
+<path data-foreground-brush="1" d="M146 1758 Q493 1707 769 1775" fill="none" stroke="#9bb9cf" stroke-width="18" stroke-opacity="0.045" stroke-linecap="round"/>
+<path data-foreground-brush="2" d="M851 1855 Q1124 1817 1442 1860" fill="none" stroke="#9bb9cf" stroke-width="25" stroke-opacity="0.065" stroke-linecap="round"/>
+<path data-foreground-brush="3" d="M1521 1762 Q1882 1682 2113 1755" fill="none" stroke="#9bb9cf" stroke-width="18" stroke-opacity="0.085" stroke-linecap="round"/>
+<path data-foreground-brush="4" d="M2218 1817 Q2588 1759 3022 1821" fill="none" stroke="#9bb9cf" stroke-width="25" stroke-opacity="0.045" stroke-linecap="round"/>
+<path data-foreground-brush="5" d="M341 1940 Q682 1892 993 1938" fill="none" stroke="#9bb9cf" stroke-width="18" stroke-opacity="0.065" stroke-linecap="round"/>
+<path data-foreground-brush="6" d="M1666 1945 Q2075 1905 2522 1945" fill="none" stroke="#9bb9cf" stroke-width="25" stroke-opacity="0.085" stroke-linecap="round"/>
+</g>
+<path id="foreground-ridge-open-highlight" d="M0 1636 C60 1636 112 1605 174 1574 Q334 1532 457 1554 T790 1536 T1141 1560 T1467 1514 T1790 1555 T2116 1502 T2469 1557 T2804 1569 Q3010 1598 3068 1620 C3120 1636 3160 1636 3200 1636" fill="none" stroke="#9bb9cf" stroke-opacity=".09" stroke-width="5"/>
+</svg>

@@ -81,8 +81,19 @@ required_paths=(
   dist-secure/night-shift/index.html
   dist-secure/admin-night-shift/index.html
   dist-secure/flappy/index.html
+  dist-secure/flappy/review-v4.html
   dist-secure/flappy/assets/v3/warm-flight.svg
   dist-secure/flappy/assets/v3/slate-flight.svg
+  dist-secure/flappy/assets/v4/warm/sky.svg
+  dist-secure/flappy/assets/v4/warm/far.svg
+  dist-secure/flappy/assets/v4/warm/mid.svg
+  dist-secure/flappy/assets/v4/warm/mist.svg
+  dist-secure/flappy/assets/v4/warm/near.svg
+  dist-secure/flappy/assets/v4/slate/sky.svg
+  dist-secure/flappy/assets/v4/slate/far.svg
+  dist-secure/flappy/assets/v4/slate/mid.svg
+  dist-secure/flappy/assets/v4/slate/mist.svg
+  dist-secure/flappy/assets/v4/slate/near.svg
   dist-secure/stack/index.html
   dist-secure/pictionary/index.html
   dist-secure/pictionary/app.js

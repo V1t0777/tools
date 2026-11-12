@@ -1,0 +1,704 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Flappy V4 · 双世界美术对比（开发预览）</title>
+<style>
+:root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif}
+*{box-sizing:border-box}body{margin:0;background:#0b1420;color:#f0f4fa}
+main{max-width:1100px;margin:auto;padding:22px 18px 55px}
+h1{font-size:clamp(23px,3vw,32px);margin:0 0 8px}
+header p,.note{color:#a5b8c9;font-size:13px;line-height:1.7}
+header p{max-width:760px;margin:0 0 16px}
+.tag{display:inline-block;border:1px solid #78674a;color:#f3d49a;background:#372c1b;padding:5px 10px;border-radius:99px;font-size:11px;margin-bottom:13px}
+.options{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;border:1px solid #2f4155;background:#152336;padding:14px;border-radius:16px;margin-bottom:19px}
+.options label{font-size:12px;color:#dbe8f4;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.options input{accent-color:#8dc5da}
+.options>input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.options>label[for]{padding:7px 9px;border:1px solid #43566b;border-radius:10px;min-height:34px;user-select:none}
+.options>input:checked+label{background:#274457;color:#e7f7ff;border-color:#739fb8}
+.options>input:focus-visible+label{outline:2px solid #a9d5e6;outline-offset:3px}
+.worlds{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+.world{min-width:0;background:#172336;border:1px solid #304358;padding:13px;border-radius:17px}
+.world h2{font-size:16px;margin:0 0 12px;font-weight:650}
+.frame{position:relative;isolation:isolate;width:100%;aspect-ratio:360/600;overflow:hidden;background:#21374b;border-radius:13px;contain:paint}
+.layer{position:absolute;max-width:none;width:auto;height:100%;top:0;left:0;transform:none;pointer-events:none;user-select:none}
+.layer.sky{z-index:0;left:89%}
+.layer.sky-pilot{display:none}
+#paint-sky-pilot:checked~.worlds .world .sky-base{display:none}
+#paint-sky-pilot:checked~.worlds .world .sky-pilot{display:block}
+.layer.far{z-index:1}
+.layer.far-pilot{display:none}
+/* Alpha38 separately authored far mountain raster, only ephemeral Draft CI. */
+.layer.far-alpha38{display:none;aspect-ratio:8/5;background-size:100% 100%;background-repeat:no-repeat}
+.warm .far-alpha38{background-image:url("./assets/v4/pilot/warm/far-raster-alpha38.png")}
+.slate .far-alpha38{background-image:url("./assets/v4/pilot/slate/far-raster-alpha38.png")}
+/* New composited editable strata, never part of shipped game. */
+.layer.far-alpha39{display:none;aspect-ratio:8/5;background-size:100% 100%;background-repeat:no-repeat}
+.warm .far-alpha39{background-image:url("./assets/v4/pilot/warm/far-raster-alpha39.png")}
+.slate .far-alpha39{background-image:url("./assets/v4/pilot/slate/far-raster-alpha39.png")}
+/* Alpha40 original full-value compositional sources, Draft visual QA only. */
+.layer.far-alpha40,.layer.mid-alpha40{display:none;aspect-ratio:8/5;background-size:100% 100%;background-repeat:no-repeat}
+.warm .far-alpha40{background-image:url("./assets/v4/pilot/warm/far-raster-alpha40.png")}
+.slate .far-alpha40{background-image:url("./assets/v4/pilot/slate/far-raster-alpha40.png")}
+.warm .mid-alpha40{background-image:url("./assets/v4/pilot/warm/mid-raster-alpha40.png")}
+.slate .mid-alpha40{background-image:url("./assets/v4/pilot/slate/mid-raster-alpha40.png")}
+/* Alpha41 editable atmospheric landscape paint is temporary Draft art only. */
+.layer.far-alpha41,.layer.mid-alpha41{display:none;aspect-ratio:8/5;background-repeat:no-repeat;background-size:100% 100%}
+.warm .far-alpha41{background-image:url("./assets/v4/pilot/warm/far-raster-alpha41.png")}
+.slate .far-alpha41{background-image:url("./assets/v4/pilot/slate/far-raster-alpha41.png")}
+.warm .mid-alpha41{background-image:url("./assets/v4/pilot/warm/mid-raster-alpha41.png")}
+.slate .mid-alpha41{background-image:url("./assets/v4/pilot/slate/mid-raster-alpha41.png")}
+/* Alpha42 genuinely redrawn blue-hour mid mountain + material, Draft only. */
+.layer.mid-alpha42{display:none;aspect-ratio:8/5;background-size:100% 100%;background-repeat:no-repeat}
+.slate .mid-alpha42{background-image:url("./assets/v4/pilot/slate/mid-raster-alpha42.png")}
+/* Alpha43 independently authored natural distant ridge bitmaps: QA-only. */
+.layer.far-alpha43{display:none;aspect-ratio:8/5;background-size:100% 100%;background-repeat:no-repeat}
+.warm .far-alpha43{background-image:url("./assets/v4/pilot/warm/far-raster-alpha43.png")}
+.slate .far-alpha43{background-image:url("./assets/v4/pilot/slate/far-raster-alpha43.png")}
+/* Alpha44 separately painted scene cohesion on three source depths — review-only. */
+.layer.far-alpha44,.layer.mid-alpha44,.layer.near-alpha44{display:none;aspect-ratio:8/5;background-size:100% 100%;background-repeat:no-repeat}
+.warm .far-alpha44{background-image:url("./assets/v4/pilot/warm/far-raster-alpha44.png")}
+.warm .mid-alpha44{background-image:url("./assets/v4/pilot/warm/mid-raster-alpha44.png")}
+.warm .near-alpha44{background-image:url("./assets/v4/pilot/warm/near-raster-alpha44.png")}
+.slate .far-alpha44{background-image:url("./assets/v4/pilot/slate/far-raster-alpha44.png")}
+.slate .mid-alpha44{background-image:url("./assets/v4/pilot/slate/mid-raster-alpha44.png")}
+.slate .near-alpha44{background-image:url("./assets/v4/pilot/slate/near-raster-alpha44.png")}
+.layer.near-alpha46,.layer.near-alpha46a{display:none}
+#paint-pilot:checked~.worlds .warm .far-base{display:none}
+#paint-pilot:checked~.worlds .warm .far-pilot{display:block}
+#paint-pilot:checked~.worlds .slate .far-base{display:none}
+#paint-pilot:checked~.worlds .slate .far-pilot{display:block}
+/* Alpha 24 pilot layer is QA opt-in, never a default runtime image. */
+.layer.mid{z-index:2}
+.layer.mid-pilot{display:none}
+/* Alpha37 only generated by Draft CI; normal game mid SVG unmodified. */
+.layer.mid-alpha37{display:none;aspect-ratio:8/5;background-size:100% 100%;background-repeat:no-repeat}
+.warm .mid-alpha37{background-image:url("./assets/v4/pilot/warm/mid-raster-alpha37.png")}
+.slate .mid-alpha37{background-image:url("./assets/v4/pilot/slate/mid-raster-alpha37.png")}
+#paint-mid-pilot:checked~.worlds .world .mid-base{display:none}
+#paint-mid-pilot:checked~.worlds .world .mid-pilot{display:block}
+.layer.mist{z-index:3;opacity:.7}
+.layer.mist-pilot{display:none}
+#paint-mist-pilot:checked~.worlds .world .mist-base{display:none}
+#paint-mist-pilot:checked~.worlds .world .mist-pilot{display:block}
+.layer.near{z-index:4}
+.layer.near-pilot{display:none}
+.layer.near-alpha29{display:none}
+/* Generated in Draft CI only. No shipped texture and no CSS filter cost. */
+.layer.near-raster-alpha31{display:none;aspect-ratio:8/5;background-size:100% 100%;background-repeat:no-repeat}
+.warm .near-raster-alpha31{background-image:url("./assets/v4/pilot/warm/near-raster-alpha31.png")}
+.slate .near-raster-alpha31{background-image:url("./assets/v4/pilot/slate/near-raster-alpha31.png")}
+.layer.near-raster-alpha32{display:none;aspect-ratio:8/5;background-size:100% 100%;background-repeat:no-repeat}
+.warm .near-raster-alpha32{background-image:url("./assets/v4/pilot/warm/near-raster-alpha32.png")}
+.slate .near-raster-alpha32{background-image:url("./assets/v4/pilot/slate/near-raster-alpha32.png")}
+.layer.near-raster-alpha33{display:none;aspect-ratio:8/5;background-size:100% 100%;background-repeat:no-repeat}
+.warm .near-raster-alpha33{background-image:url("./assets/v4/pilot/warm/near-raster-alpha33.png")}
+.slate .near-raster-alpha33{background-image:url("./assets/v4/pilot/slate/near-raster-alpha33.png")}
+.layer.near-raster-alpha34{display:none;aspect-ratio:8/5;background-size:100% 100%;background-repeat:no-repeat}
+.warm .near-raster-alpha34{background-image:url("./assets/v4/pilot/warm/near-raster-alpha34.png")}
+.slate .near-raster-alpha34{background-image:url("./assets/v4/pilot/slate/near-raster-alpha34.png")}
+/* Alpha35 focuses slate per-tree readable branch and conifer material layout only. */
+.layer.near-raster-alpha35{display:none;aspect-ratio:8/5;background-size:100% 100%;background-repeat:no-repeat}
+.slate .near-raster-alpha35{background-image:url("./assets/v4/pilot/slate/near-raster-alpha35.png")}
+/* Alpha36 editable irregular outline: two new truly alpha-changing RGBA studies. */
+.layer.near-raster-alpha36{display:none;aspect-ratio:8/5;background-size:100% 100%;background-repeat:no-repeat}
+.warm .near-raster-alpha36{background-image:url("./assets/v4/pilot/warm/near-raster-alpha36.png")}
+.slate .near-raster-alpha36{background-image:url("./assets/v4/pilot/slate/near-raster-alpha36.png")}
+/* Historical source state remains hidden unless the explicit Alpha 29 review hash is targeted. */
+#paint-near-pilot:checked~.worlds .world .near-base{display:none}
+#paint-near-pilot:checked~.worlds .world .near-pilot{display:block}
+/* Match the live Canvas sky crop: sx = lightX - 0.89 * visibleSourceWidth.
+   For a 1600px-wide image at 100% scene height, the world-space light
+   anchors (1170 / 1230) become 73.125% / 76.875% image offsets. */
+.warm .layer.sky{transform:translateX(-73.125%)}
+.slate .layer.sky{transform:translateX(-76.875%)}
+.guides{position:absolute;z-index:5;inset:0;display:none;pointer-events:none}
+.pipe{position:absolute;left:68%;width:14%;background:linear-gradient(90deg,#526365,#abafa1 46%,#536466);box-shadow:0 0 0 1px #d1d6d1}
+.slate .pipe{background:linear-gradient(90deg,#283e58,#889eb2 50%,#30475c)}
+.pipe.top{top:0;height:30%}.pipe.bottom{top:61%;bottom:11.5%}
+/* Alpha 23: the SAME passive 6x4 / 24-frame transparent atlas as the real game.
+   Nominal game draw size = birdRadius() * 4.04; r=max(13, width*.043).
+   Actual Canvas composition is still checked independently, not claimed by CSS. */
+.bird{position:absolute;left:25%;top:42%;width:max(52.52px,17.372%);aspect-ratio:1;
+  transform:translate(-50%,-52.5%);border:0;border-radius:0;box-shadow:none;
+  background-image:url("./assets/v3/warm-flight.svg");background-repeat:no-repeat;
+  background-size:600% 400%;background-position:0% 0%;image-rendering:auto;pointer-events:none}
+.slate .bird{background-image:url("./assets/v3/slate-flight.svg")}
+#wing-rest:checked~.worlds .bird{background-position:0% 0%}
+#wing-power:checked~.worlds .bird{background-position:0% 33.333333%}
+#wing-recovery:checked~.worlds .bird{background-position:0% 66.666667%}
+#wing-glide:checked~.worlds .bird{background-position:0% 100%}
+.ground{position:absolute;bottom:0;left:0;right:0;height:11.5%;background:rgba(28,52,47,.83);border-top:2px solid rgba(219,212,165,.5)}
+.slate .ground{background:rgba(21,42,60,.89)}
+#s390:checked~.worlds .frame{aspect-ratio:390/844}
+#s420:checked~.worlds .frame{aspect-ratio:420/740}
+#s320:checked~.worlds .frame{aspect-ratio:320/568}
+#guides:checked~.worlds .guides{display:block}
+#fog:not(:checked)~.worlds .layer.mist{display:none}
+.note{margin:12px 2px 0;font-size:12px}
+aside{font-size:12px;color:#a5b8c9;line-height:1.8;margin-top:20px}
+a{color:#9acde2}
+/* Evidence capture mode: hash-select a single original world at the exact
+   browser viewport ratio. No JavaScript, downloaded libraries or external data.
+   Unfragmented links retain the interactive, side-by-side art review. */
+body:has(.world:target) main{padding:0;max-width:none;margin:0}
+body:has(.world:target) header,
+body:has(.world:target) aside,
+body:has(.world:target) .options>input,
+body:has(.world:target) .options>label[for]{display:none}
+body:has(.world:target) .options{padding:0;margin:0;border:0;background:none;border-radius:0;display:block}
+body:has(.world:target) .worlds{display:block}
+body:has(.world:target) .world:not(:target){display:none}
+body:has(.world:target) .world:target{padding:0;border:0;border-radius:0;background:none}
+body:has(.world:target) .world h2,
+body:has(.world:target) .world .note{display:none}
+body:has(.world:target) .frame{width:100vw;height:100dvh;aspect-ratio:auto;border-radius:0}
+/* Direct edge-join evidence: the center line is the physical point where the
+   same 1600:1000 panoramic strip repeats. Both halves use the same source art.
+   The sky is non-tiling and intentionally omitted from seam comparisons. */
+.phase-anchor{position:absolute;width:0;height:0;overflow:hidden;pointer-events:none}
+body:has(.phase-anchor:target) main{padding:0;max-width:none;margin:0}
+body:has(.phase-anchor:target) header,
+body:has(.phase-anchor:target) aside,
+body:has(.phase-anchor:target) .options>input,
+body:has(.phase-anchor:target) .options>label[for]{display:none}
+body:has(.phase-anchor:target) .options{padding:0;margin:0;border:0;background:none;border-radius:0;display:block}
+body:has(.phase-anchor:target) .worlds{display:block}
+body:has(.phase-anchor:target) .world:not(:has(.phase-anchor:target)){display:none}
+body:has(.phase-anchor:target) .world:has(.phase-anchor:target){padding:0;border:0;border-radius:0;background:none}
+body:has(.phase-anchor:target) .world:has(.phase-anchor:target) h2,
+body:has(.phase-anchor:target) .world:has(.phase-anchor:target) .note{display:none}
+body:has(.phase-anchor:target) .frame{width:100vw;height:100dvh;aspect-ratio:auto;border-radius:0}
+.phase-anchor:is(#warm-power,#slate-power):target~.frame .bird{background-position:0% 33.333333%}
+.phase-anchor:is(#warm-recovery,#slate-recovery):target~.frame .bird{background-position:0% 66.666667%}
+.phase-anchor:is(#warm-glide,#slate-glide):target~.frame .bird{background-position:0% 100%}
+#warm-pilot:target~.frame .far-base{display:none}
+#warm-pilot:target~.frame .far-pilot{display:block}
+#slate-pilot:target~.frame .far-base{display:none}
+#slate-pilot:target~.frame .far-pilot{display:block}
+/* Mid-only and paired far+mid screenshots isolate the artist's value grouping. */
+#warm-mid-pilot:target~.frame .mid-base,#slate-mid-pilot:target~.frame .mid-base{display:none}
+#warm-mid-pilot:target~.frame .mid-pilot,#slate-mid-pilot:target~.frame .mid-pilot{display:block}
+/* Alpha38 far-only and cohesive original artwork from both worlds. */
+#warm-far-alpha38:target~.frame .far-base,#slate-far-alpha38:target~.frame .far-base,
+#warm-world-alpha38:target~.frame .far-base,#slate-world-alpha38:target~.frame .far-base{display:none}
+#warm-far-alpha38:target~.frame .far-alpha38,#slate-far-alpha38:target~.frame .far-alpha38,
+#warm-world-alpha38:target~.frame .far-alpha38,#slate-world-alpha38:target~.frame .far-alpha38{display:block}
+#warm-world-alpha38:target~.frame .mid-base,#slate-world-alpha38:target~.frame .mid-base,
+#warm-world-alpha38:target~.frame .mist-base,#slate-world-alpha38:target~.frame .mist-base,
+#warm-world-alpha38:target~.frame .near-base,#slate-world-alpha38:target~.frame .near-base{display:none}
+#warm-world-alpha38:target~.frame .mid-alpha37,#slate-world-alpha38:target~.frame .mid-alpha37,
+#warm-world-alpha38:target~.frame .mist-pilot,#slate-world-alpha38:target~.frame .mist-pilot,
+#warm-world-alpha38:target~.frame .near-raster-alpha36,#slate-world-alpha38:target~.frame .near-raster-alpha36{display:block}
+#warm-far-alpha39:target~.frame .far-base,#slate-far-alpha39:target~.frame .far-base,
+#warm-world-alpha39:target~.frame .far-base,#slate-world-alpha39:target~.frame .far-base{display:none}
+#warm-far-alpha39:target~.frame .far-alpha39,#slate-far-alpha39:target~.frame .far-alpha39,
+#warm-world-alpha39:target~.frame .far-alpha39,#slate-world-alpha39:target~.frame .far-alpha39{display:block}
+#warm-world-alpha39:target~.frame .mid-base,#slate-world-alpha39:target~.frame .mid-base,
+#warm-world-alpha39:target~.frame .mist-base,#slate-world-alpha39:target~.frame .mist-base,
+#warm-world-alpha39:target~.frame .near-base,#slate-world-alpha39:target~.frame .near-base{display:none}
+#warm-world-alpha39:target~.frame .mid-alpha37,#slate-world-alpha39:target~.frame .mid-alpha37,
+#warm-world-alpha39:target~.frame .mist-pilot,#slate-world-alpha39:target~.frame .mist-pilot,
+#warm-world-alpha39:target~.frame .near-raster-alpha36,#slate-world-alpha39:target~.frame .near-raster-alpha36{display:block}
+#warm-far-alpha40:target~.frame .far-base,#slate-far-alpha40:target~.frame .far-base,
+#warm-world-alpha40:target~.frame .far-base,#slate-world-alpha40:target~.frame .far-base{display:none}
+#warm-far-alpha40:target~.frame .far-alpha40,#slate-far-alpha40:target~.frame .far-alpha40,
+#warm-world-alpha40:target~.frame .far-alpha40,#slate-world-alpha40:target~.frame .far-alpha40{display:block}
+#warm-mid-alpha40:target~.frame .mid-base,#slate-mid-alpha40:target~.frame .mid-base,
+#warm-world-alpha40:target~.frame .mid-base,#slate-world-alpha40:target~.frame .mid-base{display:none}
+#warm-mid-alpha40:target~.frame .mid-alpha40,#slate-mid-alpha40:target~.frame .mid-alpha40,
+#warm-world-alpha40:target~.frame .mid-alpha40,#slate-world-alpha40:target~.frame .mid-alpha40{display:block}
+#warm-world-alpha40:target~.frame .mist-base,#slate-world-alpha40:target~.frame .mist-base,
+#warm-world-alpha40:target~.frame .near-base,#slate-world-alpha40:target~.frame .near-base{display:none}
+#warm-world-alpha40:target~.frame .mist-pilot,#slate-world-alpha40:target~.frame .mist-pilot,
+#warm-world-alpha40:target~.frame .near-raster-alpha36,#slate-world-alpha40:target~.frame .near-raster-alpha36{display:block}
+#warm-far-alpha41:target~.frame .far-base,#slate-far-alpha41:target~.frame .far-base,
+#warm-world-alpha41:target~.frame .far-base,#slate-world-alpha41:target~.frame .far-base{display:none}
+#warm-far-alpha41:target~.frame .far-alpha41,#slate-far-alpha41:target~.frame .far-alpha41,
+#warm-world-alpha41:target~.frame .far-alpha41,#slate-world-alpha41:target~.frame .far-alpha41{display:block}
+#warm-mid-alpha41:target~.frame .mid-base,#slate-mid-alpha41:target~.frame .mid-base,
+#warm-world-alpha41:target~.frame .mid-base,#slate-world-alpha41:target~.frame .mid-base{display:none}
+#warm-mid-alpha41:target~.frame .mid-alpha41,#slate-mid-alpha41:target~.frame .mid-alpha41,
+#warm-world-alpha41:target~.frame .mid-alpha41,#slate-world-alpha41:target~.frame .mid-alpha41{display:block}
+#warm-world-alpha41:target~.frame .mist-base,#slate-world-alpha41:target~.frame .mist-base,
+#warm-world-alpha41:target~.frame .near-base,#slate-world-alpha41:target~.frame .near-base{display:none}
+#warm-world-alpha41:target~.frame .mist-pilot,#slate-world-alpha41:target~.frame .mist-pilot,
+#warm-world-alpha41:target~.frame .near-raster-alpha36,#slate-world-alpha41:target~.frame .near-raster-alpha36{display:block}
+#slate-mid-alpha42:target~.frame .mid-base,
+#slate-world-alpha42:target~.frame .mid-base{display:none}
+#slate-mid-alpha42:target~.frame .mid-alpha42,
+#slate-world-alpha42:target~.frame .mid-alpha42{display:block}
+#slate-world-alpha42:target~.frame .far-base,
+#slate-world-alpha42:target~.frame .mist-base,
+#slate-world-alpha42:target~.frame .near-base{display:none}
+#slate-world-alpha42:target~.frame .far-alpha41,
+#slate-world-alpha42:target~.frame .mist-pilot,
+#slate-world-alpha42:target~.frame .near-raster-alpha36{display:block}
+#warm-far-alpha43:target~.frame .far-base,#slate-far-alpha43:target~.frame .far-base,
+#warm-world-alpha43:target~.frame .far-base,#slate-world-alpha43:target~.frame .far-base{display:none}
+#warm-far-alpha43:target~.frame .far-alpha43,#slate-far-alpha43:target~.frame .far-alpha43,
+#warm-world-alpha43:target~.frame .far-alpha43,#slate-world-alpha43:target~.frame .far-alpha43{display:block}
+#warm-world-alpha43:target~.frame .mid-base,#slate-world-alpha43:target~.frame .mid-base,
+#warm-world-alpha43:target~.frame .mist-base,#slate-world-alpha43:target~.frame .mist-base,
+#warm-world-alpha43:target~.frame .near-base,#slate-world-alpha43:target~.frame .near-base{display:none}
+#warm-world-alpha43:target~.frame .mid-alpha41,#slate-world-alpha43:target~.frame .mid-alpha42,
+#warm-world-alpha43:target~.frame .mist-pilot,#slate-world-alpha43:target~.frame .mist-pilot,
+#warm-world-alpha43:target~.frame .near-raster-alpha36,#slate-world-alpha43:target~.frame .near-raster-alpha36{display:block}
+#warm-far-alpha44:target~.frame .far-base,#slate-far-alpha44:target~.frame .far-base,
+#warm-world-alpha44:target~.frame .far-base,#slate-world-alpha44:target~.frame .far-base{display:none}
+#warm-far-alpha44:target~.frame .far-alpha44,#slate-far-alpha44:target~.frame .far-alpha44,
+#warm-world-alpha44:target~.frame .far-alpha44,#slate-world-alpha44:target~.frame .far-alpha44{display:block}
+#warm-mid-alpha44:target~.frame .mid-base,#slate-mid-alpha44:target~.frame .mid-base,
+#warm-world-alpha44:target~.frame .mid-base,#slate-world-alpha44:target~.frame .mid-base{display:none}
+#warm-mid-alpha44:target~.frame .mid-alpha44,#slate-mid-alpha44:target~.frame .mid-alpha44,
+#warm-world-alpha44:target~.frame .mid-alpha44,#slate-world-alpha44:target~.frame .mid-alpha44{display:block}
+#warm-near-alpha44:target~.frame .near-base,#slate-near-alpha44:target~.frame .near-base,
+#warm-world-alpha44:target~.frame .near-base,#slate-world-alpha44:target~.frame .near-base{display:none}
+#warm-near-alpha44:target~.frame .near-alpha44,#slate-near-alpha44:target~.frame .near-alpha44,
+#warm-world-alpha44:target~.frame .near-alpha44,#slate-world-alpha44:target~.frame .near-alpha44{display:block}
+#warm-world-alpha44:target~.frame .mist-base,#slate-world-alpha44:target~.frame .mist-base{display:none}
+#warm-world-alpha44:target~.frame .mist-pilot,#slate-world-alpha44:target~.frame .mist-pilot{display:block}
+
+/* Alpha45 real atlas wing silhouettes, 4 genuine sampled frames + absent-bird
+   baseline per world/viewport. Draft static CSS-only QA; no executable JS. */
+#warm-world-alpha45-rest:target~.frame .far-base,#warm-world-alpha45-power:target~.frame .far-base,#warm-world-alpha45-recovery:target~.frame .far-base,#warm-world-alpha45-glide:target~.frame .far-base,#warm-world-alpha45-clear:target~.frame .far-base{display:none}
+#warm-world-alpha45-rest:target~.frame .far-alpha44,#warm-world-alpha45-power:target~.frame .far-alpha44,#warm-world-alpha45-recovery:target~.frame .far-alpha44,#warm-world-alpha45-glide:target~.frame .far-alpha44,#warm-world-alpha45-clear:target~.frame .far-alpha44{display:block}
+#warm-world-alpha45-rest:target~.frame .mid-base,#warm-world-alpha45-power:target~.frame .mid-base,#warm-world-alpha45-recovery:target~.frame .mid-base,#warm-world-alpha45-glide:target~.frame .mid-base,#warm-world-alpha45-clear:target~.frame .mid-base{display:none}
+#warm-world-alpha45-rest:target~.frame .mid-alpha44,#warm-world-alpha45-power:target~.frame .mid-alpha44,#warm-world-alpha45-recovery:target~.frame .mid-alpha44,#warm-world-alpha45-glide:target~.frame .mid-alpha44,#warm-world-alpha45-clear:target~.frame .mid-alpha44{display:block}
+#warm-world-alpha45-rest:target~.frame .near-base,#warm-world-alpha45-power:target~.frame .near-base,#warm-world-alpha45-recovery:target~.frame .near-base,#warm-world-alpha45-glide:target~.frame .near-base,#warm-world-alpha45-clear:target~.frame .near-base{display:none}
+#warm-world-alpha45-rest:target~.frame .near-alpha44,#warm-world-alpha45-power:target~.frame .near-alpha44,#warm-world-alpha45-recovery:target~.frame .near-alpha44,#warm-world-alpha45-glide:target~.frame .near-alpha44,#warm-world-alpha45-clear:target~.frame .near-alpha44{display:block}
+#warm-world-alpha45-rest:target~.frame .mist-base,#warm-world-alpha45-power:target~.frame .mist-base,#warm-world-alpha45-recovery:target~.frame .mist-base,#warm-world-alpha45-glide:target~.frame .mist-base,#warm-world-alpha45-clear:target~.frame .mist-base{display:none}
+#warm-world-alpha45-rest:target~.frame .mist-pilot,#warm-world-alpha45-power:target~.frame .mist-pilot,#warm-world-alpha45-recovery:target~.frame .mist-pilot,#warm-world-alpha45-glide:target~.frame .mist-pilot,#warm-world-alpha45-clear:target~.frame .mist-pilot{display:block}
+#warm-world-alpha45-rest:target~.frame .bird{background-position:0% 0%;display:block}
+#warm-world-alpha45-power:target~.frame .bird{background-position:0% 33.333333%;display:block}
+#warm-world-alpha45-recovery:target~.frame .bird{background-position:0% 66.666667%;display:block}
+#warm-world-alpha45-glide:target~.frame .bird{background-position:0% 100%;display:block}
+#warm-world-alpha45-clear:target~.frame .bird{display:none}
+#slate-world-alpha45-rest:target~.frame .far-base,#slate-world-alpha45-power:target~.frame .far-base,#slate-world-alpha45-recovery:target~.frame .far-base,#slate-world-alpha45-glide:target~.frame .far-base,#slate-world-alpha45-clear:target~.frame .far-base{display:none}
+#slate-world-alpha45-rest:target~.frame .far-alpha44,#slate-world-alpha45-power:target~.frame .far-alpha44,#slate-world-alpha45-recovery:target~.frame .far-alpha44,#slate-world-alpha45-glide:target~.frame .far-alpha44,#slate-world-alpha45-clear:target~.frame .far-alpha44{display:block}
+#slate-world-alpha45-rest:target~.frame .mid-base,#slate-world-alpha45-power:target~.frame .mid-base,#slate-world-alpha45-recovery:target~.frame .mid-base,#slate-world-alpha45-glide:target~.frame .mid-base,#slate-world-alpha45-clear:target~.frame .mid-base{display:none}
+#slate-world-alpha45-rest:target~.frame .mid-alpha44,#slate-world-alpha45-power:target~.frame .mid-alpha44,#slate-world-alpha45-recovery:target~.frame .mid-alpha44,#slate-world-alpha45-glide:target~.frame .mid-alpha44,#slate-world-alpha45-clear:target~.frame .mid-alpha44{display:block}
+#slate-world-alpha45-rest:target~.frame .near-base,#slate-world-alpha45-power:target~.frame .near-base,#slate-world-alpha45-recovery:target~.frame .near-base,#slate-world-alpha45-glide:target~.frame .near-base,#slate-world-alpha45-clear:target~.frame .near-base{display:none}
+#slate-world-alpha45-rest:target~.frame .near-alpha44,#slate-world-alpha45-power:target~.frame .near-alpha44,#slate-world-alpha45-recovery:target~.frame .near-alpha44,#slate-world-alpha45-glide:target~.frame .near-alpha44,#slate-world-alpha45-clear:target~.frame .near-alpha44{display:block}
+#slate-world-alpha45-rest:target~.frame .mist-base,#slate-world-alpha45-power:target~.frame .mist-base,#slate-world-alpha45-recovery:target~.frame .mist-base,#slate-world-alpha45-glide:target~.frame .mist-base,#slate-world-alpha45-clear:target~.frame .mist-base{display:none}
+#slate-world-alpha45-rest:target~.frame .mist-pilot,#slate-world-alpha45-power:target~.frame .mist-pilot,#slate-world-alpha45-recovery:target~.frame .mist-pilot,#slate-world-alpha45-glide:target~.frame .mist-pilot,#slate-world-alpha45-clear:target~.frame .mist-pilot{display:block}
+#slate-world-alpha45-rest:target~.frame .bird{background-position:0% 0%;display:block}
+#slate-world-alpha45-power:target~.frame .bird{background-position:0% 33.333333%;display:block}
+#slate-world-alpha45-recovery:target~.frame .bird{background-position:0% 66.666667%;display:block}
+#slate-world-alpha45-glide:target~.frame .bird{background-position:0% 100%;display:block}
+#slate-world-alpha45-clear:target~.frame .bird{display:none}
+/* Alpha46: only the previously rejected near-tree illustration changes. */
+#warm-world-alpha46:target~.frame .far-base,#warm-world-alpha46:target~.frame .mid-base,#warm-world-alpha46:target~.frame .mist-base,#warm-world-alpha46:target~.frame .near-base{display:none}
+#warm-world-alpha46:target~.frame .far-alpha44,#warm-world-alpha46:target~.frame .mid-alpha44,#warm-world-alpha46:target~.frame .mist-pilot,#warm-world-alpha46:target~.frame .near-alpha46{display:block}
+#warm-near-alpha46:target~.frame .near-base{display:none}
+#warm-near-alpha46:target~.frame .near-alpha46{display:block}
+#warm-world-alpha46:target~.frame .guides{display:block}
+/* Alpha46A stricter botanical silhouettes: all other layers identical to Alpha46. */
+#warm-world-alpha46a:target~.frame .far-base,#warm-world-alpha46a:target~.frame .mid-base,#warm-world-alpha46a:target~.frame .mist-base,#warm-world-alpha46a:target~.frame .near-base{display:none}
+#warm-world-alpha46a:target~.frame .far-alpha44,#warm-world-alpha46a:target~.frame .mid-alpha44,#warm-world-alpha46a:target~.frame .mist-pilot,#warm-world-alpha46a:target~.frame .near-alpha46a{display:block}
+#warm-near-alpha46a:target~.frame .near-base{display:none}
+#warm-near-alpha46a:target~.frame .near-alpha46a{display:block}
+#warm-world-alpha46a:target~.frame .guides{display:block}
+#slate-world-alpha46:target~.frame .far-base,#slate-world-alpha46:target~.frame .mid-base,#slate-world-alpha46:target~.frame .mist-base,#slate-world-alpha46:target~.frame .near-base{display:none}
+#slate-world-alpha46:target~.frame .far-alpha44,#slate-world-alpha46:target~.frame .mid-alpha44,#slate-world-alpha46:target~.frame .mist-pilot,#slate-world-alpha46:target~.frame .near-alpha46{display:block}
+#slate-near-alpha46:target~.frame .near-base{display:none}
+#slate-near-alpha46:target~.frame .near-alpha46{display:block}
+#slate-world-alpha46:target~.frame .guides{display:block}
+/* Alpha46A stricter botanical silhouettes: all other layers identical to Alpha46. */
+#slate-world-alpha46a:target~.frame .far-base,#slate-world-alpha46a:target~.frame .mid-base,#slate-world-alpha46a:target~.frame .mist-base,#slate-world-alpha46a:target~.frame .near-base{display:none}
+#slate-world-alpha46a:target~.frame .far-alpha44,#slate-world-alpha46a:target~.frame .mid-alpha44,#slate-world-alpha46a:target~.frame .mist-pilot,#slate-world-alpha46a:target~.frame .near-alpha46a{display:block}
+#slate-near-alpha46a:target~.frame .near-base{display:none}
+#slate-near-alpha46a:target~.frame .near-alpha46a{display:block}
+#slate-world-alpha46a:target~.frame .guides{display:block}
+/* Independent hand-reshaped midrange, plus integrated cinema-world check. */
+#warm-mid-alpha37:target~.frame .mid-base,#slate-mid-alpha37:target~.frame .mid-base,
+#warm-world-alpha37:target~.frame .mid-base,#slate-world-alpha37:target~.frame .mid-base{display:none}
+#warm-mid-alpha37:target~.frame .mid-alpha37,#slate-mid-alpha37:target~.frame .mid-alpha37,
+#warm-world-alpha37:target~.frame .mid-alpha37,#slate-world-alpha37:target~.frame .mid-alpha37{display:block}
+#warm-world-alpha37:target~.frame .far-base,#slate-world-alpha37:target~.frame .far-base,
+#warm-world-alpha37:target~.frame .mist-base,#slate-world-alpha37:target~.frame .mist-base,
+#warm-world-alpha37:target~.frame .near-base,#slate-world-alpha37:target~.frame .near-base{display:none}
+#warm-world-alpha37:target~.frame .far-pilot,#slate-world-alpha37:target~.frame .far-pilot,
+#warm-world-alpha37:target~.frame .mist-pilot,#slate-world-alpha37:target~.frame .mist-pilot,
+#warm-world-alpha37:target~.frame .near-raster-alpha36,#slate-world-alpha37:target~.frame .near-raster-alpha36{display:block}
+#warm-stack-pilot:target~.frame .far-base,#slate-stack-pilot:target~.frame .far-base,
+#warm-stack-pilot:target~.frame .mid-base,#slate-stack-pilot:target~.frame .mid-base{display:none}
+#warm-stack-pilot:target~.frame .far-pilot,#slate-stack-pilot:target~.frame .far-pilot,
+#warm-stack-pilot:target~.frame .mid-pilot,#slate-stack-pilot:target~.frame .mid-pilot{display:block}
+/* Alpha 27 mist-only A/B and three-layer far+mid+mist atlas-correct QA. */
+#warm-mist-pilot:target~.frame .mist-base,#slate-mist-pilot:target~.frame .mist-base{display:none}
+#warm-mist-pilot:target~.frame .mist-pilot,#slate-mist-pilot:target~.frame .mist-pilot{display:block}
+#warm-atmo-pilot:target~.frame .far-base,#slate-atmo-pilot:target~.frame .far-base,
+#warm-atmo-pilot:target~.frame .mid-base,#slate-atmo-pilot:target~.frame .mid-base,
+#warm-atmo-pilot:target~.frame .mist-base,#slate-atmo-pilot:target~.frame .mist-base{display:none}
+#warm-atmo-pilot:target~.frame .far-pilot,#slate-atmo-pilot:target~.frame .far-pilot,
+#warm-atmo-pilot:target~.frame .mid-pilot,#slate-atmo-pilot:target~.frame .mid-pilot,
+#warm-atmo-pilot:target~.frame .mist-pilot,#slate-atmo-pilot:target~.frame .mist-pilot{display:block}
+/* Alpha 28: original sky A/B and four-layer atmosphere with the exact same
+   nonrepeating sky offset as the existing real game sky crop. */
+#warm-sky-pilot:target~.frame .sky-base,#slate-sky-pilot:target~.frame .sky-base{display:none}
+#warm-sky-pilot:target~.frame .sky-pilot,#slate-sky-pilot:target~.frame .sky-pilot{display:block}
+#warm-light-pilot:target~.frame .sky-base,#slate-light-pilot:target~.frame .sky-base,
+#warm-light-pilot:target~.frame .far-base,#slate-light-pilot:target~.frame .far-base,
+#warm-light-pilot:target~.frame .mid-base,#slate-light-pilot:target~.frame .mid-base,
+#warm-light-pilot:target~.frame .mist-base,#slate-light-pilot:target~.frame .mist-base{display:none}
+#warm-light-pilot:target~.frame .sky-pilot,#slate-light-pilot:target~.frame .sky-pilot,
+#warm-light-pilot:target~.frame .far-pilot,#slate-light-pilot:target~.frame .far-pilot,
+#warm-light-pilot:target~.frame .mid-pilot,#slate-light-pilot:target~.frame .mid-pilot,
+#warm-light-pilot:target~.frame .mist-pilot,#slate-light-pilot:target~.frame .mist-pilot{display:block}
+/* Alpha 29 — fore-edge A/B and full original five-layer artwork, no runtime replacement. */
+#warm-near-pilot:target~.frame .near-base,#slate-near-pilot:target~.frame .near-base{display:none}
+#warm-near-pilot:target~.frame .near-pilot,#slate-near-pilot:target~.frame .near-pilot{display:block}
+#warm-full-pilot:target~.frame .sky-base,#slate-full-pilot:target~.frame .sky-base,
+#warm-full-pilot:target~.frame .far-base,#slate-full-pilot:target~.frame .far-base,
+#warm-full-pilot:target~.frame .mid-base,#slate-full-pilot:target~.frame .mid-base,
+#warm-full-pilot:target~.frame .mist-base,#slate-full-pilot:target~.frame .mist-base,
+#warm-full-pilot:target~.frame .near-base,#slate-full-pilot:target~.frame .near-base{display:none}
+#warm-full-pilot:target~.frame .sky-pilot,#slate-full-pilot:target~.frame .sky-pilot,
+#warm-full-pilot:target~.frame .far-pilot,#slate-full-pilot:target~.frame .far-pilot,
+#warm-full-pilot:target~.frame .mid-pilot,#slate-full-pilot:target~.frame .mid-pilot,
+#warm-full-pilot:target~.frame .mist-pilot,#slate-full-pilot:target~.frame .mist-pilot,
+#warm-full-pilot:target~.frame .near-pilot,#slate-full-pilot:target~.frame .near-pilot{display:block}
+/* Alpha 30: frozen Alpha 29 near-only visual reference for honest shape A/B */
+#warm-near-alpha29:target~.frame .near-base,#slate-near-alpha29:target~.frame .near-base{display:none}
+#warm-near-alpha29:target~.frame .near-alpha29,#slate-near-alpha29:target~.frame .near-alpha29{display:block}
+/* The raster assets are written only by tests/flappy-v4-raster-pigment.py in CI.
+   Without that build these hash routes are explicitly not an online preview. */
+#warm-raster-alpha31:target~.frame .near-base,#slate-raster-alpha31:target~.frame .near-base{display:none}
+#warm-raster-alpha31:target~.frame .near-raster-alpha31,#slate-raster-alpha31:target~.frame .near-raster-alpha31{display:block}
+/* Alpha 32 independent RGBA painting-study comparison; generated in Draft QA only. */
+#warm-raster-alpha32:target~.frame .near-base,#slate-raster-alpha32:target~.frame .near-base{display:none}
+#warm-raster-alpha32:target~.frame .near-raster-alpha32,#slate-raster-alpha32:target~.frame .near-raster-alpha32{display:block}
+/* Alpha 33 original crown path-masked brush/earth versus Alpha 32. */
+#warm-raster-alpha33:target~.frame .near-base,#slate-raster-alpha33:target~.frame .near-base{display:none}
+#warm-raster-alpha33:target~.frame .near-raster-alpha33,#slate-raster-alpha33:target~.frame .near-raster-alpha33{display:block}
+/* Alpha34 separately authored tree-specific original SVG brush planes. */
+#warm-raster-alpha34:target~.frame .near-base,#slate-raster-alpha34:target~.frame .near-base{display:none}
+#warm-raster-alpha34:target~.frame .near-raster-alpha34,#slate-raster-alpha34:target~.frame .near-raster-alpha34{display:block}
+#slate-raster-alpha35:target~.frame .near-base{display:none}
+#slate-raster-alpha35:target~.frame .near-raster-alpha35{display:block}
+#warm-raster-alpha36:target~.frame .near-base,#slate-raster-alpha36:target~.frame .near-base{display:none}
+#warm-raster-alpha36:target~.frame .near-raster-alpha36,#slate-raster-alpha36:target~.frame .near-raster-alpha36{display:block}
+/* Automated screenshot capture uses no JavaScript and exercises real atlas rows. */
+.seamworld{display:none}
+.seamframe{position:relative;isolation:isolate;height:100dvh;width:100vw;overflow:hidden}
+.seamframe.warm{background:linear-gradient(#9eb9ba,#e5c9ae)}
+.seamframe.slate{background:linear-gradient(#314967,#a5a0b1)}
+.seamframe img{position:absolute;height:100%;width:auto;max-width:none;pointer-events:none;user-select:none}
+.seamframe img.first{left:calc(50% - 160dvh)}
+.seamframe img.second{left:50%}
+.seamframe img.far{z-index:1}
+.seamframe img.mid{z-index:2}
+.seamframe img.mist{z-index:3;opacity:.7}
+.seamframe img.near{z-index:4}
+body:has(.seamworld:target) main{max-width:none;margin:0;padding:0}
+body:has(.seamworld:target) header,
+body:has(.seamworld:target) .options,
+body:has(.seamworld:target) aside{display:none}
+body:has(.seamworld:target) .seamworld:target{display:block}
+@media(max-width:670px){.worlds{grid-template-columns:1fr}main{padding:17px 12px 34px}}
+</style>
+</head>
+<body>
+<main>
+<header><span class="tag">DRAFT · 静态安全验收页 · 不代表正式发布</span>
+<h1>V4 Cinematic Worlds · 双主题对比</h1>
+<p>无 JavaScript 的五层场景对比。角色使用游戏中的透明 24 帧图集（帧 0、6、12、18 可切换）。天空、远景、中景、谷雾和近景森林均有独立试制 A/B（Alpha 24–30）；近景可用 #warm-near-alpha29 / #slate-near-alpha29 对照前版；新增 #warm-raster-alpha31 / #slate-raster-alpha31 为本地构建或 Draft CI 才可看的 PNG 像素肌理试制，Alpha 32 新增 #warm-raster-alpha32 / #slate-raster-alpha32 的定向叶片、针叶、树干和地表笔触 A/B（仅 Draft QA 生成），Alpha 33 新增 #warm-raster-alpha33 / #slate-raster-alpha33 依原画树冠形状遮罩的光照、叶片和地面材质试制，并修复暮蓝 Alpha 32 预览节点缺失；Alpha 34 新增 #warm-raster-alpha34 / #slate-raster-alpha34，两份独立可编辑原创笔触 SVG，经树冠与地形原轮廓裁切生成 PNG；Alpha 35 新增 #slate-raster-alpha35，独立的暮蓝针叶树枝层光影原画构图，保留 Alpha34 作为 A/B 对照，避免侵入小鸟飞行的上部视区；Alpha 36 新增 #warm-raster-alpha36 / #slate-raster-alpha36，对照来源为两套独立可编辑外轮廓原画，允许严格受控的透明边缘变化，不改动小鸟飞行区与背景接缝；Alpha 37 新增 #warm-mid-alpha37 / #slate-mid-alpha37 两套经过统一山体裁切与山脊高光的中景自然轮廓，以及 #warm-world-alpha37 / #slate-world-alpha37 的远山-中景-谷雾-Alpha36森林整体构图评审；Alpha 38 新增 #warm-far-alpha38 / #slate-far-alpha38 两份独立的原创远山自然轮廓 A/B 和 #warm-world-alpha38 / #slate-world-alpha38 将 Alpha38 远山+Alpha37 中景+谷雾+Alpha36 森林进行统一审图；Alpha 39 新增 #warm-far-alpha39 / #slate-far-alpha39 原创低对比岩层笔触，以及 #warm-world-alpha39 / #slate-world-alpha39 的远山Alpha39+中景Alpha37+近景Alpha36整景审图；Alpha40 新增远山与中景两套完整绘画明暗面：#warm-far-alpha40 / #slate-far-alpha40、#warm-mid-alpha40 / #slate-mid-alpha40；两套整景 #warm-world-alpha40 / #slate-world-alpha40 可对比大面积渐变与旧矢量分面的差异；Alpha41 新增远山与中景空气透视及岩层材质：#warm-far-alpha41 / #slate-far-alpha41、#warm-mid-alpha41 / #slate-mid-alpha41；整景 #warm-world-alpha41 / #slate-world-alpha41，与 Alpha40 的同机型截图对照；Alpha42 暮蓝中景真正重新绘制的非对称山脊、谷地块面与有机岩层：#slate-mid-alpha42 和 #slate-world-alpha42；与 Alpha41 同机型对照并检查实际循环接缝；Alpha43 独立重绘暖色与暮蓝远山原始山脊和大面积曲线岩层：#warm-far-alpha43、#slate-far-alpha43；#warm-world-alpha43 和 #slate-world-alpha43 将远山43+暖色中景41/暮蓝中景42+谷雾+近景森林整景审图；Alpha44 整景明暗与辨识度专题：#warm-world-alpha44、#slate-world-alpha44。远/中/近单层 Alpha44 可分别选取 A/B；小鸟和石柱与 Alpha43 完全相同，额外运行实际像素保真及石柱边缘对比检查。Alpha45 进一步使用真实 24帧小鸟原有精灵图谱的四帧（0/6/12/18）及隐藏角色空背景，分别复核晨曦/暮蓝的视觉分离，不修改角色图像、障碍及游戏逻辑。默认仍为原始游戏 SVG；也可对比五层完整试制构图。试制图层不在游戏运行时使用；石柱仍为布局参考，不是正式 Canvas 材质。</p>
+</header>
+<section class="options" aria-label="美术验收选项">
+<input type="radio" id="s360" name="size" checked><label for="s360">360 × 600</label>
+<input type="radio" id="s390" name="size"><label for="s390">390 × 844</label>
+<input type="radio" id="s420" name="size"><label for="s420">420 × 740</label>
+<input type="radio" id="s320" name="size"><label for="s320">320 × 568</label>
+<input type="checkbox" id="guides" checked><label for="guides">角色与障碍参考</label>
+<input type="checkbox" id="fog" checked><label for="fog">谷雾图层</label>
+<input type="checkbox" id="paint-pilot"><label for="paint-pilot">双世界远山原画试制 A/B（非正式资源）</label>
+<input type="checkbox" id="paint-mid-pilot"><label for="paint-mid-pilot">双世界中景原画试制 A/B（非正式资源）</label>
+<input type="checkbox" id="paint-mist-pilot"><label for="paint-mist-pilot">双世界谷雾空气透视试制 A/B（非正式资源）</label>
+<input type="checkbox" id="paint-sky-pilot"><label for="paint-sky-pilot">双世界天空光照试制 A/B（非正式资源）</label>
+<input type="checkbox" id="paint-near-pilot"><label for="paint-near-pilot">双世界近景森林试制 A/B（非正式资源）</label>
+<input type="radio" id="wing-rest" name="wing" checked><label for="wing-rest">羽翼 0 · 休止</label>
+<input type="radio" id="wing-power" name="wing"><label for="wing-power">羽翼 6 · 发力</label>
+<input type="radio" id="wing-recovery" name="wing"><label for="wing-recovery">羽翼 12 · 回收</label>
+<input type="radio" id="wing-glide" name="wing"><label for="wing-glide">羽翼 18 · 滑翔</label>
+<div class="worlds">
+<article class="world warm" id="warm">
+<h2>晨曦山谷 · 暖棕旅鸟</h2>
+<span class="phase-anchor" id="warm-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-mid-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-mid-alpha37" aria-hidden="true"></span><span class="phase-anchor" id="warm-far-alpha38" aria-hidden="true"></span><span class="phase-anchor" id="warm-far-alpha39" aria-hidden="true"></span><span class="phase-anchor" id="warm-far-alpha40" aria-hidden="true"></span><span class="phase-anchor" id="warm-far-alpha41" aria-hidden="true"></span><span class="phase-anchor" id="warm-far-alpha43" aria-hidden="true"></span><span class="phase-anchor" id="warm-world-alpha44" aria-hidden="true"></span><span class="phase-anchor" id="warm-world-alpha46" aria-hidden="true"></span><span class="phase-anchor" id="warm-world-alpha46a" aria-hidden="true"></span><span class="phase-anchor" id="warm-near-alpha46a" aria-hidden="true"></span><span class="phase-anchor" id="warm-near-alpha46" aria-hidden="true"></span><span class="phase-anchor" id="warm-world-alpha45-rest" aria-hidden="true"></span><span class="phase-anchor" id="warm-world-alpha45-power" aria-hidden="true"></span><span class="phase-anchor" id="warm-world-alpha45-recovery" aria-hidden="true"></span><span class="phase-anchor" id="warm-world-alpha45-glide" aria-hidden="true"></span><span class="phase-anchor" id="warm-world-alpha45-clear" aria-hidden="true"></span><span class="phase-anchor" id="warm-far-alpha44" aria-hidden="true"></span><span class="phase-anchor" id="warm-mid-alpha44" aria-hidden="true"></span><span class="phase-anchor" id="warm-near-alpha44" aria-hidden="true"></span><span class="phase-anchor" id="warm-world-alpha43" aria-hidden="true"></span><span class="phase-anchor" id="warm-mid-alpha41" aria-hidden="true"></span><span class="phase-anchor" id="warm-world-alpha41" aria-hidden="true"></span><span class="phase-anchor" id="warm-mid-alpha40" aria-hidden="true"></span><span class="phase-anchor" id="warm-world-alpha40" aria-hidden="true"></span><span class="phase-anchor" id="warm-world-alpha39" aria-hidden="true"></span><span class="phase-anchor" id="warm-world-alpha38" aria-hidden="true"></span><span class="phase-anchor" id="warm-world-alpha37" aria-hidden="true"></span><span class="phase-anchor" id="warm-stack-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-mist-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-atmo-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-sky-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-light-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-near-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-near-alpha29" aria-hidden="true"></span><span class="phase-anchor" id="warm-raster-alpha31" aria-hidden="true"></span><span class="phase-anchor" id="warm-raster-alpha32" aria-hidden="true"></span><span class="phase-anchor" id="warm-raster-alpha33" aria-hidden="true"></span><span class="phase-anchor" id="warm-raster-alpha34" aria-hidden="true"></span><span class="phase-anchor" id="warm-raster-alpha36" aria-hidden="true"></span><span class="phase-anchor" id="warm-full-pilot" aria-hidden="true"></span><span class="phase-anchor" id="warm-power" aria-hidden="true"></span><span class="phase-anchor" id="warm-recovery" aria-hidden="true"></span><span class="phase-anchor" id="warm-glide" aria-hidden="true"></span>
+<div class="frame" role="img" aria-label="晨曦山谷 · 暖棕旅鸟五层背景静态美术预览">
+<img class="layer sky sky-base" src="./assets/v4/warm/sky.svg" alt="" loading="eager" decoding="async">
+<img class="layer sky sky-pilot" src="./assets/v4/pilot/warm/sky.svg" alt="" loading="eager" decoding="async">
+<img class="layer far far-base" src="./assets/v4/warm/far.svg" alt="" loading="eager" decoding="async">
+<img class="layer far far-pilot" src="./assets/v4/pilot/warm/far.svg" alt="" loading="eager" decoding="async">
+<div class="layer far far-alpha38" role="presentation" aria-hidden="true"></div>
+<div class="layer far far-alpha39" role="presentation" aria-hidden="true"></div>
+<div class="layer far far-alpha40" role="presentation" aria-hidden="true"></div>
+<div class="layer far far-alpha41" role="presentation" aria-hidden="true"></div>
+<div class="layer far far-alpha43" role="presentation" aria-hidden="true"></div>
+<div class="layer far far-alpha44" role="presentation" aria-hidden="true"></div>
+<img class="layer mid mid-base" src="./assets/v4/warm/mid.svg" alt="" loading="eager" decoding="async">
+<img class="layer mid mid-pilot" src="./assets/v4/pilot/warm/mid.svg" alt="" loading="eager" decoding="async">
+<div class="layer mid mid-alpha37" role="presentation" aria-hidden="true"></div>
+<div class="layer mid mid-alpha40" role="presentation" aria-hidden="true"></div>
+<div class="layer mid mid-alpha41" role="presentation" aria-hidden="true"></div>
+<div class="layer mid mid-alpha44" role="presentation" aria-hidden="true"></div>
+<img class="layer mist mist-base" src="./assets/v4/warm/mist.svg" alt="" loading="eager" decoding="async">
+<img class="layer mist mist-pilot" src="./assets/v4/pilot/warm/mist.svg" alt="" loading="eager" decoding="async">
+<img class="layer near near-base" src="./assets/v4/warm/near.svg" alt="" loading="eager" decoding="async">
+<img class="layer near near-pilot" src="./assets/v4/pilot/warm/near.svg" alt="" loading="eager" decoding="async">
+<img class="layer near near-alpha29" src="./assets/v4/pilot/warm/near-alpha29.svg" alt="" loading="eager" decoding="async">
+<div class="layer near near-raster-alpha31" role="presentation" aria-hidden="true"></div>
+<div class="layer near near-raster-alpha32" role="presentation" aria-hidden="true"></div>
+<div class="layer near near-raster-alpha33" role="presentation" aria-hidden="true"></div>
+<div class="layer near near-raster-alpha34" role="presentation" aria-hidden="true"></div>
+<div class="layer near near-raster-alpha36" role="presentation" aria-hidden="true"></div>
+<div class="layer near near-alpha44" role="presentation" aria-hidden="true"></div>
+<img class="layer near near-alpha46" src="./assets/v4/masters/warm/near-structure-alpha46.svg" alt="" loading="eager" decoding="async">
+<img class="layer near near-alpha46a" src="./assets/v4/masters/warm/near-botanical-alpha46a.svg" alt="" loading="eager" decoding="async">
+<div class="guides" aria-hidden="true"><span class="pipe top"></span><span class="pipe bottom"></span><span class="bird"></span><span class="ground"></span></div>
+</div><p class="note">独立山谷图层与空间层次；需要实机截图审核，当前不是最终手绘纹理。</p></article>
+<article class="world slate" id="slate">
+<h2>暮蓝远山 · 板岩夜鸟</h2>
+<span class="phase-anchor" id="slate-pilot" aria-hidden="true"></span><span class="phase-anchor" id="slate-mid-pilot" aria-hidden="true"></span><span class="phase-anchor" id="slate-mid-alpha37" aria-hidden="true"></span><span class="phase-anchor" id="slate-far-alpha38" aria-hidden="true"></span><span class="phase-anchor" id="slate-far-alpha39" aria-hidden="true"></span><span class="phase-anchor" id="slate-far-alpha40" aria-hidden="true"></span><span class="phase-anchor" id="slate-far-alpha41" aria-hidden="true"></span><span class="phase-anchor" id="slate-far-alpha43" aria-hidden="true"></span><span class="phase-anchor" id="slate-world-alpha44" aria-hidden="true"></span><span class="phase-anchor" id="slate-world-alpha46" aria-hidden="true"></span><span class="phase-anchor" id="slate-world-alpha46a" aria-hidden="true"></span><span class="phase-anchor" id="slate-near-alpha46a" aria-hidden="true"></span><span class="phase-anchor" id="slate-near-alpha46" aria-hidden="true"></span><span class="phase-anchor" id="slate-world-alpha45-rest" aria-hidden="true"></span><span class="phase-anchor" id="slate-world-alpha45-power" aria-hidden="true"></span><span class="phase-anchor" id="slate-world-alpha45-recovery" aria-hidden="true"></span><span class="phase-anchor" id="slate-world-alpha45-glide" aria-hidden="true"></span><span class="phase-anchor" id="slate-world-alpha45-clear" aria-hidden="true"></span><span class="phase-anchor" id="slate-far-alpha44" aria-hidden="true"></span><span class="phase-anchor" id="slate-mid-alpha44" aria-hidden="true"></span><span class="phase-anchor" id="slate-near-alpha44" aria-hidden="true"></span><span class="phase-anchor" id="slate-world-alpha43" aria-hidden="true"></span><span class="phase-anchor" id="slate-mid-alpha41" aria-hidden="true"></span><span class="phase-anchor" id="slate-mid-alpha42" aria-hidden="true"></span><span class="phase-anchor" id="slate-world-alpha42" aria-hidden="true"></span><span class="phase-anchor" id="slate-world-alpha41" aria-hidden="true"></span><span class="phase-anchor" id="slate-mid-alpha40" aria-hidden="true"></span><span class="phase-anchor" id="slate-world-alpha40" aria-hidden="true"></span><span class="phase-anchor" id="slate-world-alpha39" aria-hidden="true"></span><span class="phase-anchor" id="slate-world-alpha38" aria-hidden="true"></span><span class="phase-anchor" id="slate-world-alpha37" aria-hidden="true"></span><span class="phase-anchor" id="slate-stack-pilot" aria-hidden="true"></span><span class="phase-anchor" id="slate-mist-pilot" aria-hidden="true"></span><span class="phase-anchor" id="slate-atmo-pilot" aria-hidden="true"></span><span class="phase-anchor" id="slate-sky-pilot" aria-hidden="true"></span><span class="phase-anchor" id="slate-light-pilot" aria-hidden="true"></span><span class="phase-anchor" id="slate-near-pilot" aria-hidden="true"></span><span class="phase-anchor" id="slate-near-alpha29" aria-hidden="true"></span><span class="phase-anchor" id="slate-raster-alpha31" aria-hidden="true"></span><span class="phase-anchor" id="slate-raster-alpha32" aria-hidden="true"></span><span class="phase-anchor" id="slate-raster-alpha33" aria-hidden="true"></span><span class="phase-anchor" id="slate-raster-alpha34" aria-hidden="true"></span><span class="phase-anchor" id="slate-raster-alpha36" aria-hidden="true"></span><span class="phase-anchor" id="slate-raster-alpha35" aria-hidden="true"></span><span class="phase-anchor" id="slate-full-pilot" aria-hidden="true"></span>
+<span class="phase-anchor" id="slate-power" aria-hidden="true"></span><span class="phase-anchor" id="slate-recovery" aria-hidden="true"></span><span class="phase-anchor" id="slate-glide" aria-hidden="true"></span>
+<div class="frame" role="img" aria-label="暮蓝远山 · 板岩夜鸟五层背景静态美术预览">
+<img class="layer sky sky-base" src="./assets/v4/slate/sky.svg" alt="" loading="eager" decoding="async">
+<img class="layer sky sky-pilot" src="./assets/v4/pilot/slate/sky.svg" alt="" loading="eager" decoding="async">
+<img class="layer far far-base" src="./assets/v4/slate/far.svg" alt="" loading="eager" decoding="async">
+<img class="layer far far-pilot" src="./assets/v4/pilot/slate/far.svg" alt="" loading="eager" decoding="async">
+<div class="layer far far-alpha38" role="presentation" aria-hidden="true"></div>
+<div class="layer far far-alpha39" role="presentation" aria-hidden="true"></div>
+<div class="layer far far-alpha40" role="presentation" aria-hidden="true"></div>
+<div class="layer far far-alpha41" role="presentation" aria-hidden="true"></div>
+<div class="layer far far-alpha43" role="presentation" aria-hidden="true"></div>
+<div class="layer far far-alpha44" role="presentation" aria-hidden="true"></div>
+<img class="layer mid mid-base" src="./assets/v4/slate/mid.svg" alt="" loading="eager" decoding="async">
+<img class="layer mid mid-pilot" src="./assets/v4/pilot/slate/mid.svg" alt="" loading="eager" decoding="async">
+<div class="layer mid mid-alpha37" role="presentation" aria-hidden="true"></div>
+<div class="layer mid mid-alpha40" role="presentation" aria-hidden="true"></div>
+<div class="layer mid mid-alpha41" role="presentation" aria-hidden="true"></div>
+<div class="layer mid mid-alpha42" role="presentation" aria-hidden="true"></div>
+<div class="layer mid mid-alpha44" role="presentation" aria-hidden="true"></div>
+<img class="layer mist mist-base" src="./assets/v4/slate/mist.svg" alt="" loading="eager" decoding="async">
+<img class="layer mist mist-pilot" src="./assets/v4/pilot/slate/mist.svg" alt="" loading="eager" decoding="async">
+<img class="layer near near-base" src="./assets/v4/slate/near.svg" alt="" loading="eager" decoding="async">
+<img class="layer near near-pilot" src="./assets/v4/pilot/slate/near.svg" alt="" loading="eager" decoding="async">
+<img class="layer near near-alpha29" src="./assets/v4/pilot/slate/near-alpha29.svg" alt="" loading="eager" decoding="async">
+<div class="layer near near-raster-alpha31" role="presentation" aria-hidden="true"></div>
+<div class="layer near near-raster-alpha32" role="presentation" aria-hidden="true"></div>
+<div class="layer near near-raster-alpha33" role="presentation" aria-hidden="true"></div>
+<div class="layer near near-raster-alpha34" role="presentation" aria-hidden="true"></div>
+<div class="layer near near-raster-alpha36" role="presentation" aria-hidden="true"></div>
+<div class="layer near near-alpha44" role="presentation" aria-hidden="true"></div>
+<img class="layer near near-alpha46" src="./assets/v4/masters/slate/near-structure-alpha46.svg" alt="" loading="eager" decoding="async">
+<img class="layer near near-alpha46a" src="./assets/v4/masters/slate/near-botanical-alpha46a.svg" alt="" loading="eager" decoding="async">
+<div class="layer near near-raster-alpha35" role="presentation" aria-hidden="true"></div>
+<div class="guides" aria-hidden="true"><span class="pipe top"></span><span class="pipe bottom"></span><span class="bird"></span><span class="ground"></span></div>
+</div><p class="note">独立山谷图层与空间层次；需要实机截图审核，当前不是最终手绘纹理。</p></article>
+</div>
+</section>
+<section class="seamworld pilot-seamworld" id="warm-raster-alpha36-seam" aria-label="warm Alpha36 original edited tree sky-outline true repeated PNG join, Draft only"><div class="seamframe warm">
+<img class="first near" src="./assets/v4/pilot/warm/near-raster-alpha36.png" alt="" decoding="async">
+<img class="second near" src="./assets/v4/pilot/warm/near-raster-alpha36.png" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="warm-raster-alpha34-seam" aria-label="warm authored RGBA pigments repeated tile border evidence, Draft"><div class="seamframe warm">
+<img class="first near" src="./assets/v4/pilot/warm/near-raster-alpha34.png" alt="" decoding="async">
+<img class="second near" src="./assets/v4/pilot/warm/near-raster-alpha34.png" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="warm-raster-alpha33-seam" aria-label="warm masked leaf/needle and earth material repeated-tile proof, Draft only"><div class="seamframe warm">
+<img class="first near" src="./assets/v4/pilot/warm/near-raster-alpha33.png" alt="" decoding="async">
+<img class="second near" src="./assets/v4/pilot/warm/near-raster-alpha33.png" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="warm-raster-alpha32-seam" aria-label="warm RGBA material-brush near-woodland repeat proof, Draft build only"><div class="seamframe warm">
+<img class="first near" src="./assets/v4/pilot/warm/near-raster-alpha32.png" alt="" decoding="async">
+<img class="second near" src="./assets/v4/pilot/warm/near-raster-alpha32.png" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="warm-raster-alpha31-seam" aria-label="warm 1600px raster-pigment original woodland repeat proof, build-only"><div class="seamframe warm">
+<img class="first near" src="./assets/v4/pilot/warm/near-raster-alpha31.png" alt="" decoding="async">
+<img class="second near" src="./assets/v4/pilot/warm/near-raster-alpha31.png" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="warm-near-pilot-seam" aria-label="warm original foreground repeat-tile proof"><div class="seamframe warm">
+<img class="first near" src="./assets/v4/pilot/warm/near.svg" alt="" decoding="async">
+<img class="second near" src="./assets/v4/pilot/warm/near.svg" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="warm-mist-pilot-seam" aria-label="warm original transparent valley mist repeating edge study"><div class="seamframe warm">
+<img class="first mist" src="./assets/v4/pilot/warm/mist.svg" alt="" decoding="async">
+<img class="second mist" src="./assets/v4/pilot/warm/mist.svg" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="warm-far-alpha44-seam" aria-label="warm Alpha44 harmonized far actual repeated source PNG integrity, review-only"><div class="seamframe warm">
+<img class="first far" src="./assets/v4/pilot/warm/far-raster-alpha44.png" alt="" decoding="async">
+<img class="second far" src="./assets/v4/pilot/warm/far-raster-alpha44.png" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="warm-mid-alpha44-seam" aria-label="warm Alpha44 harmonized mid actual repeated source PNG integrity, review-only"><div class="seamframe warm">
+<img class="first mid" src="./assets/v4/pilot/warm/mid-raster-alpha44.png" alt="" decoding="async">
+<img class="second mid" src="./assets/v4/pilot/warm/mid-raster-alpha44.png" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="warm-near-alpha44-seam" aria-label="warm Alpha44 harmonized near actual repeated source PNG integrity, review-only"><div class="seamframe warm">
+<img class="first near" src="./assets/v4/pilot/warm/near-raster-alpha44.png" alt="" decoding="async">
+<img class="second near" src="./assets/v4/pilot/warm/near-raster-alpha44.png" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="warm-far-alpha43-seam" aria-label="warm original Alpha43 distant natural skyline 1600 RGBA original repeat join QA, never production"><div class="seamframe warm">
+<img class="first far" src="./assets/v4/pilot/warm/far-raster-alpha43.png" alt="" decoding="async">
+<img class="second far" src="./assets/v4/pilot/warm/far-raster-alpha43.png" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="warm-far-alpha41-seam" aria-label="warm original independent atmospheric far mountain source tiled QA, Draft"><div class="seamframe warm">
+<img class="first far" src="./assets/v4/pilot/warm/far-raster-alpha41.png" alt="" decoding="async">
+<img class="second far" src="./assets/v4/pilot/warm/far-raster-alpha41.png" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="warm-mid-alpha41-seam" aria-label="warm original independent atmospheric mid mountain source tiled QA, Draft"><div class="seamframe warm">
+<img class="first mid" src="./assets/v4/pilot/warm/mid-raster-alpha41.png" alt="" decoding="async">
+<img class="second mid" src="./assets/v4/pilot/warm/mid-raster-alpha41.png" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="warm-far-alpha40-seam" aria-label="warm original complete painted far landscape repeated RGBA bitmap QA, Draft"><div class="seamframe warm">
+<img class="first far" src="./assets/v4/pilot/warm/far-raster-alpha40.png" alt="" decoding="async">
+<img class="second far" src="./assets/v4/pilot/warm/far-raster-alpha40.png" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="warm-mid-alpha40-seam" aria-label="warm original complete painted mid landscape repeated RGBA bitmap QA, Draft"><div class="seamframe warm">
+<img class="first mid" src="./assets/v4/pilot/warm/mid-raster-alpha40.png" alt="" decoding="async">
+<img class="second mid" src="./assets/v4/pilot/warm/mid-raster-alpha40.png" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="warm-far-alpha39-seam" aria-label="warm hand-authored irregular distant rock-strata transparent repeated source join, draft only"><div class="seamframe warm">
+<img class="first far" src="./assets/v4/pilot/warm/far-raster-alpha39.png" alt="" decoding="async">
+<img class="second far" src="./assets/v4/pilot/warm/far-raster-alpha39.png" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="warm-far-alpha38-seam" aria-label="warm Alpha38 original far natural mountain repeated bitmap QA only"><div class="seamframe warm">
+<img class="first far" src="./assets/v4/pilot/warm/far-raster-alpha38.png" alt="" decoding="async">
+<img class="second far" src="./assets/v4/pilot/warm/far-raster-alpha38.png" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="warm-mid-alpha37-seam" aria-label="warm natural original painted midrange seamless parallax trial, draft"><div class="seamframe warm">
+<img class="first mid" src="./assets/v4/pilot/warm/mid-raster-alpha37.png" alt="" decoding="async">
+<img class="second mid" src="./assets/v4/pilot/warm/mid-raster-alpha37.png" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="warm-mid-pilot-seam" aria-label="warm original middle mountains repeating tile proof"><div class="seamframe warm">
+<img class="first mid" src="./assets/v4/pilot/warm/mid.svg" alt="" decoding="async">
+<img class="second mid" src="./assets/v4/pilot/warm/mid.svg" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="warm-pilot-seam" aria-label="warm original far painting pilot seamless tile visual evidence"><div class="seamframe warm">
+<img class="first far" src="./assets/v4/pilot/warm/far.svg" alt="" decoding="async">
+<img class="second far" src="./assets/v4/pilot/warm/far.svg" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="slate-raster-alpha35-seam" aria-label="slate Alpha35 eleven independent conifer material trees tile wrap proof, Draft CI only"><div class="seamframe slate">
+<img class="first near" src="./assets/v4/pilot/slate/near-raster-alpha35.png" alt="" decoding="async">
+<img class="second near" src="./assets/v4/pilot/slate/near-raster-alpha35.png" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="slate-raster-alpha36-seam" aria-label="slate Alpha36 original edited tree sky-outline true repeated PNG join, Draft only"><div class="seamframe slate">
+<img class="first near" src="./assets/v4/pilot/slate/near-raster-alpha36.png" alt="" decoding="async">
+<img class="second near" src="./assets/v4/pilot/slate/near-raster-alpha36.png" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="slate-raster-alpha34-seam" aria-label="slate authored RGBA pigments repeated tile border evidence, Draft"><div class="seamframe slate">
+<img class="first near" src="./assets/v4/pilot/slate/near-raster-alpha34.png" alt="" decoding="async">
+<img class="second near" src="./assets/v4/pilot/slate/near-raster-alpha34.png" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="slate-raster-alpha33-seam" aria-label="slate masked leaf/needle and earth material repeated-tile proof, Draft only"><div class="seamframe slate">
+<img class="first near" src="./assets/v4/pilot/slate/near-raster-alpha33.png" alt="" decoding="async">
+<img class="second near" src="./assets/v4/pilot/slate/near-raster-alpha33.png" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="slate-raster-alpha32-seam" aria-label="slate RGBA material-brush near-woodland repeat proof, Draft build only"><div class="seamframe slate">
+<img class="first near" src="./assets/v4/pilot/slate/near-raster-alpha32.png" alt="" decoding="async">
+<img class="second near" src="./assets/v4/pilot/slate/near-raster-alpha32.png" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="slate-raster-alpha31-seam" aria-label="slate 1600px raster-pigment original woodland repeat proof, build-only"><div class="seamframe slate">
+<img class="first near" src="./assets/v4/pilot/slate/near-raster-alpha31.png" alt="" decoding="async">
+<img class="second near" src="./assets/v4/pilot/slate/near-raster-alpha31.png" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="slate-near-pilot-seam" aria-label="slate original foreground repeat-tile proof"><div class="seamframe slate">
+<img class="first near" src="./assets/v4/pilot/slate/near.svg" alt="" decoding="async">
+<img class="second near" src="./assets/v4/pilot/slate/near.svg" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="slate-mist-pilot-seam" aria-label="slate original transparent valley mist repeating edge study"><div class="seamframe slate">
+<img class="first mist" src="./assets/v4/pilot/slate/mist.svg" alt="" decoding="async">
+<img class="second mist" src="./assets/v4/pilot/slate/mist.svg" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="slate-far-alpha44-seam" aria-label="slate Alpha44 harmonized far actual repeated source PNG integrity, review-only"><div class="seamframe slate">
+<img class="first far" src="./assets/v4/pilot/slate/far-raster-alpha44.png" alt="" decoding="async">
+<img class="second far" src="./assets/v4/pilot/slate/far-raster-alpha44.png" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="slate-mid-alpha44-seam" aria-label="slate Alpha44 harmonized mid actual repeated source PNG integrity, review-only"><div class="seamframe slate">
+<img class="first mid" src="./assets/v4/pilot/slate/mid-raster-alpha44.png" alt="" decoding="async">
+<img class="second mid" src="./assets/v4/pilot/slate/mid-raster-alpha44.png" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="slate-near-alpha44-seam" aria-label="slate Alpha44 harmonized near actual repeated source PNG integrity, review-only"><div class="seamframe slate">
+<img class="first near" src="./assets/v4/pilot/slate/near-raster-alpha44.png" alt="" decoding="async">
+<img class="second near" src="./assets/v4/pilot/slate/near-raster-alpha44.png" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="slate-far-alpha43-seam" aria-label="slate original Alpha43 distant natural skyline 1600 RGBA original repeat join QA, never production"><div class="seamframe slate">
+<img class="first far" src="./assets/v4/pilot/slate/far-raster-alpha43.png" alt="" decoding="async">
+<img class="second far" src="./assets/v4/pilot/slate/far-raster-alpha43.png" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="slate-far-alpha41-seam" aria-label="slate original independent atmospheric far mountain source tiled QA, Draft"><div class="seamframe slate">
+<img class="first far" src="./assets/v4/pilot/slate/far-raster-alpha41.png" alt="" decoding="async">
+<img class="second far" src="./assets/v4/pilot/slate/far-raster-alpha41.png" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="slate-mid-alpha42-seam" aria-label="slate Alpha42 edited organic mountain skyline and paint original 2x tile repeat"><div class="seamframe slate">
+<img class="first mid" src="./assets/v4/pilot/slate/mid-raster-alpha42.png" alt="" decoding="async">
+<img class="second mid" src="./assets/v4/pilot/slate/mid-raster-alpha42.png" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="slate-mid-alpha41-seam" aria-label="slate original independent atmospheric mid mountain source tiled QA, Draft"><div class="seamframe slate">
+<img class="first mid" src="./assets/v4/pilot/slate/mid-raster-alpha41.png" alt="" decoding="async">
+<img class="second mid" src="./assets/v4/pilot/slate/mid-raster-alpha41.png" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="slate-far-alpha40-seam" aria-label="slate original complete painted far landscape repeated RGBA bitmap QA, Draft"><div class="seamframe slate">
+<img class="first far" src="./assets/v4/pilot/slate/far-raster-alpha40.png" alt="" decoding="async">
+<img class="second far" src="./assets/v4/pilot/slate/far-raster-alpha40.png" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="slate-mid-alpha40-seam" aria-label="slate original complete painted mid landscape repeated RGBA bitmap QA, Draft"><div class="seamframe slate">
+<img class="first mid" src="./assets/v4/pilot/slate/mid-raster-alpha40.png" alt="" decoding="async">
+<img class="second mid" src="./assets/v4/pilot/slate/mid-raster-alpha40.png" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="slate-far-alpha39-seam" aria-label="slate hand-authored irregular distant rock-strata transparent repeated source join, draft only"><div class="seamframe slate">
+<img class="first far" src="./assets/v4/pilot/slate/far-raster-alpha39.png" alt="" decoding="async">
+<img class="second far" src="./assets/v4/pilot/slate/far-raster-alpha39.png" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="slate-far-alpha38-seam" aria-label="slate Alpha38 original far natural mountain repeated bitmap QA only"><div class="seamframe slate">
+<img class="first far" src="./assets/v4/pilot/slate/far-raster-alpha38.png" alt="" decoding="async">
+<img class="second far" src="./assets/v4/pilot/slate/far-raster-alpha38.png" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="slate-mid-alpha37-seam" aria-label="slate natural original painted midrange seamless parallax trial, draft"><div class="seamframe slate">
+<img class="first mid" src="./assets/v4/pilot/slate/mid-raster-alpha37.png" alt="" decoding="async">
+<img class="second mid" src="./assets/v4/pilot/slate/mid-raster-alpha37.png" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="slate-mid-pilot-seam" aria-label="slate original middle mountains repeating tile proof"><div class="seamframe slate">
+<img class="first mid" src="./assets/v4/pilot/slate/mid.svg" alt="" decoding="async">
+<img class="second mid" src="./assets/v4/pilot/slate/mid.svg" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="slate-pilot-seam" aria-label="slate original far painting pilot seamless tile visual evidence"><div class="seamframe slate">
+<img class="first far" src="./assets/v4/pilot/slate/far.svg" alt="" decoding="async">
+<img class="second far" src="./assets/v4/pilot/slate/far.svg" alt="" decoding="async">
+</div></section>
+<section class="seamworld" id="warm-seam" aria-label="warm 地貌图层无缝循环边界审阅"><div class="seamframe warm">
+<img class="first far" src="./assets/v4/warm/far.svg" alt="" decoding="async">
+<img class="second far" src="./assets/v4/warm/far.svg" alt="" decoding="async">
+<img class="first mid" src="./assets/v4/warm/mid.svg" alt="" decoding="async">
+<img class="second mid" src="./assets/v4/warm/mid.svg" alt="" decoding="async">
+<img class="first mist" src="./assets/v4/warm/mist.svg" alt="" decoding="async">
+<img class="second mist" src="./assets/v4/warm/mist.svg" alt="" decoding="async">
+<img class="first near" src="./assets/v4/warm/near.svg" alt="" decoding="async">
+<img class="second near" src="./assets/v4/warm/near.svg" alt="" decoding="async">
+</div></section>
+<section class="seamworld" id="slate-seam" aria-label="slate 地貌图层无缝循环边界审阅"><div class="seamframe slate">
+<img class="first far" src="./assets/v4/slate/far.svg" alt="" decoding="async">
+<img class="second far" src="./assets/v4/slate/far.svg" alt="" decoding="async">
+<img class="first mid" src="./assets/v4/slate/mid.svg" alt="" decoding="async">
+<img class="second mid" src="./assets/v4/slate/mid.svg" alt="" decoding="async">
+<img class="first mist" src="./assets/v4/slate/mist.svg" alt="" decoding="async">
+<img class="second mist" src="./assets/v4/slate/mist.svg" alt="" decoding="async">
+<img class="first near" src="./assets/v4/slate/near.svg" alt="" decoding="async">
+<img class="second near" src="./assets/v4/slate/near.svg" alt="" decoding="async">
+</div></section>
+<section class="seamworld pilot-seamworld" id="warm-near-alpha46-seam" aria-label="Alpha46 warm source-tree transparent near-layer physical repeat edge">
+<div class="seamframe warm"><img class="first near" src="./assets/v4/masters/warm/near-structure-alpha46.svg" alt="" decoding="async"><img class="second near" src="./assets/v4/masters/warm/near-structure-alpha46.svg" alt="" decoding="async"></div>
+</section>
+<section class="seamworld pilot-seamworld" id="slate-near-alpha46-seam" aria-label="Alpha46 slate source-tree transparent near-layer physical repeat edge">
+<div class="seamframe slate"><img class="first near" src="./assets/v4/masters/slate/near-structure-alpha46.svg" alt="" decoding="async"><img class="second near" src="./assets/v4/masters/slate/near-structure-alpha46.svg" alt="" decoding="async"></div>
+</section>
+<section class="seamworld pilot-seamworld" id="warm-near-alpha46a-seam" aria-label="Alpha46A warm botanical tree repeat seam proof">
+<div class="seamframe warm"><img class="first near" src="./assets/v4/masters/warm/near-botanical-alpha46a.svg" alt="" decoding="async"><img class="second near" src="./assets/v4/masters/warm/near-botanical-alpha46a.svg" alt="" decoding="async"></div></section>
+<section class="seamworld pilot-seamworld" id="slate-near-alpha46a-seam" aria-label="Alpha46A slate botanical tree repeat seam proof">
+<div class="seamframe slate"><img class="first near" src="./assets/v4/masters/slate/near-botanical-alpha46a.svg" alt="" decoding="async"><img class="second near" src="./assets/v4/masters/slate/near-botanical-alpha46a.svg" alt="" decoding="async"></div></section>
+<aside>验收说明：此页面无脚本、无第三方资源、无登录/数据库访问。真实小鸟取自游戏的 1440×960、6 列×4 行透明原始 24 帧 SVG 图集；四个选项为第 0、6、12、18 帧。静态石柱仅提示视觉占位和开口，形状与光影不等于游戏 Canvas 石柱。正式发布前须在真实游戏截图中审核管道、完整扑翼、动态接缝和移动端设备，且移除本开发页。</aside>
+</main>
+</body>
+</html>

@@ -1,0 +1,47 @@
+{
+  "version": "4.0-alpha2",
+  "status": "technical-sample-not-for-release",
+  "theme": "slate",
+  "viewBox": [
+    0,
+    0,
+    1600,
+    1000
+  ],
+  "tileAspect": 1.6,
+  "fallback": "V3 procedural scene",
+  "layers": [
+    {
+      "id": "sky",
+      "file": "sky.svg",
+      "scrollFactor": 0,
+      "alpha": false
+    },
+    {
+      "id": "far",
+      "file": "far.svg",
+      "scrollFactor": 0.045,
+      "alpha": true
+    },
+    {
+      "id": "mid",
+      "file": "mid.svg",
+      "scrollFactor": 0.12,
+      "alpha": true
+    },
+    {
+      "id": "mist",
+      "file": "mist.svg",
+      "scrollFactor": 0.19,
+      "alpha": true,
+      "optionalForReducedMotion": true
+    },
+    {
+      "id": "near",
+      "file": "near.svg",
+      "scrollFactor": 0.28,
+      "alpha": true
+    }
+  ],
+  "notes": "Hand-authored blue-hour mountains and conifers, not recolored dawn scene. Final texture-rich painted asset approval pending."
+}

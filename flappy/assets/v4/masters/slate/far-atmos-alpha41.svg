@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3200" height="2000" viewBox="0 0 3200 2000" role="img" aria-label="Alpha41 slate far original atmospheric rock pigment study">
+<title>Alpha41 slate far hand-positioned atmospheric perspective, transparent source art</title>
+<desc>Separate editable 2x pigment art. Two broad irregular value-color atmospheric glazes and ten unique hand-placed broken drybrush strata. Clip to prior Alpha40 original alpha in offline-only QA; these are not signed-off native bitmap paintings.</desc>
+<defs>
+<linearGradient id="atmo-haze" x1="1" x2=".12" y1="0" y2="1">
+<stop stop-color="#d3dceb" stop-opacity=".44"/>
+<stop offset=".48" stop-color="#a0b9cf" stop-opacity=".35"/>
+<stop offset="1" stop-color="#738dab" stop-opacity="0"/>
+</linearGradient>
+<linearGradient id="atmo-deep" x1="0" x2=".65" y1="0" y2="1">
+<stop stop-color="#1c3d61" stop-opacity=".05"/>
+<stop offset=".48" stop-color="#1c3d61" stop-opacity=".17"/>
+<stop offset="1" stop-color="#afbed8" stop-opacity=".24"/>
+</linearGradient></defs>
+<g id="authored-soft-distance-planes"><path data-alpha41-airband="1" d="M85 1325 Q320 1204 535 1235 Q791 1168 1008 1198 Q1222 1111 1440 1201 Q1659 1141 1880 1163 Q2101 1094 2323 1206 Q2661 1139 3118 1311 L3120 1518 Q2895 1484 2619 1549 Q2254 1453 1950 1550 Q1582 1495 1303 1579 Q865 1473 555 1559 Q325 1512 104 1599Z" fill="url(#atmo-haze)"/>
+<path data-alpha41-airband="2" d="M105 1566 Q401 1499 708 1608 Q1057 1507 1316 1630 Q1650 1582 1990 1665 Q2369 1546 2649 1648 Q2888 1585 3131 1665 L3156 1896 Q2763 1802 2425 1878 Q2005 1764 1680 1846 Q1250 1791 1047 1886 Q580 1761 110 1889Z" fill="url(#atmo-deep)"/></g>
+<g id="authored-rock-scumble"><path data-alpha41-pigment="1" d="M229 1343 Q389 1257 543 1287" stroke="#d3dceb" stroke-opacity=".31" stroke-width="19" fill="none" stroke-linecap="round"/>
+<path data-alpha41-pigment="2" d="M695 1393 Q845 1294 979 1312" stroke="#738dab" stroke-opacity=".18" stroke-width="12" fill="none" stroke-linecap="round"/>
+<path data-alpha41-pigment="3" d="M1098 1262 Q1273 1208 1406 1237" stroke="#a0b9cf" stroke-opacity=".25" stroke-width="22" fill="none" stroke-linecap="round"/>
+<path data-alpha41-pigment="4" d="M1570 1340 Q1736 1256 1882 1277" stroke="#1c3d61" stroke-opacity=".31" stroke-width="9" fill="none" stroke-linecap="round"/>
+<path data-alpha41-pigment="5" d="M2071 1363 Q2244 1275 2392 1320" stroke="#afbed8" stroke-opacity=".18" stroke-width="19" fill="none" stroke-linecap="round"/>
+<path data-alpha41-pigment="6" d="M2571 1322 Q2723 1247 2907 1312" stroke="#d3dceb" stroke-opacity=".25" stroke-width="12" fill="none" stroke-linecap="round"/>
+<path data-alpha41-pigment="7" d="M365 1651 Q594 1574 799 1625" stroke="#738dab" stroke-opacity=".31" stroke-width="22" fill="none" stroke-linecap="round"/>
+<path data-alpha41-pigment="8" d="M1168 1714 Q1349 1640 1571 1702" stroke="#a0b9cf" stroke-opacity=".18" stroke-width="9" fill="none" stroke-linecap="round"/>
+<path data-alpha41-pigment="9" d="M1876 1733 Q2109 1639 2358 1705" stroke="#1c3d61" stroke-opacity=".25" stroke-width="19" fill="none" stroke-linecap="round"/>
+<path data-alpha41-pigment="10" d="M2626 1703 Q2807 1649 2972 1718" stroke="#afbed8" stroke-opacity=".31" stroke-width="12" fill="none" stroke-linecap="round"/></g>
+</svg>
