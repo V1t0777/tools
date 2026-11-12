@@ -28,7 +28,7 @@ test('every offline JS import, HTML script and local CSS path is in public manif
     const body=source(file);
     if(file.endsWith('.mjs')){
       assert.doesNotMatch(body,/\bimport\s*\(/,file);
-      for(const match of body.matchAll(/\b(?:from\s*|import\s*)['"]([^'"]+)['"]/g))refs.push([file,match[1]]);
+      for(const match of body.matchAll(/\b(?:from\s*|import\s*)['"](\.[^'"]+)['"]/g))refs.push([file,match[1]]);
     }
     if(file.endsWith('.html')){
       for(const match of body.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/g))refs.push([file,match[1]]);

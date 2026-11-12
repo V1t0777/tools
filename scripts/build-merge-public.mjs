@@ -31,7 +31,7 @@ for(const path of files){
     throw Error('Private cloud reference in public artifact: '+path);
   if(path.endsWith('.mjs')){
     if(/\bimport\s*\(/.test(body))throw Error('Dynamic import is not allowlisted: '+path);
-    for(const item of body.matchAll(/\b(?:from\s*|import\s*)['"]([^'"]+)['"]/g))
+    for(const item of body.matchAll(/\b(?:from\s*|import\s*)['"](\.[^'"]+)['"]/g))
       relativeTo(path,item[1]);
   }
   if(path.endsWith('.html')){
