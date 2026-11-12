@@ -21,7 +21,9 @@ test('public Yunyu release is precisely 78 reviewed offline resources, no cloud/
   assert.match(index,/公开试玩版/);
   assert.match(index,/仅保存在当前浏览器/);
   assert.doesNotMatch(index,/cloud-preview\.html/);
-  assert.match(source('games/index.html'),/https:\/\/v1t0777\.github\.io\/tools\/merge\//);
+  assert.match(source('games/index.html'),/https:\/\/zhao-toolbox-secure\.pages\.dev\/merge\/index\.html/);
+  assert.match(index,/https:\/\/zhao-toolbox-secure\.pages\.dev\/merge\/index\.html\?mode=cloud/);
+  assert.doesNotMatch(index,/toolbox-auth\.js|cloud-preview\.mjs/);
 });
 test('every offline JS import, HTML script and local CSS path is in public manifest',()=>{
   const refs=[];
