@@ -137,3 +137,7 @@ html{-webkit-text-size-adjust:100%}
 
 /* iOS Safari: at least 16px on focusable select to avoid auto zoom. */
 @media(max-width:480px){.supply-select{font-size:16px}}
+
+/* Explicit opt-in to the secure, same-game Cloudflare cloud mode. */
+.cloud-entry-link{display:inline-flex;align-items:center;justify-content:center;margin:8px auto 14px;padding:12px 14px;min-height:44px;max-width:100%;border-radius:13px;border:1px solid #8bbaa9;background:#e1f2e8;color:#315a4c;font-size:12px;font-weight:800;text-decoration:none;line-height:1.5}
+.cloud-entry-link:focus-visible{outline:3px solid #547ec4;outline-offset:3px}

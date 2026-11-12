@@ -94,6 +94,8 @@ required_paths=(
   dist-secure/merge/index.html
   dist-secure/merge/cloud-preview.html
   dist-secure/merge/cloud-preview.mjs
+  dist-secure/merge/cloud-integrated-nav.mjs
+  dist-secure/merge/cloud-integrated.css
   dist-secure/merge/cloud/client-session.mjs
   dist-secure/merge/story.html
   dist-secure/merge/story-workshop.html
@@ -165,6 +167,8 @@ public_forbidden_paths=(
   dist-public/merge/cloud-preview.html
   dist-public/merge/cloud-preview.mjs
   dist-public/merge/cloud-preview.css
+  dist-public/merge/cloud-integrated-nav.mjs
+  dist-public/merge/cloud-integrated.css
 )
 for path in "${public_forbidden_paths[@]}"; do
   if [[ -e "$path" ]]; then
@@ -175,6 +179,20 @@ done
 
 if grep -RIlE 'toolbox-auth|tmxpueakxibsaakdyusn\.supabase\.co|sb_publishable_' dist-public >/dev/null; then
   echo "::error::Public Pages artifact contains Supabase authentication code or project configuration."
+  fail=1
+fi
+
+echo "== Integrated cloud mode origin isolation =="
+if ! grep -Fq 'id="cloud-suite"' dist-secure/merge/index.html ||
+   ! grep -Fq 'id="cloud-login-form"' dist-secure/merge/index.html ||
+   ! grep -Fq 'cloud-integrated-nav.mjs' dist-secure/merge/index.html; then
+  echo "::error::Unified secure game is missing its cloud login or navigation."
+  fail=1
+fi
+if grep -Fq 'id="cloud-suite"' dist-public/merge/index.html ||
+   grep -Fq 'cloud-preview.mjs' dist-public/merge/index.html ||
+   grep -Fq 'toolbox-auth.js' dist-public/merge/index.html; then
+  echo "::error::Public offline artifact unexpectedly includes authenticated code."
   fail=1
 fi
 

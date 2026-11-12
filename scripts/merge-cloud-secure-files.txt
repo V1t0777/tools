@@ -1,3 +1,5 @@
+merge/cloud-integrated-nav.mjs
+merge/cloud-integrated.css
 merge/cloud-preview.css
 merge/cloud-preview.html
 merge/cloud-preview.mjs

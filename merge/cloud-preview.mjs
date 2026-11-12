@@ -5,7 +5,10 @@ import {openStoryPersistence} from './story/indexeddb-persistence.mjs';
 import {openNormalPersistence} from './normal-indexeddb-persistence.mjs';
 import {createNormalMigrationManifest} from './cloud/normal-migration-review.mjs';
 
-const $=id=>document.getElementById(id);
+// The Cloudflare unified game embeds the private panel with namespaced IDs;
+// the standalone private beta retains its original IDs for compatibility.
+const idPrefix=document.getElementById('cloud-suite')?'cloud-':'';
+const $=id=>document.getElementById(idPrefix+id);
 const auth=window.ToolboxAuth;
 const game=$('game'),cloud=$('cloud'),story=$('story');
 let session=null,storySession=null,storyBackend=null,busy=false;
