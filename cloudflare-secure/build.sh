@@ -23,6 +23,8 @@ cp blackjack/index.html blackjack/app.js blackjack/style.css "$OUT/blackjack/"
 cp shared/toolbox-auth.js shared/toolbox-mfa.js shared/toolbox-ui.css shared/toolbox-motion.css shared/toolbox-ui.js "$OUT/shared/"
 cp shared/vendor/supabase-2.57.4.min.js shared/vendor/supabase-LICENSE "$OUT/shared/vendor/"
 cp holidays/*.json "$OUT/holidays/"
+# Explicit reviewed offline and four-account cloud resource closure.
+node scripts/build-merge-secure.mjs
 
 cp cloudflare-secure/index.html "$OUT/index.html"
 cp cloudflare-secure/_headers "$OUT/_headers"
