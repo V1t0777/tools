@@ -8,9 +8,11 @@
   <title>云屿百物铺 · 潮声初起</title>
   <link rel="stylesheet" href="./story/story.css">
   <script type="module" src="./story/ui.mjs"></script>
+  <link rel="stylesheet" href="./mobile-quick-nav.css">
+  <script type="module" src="./mobile-quick-nav.mjs"></script>
 </head>
 <body>
-<div class="story-shell">
+<div class="story-shell" id="mobile-top-anchor">
   <header class="top">
     <a class="back" href="./index.html" aria-label="返回百物铺普通经营模式">← 返回经营</a>
     <span class="eyebrow">ISLE CHRONICLES · STORY PREVIEW</span>
@@ -33,7 +35,7 @@
       <p class="muted">仅当剧情对白存档损坏时，可在确认后将原始记录导出到本机。导出不修复、不上传、不清除进度；请自行核对设备是否真正保存文件。</p>
       <button type="button" id="export-corrupt-story" class="quiet" disabled>导出异常剧情对白存档（仅本机）</button>
     </section>
-    <section class="progress" aria-label="主线进度">
+    <section class="progress" aria-label="主线进度" id="story-progress-anchor">
       <div class="progress-heading"><h2>百物手账</h2><span id="progress-count">0 / 12</span></div>
       <div class="track" role="progressbar" aria-label="主线完成进度" aria-valuemin="0" aria-valuemax="12" aria-valuenow="0" id="progress-track"><span id="progress-fill"></span></div>
       <p id="chapter-hint" class="chapter-hint">清晨，新的旅程将要开始。</p>
@@ -64,6 +66,11 @@
     </div>
   </main>
   <footer>剧情体验预览 · 非完整发行版本 · 后续篇章将通过独立故事包扩展</footer>
+  <nav class="mobile-quick-nav" aria-label="手机快速导航">
+    <button type="button" data-mobile-target="story-progress-anchor">▤ <span>进度</span></button>
+    <button type="button" data-mobile-target="entries-title">◈ <span>故事</span></button>
+    <button type="button" data-mobile-target="mobile-top-anchor">↑ <span>顶部</span></button>
+  </nav>
 </div>
 <dialog id="story-dialog" aria-labelledby="dialog-title">
   <div class="dialog-inner">
