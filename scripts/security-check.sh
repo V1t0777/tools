@@ -126,6 +126,9 @@ public_required_paths=(
   dist-public/snake/index.html
   dist-public/shared/toolbox-ui.css
   dist-public/.nojekyll
+  dist-public/merge/index.html
+  dist-public/merge/story.html
+  dist-public/merge/story-workshop.html
 )
 for path in "${public_required_paths[@]}"; do
   if [[ ! -f "$path" ]]; then
@@ -152,6 +155,10 @@ public_forbidden_paths=(
   dist-public/shared/toolbox-auth.js
   dist-public/shared/toolbox-mfa.js
   dist-public/shared/vendor
+  dist-public/merge/cloud
+  dist-public/merge/cloud-preview.html
+  dist-public/merge/cloud-preview.mjs
+  dist-public/merge/cloud-preview.css
 )
 for path in "${public_forbidden_paths[@]}"; do
   if [[ -e "$path" ]]; then

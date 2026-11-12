@@ -17,6 +17,8 @@ cp -R mokugyo/audio "$OUT/mokugyo/audio"
 cp mokugyo/index.html "$OUT/mokugyo/"
 cp snake/index.html "$OUT/snake/"
 cp shared/toolbox-ui.css shared/toolbox-motion.css shared/toolbox-ui.js "$OUT/shared/"
+# Public/offline-only Yunyu beta, with a closed, recursive 78-file allowlist.
+node scripts/build-merge-public.mjs
 touch "$OUT/.nojekyll"
 
 printf 'Public GitHub Pages artifact built at %s\n' "$OUT"
