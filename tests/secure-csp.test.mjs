@@ -21,6 +21,17 @@ test('external script tags are unchanged and are not hashed', () => {
   assert.throws(() => inlineHashes('<script src="x.js">ignored()</script>'), /inline content/);
 });
 
+test('reviewed local module tags do not change CSP and injected module attributes fail closed', () => {
+  assert.deepEqual(inlineHashes('<script type="module" src="./cloud-preview.mjs"></script>'), []);
+  assert.deepEqual(inlineHashes('<SCRIPT TYPE="MODULE" SRC="./story/workshop.mjs"></SCRIPT>'), []);
+  for (const markup of [
+    '<script type="module" src="https://evil.invalid/a.mjs"></script>',
+    '<script type="module" src="./safe.mjs" onload="alert(1)"></script>',
+    '<script type="module" src="./safe.mjs">alert(1)</script>',
+    '<script type="module" src="../escape.mjs"></script>'
+  ])assert.throws(()=>inlineHashes(markup), /attributes|inline content/);
+});
+
 test('unsupported or malformed script markup fails closed', () => {
   assert.throws(() => inlineHashes('<script type="module">hello()</script>'), /attributes/);
   assert.throws(() => inlineHashes('<script>unfinished'), /unsupported/);

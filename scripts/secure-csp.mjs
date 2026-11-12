@@ -28,6 +28,13 @@ export function inlineHashes(html, label = 'HTML') {
       if (body.trim()) throw new Error(`${label}: external script has inline content`);
       continue;
     }
+    // A reviewed local ES module entry is an external script, never inline JS.
+    // Explicitly reject absolute URLs, query strings, event handlers and all
+    // other attributes, including case-mixed variants.
+    if (/^\s+type="module"\s+src="\.\/[a-z0-9_\/-]+\.mjs"\s*$/i.test(attributes)) {
+      if (body.trim()) throw new Error(`${label}: module script has inline content`);
+      continue;
+    }
     if (attributes.trim()) throw new Error(`${label}: review new inline script attributes`);
     hashes.push(scriptHash(body));
   }

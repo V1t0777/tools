@@ -46,7 +46,7 @@ for(const path of paths){
   if(path==='merge/cloud-preview.html'){
     const scripts=[...data.matchAll(/<script\b[^>]*>/gi)].map(x=>x[0]);
     if(scripts.length!==2||
-      !scripts.some(x=>/^<script defer src="\.\.\/shared\/toolbox-auth\.js">$/i.test(x))||
+      !scripts.some(x=>/^<script src="\.\.\/shared\/toolbox-auth\.js" defer>$/i.test(x))||
       !scripts.some(x=>/^<script type="module" src="\.\/cloud-preview\.mjs">$/i.test(x))||
       /<script\b[^>]*>\s*[^\s<]+/i.test(data))
       throw Error('Unreviewed private cloud login script');
