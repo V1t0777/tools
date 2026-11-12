@@ -1,0 +1,59 @@
+name: One-time Yunyu integrated cloud production smoke
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  live-unified-game:
+    name: Verify live Cloudflare integrated page and public entry
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Validate production Cloudflare integrated game without credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          host=https://zhao-toolbox-secure.pages.dev
+          ok=0
+          for attempt in {1..30}; do
+            status=$(curl -sS -L --max-time 15 -o /tmp/yunyu-integrated.html -w '%{http_code}' "$host/merge/index.html?mode=cloud" || true)
+            if [[ "$status" == "200" ]] &&
+               grep -Fq 'id="cloud-suite"' /tmp/yunyu-integrated.html &&
+               grep -Fq 'id="cloud-login-form"' /tmp/yunyu-integrated.html &&
+               grep -Fq 'cloud-integrated-nav.mjs' /tmp/yunyu-integrated.html; then
+              ok=1;echo "New Cloudflare unified game verified on attempt $attempt";break
+            fi
+            echo "Cloudflare integrated rollout pending: attempt $attempt status $status"
+            sleep 10
+          done
+          [[ "$ok" == "1" ]] || { echo "::error::Cloudflare integrated game did not go live";exit 1; }
+          for asset in /merge/cloud-integrated-nav.mjs /merge/cloud-integrated.css /merge/cloud-preview.mjs /merge/cloud/client-session.mjs /shared/toolbox-auth.js; do
+            code=$(curl -sS -L --max-time 15 -o /dev/null -w '%{http_code}' "$host$asset")
+            [[ "$code" == "200" ]] || { echo "::error::Missing runtime $asset HTTP $code"; exit 1; }
+          done
+          echo "Integrated mode and private runtime HTTP 200 verified"
+      - name: Validate public game card and anonymous Edge access denial
+        shell: bash
+        run: |
+          set -euo pipefail
+          host=https://v1t0777.github.io/tools
+          ok=0
+          for attempt in {1..20}; do
+            code=$(curl -sS -L --max-time 15 -o /tmp/yunyu-games.html -w '%{http_code}' "$host/games/" || true)
+            if [[ "$code" == "200" ]] && grep -Fq 'https://zhao-toolbox-secure.pages.dev/merge/index.html' /tmp/yunyu-games.html; then
+              ok=1;echo "Public game entry verified";break
+            fi
+            sleep 10
+          done
+          [[ "$ok" == "1" ]] || { echo "::error::Public game card not updated"; exit 1; }
+          code=$(curl -sS -L --max-time 15 -o /tmp/yunyu-old.html -w '%{http_code}' "$host/merge/" || true)
+          [[ "$code" == "200" ]] || { echo "::error::Legacy Github offline save entry missing";exit 1; }
+          ! grep -Fq 'id="cloud-suite"' /tmp/yunyu-old.html || { echo "::error::Auth leaked to public origin";exit 1; }
+          root=https://tmxpueakxibsaakdyusn.supabase.co/functions/v1
+          for name in merge-game merge-story; do
+            code=$(curl -sS --max-time 15 -X POST -o /dev/null -w '%{http_code}' \
+              -H 'Content-Type: application/json' -d '{"mode":"read"}' "$root/$name")
+            [[ "$code" == "401" ]] || { echo "::error::Anonymous $name status $code";exit 1; }
+          done
+          echo "Public link, legacy local save, and Edge JWT boundaries verified"
