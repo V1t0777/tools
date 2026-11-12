@@ -1,3 +1,4 @@
+import './mobile-quick-nav.mjs';
 import { WIDTH, CELL_COUNT, MAX_ENERGY, ENERGY_REGEN_MS, CHAINS, createInitialState,
   moveOrMerge, produce, fulfillOrder, getItemIcon, getItemName,
   storeItem, withdrawItem, upgradeWarehouse, upgradeProducer, upgradeBuilding,

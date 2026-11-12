@@ -52,9 +52,9 @@ function cdp(url){
 test('mobile one-thumb nav is presentation-only and cannot write save bytes',()=>{
   const js=read('merge/mobile-quick-nav.mjs');
   const css=read('merge/mobile-quick-nav.css');
-  assert.doesNotMatch(js,/localStorage|indexedDB|setItem|\\.enqueue\\(|\\.execute\\(|\\.dispatchEvent\\(|\\.click\\(|\\.submit\\(|\\.pushState\\(|location\\.hash/);
+  assert.doesNotMatch(js,/localStorage|indexedDB|setItem|\.enqueue\(|\.execute\(|\.dispatchEvent\(|\.click\(|\.submit\(|\.pushState\(|location\.hash/);
   assert.match(js,/target\.scrollIntoView/);
-  assert.match(js,/target\.focus\\(\\{preventScroll:true\\}\\)/);
+  assert.match(js,/target\.focus\(\{preventScroll:true\}\)/);
   assert.match(js,/dialog\.open/);
   assert.match(js,/visualViewport/);
   assert.match(css,/@media\(max-width:600px\)/);
@@ -62,10 +62,15 @@ test('mobile one-thumb nav is presentation-only and cannot write save bytes',()=
   assert.match(css,/min-height:50px/);
   for(const path of ['merge/index.html','merge/story.html','merge/story-workshop.html']){
     const html=read(path);
-    assert.match(html,/mobile-quick-nav\.mjs/);
     assert.match(html,/mobile-quick-nav\.css/);
+    assert.doesNotMatch(html,/<script[^>]+src="\.\/mobile-quick-nav\.mjs"/);
     assert.match(html,/aria-label="手机快速导航"/);
   }
+  for(const [file,dep] of [
+    ['merge/main-locked.mjs',"import './mobile-quick-nav.mjs';"],
+    ['merge/story/ui.mjs',"import '../mobile-quick-nav.mjs';"],
+    ['merge/story/workshop.mjs',"import '../mobile-quick-nav.mjs';"]
+  ])assert.ok(read(file).includes(dep),'one runtime imports pure mobile helper');
 });
 
 test('real Chromium 320–430px thumb navigation, keyboard/dialog avoid and no game writes',

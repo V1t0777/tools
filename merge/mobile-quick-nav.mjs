@@ -5,7 +5,10 @@
  * change the URL/hash. Interactions only scroll and focus existing headings.
  * Never intercept gameplay touch/pointer events.
  */
-const bar=document.querySelector('.mobile-quick-nav');
+// Tiny DOM regression harnesses have no querySelector; navigation remains an
+// optional browser-only enhancement loaded by the single game runtime entry.
+const bar=typeof document!=='undefined'&&typeof document.querySelector==='function'
+  ?document.querySelector('.mobile-quick-nav'):null;
 if(bar){
   const buttons=[...bar.querySelectorAll('button[data-mobile-target]')];
   const targets=buttons.map(button=>document.getElementById(button.dataset.mobileTarget));

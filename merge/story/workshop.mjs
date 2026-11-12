@@ -1,3 +1,4 @@
+import '../mobile-quick-nav.mjs';
 import {WIDTH,MAX_ENERGY,CHAINS,getLevel,advanceTime,moveOrMerge,produce,fulfillOrder,storeItem,withdrawItem,upgradeWarehouse,getWarehouseUpgrade,upgradeBuilding,getItemIcon,getItemName,useSupply,purchaseSupply,SUPPLY_ITEMS} from '../engine.mjs';
 import {BUILDINGS} from '../economy.mjs';
 import {readStoryWorkshop,writeStoryWorkshop,STORY_WORKSHOP_KEY} from './workshop-storage.mjs';

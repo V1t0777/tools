@@ -9,7 +9,7 @@ test('mobile toast only mirrors status, cannot intercept touches or double-annou
   assert.match(js,/sourceNotice\.textContent\?\.trim\(\)/);
   assert.match(js,/new MutationObserver\(updateFeedback\)/);
   assert.match(css,/pointer-events:none/);
-  assert.doesNotMatch(js,/localStorage|indexedDB|setItem|\\.enqueue\\(|\\.execute\\(/);
+  assert.doesNotMatch(js,/localStorage|indexedDB|setItem|\.enqueue\(|\.execute\(/);
 });
 test('cloud read-only board navigation remains enabled while writes are blocked',()=>{
   const js=read('merge/cloud-preview.mjs');
@@ -17,5 +17,5 @@ test('cloud read-only board navigation remains enabled while writes are blocked'
   const part=js.slice(js.indexOf('function toggleControls()'),
     js.indexOf('function stateStatus('));
   assert.match(part,/if\(button\.id==='cloud-board-left'/);
-  assert.doesNotMatch(part,/\\.enqueue\\(|\\.flush\\(/);
+  assert.doesNotMatch(part,/\.enqueue\(|\.flush\(/);
 });
