@@ -1,3 +1,4 @@
+import '../mobile-quick-nav.mjs';
 import {CORE_STORY_PACK} from './core-pack.mjs';
 import {availableStoryEntries,completedStoryEntries,completeStoryEntry,startCoreStory,dailyStoryIncident,pinnedDailyStoryIncident,pinDailyStoryIncident} from './runtime.mjs';
 import {readStorySave} from './local-storage.mjs';

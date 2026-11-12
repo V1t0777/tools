@@ -43,3 +43,20 @@
 @media(prefers-reduced-motion:reduce){
   .mobile-quick-nav *{transition:none!important;animation:none!important}
 }
+
+/* Short-lived passive visual mirror of the existing #notice status.
+ * No duplicate aria-live announcements; taps pass THROUGH to gameplay. */
+.mobile-action-feedback{display:none}
+@media(max-width:600px){
+  .mobile-action-feedback:not([hidden]){
+    position:fixed;z-index:49;left:50%;
+    transform:translateX(-50%);bottom:calc(80px + env(safe-area-inset-bottom));
+    display:block;width:max-content;max-width:min(90vw,520px);
+    padding:10px 15px;border-radius:15px;
+    background:var(--ink);color:var(--card);
+    border:1px solid var(--line);box-shadow:0 6px 20px rgba(0,0,0,.17);
+    font-size:13px;font-weight:700;line-height:1.45;
+    text-align:center;overflow-wrap:anywhere;pointer-events:none;
+  }
+  .mobile-action-feedback[hidden]{display:none!important}
+}
