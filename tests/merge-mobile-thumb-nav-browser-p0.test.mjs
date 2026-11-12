@@ -136,8 +136,14 @@ test('real Chromium 320–430px thumb navigation, keyboard/dialog avoid and no g
       await until(()=>evaluate(x=>document.documentElement.clientWidth===x,width),
         'viewport '+width);
     }
-    await viewport(320);
+    // about:blank has no viewport meta and mobile emulation can report a
+    // 980px layout viewport until a real page supplies viewport-fit/width.
+    // Install device metrics first, navigate, then assert actual 320px width.
+    await call('Emulation.setDeviceMetricsOverride',{
+      width:320,height:740,deviceScaleFactor:3,mobile:true
+    },sessionId);
     await navigate('/merge/index.html');
+    await viewport(320);
     await until(()=>evaluate(()=>document.getElementById('save-status')?.textContent?.length>0),
       'normal mode loads');
     for(const width of [320,375,390,430]){
